@@ -1,7 +1,6 @@
 
 echo "Compiling eBPF program.."
 clang -O2 -target bpf -c packet-cloning.c -o packet-cloning.o
-#clang-6.0 -O2 -target bpf -Weverything -Wno-pedantic -o clone.o packet-cloning.c
 if [ $? -ne 0 ]; then
     echo "Compilation failed, aborting.."
     exit
@@ -70,9 +69,9 @@ sudo ip netns exec switch tc qdisc add dev eth0 clsact
 sudo ip netns exec switch tc qdisc add dev eth1 clsact
 sudo ip netns exec switch tc qdisc add dev eth2 clsact
 
-echo "Adding BPF prog to eth0 of switch"
-sudo nsenter --net=/var/run/netns/switch tc filter add dev eth0 ingress bpf da obj packet-cloning.o sec pktclone verbose
-
 sudo nsenter --net=/var/run/netns/switch tc filter add dev eth0 egress bpf da obj packet-cloning.o sec tc-egress verbose
 sudo nsenter --net=/var/run/netns/switch tc filter add dev eth1 egress bpf da obj packet-cloning.o sec tc-egress verbose
 sudo nsenter --net=/var/run/netns/switch tc filter add dev eth2 egress bpf da obj packet-cloning.o sec tc-egress verbose
+
+echo "Adding BPF prog to eth0 of switch"
+sudo nsenter --net=/var/run/netns/switch tc filter add dev eth0 ingress bpf da obj packet-cloning.o sec pktclone verbose

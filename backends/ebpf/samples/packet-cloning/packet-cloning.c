@@ -1,7 +1,7 @@
 
 #include <linux/bpf.h>
 #include <linux/pkt_cls.h>
-
+#include <bpf/bpf_helpers.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -44,15 +44,6 @@ struct bpf_elf_map {
       bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
   })
 
-static int (*bpf_trace_printk)(const char *fmt, int fmt_size, ...) =
-(void *) BPF_FUNC_trace_printk;
-static int (*bpf_clone_redirect)(void *ctx, int ifindex, int flags) =
-(void *) BPF_FUNC_clone_redirect;
-static int (*bpf_redirect)(int ifindex, int flags) =
-(void *) BPF_FUNC_redirect;
-static void *(*bpf_map_lookup_elem)(void *map, void *key) =
-(void *) BPF_FUNC_map_lookup_elem;
-
 /***
  * PACKET CLONING (CI2E) EXAMPLE START
  *
@@ -79,19 +70,20 @@ struct bpf_elf_map SEC("maps") clone_session_pairs = {
         .type = BPF_MAP_TYPE_HASH,
         .size_key = sizeof(__u32),
         .size_value = sizeof(struct egress_pair),
+        .flags = 0,
         .max_elem = MAX_PORTS * MAX_INSTANCES,  // only one element, because we use only one clone_session_id in the example.
         .pinning = 2,
-        .id = 3,
 };
 
 struct bpf_elf_map SEC("maps") clone_session_tbl = {
         .type = BPF_MAP_TYPE_HASH_OF_MAPS,
         .size_key = sizeof(__u16),
         .size_value = sizeof(__u32),
+        .flags = 0,
         .pinning = 2,
         .max_elem = 1,  // only one element, because we use only one clone_session_id in the example.
-        .inner_id = 3,
 };
+
 
 /*
  * This eBPF program implements PoC of simple packet clone scenario (CI2E) for PSA.
@@ -115,33 +107,29 @@ int pkt_clone(struct __sk_buff *skb)
        .clone_session_id = 3,
     };
 
-    void *data = (void *)(long)skb->data;
-    char fmt1[] = "\"Packet clone to port %d\n";
-    char fmt2[] = "Handling packet in the pktclone TC ingress. Ingress port = %d\n";
-
-    bpf_debug_printk("before clone\n");
     // This will be always true, but it shows generic condition to check if packet should be cloned by "Traffic Manager"
     if (meta.clone) {
-        bpf_debug_printk("In clone\n");
-        // TODO: implement map-in-map
-        void *inner_map = bpf_map_lookup_elem(&clone_session_tbl, &meta.clone_session_id);
+        struct bpf_elf_map *inner_map;
+        bpf_debug_printk("Looking for clone_session_id = %d\n", meta.clone_session_id);
+
+        inner_map = bpf_map_lookup_elem(&clone_session_tbl, &meta.clone_session_id);
         if (!inner_map) {
-            bpf_debug_printk("Inner map not found\n");
+            bpf_debug_printk("Unsupported ostd.clone_session_id value (bpf: inner map not found)\n");
             return TC_ACT_SHOT;
         }
+
+        bpf_debug_printk("Inner Map found\n");
 
         for (int i = 0; i < MAX_PORTS * MAX_INSTANCES; i++) {
             int idx = i;
             struct egress_pair *pair = (struct egress_pair *) bpf_map_lookup_elem(&clone_session_pairs, &idx);
-
             if (pair == NULL) {
                 bpf_debug_printk("No more pairs found, aborting\n");
                 // we don't have more pairs in the map, continue..
                 return TC_ACT_SHOT;
             }
 
-            bpf_debug_printk("Pair found (egress_port=%d)!\n", pair->egress_port);
-
+            bpf_debug_printk("Pair found, redirecting to egress_port=%d!\n", pair->egress_port);
             bpf_clone_redirect(skb, pair->egress_port, 0);
         }
         return TC_ACT_SHOT;
