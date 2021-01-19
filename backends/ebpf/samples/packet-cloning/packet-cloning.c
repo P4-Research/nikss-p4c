@@ -64,6 +64,9 @@ struct bpf_elf_map {
 struct egress_pair {
     uint32_t egress_port;
     uint16_t instance;
+    uint8_t  class_of_service;
+    uint8_t  truncate;
+    uint16_t packet_length_bytes;
 };
 
 struct bpf_elf_map SEC("maps") clone_session_pairs = {
@@ -72,17 +75,17 @@ struct bpf_elf_map SEC("maps") clone_session_pairs = {
         .size_value = sizeof(struct egress_pair),
         .max_elem = 2,
         .pinning = 2,
-        .id		= 3,
-        .inner_idx	= 3,
+        .id		= 1,
+        .inner_idx	= 1,
 };
 
 struct bpf_elf_map SEC("maps") clone_session_tbl = {
-        .type = BPF_MAP_TYPE_ARRAY_OF_MAPS,
+        .type = BPF_MAP_TYPE_HASH_OF_MAPS,
         .size_key = sizeof(__u32),
         .size_value = sizeof(__u32),
         .flags = 0,
         .pinning = 2,
-        .inner_id = 3,
+        .inner_id = 1,
         .max_elem = 32,
 };
 
@@ -106,7 +109,7 @@ int pkt_clone(struct __sk_buff *skb)
         uint32_t clone_session_id;
     } meta = {
        .clone = true,
-       .clone_session_id = 3,
+       .clone_session_id = 1,
     };
 
     // This will be always true, but it shows generic condition to check if packet should be cloned by "Traffic Manager"
@@ -119,18 +122,20 @@ int pkt_clone(struct __sk_buff *skb)
             return TC_ACT_SHOT;
         }
 
-        bpf_debug_printk("Inner Map found\n");
+        bpf_debug_printk("Clone Session with ID %d found.\n", meta.clone_session_id);
 
         for (int i = 0; i < MAX_PORTS * MAX_INSTANCES; i++) {
             int idx = i;
             struct egress_pair *pair = (struct egress_pair *) bpf_map_lookup_elem(inner_map, &idx);
             if (pair == NULL) {
-                bpf_debug_printk("No more pairs found, aborting\n");
+                bpf_debug_printk("No more clone session entries found, aborting\n");
                 // we don't have more pairs in the map, continue..
                 return TC_ACT_SHOT;
             }
 
-            bpf_debug_printk("Pair found, redirecting to egress_port=%d!\n", pair->egress_port);
+            bpf_debug_printk("Clone session entry found. Clone session parameters: class_of_service=%d\n",
+                             pair->class_of_service);
+            bpf_debug_printk("Redirecting to port %d\n", pair->egress_port);
             bpf_clone_redirect(skb, pair->egress_port, 0);
         }
         return TC_ACT_SHOT;
@@ -142,40 +147,6 @@ int pkt_clone(struct __sk_buff *skb)
 /***
  * PACKET CLONING (CI2E) EXAMPLE END
  */
-
-//#define MAX_MCAST_GROUPS 32
-//
-//struct mcast_member {
-//    uint32_t port;
-//    uint16_t instance;
-//};
-//
-//struct bpf_elf_map SEC("maps") mcast_group_members_map = {
-//        .type = BPF_MAP_TYPE_HASH,
-//        .size_key = sizeof(__u32),
-//        .size_value = sizeof(struct mcast_member),
-//        .flags = 0,
-//        .max_elem = MAX_PORTS * MAX_INSTANCES,
-//        .pinning = 2,
-//        .inner_idx = 0,
-//        .id = 0
-//};
-//
-//struct bpf_elf_map SEC("maps") multicast_tbl = {
-//        .type = BPF_MAP_TYPE_HASH_OF_MAPS,
-//        .size_key = sizeof(__u16),
-//        .size_value = sizeof(__u32),
-//        .flags = 0,
-//        .pinning = 2,
-//        .max_elem = MAX_MCAST_GROUPS,
-//        .inner_id = 0,
-//};
-//
-//SEC("mcast")
-//int multicast(struct __sk_buff *skb)
-//{
-//
-//}
 
 SEC("tc-egress")
 int tc_egress(struct __sk_buff *skb)
