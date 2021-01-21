@@ -1,6 +1,13 @@
-#include <uapi/linux/bpf.h>
-#include <uapi/linux/pkt_cls.h>
+#include <linux/bpf.h>
+#include <linux/in.h>
+#include <linux/if_ether.h>
+#include <linux/ip.h>
+#include <linux/icmp.h>
+#include <linux/pkt_cls.h>
+#include <linux/swab.h>
 #include <bpf/bpf_helpers.h>
+#include <bpf/bpf_endian.h>
+#include <inttypes.h>
 
 struct some_xdp_metadata
 {
@@ -8,7 +15,7 @@ struct some_xdp_metadata
 } __attribute__((aligned(4))); // metadata must be aligned to 4 bytes
 
 SEC("xdp_add_metadata")
-int _xdp_mark(struct xdp_md *ctx)
+int _xdp_ingress(struct xdp_md *ctx)
 {
     struct some_xdp_metadata *meta;
     void *data, *data_end;
@@ -36,7 +43,7 @@ int _xdp_mark(struct xdp_md *ctx)
 }
 
 SEC("tc_read_xdp_metadata")
-int _tc_mark(struct __sk_buff *ctx)
+int _tc_ingress(struct __sk_buff *ctx)
 {
     void *data = (void *)(unsigned long)ctx->data;
     void *data_end = (void *)(unsigned long)ctx->data_end;

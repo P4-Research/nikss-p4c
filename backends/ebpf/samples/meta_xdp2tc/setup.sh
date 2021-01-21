@@ -2,8 +2,6 @@
 
 echo "
     This will setup two network namespaces: machine-1 & machine-2
-    Machine-1 eth device will be setup to *encap* outgoing packets with a fixed MPLS header.
-    Machine-2 eth device will be setup to *decap* incoming packets with a fixed MPLS header.
     Make sure that you have tracing enabled so you'll see the debug if enabled.
     $ echo 1 > /sys/kernel/debug/tracing/tracing_on
     Once enabled you can do:
@@ -54,7 +52,7 @@ sudo ip netns exec machine-2 tc qdisc del dev eth0 clsact 2> /dev/null
 sudo ip netns exec machine-2 tc qdisc add dev eth0 clsact
 
 echo "Compiling eBPF program"
-clang -O2 -emit-llvm -c meta_xdp2tc.c -o - | llc -march=bpf -mcpu=probe -filetype=obj -o meta_xdp2tc.o
+clang -O2 -target bpf -c meta_xdp2tc.c -o meta_xdp2tc.o
 
 echo "Loading TC ingress program into machine-2"
 sudo nsenter --net=/var/run/netns/machine-2 tc filter add dev eth0 ingress bpf da obj meta_xdp2tc.o sec tc_read_xdp_metadata
@@ -63,6 +61,8 @@ sudo nsenter --net=/var/run/netns/machine-2 tc filter add dev eth0 ingress bpf d
 echo "Loading XDP ingress program into machine-2"
 sudo nsenter --net=/var/run/netns/machine-2 ip link set dev eth0 xdp off
 sudo nsenter --net=/var/run/netns/machine-2 ip link set dev eth0 xdp obj meta_xdp2tc.o sec xdp_add_metadata
+
+sleep 3
 
 echo "Pinging machine-2 from machine-1"
 sudo ip netns exec machine-1 ping -c 3 -I eth0 10.132.204.33
