@@ -27,36 +27,39 @@
 ### Example output
 
 ```markdown
-           <...>-48595   [008] ..s1 23843.259948: 0: ----------------------- NEW PACKET ---------------------------
-           <...>-48595   [008] ..s1 23843.259951: 0: ----------------------- XDP metadata (xdp_md) ---------------------------
-           <...>-48595   [008] ..s1 23843.259954: 0: xdp_md.data=955273472
-           <...>-48595   [008] ..s1 23843.259955: 0: xdp_md.data_end=955273570
-           <...>-48595   [008] ..s1 23843.259956: 0: xdp_md.data_meta=955273472
-           <...>-48595   [008] ..s1 23843.259957: 0: xdp_md.ingress_ifindex=59
-           <...>-48595   [008] ..s1 23843.259958: 0: xdp_md.rx_queue_index=0
-           <...>-48595   [008] ..s1 23843.259960: 0: bpf_ktime_get_ns=1889154915
-           <...>-48595   [008] ..s1 23843.259967: 0: ----------------------- TC metadata (sk_buff) ---------------------------
-           <...>-48595   [008] ..s1 23843.259968: 0: sk_buff.len=98
-           <...>-48595   [008] ..s1 23843.259969: 0: sk_buff.pkt_type=3
-           <...>-48595   [008] ..s1 23843.259970: 0: sk_buff.mark=0
-           <...>-48595   [008] ..s1 23843.259971: 0: sk_buff.queue_mapping=1
-           <...>-48595   [008] ..s1 23843.259972: 0: sk_buff.protocol=8
-           <...>-48595   [008] ..s1 23843.259973: 0: sk_buff.vlan_present=0
-           <...>-48595   [008] ..s1 23843.259974: 0: sk_buff.vlan_tci=0
-           <...>-48595   [008] ..s1 23843.259975: 0: sk_buff.vlan_proto=0
-           <...>-48595   [008] ..s1 23843.259975: 0: sk_buff.priority=0
-           <...>-48595   [008] ..s1 23843.259977: 0: sk_buff.ingress_ifindex=59
-           <...>-48595   [008] ..s1 23843.259978: 0: sk_buff.ifindex=59
-           <...>-48595   [008] ..s1 23843.259978: 0: sk_buff.tc_index=0
-           <...>-48595   [008] ..s1 23843.259979: 0: sk_buff.cb=1106162992
-           <...>-48595   [008] ..s1 23843.259980: 0: sk_buff.hash=0
-           <...>-48595   [008] ..s1 23843.259981: 0: sk_buff.tc_classid=0
-           <...>-48595   [008] ..s1 23843.259983: 0: sk_buff.data=955273472
-           <...>-48595   [008] ..s1 23843.259984: 0: sk_buff.data_end=955273570
-           <...>-48595   [008] ..s1 23843.259986: 0: sk_buff.napi_id=8228
-           <...>-48595   [008] ..s1 23843.259987: 0: sk_buff.data_meta=955273472
-           <...>-48595   [008] ..s1 23843.259988: 0: sk_buff.tstamp=1803767005
-           <...>-48595   [008] ..s1 23843.259989: 0: sk_buff.wire_len=84
-           <...>-48595   [008] ..s1 23843.259990: 0: sk_buff.gso_segs=0
-           <...>-48595   [008] ..s1 23843.259991: 0: bpf_ktime_get_ns=1889185463
+----------------------- NEW PACKET ---------------------------
+----------------------- XDP metadata (xdp_md) ---------------------------
+xdp_md.data=955273472
+xdp_md.data_end=955273570
+xdp_md.data_meta=955273472
+xdp_md.ingress_ifindex=59
+xdp_md.rx_queue_index=0
+bpf_ktime_get_ns=1889154915
+----------------------- TC metadata (sk_buff) ---------------------------
+sk_buff.len=98
+sk_buff.pkt_type=3              Packet classification used in delivering it (PACKET_HOST|PACKET_BROADCAST|PACKET_MULTICAST|PACKET_OTHERHOST)
+sk_buff.mark=0                  Generic packet mark
+sk_buff.queue_mapping=1
+sk_buff.protocol=8
+sk_buff.vlan_present=0
+sk_buff.vlan_tci=0
+sk_buff.vlan_proto=0
+sk_buff.priority=0
+sk_buff.ingress_ifindex=59
+sk_buff.ifindex=59
+sk_buff.tc_index=0              Result of the initial classification for later use in DSMARK process.
+                                Will be initially set by the DSMARK qdisc, retrieving it from the DS field in IP header of every received packet [link](https://lukasz.bromirski.net/docs/translations/lartc-pl.html#AEN2098)
+sk_buff.cb=1106162992           A free area of 48 bytes called control buffer ( cb ) is left for specific protocol layers necessities (that area can be used to pass info between protocol layers).
+                                TCP uses this, for example, to store sequence numbers and retransmission state for the frame.
+sk_buff.hash=0
+sk_buff.tc_classid=0            Traffic Control class ID. Indicates to what class the packet should be dispatched [link](https://qmonnet.github.io/whirl-offload/2020/04/11/tc-bpf-direct-action/)
+sk_buff.data=955273472
+sk_buff.data_end=955273570
+sk_buff.napi_id=8228            ID of the NAPI struct this skb came from. NAPI is a proven technique to improve network performance on Linux. 
+                                Drivers that support NAPI can disable the packet-reception interrupt most of the time and rely on the network stack to poll for new packets at a frequent interval.
+sk_buff.data_meta=955273472
+sk_buff.tstamp=1803767005
+sk_buff.wire_len=84
+sk_buff.gso_segs=0              Number of GSO data segments. (Generic Segmentation Offload reduces per-packet processing overhead) [link](https://doc.dpdk.org/guides/prog_guide/generic_segmentation_offload_lib.html)
+bpf_ktime_get_ns=1889185463
 ```
