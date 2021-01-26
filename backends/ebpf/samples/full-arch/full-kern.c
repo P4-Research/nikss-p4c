@@ -11,20 +11,49 @@
       bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
   })
 
-enum test_enum {
-    ONE,
-    TWO
+struct dummy_md {
+    __u8  pad[12];
+    __u16  ether_type;
 };
 
+// Simple user metadata
+struct user_metadata {
+    __u32  field1;
+    __u8   field2;
+} __attribute__((aligned(4)));
+
+struct Ethernet_h {
+    unsigned char	dst[6];	/* destination eth addr	*/
+    unsigned char	src[6];	/* source ether addr	*/
+    __u16		    ether_type;		/* packet type ID field	*/
+} __attribute__((aligned(4)));
+
 /*
- * Program implementing P4 Ingress pipeline that is expected to be attached to the XDP hook.
+ * The eBPF program for XDP is used to "prepare" packet for further processing by TC (e.g. it intialize global metadata).
  */
 SEC("xdp-ingress")
 int xdp_ingress(struct xdp_md *ctx)
 {
-    /// at the very beginning, we need to retrieve current timestamp
-    __u64 tstamp = bpf_ktime_get_ns();
+//    /// at the very beginning, we need to retrieve current timestamp
+//    __u64 tstamp = bpf_ktime_get_ns();
+//
+    void *data = (void *)(long)ctx->data;
+    void *data_end = (void *)(long)ctx->data_end;
+    if (bpf_xdp_adjust_head(ctx, -(int)sizeof(struct user_metadata))) {
+        return XDP_DROP;
+    }
+    data = (void *)(long)ctx->data;
+    data_end = (void *)(long)ctx->data_end;
+    struct dummy_md *dummy_md = data;
+    if (data + sizeof(struct dummy_md) > data_end) {
+        return XDP_DROP;
+    }
+    // the workaround to make TC protocol-independent
+    dummy_md->ether_type = bpf_htons(0x0800);
 
+    bpf_debug_printk("[XDP] Input md: port=%d", ctx->ingress_ifindex);
+
+    /// Store PSA global metadata right before passing it up to TC
     /// initialize PSA global metadata
     struct psa_global_metadata *meta;
     int ret = bpf_xdp_adjust_meta(ctx, -(int)sizeof(*meta));
@@ -36,50 +65,10 @@ int xdp_ingress(struct xdp_md *ctx)
     if (meta + 1 > ctx->data)
         return XDP_ABORTED;
 
-    struct psa_ingress_parser_input_metadata_t parser_in_md = {
-        .ingress_port = ctx->ingress_ifindex,
-        .packet_path = NORMAL,  /// in XDP, packet path will always be equal to NORMAL at the entry point
-    };
-    /*
-     * PARSER
-     */
-
-
-    /*
-     * CONTROL
-     */
-    struct psa_ingress_input_metadata_t input_md = {
-        .ingress_port = ctx->ingress_ifindex,
-        .packet_path = NORMAL,  /// in XDP, packet path will always be equal to NORMAL
-        .ingress_timestamp = tstamp,
-        .parser_error = NoError,
-    };
-
-    bpf_debug_printk("Input md: port=%d, packet_path=%d, ingress_timestamp=%lu",
-                     input_md.ingress_port, input_md.packet_path, input_md.ingress_timestamp);
-
-
-    struct psa_ingress_output_metadata_t out_md = {
-        .drop = true,  /// according to PSA spec, drop is initialized with true
-    };
-
-    out_md.multicast_group = 2;
-    out_md.egress_port = 4;
-
-    /// PROCESSING HERE
-
-    /*
-     * DEPARSER
-     */
-
-    /// Store PSA global metadata right before passing it up to TC
-    meta->multicast_group = out_md.multicast_group;
-    meta->egress_port = out_md.egress_port;
-    meta->class_of_service = out_md.class_of_service;
-    meta->clone_session_id = out_md.clone_session_id;
-    meta->clone = out_md.clone;
-    meta->drop = out_md.drop;
-
+    // We set packet path to NORMAL
+    meta->packet_path = NORMAL;
+    // As we use NORMAL, packet instance is set to 0
+    meta->instance = 0;
     return XDP_PASS;
 }
 
@@ -96,12 +85,14 @@ int tc_ingress(struct __sk_buff *skb)
 }
 
 /*
- * Program implementing P4 Packet Replication Enginer (PRE) that is expected to be attached to the TC hook.
+ * Program implementing P4 Ingress pipeline and Packet Replication Enginer (PRE) that is expected to be attached to the TC hook.
  */
 SEC("tc-pre")
 int tc_pre(struct __sk_buff *skb)
 {
     bpf_debug_printk("TC-PRE interface %d", skb->ifindex);
+    // TODO: helper introduces extra overhead. For now, we use skb->tstamp.
+    //__u64 tstamp = bpf_ktime_get_ns();
 
     /// Reading PSA global metadata that comes from XDP
     struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->data_meta;
@@ -109,15 +100,69 @@ int tc_pre(struct __sk_buff *skb)
     if (meta + 1 > skb->data)
         return TC_ACT_SHOT;
 
-    bpf_debug_printk("PSA global metadata in TC: mcast_grp=%d, egress_port=%d, drop=%d",
-                     meta->multicast_group, meta->egress_port, meta->drop);
+    bpf_debug_printk("PSA global metadata in TC: packet_path=%d, instance=%d",
+                     meta->packet_path, meta->instance);
 
-    // We set packet path to NORMAL_UNICAST
-    meta->packet_path = NORMAL_UNICAST;
-    // As we use NORMAL_UNICAST, packet instance is set to 0
-    meta->instance = 0;
+    struct psa_ingress_parser_input_metadata_t parser_in_md = {
+        .ingress_port = skb->ifindex,
+        .packet_path = NORMAL,  /// in XDP, packet path will always be equal to NORMAL at the entry point
+    };
 
-    return bpf_redirect(meta->egress_port, 0);
+    void *data_end = (void *)(long)skb->data_end;
+    void *data = (void *)(long)skb->data;
+    /*
+     * PARSER
+     */
+    struct Ethernet_h *eth = data + sizeof(struct dummy_md);
+    if (eth + 1 > data_end) {
+        return XDP_DROP;
+    }
+    bpf_debug_printk("[TC-Ingress] Read Ethernet header: src=%x, dst=%x, etherType=%x", eth->src[0], eth->dst[0], eth->ether_type);
+
+
+    /*
+     * CONTROL
+     */
+    struct psa_ingress_input_metadata_t input_md = {
+        .ingress_port = skb->ifindex,
+        .packet_path = meta->packet_path,
+        .ingress_timestamp = skb->tstamp,
+        .parser_error = NoError,
+    };
+
+    bpf_debug_printk("[TC-Ingress] Input md: port=%d, packet_path=%d, ingress_timestamp=%lu",
+                     input_md.ingress_port, input_md.packet_path, input_md.ingress_timestamp);
+
+    int ret = bpf_skb_change_head(skb, sizeof(struct user_metadata), 0);
+    if (ret) {
+        bpf_printk("Change head did not succeed!\n");
+        return TC_ACT_SHOT;
+    }
+
+    data = (void *)(long)skb->data;
+    data_end = (void *)(long)skb->data_end;
+    struct user_metadata *user_md = data;
+    // needed to pass verifier
+    if (user_md + 1 > data_end) {
+        return TC_ACT_SHOT;
+    }
+    user_md->field1 = 5;
+    user_md->field2 = 32;
+
+    struct psa_ingress_output_metadata_t out_md = {
+        .drop = true,  /// according to PSA spec, drop is initialized with true
+    };
+
+//    out_md.multicast_group = 2;
+    out_md.egress_port = 4;
+
+    /// PROCESSING HERE
+
+    /*
+     * DEPARSER
+     */
+
+    return bpf_redirect(out_md.egress_port, 0);
 }
 
 SEC("tc-egress")
@@ -132,6 +177,9 @@ int tc_egress(struct __sk_buff *skb)
     if (meta + 1 > skb->data)
         return TC_ACT_SHOT;
 
+    char *data_end = (char *) (unsigned long long) skb->data_end;
+    char *data = (char *) (unsigned long long) skb->data;
+
     /*
      * PARSER
      */
@@ -141,6 +189,28 @@ int tc_egress(struct __sk_buff *skb)
             .packet_path = meta->packet_path,
     };
     bpf_debug_printk("TC-Egress PARSER: packet_path=%d", parser_in_md.packet_path);
+
+    __u8 pkt_buf[100]; // fixed packet buffer
+    int ret = bpf_skb_load_bytes(skb, sizeof(struct user_metadata), pkt_buf, sizeof(struct Ethernet_h));
+    if (ret) {
+        bpf_printk("Ret load bytes: %d\n", ret);
+        return TC_ACT_SHOT;
+    }
+
+    struct user_metadata *user_md = data;
+    if (data + sizeof(struct user_metadata) >
+        data_end) {
+        return TC_ACT_SHOT;
+    }
+    bpf_debug_printk("Packet [length=%u] with metadata arrived with values: field: %d, field2: %d", skb->len, user_md->field1, user_md->field2);
+
+    struct Ethernet_h *eth = data + sizeof(*user_md);
+    if (eth + 1 > data_end) {
+        return XDP_DROP;
+    }
+    // print only the last byte of MAC address
+    bpf_debug_printk("[TC-Egress] Read Ethernet header: src=%x, dst=%x, etherType=%x", eth->src[0], eth->dst[0], eth->ether_type);
+
 
     /*
      * CONTROL
@@ -164,6 +234,20 @@ int tc_egress(struct __sk_buff *skb)
         .egress_port = skb->ifindex,
     };
 
+    bpf_debug_printk("skb protocol=%x", skb->protocol);
+    ret = bpf_skb_adjust_room(skb, -(int)sizeof(struct user_metadata), BPF_ADJ_ROOM_MAC, 0);
+    if (ret) {
+        bpf_debug_printk("Ret adjust: %d\n", ret);
+        return TC_ACT_SHOT;
+    }
+
+    ret = bpf_skb_store_bytes(skb, 0, pkt_buf, sizeof(struct Ethernet_h), 0);
+    if (ret) {
+        bpf_debug_printk("Ret store %d\n", ret);
+        return TC_ACT_SHOT;
+    }
+
+    bpf_debug_printk("Processing end");
     return TC_ACT_OK;
 }
 

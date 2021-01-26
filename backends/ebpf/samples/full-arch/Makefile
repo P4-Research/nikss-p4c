@@ -28,8 +28,6 @@ uninstall:
 	ip netns exec switch ip link del psa_cpu
 	for intf in $(INTERFACES) ; do \
 			ip netns exec switch ip link set dev $$intf xdp off ; \
-        	ip netns exec switch ip link set dev $$intf xdp off ; \
-        	ip netns exec switch ip link set dev $$intf xdp off ; \
         	ip netns exec switch tc filter del dev $$intf ingress ; \
         	ip netns exec switch tc filter del dev $$intf egress ; \
 	done
