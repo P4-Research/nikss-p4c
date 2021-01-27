@@ -36,8 +36,9 @@ struct bpf_elf_map SEC("maps") queue = {
 SEC("test_queue")
 int _test_queue(struct __sk_buff *skb)
 {
+    __u32 random_value = (bpf_get_prandom_u32() >> 24);
     struct digest value = {
-            .field1 = 5,
+            .field1 = random_value,
             .field2 = 6,
             .field3 = 7,
             .field4 = 8,
@@ -45,7 +46,7 @@ int _test_queue(struct __sk_buff *skb)
     int ret = bpf_map_push_elem(&queue, &value, BPF_EXIST);
 
     if (!ret) {
-        bpf_printk("Digest was sent: %d\n", value);
+        bpf_printk("Digest was sent: %u\n", value);
         return TC_ACT_OK;
     } else {
         bpf_printk("Some problems happened, code: %d\n", ret);

@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
         if (ret) {
             printf("Queue is empty, code: %d\n", ret);
         } else {
-            printf("Value from queue: %d\n", digest_value);
+            printf("Value from queue: %u\n", digest_value);
         }
         sleep(1);
     }
