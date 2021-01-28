@@ -5,6 +5,9 @@
 
 #include "psa.h"
 
+#define PSA_PORT_RECIRCULATE 134
+#define MAX_RESUBMIT_DEPTH 4
+
 #define bpf_debug_printk(fmt, ...)                               \
   ({                                                             \
       char ____fmt[] = fmt;                                      \
@@ -84,16 +87,10 @@ int tc_ingress(struct __sk_buff *skb)
     return TC_ACT_OK;
 }
 
-/*
- * Program implementing P4 Ingress pipeline and Packet Replication Enginer (PRE) that is expected to be attached to the TC hook.
- */
-SEC("tc-pre")
-int tc_pre(struct __sk_buff *skb)
-{
-    bpf_debug_printk("TC-PRE interface %d", skb->ifindex);
-    // TODO: helper introduces extra overhead. For now, we use skb->tstamp.
-    //__u64 tstamp = bpf_ktime_get_ns();
 
+
+static __always_inline int ingress(struct __sk_buff *skb, struct psa_ingress_output_metadata_t *out_md)
+{
     /// Reading PSA global metadata that comes from XDP
     struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->data_meta;
     // Check XDP gave us some data_meta (boundary check to pass verifier)
@@ -103,9 +100,17 @@ int tc_pre(struct __sk_buff *skb)
     bpf_debug_printk("PSA global metadata in TC: packet_path=%d, instance=%d",
                      meta->packet_path, meta->instance);
 
+    if (meta->packet_path == RECIRCULATE) {
+        bpf_debug_printk("Packet has been recirculated to port %d", skb->ifindex);
+        return TC_ACT_SHOT;
+    } else if (meta->packet_path == RESUBMIT) {
+        bpf_debug_printk("Packet has been resubmitted to port %d", skb->ifindex);
+        return TC_ACT_SHOT;
+    }
+
     struct psa_ingress_parser_input_metadata_t parser_in_md = {
-        .ingress_port = skb->ifindex,
-        .packet_path = NORMAL,  /// in XDP, packet path will always be equal to NORMAL at the entry point
+            .ingress_port = skb->ifindex,
+            .packet_path = NORMAL,  /// in XDP, packet path will always be equal to NORMAL at the entry point
     };
 
     void *data_end = (void *)(long)skb->data_end;
@@ -115,7 +120,7 @@ int tc_pre(struct __sk_buff *skb)
      */
     struct Ethernet_h *eth = data + sizeof(struct dummy_md);
     if (eth + 1 > data_end) {
-        return XDP_DROP;
+        return TC_ACT_SHOT;
     }
     bpf_debug_printk("[TC-Ingress] Read Ethernet header: src=%x, dst=%x, etherType=%x", eth->src[0], eth->dst[0], eth->ether_type);
 
@@ -124,10 +129,10 @@ int tc_pre(struct __sk_buff *skb)
      * CONTROL
      */
     struct psa_ingress_input_metadata_t input_md = {
-        .ingress_port = skb->ifindex,
-        .packet_path = meta->packet_path,
-        .ingress_timestamp = skb->tstamp,
-        .parser_error = NoError,
+            .ingress_port = skb->ifindex,
+            .packet_path = meta->packet_path,
+            .ingress_timestamp = skb->tstamp,
+            .parser_error = NoError,
     };
 
     bpf_debug_printk("[TC-Ingress] Input md: port=%d, packet_path=%d, ingress_timestamp=%lu",
@@ -149,18 +154,62 @@ int tc_pre(struct __sk_buff *skb)
     user_md->field1 = 5;
     user_md->field2 = 32;
 
-    struct psa_ingress_output_metadata_t out_md = {
-        .drop = true,  /// according to PSA spec, drop is initialized with true
-    };
+    /// Reading PSA global metadata that comes from XDP
+    meta = (struct psa_global_metadata *) skb->data_meta;
+    // Check XDP gave us some data_meta (boundary check to pass verifier)
+    if (meta + 1 > skb->data)
+        return TC_ACT_SHOT;
 
-//    out_md.multicast_group = 2;
-    out_md.egress_port = 4;
+    if (input_md.ingress_port == 2) {
+        bpf_printk("Packet came from interface 2, redirected to interface 4 (NORMAL UNICAST)");
+        out_md->egress_port = 4;
+    } else if (input_md.ingress_port == 3) {
+        bpf_printk("Packet came from interface 3, redirected to interface 3 (NORMAL UNICAST)");
+        out_md->egress_port = 3;
+    } else if (input_md.ingress_port == 4) {
+        bpf_printk("Packet came from interface 4, resubmitting (RESUBMIT)");
+        out_md->resubmit = true;
+        meta->packet_path = RESUBMIT;
+    }
+
 
     /// PROCESSING HERE
 
     /*
      * DEPARSER
      */
+    return TC_ACT_UNSPEC;
+}
+
+/*
+ * Program implementing P4 Ingress pipeline and Packet Replication Enginer (PRE) that is expected to be attached to the TC hook.
+ */
+SEC("tc-pre")
+int tc_pre(struct __sk_buff *skb)
+{
+    bpf_debug_printk("TC-PRE interface %d", skb->ifindex);
+
+    struct psa_ingress_output_metadata_t out_md = {
+            .drop = true,  /// according to PSA spec, drop is initialized with true
+    };
+
+    int i = 0;
+    int ret = TC_ACT_UNSPEC;
+    for (i = 0; i < MAX_RESUBMIT_DEPTH; i++) {
+        // FIXME: this is dummy solution, we need more advanced logic
+        out_md.resubmit = 0;
+        ret = ingress(skb, &out_md);
+        bpf_debug_printk("Returned from ingress(), code=%d, resubmit=%d", ret, out_md.resubmit);
+        if (out_md.resubmit == 0) {
+            bpf_debug_printk("No resubmit, continuing processing..");
+            break;
+        }
+    }
+
+    // if we ingress() function dropped or passed packet, we should accept this decision.
+    if (ret != TC_ACT_UNSPEC) {
+        return ret;
+    }
 
     return bpf_redirect(out_md.egress_port, 0);
 }
@@ -234,6 +283,10 @@ int tc_egress(struct __sk_buff *skb)
         .egress_port = skb->ifindex,
     };
 
+    if (input_md.egress_port == 3) {
+        dprsr_in_md.egress_port = PSA_PORT_RECIRCULATE;
+    }
+
     bpf_debug_printk("skb protocol=%x", skb->protocol);
     ret = bpf_skb_adjust_room(skb, -(int)sizeof(struct user_metadata), BPF_ADJ_ROOM_MAC, 0);
     if (ret) {
@@ -248,6 +301,17 @@ int tc_egress(struct __sk_buff *skb)
     }
 
     bpf_debug_printk("Processing end");
+
+    if (dprsr_in_md.egress_port == PSA_PORT_RECIRCULATE) {
+        struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->data_meta;
+        // Check XDP gave us some data_meta (boundary check to pass verifier)
+        if (meta + 1 > skb->data)
+            return TC_ACT_SHOT;
+        bpf_debug_printk("Redirecting to %d", PSA_PORT_RECIRCULATE);
+        meta->packet_path = RECIRCULATE;
+        return bpf_redirect(dprsr_in_md.egress_port, BPF_F_INGRESS);
+    }
+
     return TC_ACT_OK;
 }
 

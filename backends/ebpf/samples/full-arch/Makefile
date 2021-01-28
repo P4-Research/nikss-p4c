@@ -9,8 +9,8 @@ full.o: full-kern.c
 
 install: full.o
 	# Create PSA_PORT_RECIRCULATE
-	ip netns exec switch ip link add name psa_recirc type dummy
-	ip netns exec switch ip link set dev psa_recirc up
+	ip netns exec switch tc qdisc add dev psa_recirc clsact
+	ip netns exec switch tc filter add dev psa_recirc ingress bpf da obj full.o sec tc-pre verbose
 	# Create PSA_PORT_CPU
 	ip netns exec switch ip link add name psa_cpu type dummy
 	ip netns exec switch ip link set dev psa_cpu up
@@ -23,7 +23,7 @@ install: full.o
 
 uninstall:
 	# Delete PSA_PORT_RECIRCULATE
-	ip netns exec switch ip link del psa_recirc
+	ip netns exec switch tc filter del dev psa_recirc ingress
 	# Delete PSA_PORT_CPU
 	ip netns exec switch ip link del psa_cpu
 	for intf in $(INTERFACES) ; do \
