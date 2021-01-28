@@ -1,0 +1,96 @@
+#!/usr/bin/env python
+
+import logging
+import subprocess
+
+import ptf
+# from ptf import config
+# from ptf.mask import Mask
+import ptf.testutils as testutils
+from ptf.base_tests import BaseTest
+
+from scapy.layers.l2 import Ether
+
+logger = logging.getLogger('eBPFTest')
+if not len(logger.handlers):
+    logger.addHandler(logging.StreamHandler())
+
+PORT0 = 0
+PORT1 = 1
+PORT2 = 2
+ALL_PORTS = [PORT0, PORT1, PORT2]
+
+
+class EbpfTest(BaseTest):
+    switch_ns = 'test'
+    test_prog_image = 'generic.o' # default, if test case not specify program
+
+    def exec_ns_cmd(self, command='echo me'):
+        command = "ip netns exec " + self.switch_ns + " " + command
+        process = subprocess.Popen(command.split(),
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+        stdout_data, stderr_data = process.communicate()
+        if stderr_data is None:
+            stderr_data = ""
+        if stdout_data is None:
+            stdout_data = ""
+        if process.returncode != 0:
+            logger.info("Command failed: %s", command)
+            logger.info("Return code: %d", process.returncode)
+            logger.info("STDOUT: %s", stdout_data)
+            logger.info("STDERR: %s", stderr_data)
+            # TODO: Maybe we should raise an exception instead of silent fail?
+        return process.returncode
+
+    def add_port(self, dev, image):
+        self.exec_ns_cmd("ip link set dev {} xdp obj {} sec xdp-ingress".format(dev, image))
+        self.exec_ns_cmd("tc qdisc add dev {} clsact".format(dev))
+        self.exec_ns_cmd("tc filter add dev {} ingress bpf da obj {} sec tc-ingress".format(dev, image))
+        self.exec_ns_cmd("tc filter add dev {} egress bpf da obj {} sec tc-egress".format(dev, image))
+
+    def del_port(self, dev):
+        self.exec_ns_cmd("ip link set dev {} xdp off".format(dev))
+        self.exec_ns_cmd("tc qdisc del dev {} clsact".format(dev))
+
+    def setUp(self):
+        super(EbpfTest, self).setUp()
+        self.dataplane = ptf.dataplane_instance
+        self.dataplane.flush()
+
+        if "namespace" in testutils.test_params_get():
+            self.switch_ns = testutils.test_param_get("namespace")
+        logger.info("Using namespace: %s", self.switch_ns)
+        self.interfaces = testutils.test_param_get("interfaces").split(",")
+        logger.info("Using interfaces: %s", str(self.interfaces))
+
+        for intf in self.interfaces:
+            self.add_port(dev=intf, image=self.test_prog_image)
+
+    def tearDown(self):
+        for intf in self.interfaces:
+            self.del_port(intf)
+
+        super(EbpfTest, self).tearDown()
+
+
+class ResubmitTest(EbpfTest):
+    """
+    Test resubmit packet path. eBPF program should do following operation:
+    1. In NORMAL path: In all packet set source MAC to starts with '00:44'.
+        Test if destination MAC address ends with 'FF:F0' - in this case resubmit.
+    2. In RESUBMIT path destination MAC set to zero.
+    Open question: how to verify here that the eBPF program did above operations?
+    """
+    test_prog_image = 'samples/resubmit_test.o'
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55', eth_src='55:44:33:22:11:00')
+        testutils.send_packet(self, PORT0, str(pkt))
+        pkt[Ether].src = '00:44:33:22:11:00'
+        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+
+        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:FF:F0', eth_src='55:44:33:22:11:00')
+        testutils.send_packet(self, PORT0, str(pkt))
+        pkt[Ether].dst = '00:00:00:00:00:00'
+        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
