@@ -2,29 +2,21 @@
 
 if [ "x$1" = "x--help" ]; then
   echo -e "Usage: \n"
-  echo -e "\t $0 --help"
-  echo -e "\t $0 file.o\n"
-  echo -e "file.o should contain eBPF code for TC ingres, TC egress and XDP."
+  echo -e "\t $0 [--help]"
+  echo -e "Will execute PTF test and setup/cleanup environment."
   exit 0
 fi
 
 # Trace all command from this point
 set -x
 
-if [ "x$1" = "x" ]; then
-  echo "Image with switch code not given (first argument for $0)"
-  exit 1
-fi
-image="$1"
-
-add_port_to_switch() {
-  ip netns exec switch ip link set dev "$1" xdp obj "$2" sec xdp-ingress
-  ip netns exec switch tc qdisc add dev "$1" clsact
-  ip netns exec switch tc filter add dev "$1" ingress bpf da obj "$2" sec tc-ingress
-  ip netns exec switch tc filter add dev "$1" egress bpf da obj "$2" sec tc-egress
-}
+# make eBPF programs
+make -C samples
 
 declare -a INTERFACES=("eth0" "eth1" "eth2")
+# For PTF tests parameter
+interface_list=$( IFS=$','; echo "${INTERFACES[*]}" )
+# TODO: similar list with interfaces for ptf
 
 ip netns add switch
 
@@ -41,7 +33,6 @@ for intf in "${INTERFACES[@]}" ; do
   ip link add "s1-$intf" type veth peer name "$intf" netns switch
   ip netns exec switch ip link set "$intf" up
   ip link set dev "s1-$intf" up
-  add_port_to_switch "$intf" "$image"
 done
 
 silent_echo_conf() {
@@ -54,6 +45,7 @@ silent_echo_conf
 ptf \
   --relax `# Allows for other packets, especially injected by the system`\
   --test-dir ptf/ \
+  --test-params='interfaces="'"$interface_list"'";namespace="switch"' \
   --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2
 
 # cleanup
