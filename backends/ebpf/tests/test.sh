@@ -12,6 +12,9 @@ set -x
 
 # make eBPF programs
 make -C samples
+if [ $? -ne 0 ]; then
+  exit 1
+fi
 
 declare -a INTERFACES=("eth0" "eth1" "eth2")
 # For PTF tests parameter

@@ -23,7 +23,7 @@ ALL_PORTS = [PORT0, PORT1, PORT2]
 
 class EbpfTest(BaseTest):
     switch_ns = 'test'
-    test_prog_image = 'generic.o' # default, if test case not specify program
+    test_prog_image = 'generic.o'  # default, if test case not specify program
 
     def exec_ns_cmd(self, command='echo me'):
         command = "ip netns exec " + self.switch_ns + " " + command
