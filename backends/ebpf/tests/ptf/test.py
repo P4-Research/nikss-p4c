@@ -94,3 +94,27 @@ class ResubmitTest(EbpfTest):
         testutils.send_packet(self, PORT0, str(pkt))
         pkt[Ether].dst = '00:00:00:00:00:00'
         testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+
+
+class RecirculateTest(EbpfTest):
+    """
+    Test resubmit packet path. eBPF program should do following operation:
+    1. In NORMAL path: In all packet set source MAC to starts with '00:44'.
+        Test if destination MAC address ends with 'FE:F0' - in this case recirculate.
+    2. In RECIRCULATE path destination MAC set to zero.
+    Any packet modification should be done on egress.
+    Open question: how to verify here that the eBPF program did above operations?
+    """
+    test_prog_image = 'samples/recirculate_test.o'
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55', eth_src='55:44:33:22:11:00')
+        testutils.send_packet(self, PORT0, str(pkt))
+        pkt[Ether].src = '00:44:33:22:11:00'
+        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+
+        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:FE:F0', eth_src='55:44:33:22:11:00')
+        testutils.send_packet(self, PORT0, str(pkt))
+        pkt[Ether].dst = '00:00:00:00:00:00'
+        pkt[Ether].src = '00:44:33:22:11:00'
+        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
