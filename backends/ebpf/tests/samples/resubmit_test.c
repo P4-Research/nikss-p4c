@@ -1,11 +1,10 @@
-
 #include <linux/bpf.h>
 #include <linux/pkt_cls.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 
-// For Ethernet header
 #include <linux/if_ether.h>
+// For Ethernet header
 
 #define bpf_debug_printk(fmt, ...)                               \
   ({                                                             \

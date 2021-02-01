@@ -7,14 +7,19 @@ if [ "x$1" = "x--help" ]; then
   exit 0
 fi
 
+function exit_on_error() {
+      exit_code=$1
+      if [ $exit_code -ne 0 ]; then
+          exit $exit_code
+      fi
+}
+
 # Trace all command from this point
 set -x
 
 # make eBPF programs
 make -C samples
-if [ $? -ne 0 ]; then
-  exit 1
-fi
+exit_on_error $?
 
 declare -a INTERFACES=("eth0" "eth1" "eth2")
 # For PTF tests parameter
@@ -38,6 +43,16 @@ for intf in "${INTERFACES[@]}" ; do
   ip netns exec switch ip link set "$intf" up
   ip link set dev "s1-$intf" up
 done
+
+sysctl -w net.ipv6.conf.default.disable_ipv6=1
+sysctl -w net.ipv6.conf.all.disable_ipv6=1
+sysctl -w net.ipv6.conf.all.autoconf=0
+sysctl -w net.ipv6.conf.all.accept_ra=0
+
+ip netns exec switch sysctl -w net.ipv6.conf.default.disable_ipv6=1
+ip netns exec switch sysctl -w net.ipv6.conf.all.disable_ipv6=1
+ip netns exec switch sysctl -w net.ipv6.conf.all.autoconf=0
+ip netns exec switch sysctl -w net.ipv6.conf.all.accept_ra=0
 
 silent_echo_conf() {
   echo "Switch configuration:"
