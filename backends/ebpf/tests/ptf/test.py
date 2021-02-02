@@ -26,7 +26,7 @@ class EbpfTest(BaseTest):
     test_prog_image = 'generic.o'  # default, if test case not specify program
 
     def exec_ns_cmd(self, command='echo me'):
-        command = "ip netns exec " + self.switch_ns + " " + command
+        command = "nsenter --net=/var/run/netns/" + self.switch_ns + " " + command
         process = subprocess.Popen(command.split(),
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
@@ -118,3 +118,21 @@ class RecirculateTest(EbpfTest):
         pkt[Ether].dst = '00:00:00:00:00:00'
         pkt[Ether].src = '00:44:33:22:11:00'
         testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+
+class PacketCloningTest(EbpfTest):
+    """
+    1. Send packet destined to MAC address equals to 'ff:ff:ff:ff:ff:ff'.
+    2. Verify that packet has been cloned to PORT1 and PORT2.
+    """
+
+    # NOTE: you need to invoke `make` from ../samples/full-arch/ before.
+    test_prog_image = '../samples/full-arch/full.o'
+    user_space_cmd = '../samples/full-arch/a.out'
+    def runTest(self):
+        self.exec_ns_cmd("{} session-add-member 1 5 1 1".format(self.user_space_cmd))
+        self.exec_ns_cmd("{} session-add-member 1 6 1 1".format(self.user_space_cmd))
+
+        pkt = testutils.simple_ip_packet(eth_dst='ff:ff:ff:ff:ff:ff', eth_src='55:44:33:22:11:00')
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packets(self, str(pkt), [PORT1, PORT2])
+

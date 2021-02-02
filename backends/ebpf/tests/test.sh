@@ -45,6 +45,16 @@ silent_echo_conf() {
 } 2> /dev/null
 silent_echo_conf
 
+sysctl -w net.ipv6.conf.default.disable_ipv6=1
+sysctl -w net.ipv6.conf.all.disable_ipv6=1
+sysctl -w net.ipv6.conf.all.autoconf=0
+sysctl -w net.ipv6.conf.all.accept_ra=0
+
+ip netns exec switch sysctl -w net.ipv6.conf.default.disable_ipv6=1
+ip netns exec switch sysctl -w net.ipv6.conf.all.disable_ipv6=1
+ip netns exec switch sysctl -w net.ipv6.conf.all.autoconf=0
+ip netns exec switch sysctl -w net.ipv6.conf.all.accept_ra=0
+
 # Start tests
 ptf \
   --relax `# Allows for other packets, especially injected by the system`\

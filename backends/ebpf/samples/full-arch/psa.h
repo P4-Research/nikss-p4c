@@ -109,4 +109,12 @@ struct psa_global_metadata {
     EgressInstance_t                            instance;  /// set by PRE, read by Egress
 } __attribute__((aligned(4)));
 
+struct clone_session_entry {
+    __u32 egress_port;
+    __u16 instance;
+    __u8  class_of_service;
+    __u8  truncate;
+    __u16 packet_length_bytes;
+};
+
 #endif //P4C_PSA_H
