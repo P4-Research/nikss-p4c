@@ -154,7 +154,6 @@ static __always_inline int ingress(struct __sk_buff *skb, struct psa_ingress_out
 
     bpf_debug_printk("PSA global metadata in TC: packet_path=%d, instance=%d",
                      meta->packet_path, meta->instance);
-    bpf_printk("Size of global md = %d", sizeof(*meta));
 
     if (meta->packet_path == RECIRCULATE) {
         bpf_debug_printk("Packet has been recirculated to port %d", skb->ifindex);
@@ -213,6 +212,10 @@ static __always_inline int ingress(struct __sk_buff *skb, struct psa_ingress_out
         bpf_printk("Packet came from interface 4, resubmitting (RESUBMIT)");
         out_md->resubmit = true;
         meta->packet_path = RESUBMIT;
+    } else if (input_md.ingress_port == 5 && eth->dst[0] == 0xaa && eth->dst[5] == 0xff) {
+        bpf_printk("Packet came from interface 5, redirected to interface 5 (NORMAL UNICAST)");
+        out_md->egress_port = 5;
+        out_md->drop = false;
     }
 
     /// PROCESSING HERE
@@ -292,7 +295,7 @@ deparser: {
 SEC("tc-ingress")
 int tc_pre(struct __sk_buff *skb)
 {
-    bpf_debug_printk("TC-PRE interface %d", skb->ifindex);
+    bpf_debug_printk("TC-Ingress interface %d", skb->ifindex);
 
     struct psa_ingress_output_metadata_t out_md = {
             .drop = true,  /// according to PSA spec, drop is initialized with true
@@ -337,7 +340,7 @@ int tc_egress(struct __sk_buff *skb)
             .egress_port = skb->ifindex,
             .packet_path = meta->packet_path,
     };
-    bpf_printk("TC-Egress PARSER: interface=%d, packet_path=%d", skb->ifindex, parser_in_md.packet_path);
+    bpf_printk("TC-Egress PARSER: interface=%d, packet_path=%d, len=%u", skb->ifindex, parser_in_md.packet_path, skb->len);
 
     if (parser_in_md.packet_path == CLONE_I2E) {
         bpf_printk("Packet cloned I2E");
@@ -345,22 +348,22 @@ int tc_egress(struct __sk_buff *skb)
     }
 
     __u8 pkt_buf[100]; // fixed packet buffer
-    int ret = bpf_skb_load_bytes(skb, sizeof(struct user_metadata), pkt_buf, sizeof(struct Ethernet_h));
+    // FIXME: 108 is set as constant, it needs to be fixed when parser/deparser will be implemented.
+    int ret = bpf_skb_load_bytes(skb, sizeof(struct user_metadata), pkt_buf, 108-sizeof(struct user_metadata));
     if (ret) {
         bpf_printk("Ret load bytes: %d\n", ret);
         return TC_ACT_SHOT;
     }
 
     struct user_metadata *user_md = data;
-    if (data + sizeof(struct user_metadata) >
-        data_end) {
+    if (data + sizeof(struct user_metadata) > data_end) {
         return TC_ACT_SHOT;
     }
     bpf_debug_printk("Packet [length=%u] with metadata arrived with values: field: %d, field2: %d", skb->len, user_md->field1, user_md->field2);
 
     struct Ethernet_h *eth = data + sizeof(*user_md);
     if (eth + 1 > data_end) {
-        return XDP_DROP;
+        return TC_ACT_SHOT;
     }
     // print only the last byte of MAC address
     bpf_debug_printk("[TC-Egress] Read Ethernet header: src=%x, dst=%x, etherType=%x", eth->src[0], eth->dst[0], eth->ether_type);
@@ -379,7 +382,51 @@ int tc_egress(struct __sk_buff *skb)
     };
 
     bpf_debug_printk("TC-Egress CTRL: egress_timestamp=%lu, instance=%d", input_md.egress_timestamp, input_md.instance);
-    struct psa_egress_output_metadata_t out_md = { };
+    struct psa_egress_output_metadata_t out_md = {
+        .clone = false,
+        .drop = false,
+    };
+
+    if (meta->packet_path != CLONE_E2E && eth->dst[0] == 0xaa && eth->dst[5] == 0xff) {
+        out_md.clone = true;
+        out_md.clone_session_id = 1;
+    }
+
+    if (out_md.clone) {
+        struct bpf_elf_map *inner_map;
+        bpf_printk("[CLONE] Looking for clone_session_id = %d\n", out_md.clone_session_id);
+        inner_map = bpf_map_lookup_elem(&clone_session_tbl, &out_md.clone_session_id);
+        if (!inner_map) {
+            bpf_debug_printk("[CLONE] Unsupported ostd.clone_session_id value (bpf: inner map not found)\n");
+            return TC_ACT_SHOT;
+        }
+        bpf_debug_printk("[CLONE]  Clone Session with ID %d found.\n", out_md.clone_session_id);
+
+        // FIXME: this method to iterate over map is buggy (issues when deleting from the head of list).
+        for (int i = 0; i < CLONE_SESSION_MAX_ENTRIES; i++) {
+            int idx = i;
+            struct clone_session_entry *entry = (struct clone_session_entry *) bpf_map_lookup_elem(inner_map, &idx);
+            if (entry == NULL) {
+                bpf_debug_printk("[CLONE]  No more clone session entries found, aborting\n");
+                // we don't have more pairs in the map, continue..
+                goto drop;
+            }
+            bpf_debug_printk("[CLONE]  Clone session entry found. Clone session parameters: class_of_service=%d\n",
+                             entry->class_of_service);
+            bpf_debug_printk("[CLONE] Redirecting to port %d\n", entry->egress_port);
+            meta->packet_path = CLONE_E2E;
+            int ret = bpf_clone_redirect(skb, entry->egress_port, 0);
+            if (ret != 0) {
+                bpf_printk("[CLONE] Clone to port %d failed", entry->egress_port);
+            }
+        }
+    }
+
+drop:
+    if (out_md.drop) {
+        bpf_printk("Dropping packet received on interface %d", skb->ifindex);
+        return TC_ACT_SHOT;
+    }
 
     /*
      * DEPARSER
@@ -392,20 +439,32 @@ int tc_egress(struct __sk_buff *skb)
         dprsr_in_md.egress_port = PSA_PORT_RECIRCULATE;
     }
 
-    bpf_debug_printk("skb protocol=%x", skb->protocol);
     ret = bpf_skb_adjust_room(skb, -(int)sizeof(struct user_metadata), BPF_ADJ_ROOM_MAC, 0);
     if (ret) {
         bpf_debug_printk("Ret adjust: %d\n", ret);
         return TC_ACT_SHOT;
     }
 
-    ret = bpf_skb_store_bytes(skb, 0, pkt_buf, sizeof(struct Ethernet_h), 0);
+    // FIXME: 108 is set as constant, it needs to be fixed when parser/deparser will be implemented.
+    ret = bpf_skb_store_bytes(skb, 0, pkt_buf, 108-sizeof(struct user_metadata), 0);
     if (ret) {
         bpf_debug_printk("Ret store %d\n", ret);
         return TC_ACT_SHOT;
     }
 
-    bpf_debug_printk("Processing end");
+    if (parser_in_md.packet_path == CLONE_E2E) {
+        data_end = (char *) (unsigned long long) skb->data_end;
+        data = (char *) (unsigned long long) skb->data;
+        bpf_printk("Packet cloned E2E");
+        struct Ethernet_h *eth = data;
+        if (eth + 1 > data_end) {
+            return TC_ACT_SHOT;
+        }
+        __builtin_memset(eth->dst, 0, 6);
+        eth->dst[5] = 0x11;
+    }
+
+    bpf_debug_printk("Processing end, sending packet out of interface %d", dprsr_in_md.egress_port);
 
     if (dprsr_in_md.egress_port == PSA_PORT_RECIRCULATE) {
         struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->data_meta;
