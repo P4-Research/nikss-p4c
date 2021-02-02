@@ -42,14 +42,14 @@ for intf in "${INTERFACES[@]}" ; do
   ip link add "s1-$intf" type veth peer name "$intf" netns switch
   ip netns exec switch ip link set "$intf" up
   ip link set dev "s1-$intf" up
+
+  # Disable trash traffic
+  sysctl -w net.ipv6.conf."s1-$intf".disable_ipv6=1
+  sysctl -w net.ipv6.conf."s1-$intf".autoconf=0
+  sysctl -w net.ipv6.conf."s1-$intf".accept_ra=0
 done
 
-sysctl -w net.ipv6.conf.default.disable_ipv6=1
-sysctl -w net.ipv6.conf.all.disable_ipv6=1
-sysctl -w net.ipv6.conf.all.autoconf=0
-sysctl -w net.ipv6.conf.all.accept_ra=0
-
-ip netns exec switch sysctl -w net.ipv6.conf.default.disable_ipv6=1
+# Disable trash traffic
 ip netns exec switch sysctl -w net.ipv6.conf.all.disable_ipv6=1
 ip netns exec switch sysctl -w net.ipv6.conf.all.autoconf=0
 ip netns exec switch sysctl -w net.ipv6.conf.all.accept_ra=0

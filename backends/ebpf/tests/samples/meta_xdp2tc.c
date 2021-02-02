@@ -109,7 +109,7 @@ int tc_egress(struct __sk_buff *ctx)
 {
     void *data = (void *) (unsigned long) ctx->data;
     void *data_end = (void *) (unsigned long) ctx->data_end;
-    struct user_metadata *meta = data;
+    struct user_metadata *meta = data + sizeof(struct dummy_md);
 
     if (meta + 1 > data_end) {
         return TC_ACT_SHOT;

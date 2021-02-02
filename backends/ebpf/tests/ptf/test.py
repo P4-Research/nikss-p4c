@@ -126,23 +126,6 @@ class RecirculateTest(EbpfTest):
         testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
 
 
-class UserMetadata(Packet):
-    name = "UserMetadata"
-    fields_desc = [IntField("field1", 0),
-                   ByteField("field2", 0),
-                   ByteField("field3", 0),
-                   ByteField("field4", 0),
-                   ByteField("global_metadata_ok", 0)]
-
-
-class DummyMetadata(Packet):
-    name = "DummyMetadata"
-    fields_desc = [IntField("field1", 0),
-                   IntField("field2", 0),
-                   IntField("field3", 0),
-                   ShortField("ether_type", 0)]
-
-
 class MetadataXdpTcTest(EbpfTest):
     """
     Test global and user metadata consists of three phases:
@@ -152,9 +135,25 @@ class MetadataXdpTcTest(EbpfTest):
     """
     test_prog_image = 'samples/meta_xdp2tc.o'
 
+    class UserMetadata(Packet):
+        name = "UserMetadata"
+        fields_desc = [IntField("field1", 0),
+                       ByteField("field2", 0),
+                       ByteField("field3", 0),
+                       ByteField("field4", 0),
+                       ByteField("global_metadata_ok", 0)]
+
+    class DummyMetadata(Packet):
+        name = "DummyMetadata"
+        fields_desc = [IntField("field1", 0),
+                       IntField("field2", 0),
+                       IntField("field3", 0),
+                       ShortField("ether_type", 0)]
+
     def runTest(self):
         pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55', eth_src='55:44:33:22:11:00')
         testutils.send_packet(self, PORT0, str(pkt))
-        pkt_with_metadata = DummyMetadata(ether_type=0x0800) / UserMetadata(field1=11, field2=2, field3=3, field4=4,
-                                                                            global_metadata_ok=255) / pkt
+        pkt_with_metadata = MetadataXdpTcTest.DummyMetadata(ether_type=0x0800) / MetadataXdpTcTest.UserMetadata(
+            field1=11, field2=2, field3=3, field4=4,
+            global_metadata_ok=255) / pkt
         testutils.verify_packet_any_port(self, str(pkt_with_metadata), ALL_PORTS)
