@@ -1,25 +1,42 @@
 # Overview
 
-The general design of PSA for eBPF is depicted in Figure below.
+The general design of PSA for eBPF is depicted in Figure below. For more details (sample implementation) please refer to 
+[PoC of target architecture](../samples/full-arch).
 
 ![alt text](figures/p4c-ebpf-psa.png "Design of PSA for eBPF")
 
 The PSA program is decomposed into several eBPF programs that are intended to be attached to various hook points in the Linux kernel.
 
-- `xdp-ingress` - The PSA Ingress pipeline (composed of Parser, Control block and Deparser) is attached to the XDP hook. The rationale is that 
-many packets can be discarded at the lowest level if the Ingress Parser does not support a packet header. 
-- `tc-ingress` - The PSA Egress pipeline (composed of Parser, Control block and Deparser) is attached to the TC Egress hook. As there is no 
-XDP hook in the Egress path, the use of TC is mandatory for the egress processing. However, there is no direct path between XDP 
-in the Ingress and the TC Egress hookpoint. Therefore, we introduce the another eBPF program in the TC Ingress.
-- `tc-egress` - In the TC Ingress, the so-called "Traffic Manager" eBPF program is attached. The role of this program is to redirect traffic between
-the Ingress (XDP) and Egress (TC). It is also responsible for packet cloning and sending packet to CPU (if `Digest` extern is used).
+- `xdp-helper` - the "helper" program attached to the XDP hookpoint. The role of the `xdp-helper` program is to prepare
+a packet for further processing in the TC subsystem. It might be also used to optimize performance by offloading ingress 
+packet processing to XDP, but it can be done only for some P4 programs. 
+- `tc-ingress` - In the TC Ingress, the P4 Ingress pipeline as well as so-called "Traffic Manager" eBPF program is attached. 
+The Ingress pipeline is composed of Parser, Control block and Deparser. The details of Parser, Control block and Deparser implementation
+will be explained further in this document. The same eBPF program in TC contains also the Traffic Manager. 
+The role of Traffic Manager is to redirect traffic between the Ingress (TC) and Egress (TC). 
+It is also responsible for packet cloning and sending packet to CPU (if `Digest` extern is used). 
+- `tc-egress` - The PSA Egress pipeline (composed of Parser, Control block and Deparser) is attached to the TC Egress hook. As there is no 
+XDP hook in the Egress path, the use of TC is mandatory for the egress processing.
+
+# Rationale behind the current design
+
+- The PSA specification differs from TNA or v1model in how the packets are processed after ingress processing is complete. 
+There is the following sequence of operations: `clone() -> drop() -> resubmit() -> multicast() -> unicast()`. However, in case of
+`clone()` and `resubmit()` a packet that is passed to these methods should be an unmodified, original packet. It causes the need to 
+perform deparsing after (at least) `clone()` is be performed. This forces us to place the P4 Ingress pipeline in the TC Ingress hookpoint
+and combine the P4 Ingress and Traffic Manager in the same eBPF program for TC. 
+- To make packet recirculation possible, we assume there will be at least one "special" interface created called `PSA_PORT_RECIRCULATE`.
+This port will have both Ingress and Egress pipelines attached to the TC hookpoint. Packets recirculated in the Egress will be send
+to this port.
 
 # Packet paths
 
 ## NFP (Normal Packet From Port)
 
-Packet arriving on an interface is intercepted in the XDP hook by the `xdp-ingress` program. It performs the Ingress processing and 
-further processing path is determined by `standard_metadata` fields.
+Packet arriving on an interface is intercepted in the XDP hook by the `xdp-helper` program. It performs some pre-processing and 
+packet is passed for further processing to the TC ingress. Note that there is no P4-related processing done in the `xdp-helper` program. 
+
+By default, a packet is further passed to the TC subsystem. It is done by `XDP_PASS` action and packet is further handled by `tc-ingress` program.
 
 ## bypass_egress
 
@@ -28,18 +45,28 @@ further processing path is determined by `standard_metadata` fields.
 The purpose of this packet path is to send packet directly to the egress port, skipping the egress processing.
 It can be done explicitly (in case of TNA by setting `bypass_egress` flag) or implicitly enforced by a compiler to improve performance.
 
-In the XDP hook, it is implemented by using `XDP_REDIRECT` or `XDP_TX` action. 
+In the XDP hook, it is implemented by using `XDP_REDIRECT` or `XDP_TX` action. However, it may be applied only in very limited number of cases.
+For example, if there is no egress processing implemented in the P4 program and packet cloning is not performed either.
 
 ## Resubmit
 
 The purpose of `RESUBMIT` is to transfer packet processing back to the Ingress Parser from Ingress Deparser.
 
-**TBD-1** It is for further study how to implement packet resubmission. 
+We implement packet resubmission by calling main `ingress()` function in a loop. The `MAX_RESUBMIT_DEPTH` variable specifies
+maximum number of resubmit operations. The `resubmit` flag defines whether the `tc-ingress` program should enter next iteration (resubmit)
+or break the loop. Pseudocode:
 
-## From Ingress Pipeline to Traffic Manager
-
-By default, a packet is further passed to the TC subsystem. It is done by `XDP_PASS` action and packet is further handled by `tc-ingress` program.
-Note that user metadata and standard metadata must be passed to the `tc-ingress` program. 
+```c
+int i = 0;
+int ret = TC_ACT_UNSPEC;
+for (i = 0; i < MAX_RESUBMIT_DEPTH; i++) {
+    out_md.resubmit = 0;
+    ret = ingress(skb, &out_md);
+    if (out_md.resubmit == 0) {
+        break;
+    }
+}
+```
 
 ## NU (Normal Unicast), NM (Normal Multicast), CI2E (Clone Ingress to Egress)
 
@@ -57,7 +84,8 @@ From the eBPF program's perspective, `bpf_clone_redirect()` must be invoked in t
 
 CE2E refers to process of copying a packet that was handled by the Egress pipeline and resubmitting the cloned packet to the Egress Parser.
 
-**TBD-2** It is for further study how to implement CE2E. 
+CE2E is implemented by invoking `bpf_clone_redirect()` helper in the Egress path. Output ports are determined based on the 
+`clone_session_id` and lookup to "clone_session" BPF map, which is shared among TC ingress and egress (eBPF subsystem allows for map sharing between programs). 
 
 ## Sending packet to CPU
 
@@ -74,7 +102,8 @@ the packet is forwarded via Traffic Manager to the Egress pipeline and then, sen
 
 The `Digest` extern causes a packet to be "digested" from the packet processing to CPU. `Digest` can be used in the Deparser
 of the Ingress pipeline. A packet that has been "digested" is passed to CPU. In the context of eBPF, it is implemented by 
-returnin `TC_ACT_OK` from the `tc-ingress` program causing a packet to be sent for the normal processing to the Network stack. 
+using the BPF map of type `BPF_MAP_QUEUE`. The `tc-ingress` program constructs structure to be digested and inserts it to the
+queue map. Digest message can be further read by a control plane application.
 
 ## NTP (Normal packet to port)
 
@@ -85,18 +114,11 @@ The egress port is determined in the Ingress pipeline and is not changed in the 
 
 The purpose of `RECIRC` is to transfer packet processing back from Egress Deparser to the Ingress Parser.
 
-**TBD-3** It is for further study how to implement packet recirculation. 
+In order to implement `RECIRC` we assume the existence of `PSA_PORT_RECIRCULATE`. Therefore, recirculation is simply performed by
+invoking `bpf_redirect()` to the `PSA_PORT_RECIRCULATE` port with `BPF_F_INGRESS` flag to enforce processing a packet by the Ingress pipeline. 
 
 # Metadata
 
-**TBD-4** Describe how metadata (standard or user) is passed in the eBPF subsystem. 
-
-# Architecture exemptions
-
-1. The XDP metadata does not contain `tstamp` field. Therefore, if `ingress_timestamp` is used in a P4 program the Ingress pipeline
-**must** be moved from XDP to TC.
-
-2. This if for further study, but if recirculation is used the control cannot be passed back from TC to XDP. Therefore, the Ingress pipeline
-implementation must exists in the TC ingress and in case recirculation is used, the TC-hooked Ingress pipeline handles recirculated packet.
-
+There are some global metadata defined for the PSA architecture. For example, `packet_path` must be shared among different pipelines.
+To share a global metadata between pipelines we will use `skb->cb` (control buffer), which gives us 20B that are free to use.
 
