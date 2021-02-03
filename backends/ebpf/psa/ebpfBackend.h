@@ -14,23 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef _BACKENDS_EBPF_EBPFOPTIONS_H_
-#define _BACKENDS_EBPF_EBPFOPTIONS_H_
+#ifndef _BACKENDS_EBPF_PSA_EBPFBACKEND_H_
+#define _BACKENDS_EBPF_PSA_EBPFBACKEND_H_
 
-#include <getopt.h>
-#include "frontends/common/options.h"
+#include "backends/ebpf/ebpfOptions.h"
+#include "backends/ebpf/ebpfObject.h"
+#include "ir/ir.h"
+#include "frontends/p4/evaluator/evaluator.h"
 
+namespace EBPF_PSA {
 
-class EbpfOptions : public CompilerOptions {
- public:
-    // read from json
-    bool loadIRFromJson = false;
-    // Externs generation
-    bool emitExterns = false;
-    bool archPSA = false;
-    EbpfOptions();
-};
+void run_ebpf_backend(const EbpfOptions& options, const IR::ToplevelBlock* toplevel,
+                      P4::ReferenceMap* refMap, P4::TypeMap* typeMap);
 
-using EbpfContext = P4CContextWithOptions<EbpfOptions>;
+}  // namespace EBPF_PSA
 
-#endif /* _BACKENDS_EBPF_EBPFOPTIONS_H_ */
+#endif /* _BACKENDS_EBPF_PSA_EBPFBACKEND_H_ */

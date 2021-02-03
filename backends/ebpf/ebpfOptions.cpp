@@ -20,4 +20,7 @@ EbpfOptions::EbpfOptions() {
         registerOption("--emit-externs", nullptr,
                 [this](const char*) { emitExterns = true; return true; },
                 "[ebpf back-end] Allow for user-provided implementation of extern functions.");
+        registerOption("--arch-psa", nullptr,
+                       [this](const char*) { archPSA = true; return true; },
+                       "[ebpf back-end] Choose if you compile to PSA eBPF architecture.");
 }

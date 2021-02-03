@@ -34,6 +34,7 @@ set (P4C_EBPF_SRCS
   ebpfModel.cpp
   midend.cpp
   lower.cpp
+  psa/ebpfBackend.cpp
   )
 
 set (P4C_EBPF_HDRS
@@ -50,6 +51,7 @@ set (P4C_EBPF_HDRS
   midend.h
   target.h
   lower.h
+  psa/ebpfBackend.h
   )
 
 add_cpplint_files(${CMAKE_CURRENT_SOURCE_DIR} "${P4C_EBPF_SRCS};${P4C_EBPF_HDRS}")
