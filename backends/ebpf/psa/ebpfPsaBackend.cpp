@@ -14,20 +14,67 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+#include "backends/bmv2/psa_switch/psaSwitch.h"
 #include "lib/error.h"
 #include "lib/nullstream.h"
 #include "frontends/p4/evaluator/evaluator.h"
 
-#include "ebpfPsaBackend.h"
 #include "backends/ebpf/target.h"
 #include "backends/ebpf/ebpfType.h"
-#include "backends/ebpf/ebpfProgram.h"
+#include "backends/ebpf/psa/ebpfPsaProgram.h"
+
+#include "ebpfPsaBackend.h"
 
 namespace EBPF_PSA {
 
-    void run_ebpf_backend(const EbpfOptions &options, const IR::ToplevelBlock *toplevel,
+    void run_ebpf_backend(const EbpfOptions &options, const IR::ToplevelBlock *tlb,
                           P4::ReferenceMap *refMap, P4::TypeMap *typeMap) {
-        
+        CHECK_NULL(tlb);
+        BMV2::PsaProgramStructure structure(refMap, typeMap);
+        auto parsePsaArch = new BMV2::ParsePsaArchitecture(&structure);
+        auto main = tlb->getMain();
+        if (!main)
+            return;
+
+        if (main->type->name != "PSA_Switch")
+            ::warning(ErrorType::WARN_INVALID,
+                      "%1%: the main package should be called PSA_Switch"
+                      "; are you using the wrong architecture?",
+                      main->type->name);
+
+        main->apply(*parsePsaArch);
+        auto program = tlb->getProgram();
+
+        EBPF::Target* target;
+        if (options.target.isNullOrEmpty() || options.target == "kernel") {
+            target = new EBPF::KernelSamplesTarget();
+        } else if (options.target == "test") {
+            target = new EBPF::TestTarget();
+        } else {
+            // curently we don't support more for PSA
+            ::error(ErrorType::ERR_UNKNOWN,
+                    "Unknown target %s; legal choices are 'bcc', 'kernel', and test", options.target);
+            return;
+        }
+
+        EBPF::EBPFTypeFactory::createFactory(typeMap);
+        auto ebpfprog = new EBPFPsaProgram(options, program, refMap, typeMap, structure);
+        if (!ebpfprog->build())
+            return;
+
+        if (options.outputFile.isNullOrEmpty())
+            return;
+
+        cstring cfile = options.outputFile;
+        auto cstream = openFile(cfile, false);
+        if (cstream == nullptr)
+            return;
+
+        EBPF::CodeBuilder c(target);
+        // instead of generating two files, put all the code in a single file
+        ebpfprog->emit(&c);
+        *cstream << c.toString();
+        cstream->flush();
     }
 
 }  // namespace EBPF_PSA
