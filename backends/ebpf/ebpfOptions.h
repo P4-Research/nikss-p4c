@@ -27,7 +27,6 @@ class EbpfOptions : public CompilerOptions {
     bool loadIRFromJson = false;
     // Externs generation
     bool emitExterns = false;
-    bool archPSA = false;
     EbpfOptions();
 };
 

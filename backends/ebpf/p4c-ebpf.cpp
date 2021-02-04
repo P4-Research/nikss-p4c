@@ -35,7 +35,7 @@ limitations under the License.
 #include "ir/json_loader.h"
 #include "fstream"
 
-#include "backends/ebpf/psa/ebpfBackend.h"
+#include "backends/ebpf/psa/ebpfPsaBackend.h"
 
 void compile(EbpfOptions& options) {
     auto hook = options.getDebugHook();
@@ -84,7 +84,7 @@ void compile(EbpfOptions& options) {
     if (::errorCount() > 0)
         return;
 
-    if (options.archPSA) {
+    if (options.arch == "psa") {
         EBPF_PSA::run_ebpf_backend(options, toplevel, &midend.refMap, &midend.typeMap);
     } else {
         EBPF::run_ebpf_backend(options, toplevel, &midend.refMap, &midend.typeMap);
