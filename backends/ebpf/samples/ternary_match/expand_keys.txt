@@ -1,0 +1,11 @@
+# Row format:
+#   key action_data
+# where key is in the form of binary string, where wildcards bits are replaced with '*',
+# action_data is just a number(s).
+# Empty lines are ignored. Comments are allowed, but line have to be started with '#'
+# Priority of entries is in order of appearance.
+
+0 1
+*0* 2
+1*0* 3
+1*1* 4

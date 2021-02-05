@@ -1,7 +1,7 @@
 
 default: all
 
-all: naive
+all: naive expand
 
 naive: naive_kern.o
 
@@ -11,6 +11,16 @@ naive_kern.o: naive_kern.c
 load_naive: naive_kern.o
 	ip netns exec test0 tc qdisc add dev veth1 clsact
 	ip netns exec test0 tc filter add dev veth1 ingress bpf da obj naive_kern.o sec tc-ingress verbose
+
+expand: expand_kern.o expand_user.cpp
+	clang++ --std=c++14 -Wall -Wextra -Wno-unused-parameter -O2 -g -lbpf -o expand expand_user.cpp
+
+expand_kern.o: expand_kern.c
+	clang -target bpf -Wall -Wextra -Wno-unused-parameter -O3 -g -c -o expand_kern.o expand_kern.c
+
+load_expand: expand_kern.o
+	nsenter --net=/var/run/netns/test0 tc qdisc add dev veth1 clsact
+	nsenter --net=/var/run/netns/test0 tc filter add dev veth1 ingress bpf da obj expand_kern.o sec tc-ingress verbose
 
 unload_poc:
 	ip netns exec test0 tc qdisc del dev veth1 clsact || true
@@ -32,6 +42,6 @@ cleanup_env:
 
 clean:
 	rm -f *.o || true
-	rm -f naive_user || true
+	rm -f expand || true
 
-.PHONY: unload_poc read_logs setup_env cleanup_env clean naive
+.PHONY: unload_poc read_logs setup_env cleanup_env clean
