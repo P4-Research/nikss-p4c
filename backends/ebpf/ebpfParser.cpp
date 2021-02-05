@@ -370,7 +370,7 @@ void EBPFParserState::emit(CodeBuilder* builder) {
     state->apply(visitor);
 }
 
-EBPFParser::EBPFParser(const EBPFProgram* program, const IR::ParserBlock* block,
+EBPFParser::EBPFParser(const EBPFProgram* program, const IR::P4Parser* block,
                        const P4::TypeMap* typeMap) :
         program(program), typeMap(typeMap), parserBlock(block),
         packet(nullptr), headers(nullptr), headerType(nullptr) {}
@@ -391,7 +391,7 @@ void EBPFParser::emitDeclaration(CodeBuilder* builder, const IR::Declaration* de
 
 
 void EBPFParser::emit(CodeBuilder* builder) {
-    for (auto l : parserBlock->container->parserLocals)
+    for (auto l : parserBlock->parserLocals)
         emitDeclaration(builder, l);
     for (auto s : states)
         s->emit(builder);
@@ -407,7 +407,7 @@ void EBPFParser::emit(CodeBuilder* builder) {
 }
 
 bool EBPFParser::build() {
-    auto pl = parserBlock->container->type->applyParams;
+    auto pl = parserBlock->type->applyParams;
     if (pl->size() != 2) {
         ::error(ErrorType::ERR_EXPECTED,
                 "Expected parser to have exactly 2 parameters");
@@ -417,7 +417,7 @@ bool EBPFParser::build() {
     auto it = pl->parameters.begin();
     packet = *it; ++it;
     headers = *it;
-    for (auto state : parserBlock->container->states) {
+    for (auto state : parserBlock->states) {
         auto ps = new EBPFParserState(state, this);
         states.push_back(ps);
     }

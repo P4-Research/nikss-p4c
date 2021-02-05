@@ -21,7 +21,7 @@ limitations under the License.
 
 #include "backends/ebpf/target.h"
 #include "backends/ebpf/ebpfType.h"
-#include "backends/ebpf/psa/ebpfPsaProgram.h"
+#include "backends/ebpf/psa/ebpfPsaArch.h"
 
 #include "ebpfPsaBackend.h"
 
@@ -45,22 +45,30 @@ namespace EBPF_PSA {
         main->apply(*parsePsaArch);
         auto program = tlb->getProgram();
 
+        auto convertToEbpfPSA = new ConvertToEbpfPSA(options, tlb,structure, refMap, typeMap);
+        PassManager psaPasses = {
+                new BMV2::DiscoverStructure(&structure),
+                new BMV2::InspectPsaProgram(refMap, typeMap, &structure),
+                // convert to EBPF objects
+                convertToEbpfPSA,
+        };
+        psaPasses.addDebugHook(options.getDebugHook(), true);
+        program = program->apply(psaPasses);
+
         EBPF::Target* target;
         if (options.target.isNullOrEmpty() || options.target == "kernel") {
             target = new EBPF::KernelSamplesTarget();
         } else if (options.target == "test") {
             target = new EBPF::TestTarget();
         } else {
-            // curently we don't support more for PSA
+            // currently we don't support more for PSA
             ::error(ErrorType::ERR_UNKNOWN,
                     "Unknown target %s; legal choices are 'bcc', 'kernel', and test", options.target);
             return;
         }
 
         EBPF::EBPFTypeFactory::createFactory(typeMap);
-        auto ebpfprog = new EBPFPsaProgram(options, program, refMap, typeMap, structure);
-        if (!ebpfprog->build())
-            return;
+
 
         if (options.outputFile.isNullOrEmpty())
             return;
@@ -71,8 +79,9 @@ namespace EBPF_PSA {
             return;
 
         EBPF::CodeBuilder c(target);
+        auto psaArchForEbpf = convertToEbpfPSA->getPSAArchForEBPF();
         // instead of generating two files, put all the code in a single file
-        ebpfprog->emit(&c);
+        psaArchForEbpf->emit(&c);
         *cstream << c.toString();
         cstream->flush();
     }

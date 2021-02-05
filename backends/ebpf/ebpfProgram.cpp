@@ -42,7 +42,7 @@ bool EBPFProgram::build() {
     auto pb = pack->getParameterValue(model.filter.parser.name)
                       ->to<IR::ParserBlock>();
     BUG_CHECK(pb != nullptr, "No parser block found");
-    parser = new EBPFParser(this, pb, typeMap);
+    parser = new EBPFParser(this, pb->container, typeMap);
     bool success = parser->build();
     if (!success)
         return success;

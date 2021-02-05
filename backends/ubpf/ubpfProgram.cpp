@@ -40,7 +40,7 @@ namespace UBPF {
         auto pb = pack->getParameterValue(model.pipeline.parser.name)
                 ->to<IR::ParserBlock>();
         BUG_CHECK(pb != nullptr, "No parser block found");
-        parser = new UBPFParser(this, pb, typeMap);
+        parser = new UBPFParser(this, pb->container, typeMap);
         success = parser->build();
         if (!success)
             return success;

@@ -72,7 +72,6 @@ class EBPFProgram : public EBPFObject {
     }
 
  protected:
-    virtual void emitGeneratedComment(CodeBuilder* builder);
     virtual void emitPreamble(CodeBuilder* builder);
     virtual void emitTypes(CodeBuilder* builder);
     virtual void emitHeaderInstances(CodeBuilder* builder);
@@ -80,6 +79,7 @@ class EBPFProgram : public EBPFObject {
     virtual void emitPipeline(CodeBuilder* builder);
 
  public:
+    virtual void emitGeneratedComment(CodeBuilder* builder);
     virtual void emitH(CodeBuilder* builder, cstring headerFile);  // emits C headers
     virtual void emitC(CodeBuilder* builder, cstring headerFile);  // emits C program
 };
