@@ -49,7 +49,9 @@ set (P4C_EBPF_SRCS
   ../bmv2/common/programStructure.cpp
   ../bmv2/psa_switch/psaSwitch.cpp
   psa/ebpfPsaBackend.cpp
-  psa/ebpfPsaProgram.cpp
+  psa/ebpfPsaArch.cpp
+  psa/ebpfPipeline.cpp
+  psa/ebpfPsaParser.cpp
   )
 
 set (P4C_EBPF_HDRS
@@ -89,7 +91,9 @@ set (P4C_EBPF_HDRS
   ../bmv2/common/sharedActionSelectorCheck.h
   ../bmv2/psa_switch/psaSwitch.h
   psa/ebpfPsaBackend.h
-  psa/ebpfPsaProgram.h
+  psa/ebpfPsaArch.h
+  psa/ebpfPipeline.h
+  psa/ebpfPsaParser.h
   )
 
 add_cpplint_files(${CMAKE_CURRENT_SOURCE_DIR} "${P4C_EBPF_SRCS};${P4C_EBPF_HDRS}")

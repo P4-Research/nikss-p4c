@@ -471,7 +471,7 @@ void UBPFParser::emit(EBPF::CodeBuilder *builder) {
 }
 
 bool UBPFParser::build() {
-    auto pl = parserBlock->container->type->applyParams;
+    auto pl = parserBlock->type->applyParams;
     size_t numberOfArgs = UBPFModel::instance.numberOfParserArguments();
     if (pl->size() != numberOfArgs) {
         ::error(ErrorType::ERR_EXPECTED,
@@ -483,7 +483,7 @@ bool UBPFParser::build() {
     packet = *it; ++it;
     headers = *it; ++it;
     metadata = *it;
-    for (auto state : parserBlock->container->states) {
+    for (auto state : parserBlock->states) {
         auto ps = new UBPFParserState(state, this);
         states.push_back(ps);
     }
