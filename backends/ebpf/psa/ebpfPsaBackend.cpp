@@ -45,6 +45,7 @@ namespace EBPF_PSA {
         main->apply(*parsePsaArch);
         auto program = tlb->getProgram();
 
+        EBPF::EBPFTypeFactory::createFactory(typeMap);
         auto convertToEbpfPSA = new ConvertToEbpfPSA(options, tlb,structure, refMap, typeMap);
         PassManager psaPasses = {
                 new BMV2::DiscoverStructure(&structure),
@@ -66,9 +67,6 @@ namespace EBPF_PSA {
                     "Unknown target %s; legal choices are 'bcc', 'kernel', and test", options.target);
             return;
         }
-
-        EBPF::EBPFTypeFactory::createFactory(typeMap);
-
 
         if (options.outputFile.isNullOrEmpty())
             return;
