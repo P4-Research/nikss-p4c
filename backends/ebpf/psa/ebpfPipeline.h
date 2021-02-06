@@ -12,13 +12,14 @@ namespace EBPF_PSA {
  */
 class EBPFPipeline : public EBPF::EBPFProgram {
  public:
+    const cstring name;
     // TODO: add deparser
     //EBPFDeparser* deparser;
 
-    EBPFPipeline(const EbpfOptions& options, const IR::ToplevelBlock* toplevel, const IR::P4Program* program,
+    EBPFPipeline(cstring name, const EbpfOptions& options, const IR::ToplevelBlock* toplevel, const IR::P4Program* program,
                  P4::ReferenceMap* refMap, P4::TypeMap* typeMap) :
-                 EBPF::EBPFProgram(options, program, refMap, typeMap, toplevel) {
-
+                 EBPF::EBPFProgram(options, program, refMap, typeMap, toplevel), name(name) {
+        functionName = name;
     }
 
     void emit(EBPF::CodeBuilder* builder);

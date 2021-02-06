@@ -70,7 +70,7 @@ void KernelSamplesTarget::emitLicense(Util::SourceCodeBuilder* builder, cstring 
 
 void KernelSamplesTarget::emitCodeSection(
     Util::SourceCodeBuilder* builder, cstring sectionName) const {
-    builder->appendFormat("SEC(\"prog\")\n", sectionName.c_str());
+    builder->appendFormat("SEC(\"%s\")\n", sectionName.c_str());
 }
 
 void KernelSamplesTarget::emitMain(Util::SourceCodeBuilder* builder,

@@ -1,5 +1,6 @@
 #include "ebpfPsaArch.h"
 #include "ebpfPsaParser.h"
+#include "ebpfPsaControl.h"
 
 namespace EBPF_PSA {
 
@@ -38,12 +39,14 @@ void PSAArch::emit(EBPF::CodeBuilder *builder) const {
     /*
      * 7. XDP helper program.
      */
-    // tcIngressProgram->emit()
+    tcIngress->emit(builder);
 
     /*
      * 8. TC Egress program.
      */
-    // tcEgressProgram->emit()
+    tcEgress->emit(builder);
+
+    builder->target->emitLicense(builder, xdp->license);
 }
 
 const PSAArch * ConvertToEbpfPSA::build(IR::P4Program *prog) {
@@ -61,7 +64,7 @@ const PSAArch * ConvertToEbpfPSA::build(IR::P4Program *prog) {
     BUG_CHECK(ingressDeparser != nullptr, "No ingress deparser block found");
 
     auto ingress_pipeline_converter =
-           new ConvertToEbpfPipeline(options, ingressParser, ingressControl, ingressDeparser, refmap, typemap);
+           new ConvertToEbpfPipeline("tc_ingress", options, ingressParser, ingressControl, ingressDeparser, refmap, typemap);
     prog->apply(*ingress_pipeline_converter);
     auto tcIngress = ingress_pipeline_converter->getEbpfPipeline();
 
@@ -76,7 +79,7 @@ const PSAArch * ConvertToEbpfPSA::build(IR::P4Program *prog) {
     BUG_CHECK(egressDeparser != nullptr, "No egress deparser block found");
 
     auto egress_pipeline_converter =
-            new ConvertToEbpfPipeline(options, egressParser, egressControl, egressDeparser, refmap, typemap);
+            new ConvertToEbpfPipeline("tc_egress", options, egressParser, egressControl, egressDeparser, refmap, typemap);
     prog->apply(*egress_pipeline_converter);
     auto tcEgress = egress_pipeline_converter->getEbpfPipeline();
 
@@ -91,15 +94,14 @@ const IR::Node * ConvertToEbpfPSA::preorder(IR::P4Program *prog) {
 
 // =====================EbpfPipeline=============================
 EBPFPipeline * ConvertToEbpfPipeline::build(const IR::P4Program *prog) {
-    auto pipeline = new EBPFPipeline(options, nullptr, prog, refmap, typemap);
+    auto pipeline = new EBPFPipeline(name, options, nullptr, prog, refmap, typemap);
     pipeline->parser = new EBPFPsaParser(pipeline, parserBlock, typemap);
     pipeline->parser->build();
 
-    // TODO: EBPFControl needs IR::ControlBlock, while we have only IR::P4Control. How to solve this problem?
-//    auto cont = decl->to<IR::P4Control>();
-//    auto block = new IR::ControlBlock(node->srcInfo, node, instanceType, controlBlock);
-//    pipeline->control = new EBPF::EBPFControl()
+    pipeline->control = new EBPFPsaControl(pipeline, controlBlock, pipeline->parser->headers);
+    pipeline->control->build();
 
+    return pipeline;
 }
 
 bool ConvertToEbpfPipeline::preorder(const IR::P4Program *prog) {

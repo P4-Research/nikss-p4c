@@ -49,6 +49,7 @@ class ConvertToEbpfPSA : public Transform {
 };
 
 class ConvertToEbpfPipeline : public Inspector {
+    const cstring name;
     const EbpfOptions &options;
 
     const IR::P4Parser* parserBlock;
@@ -60,8 +61,9 @@ class ConvertToEbpfPipeline : public Inspector {
     EBPFPipeline* pipeline;
 
   public:
-    ConvertToEbpfPipeline(const EbpfOptions &options, const IR::P4Parser* parserBlock, const IR::P4Control* controlBlock,
-            const IR::P4Control* deparserBlock,  P4::ReferenceMap *refmap, P4::TypeMap *typemap) : options(options),
+    ConvertToEbpfPipeline(cstring name, const EbpfOptions &options, const IR::P4Parser* parserBlock, const IR::P4Control* controlBlock,
+            const IR::P4Control* deparserBlock,  P4::ReferenceMap *refmap, P4::TypeMap *typemap) : name(name),
+            options(options),
             parserBlock(parserBlock), controlBlock(controlBlock),
             deparserBlock(deparserBlock), typemap(typemap), refmap(refmap) {
 
@@ -70,6 +72,18 @@ class ConvertToEbpfPipeline : public Inspector {
     EBPFPipeline *build(const IR::P4Program *prog);
     bool preorder(const IR::P4Program *p) override;
     EBPFPipeline *getEbpfPipeline() { return pipeline; }
+};
+
+class ConvertToEBPFControlPSA : public Inspector {
+    // TODO: compose EBPFPsaControl object
+};
+
+class ConvertToEBPFParserPSA : public Inspector {
+    // TODO: compose EBPFParserPSA
+};
+
+class ConvertToEBPFDeparserPSA : public Inspector {
+    // TODO: compose EBPFDeparserPSA
 };
 
 }

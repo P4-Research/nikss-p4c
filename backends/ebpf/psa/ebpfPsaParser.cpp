@@ -10,6 +10,19 @@ namespace EBPF_PSA {
             return false;
         }
 
+        auto it = pl->parameters.begin();
+        packet = *it; ++it;
+        headers = *it;
+        for (auto state : parserBlock->states) {
+            auto ps = new EBPF::EBPFParserState(state, this);
+            states.push_back(ps);
+        }
+
+        auto ht = typeMap->getType(headers);
+        if (ht == nullptr)
+            return false;
+        headerType = EBPF::EBPFTypeFactory::instance->create(ht);
+
         return true;
     }
 
