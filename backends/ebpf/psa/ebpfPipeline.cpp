@@ -1,9 +1,9 @@
 
 #include "ebpfPipeline.h"
 
-namespace EBPF_PSA {
+namespace EBPF {
 
-    void EBPFPipeline::emit(EBPF::CodeBuilder *builder) {
+    void EBPFPipeline::emit(CodeBuilder *builder) {
         builder->target->emitCodeSection(builder, functionName);
         builder->emitIndent();
         builder->target->emitMain(builder, functionName, model.CPacketName.str());

@@ -3,18 +3,18 @@
 
 #include "backends/ebpf/ebpfControl.h"
 
-namespace EBPF_PSA {
+namespace EBPF {
 
-class EBPFPsaControl : public EBPF::EBPFControl {
+class EBPFPsaControl : public EBPFControl {
  public:
     // FIXME: this should not be part of EBPFPsaControl object. It should be moved to ConvertToEBPFPsaControl.
     const IR::P4Control* control;
 
-    EBPFPsaControl(const EBPF::EBPFProgram* program, const IR::P4Control* control, const IR::Parameter* parserHeaders) :
-        EBPF::EBPFControl(program, nullptr, parserHeaders), control(control) {}
+    EBPFPsaControl(const EBPFProgram* program, const IR::P4Control* control, const IR::Parameter* parserHeaders) :
+        EBPFControl(program, nullptr, parserHeaders), control(control) {}
 
     bool build() override;
-    void emit(EBPF::CodeBuilder* builder) override;
+    void emit(CodeBuilder* builder) override;
 
 };
 

@@ -3,13 +3,13 @@
 
 #include "backends/ebpf/ebpfParser.h"
 
-namespace EBPF_PSA {
+namespace EBPF {
 
-class EBPFPsaParser : public EBPF::EBPFParser {
+class EBPFPsaParser : public EBPFParser {
  public:
 
-    EBPFPsaParser(const EBPF::EBPFProgram* program, const IR::P4Parser* block,
-                  const P4::TypeMap* typeMap) : EBPF::EBPFParser(program, block, typeMap) {
+    EBPFPsaParser(const EBPFProgram* program, const IR::P4Parser* block,
+                  const P4::TypeMap* typeMap) : EBPFParser(program, block, typeMap) {
 
     }
 

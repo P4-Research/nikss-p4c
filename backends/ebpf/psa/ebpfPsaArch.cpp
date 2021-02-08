@@ -2,9 +2,9 @@
 #include "ebpfPsaParser.h"
 #include "ebpfPsaControl.h"
 
-namespace EBPF_PSA {
+namespace EBPF {
 
-void PSAArch::emit(EBPF::CodeBuilder *builder) const {
+void PSAArch::emit(CodeBuilder *builder) const {
     /**
      * How the structure of a single C program for PSA should look like?
      * 1. Automatically generated comment
@@ -51,7 +51,7 @@ void PSAArch::emit(EBPF::CodeBuilder *builder) const {
 
 const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
     // TODO: use converter
-    auto xdp = new EBPF::EBPFProgram(options, tlb->getProgram(), refmap, typemap, tlb);
+    auto xdp = new EBPFProgram(options, tlb->getProgram(), refmap, typemap, tlb);
 
     /*
      * INGRESS
@@ -89,7 +89,6 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
     egress->apply(*egress_pipeline_converter);
     auto tcEgress = egress_pipeline_converter->getEbpfPipeline();
 
-
     return new PSAArch(xdp, tcIngress, tcEgress);
 }
 
@@ -99,25 +98,9 @@ const IR::Node * ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
 }
 
 // =====================EbpfPipeline=============================
-EBPFPipeline * ConvertToEbpfPipeline::build(const IR::P4Program *prog) {
-    auto pipeline = new EBPFPipeline(name, options, refmap, typemap);
-
-    auto parser_converter = new ConvertToEBPFParserPSA(pipeline, refmap, typemap);
-    parserBlock->apply(*parser_converter);
-    pipeline->parser = parser_converter->getEBPFParser();
-
-    auto control_converter = new ConvertToEBPFControlPSA(pipeline, pipeline->parser->headers, refmap, typemap);
-    controlBlock->apply(*control_converter);
-    pipeline->control = control_converter->getEBPFControl();
-
-    return pipeline;
-}
-
-bool ConvertToEbpfPipeline::preorder(const IR::P4Program *prog) {
-    pipeline = build(prog);
-    return true;
-}
-
+// FIXME: probably we shouldn't have ConvertToEbpfPipeline inspector as "block" is not used here.
+// We can invoke parser/control/deparser->apply() inside the ConvertToEbpfPSA::build() method.
+// If so, EBPFPipeline construct should have the following arguments: EBPFPipeline(name, EBPFParser, EBPFControl, EBPFDeparser).
 bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
     pipeline = new EBPFPipeline(name, options, refmap, typemap);
 
@@ -134,20 +117,20 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
 // =====================EBPFParser=============================
 bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     auto pl = prsr->container->type->applyParams;
-    parser = new EBPF::EBPFParser(program, prsr->container, typemap);
+    parser = new EBPFParser(program, prsr->container, typemap);
 
     auto it = pl->parameters.begin();
     parser->packet = *it; ++it;
     parser->headers = *it;
     for (auto state : prsr->container->states) {
-        auto ps = new EBPF::EBPFParserState(state, parser);
+        auto ps = new EBPFParserState(state, parser);
         parser->states.push_back(ps);
     }
 
     auto ht = typemap->getType(parser->headers);
     if (ht == nullptr)
         return false;
-    parser->headerType = EBPF::EBPFTypeFactory::instance->create(ht);
+    parser->headerType = EBPFTypeFactory::instance->create(ht);
 
     return true;
 }
@@ -158,15 +141,15 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserState *s) {
 
 // =====================EBPFControl=============================
 bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
-    control = new EBPF::EBPFControl(program,
+    control = new EBPFControl(program,
                                     ctrl,
                                     parserHeaders);
-
+    control->hitVariable = refmap->newName("hit");
     auto pl = ctrl->container->type->applyParams;
     auto it = pl->parameters.begin();
     control->headers = *it;
 
-    auto codegen = new EBPF::ControlBodyTranslator(control);
+    auto codegen = new ControlBodyTranslator(control);
     codegen->substitute(control->headers, parserHeaders);
     control->codeGen = codegen;
 
@@ -179,7 +162,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
-    auto tbl = new EBPF::EBPFTable(program, tblblk, control->codeGen);
+    auto tbl = new EBPFTable(program, tblblk, control->codeGen);
     control->tables.emplace(tblblk->container->name, tbl);
 }
 
@@ -197,13 +180,13 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
         auto node = instance->node;
         if (node->is<IR::Declaration_Instance>()) {
             auto di = node->to<IR::Declaration_Instance>();
-            cstring name = EBPF::EBPFObject::externalName(di);
+            cstring name = EBPFObject::externalName(di);
             auto size = (*di->arguments)[0]->expression->to<IR::Constant>();
             if (!size->fitsInt()) {
                 ::error(ErrorType::ERR_OVERLIMIT, "%1%: size too large", size);
                 return false;
             }
-            auto ctr = new EBPF::EBPFCounterTable(program, name, control->codeGen, (size_t) size->asInt(), false);
+            auto ctr = new EBPFCounterTable(program, name, control->codeGen, (size_t) size->asInt(), false);
             control->counters.emplace(name, ctr);
         }
     } else {

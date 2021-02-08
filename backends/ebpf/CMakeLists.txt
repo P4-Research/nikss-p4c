@@ -48,7 +48,6 @@ set (P4C_EBPF_SRCS
   ../bmv2/common/parser.cpp
   ../bmv2/common/programStructure.cpp
   ../bmv2/psa_switch/psaSwitch.cpp
-  psa/ebpfPsaBackend.cpp
   psa/ebpfPsaArch.cpp
   psa/ebpfPipeline.cpp
   psa/ebpfPsaParser.cpp
@@ -91,7 +90,6 @@ set (P4C_EBPF_HDRS
   ../bmv2/common/programStructure.h
   ../bmv2/common/sharedActionSelectorCheck.h
   ../bmv2/psa_switch/psaSwitch.h
-  psa/ebpfPsaBackend.h
   psa/ebpfPsaArch.h
   psa/ebpfPipeline.h
   psa/ebpfPsaParser.h

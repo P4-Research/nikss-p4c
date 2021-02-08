@@ -1,6 +1,6 @@
 #include "ebpfPsaParser.h"
 
-namespace EBPF_PSA {
+namespace EBPF {
 
     bool EBPFPsaParser::build() {
         auto pl = parserBlock->type->applyParams;
@@ -14,14 +14,14 @@ namespace EBPF_PSA {
         packet = *it; ++it;
         headers = *it;
         for (auto state : parserBlock->states) {
-            auto ps = new EBPF::EBPFParserState(state, this);
+            auto ps = new EBPFParserState(state, this);
             states.push_back(ps);
         }
 
         auto ht = typeMap->getType(headers);
         if (ht == nullptr)
             return false;
-        headerType = EBPF::EBPFTypeFactory::instance->create(ht);
+        headerType = EBPFTypeFactory::instance->create(ht);
 
         return true;
     }
