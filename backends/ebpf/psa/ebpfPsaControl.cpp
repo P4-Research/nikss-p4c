@@ -1,6 +1,6 @@
 #include "ebpfPsaControl.h"
 
-namespace EBPF_PSA {
+namespace EBPF {
 
     bool EBPFPsaControl::build() {
         auto params = control->type->applyParams;
@@ -13,15 +13,15 @@ namespace EBPF_PSA {
         auto it = params->parameters.begin();
         headers = *it;
 
-        codeGen = new EBPF::ControlBodyTranslator(this);
+        codeGen = new ControlBodyTranslator(this);
         codeGen->substitute(headers, parserHeaders);
 
         return ::errorCount() == 0;
     }
 
-    void EBPFPsaControl::emit(EBPF::CodeBuilder *builder) {
+    void EBPFPsaControl::emit(CodeBuilder *builder) {
         hitVariable = program->refMap->newName("hit");
-        auto hitType = EBPF::EBPFTypeFactory::instance->create(IR::Type_Boolean::get());
+        auto hitType = EBPFTypeFactory::instance->create(IR::Type_Boolean::get());
         builder->emitIndent();
         hitType->declare(builder, hitVariable, false);
         builder->endOfStatement(true);

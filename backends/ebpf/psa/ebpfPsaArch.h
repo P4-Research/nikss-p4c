@@ -10,18 +10,18 @@
 #include "ebpfPipeline.h"
 
 
-namespace EBPF_PSA {
+namespace EBPF {
 
 class PSAArch {
  public:
-    EBPF::EBPFProgram*     xdp;
+    EBPFProgram*     xdp;
     EBPFPipeline*          tcIngress;
     EBPFPipeline*          tcEgress;
 
-    PSAArch(EBPF::EBPFProgram* xdp, EBPFPipeline* tcIngress, EBPFPipeline* tcEgress) : xdp(xdp),
+    PSAArch(EBPFProgram* xdp, EBPFPipeline* tcIngress, EBPFPipeline* tcEgress) : xdp(xdp),
         tcIngress(tcIngress), tcEgress(tcEgress) { }
 
-    void emit(EBPF::CodeBuilder* builder) const;  // emits C file for eBPF program
+    void emit(CodeBuilder* builder) const;  // emits C file for eBPF program
 };
 
 class ConvertToEbpfPSA : public Transform {
@@ -66,8 +66,6 @@ class ConvertToEbpfPipeline : public Inspector {
 
     }
 
-    EBPFPipeline *build(const IR::P4Program *prog);
-    bool preorder(const IR::P4Program *p) override;
     bool preorder(const IR::PackageBlock *block) override;
     EBPFPipeline *getEbpfPipeline() { return pipeline; }
 };
