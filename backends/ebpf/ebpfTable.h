@@ -71,7 +71,8 @@ class EBPFCounterTable final : public EBPFTableBase {
  public:
     EBPFCounterTable(const EBPFProgram* program, const IR::ExternBlock* block,
                      cstring name, CodeGenInspector* codeGen);
-    EBPFCounterTable(const EBPFProgram* program, cstring name, CodeGenInspector* codeGen, size_t size, bool isHash) :
+    EBPFCounterTable(const EBPFProgram* program, cstring name, CodeGenInspector* codeGen,
+                     size_t size, bool isHash) :
             EBPFTableBase(program, name, codeGen), size(size), isHash(isHash) { }
     void emitTypes(CodeBuilder*);
     void emitInstance(CodeBuilder* builder);

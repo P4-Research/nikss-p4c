@@ -7,6 +7,7 @@
 #include "backends/ebpf/ebpfObject.h"
 #include "backends/ebpf/ebpfOptions.h"
 #include "backends/ebpf/ebpfParser.h"
+#include "xdpProgram.h"
 #include "ebpfPipeline.h"
 
 
@@ -14,11 +15,11 @@ namespace EBPF {
 
 class PSAArch {
  public:
-    EBPFProgram*     xdp;
+    XDPProgram*             xdp;
     EBPFPipeline*          tcIngress;
     EBPFPipeline*          tcEgress;
 
-    PSAArch(EBPFProgram* xdp, EBPFPipeline* tcIngress, EBPFPipeline* tcEgress) : xdp(xdp),
+    PSAArch(XDPProgram* xdp, EBPFPipeline* tcIngress, EBPFPipeline* tcEgress) : xdp(xdp),
         tcIngress(tcIngress), tcEgress(tcEgress) { }
 
     void emit(CodeBuilder* builder) const;  // emits C file for eBPF program

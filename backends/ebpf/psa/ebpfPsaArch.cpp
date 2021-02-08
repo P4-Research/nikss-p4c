@@ -1,6 +1,7 @@
 #include "ebpfPsaArch.h"
 #include "ebpfPsaParser.h"
 #include "ebpfPsaControl.h"
+#include "xdpProgram.h"
 
 namespace EBPF {
 
@@ -34,7 +35,7 @@ void PSAArch::emit(CodeBuilder *builder) const {
     /*
      * 6. XDP helper program.
      */
-    // xdpProgram->emit()
+    xdp->emit(builder);
 
     /*
      * 7. XDP helper program.
@@ -50,8 +51,7 @@ void PSAArch::emit(CodeBuilder *builder) const {
 }
 
 const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
-    // TODO: use converter
-    auto xdp = new EBPFProgram(options, tlb->getProgram(), refmap, typemap, tlb);
+    auto xdp = new XDPProgram(options);
 
     /*
      * INGRESS
