@@ -46,7 +46,7 @@ namespace EBPF_PSA {
         auto program = tlb->getProgram();
 
         EBPF::EBPFTypeFactory::createFactory(typeMap);
-        auto convertToEbpfPSA = new ConvertToEbpfPSA(options, tlb,structure, refMap, typeMap);
+        auto convertToEbpfPSA = new ConvertToEbpfPSA(options,structure, refMap, typeMap);
         PassManager psaPasses = {
                 new BMV2::DiscoverStructure(&structure),
                 new BMV2::InspectPsaProgram(refMap, typeMap, &structure),
@@ -54,7 +54,7 @@ namespace EBPF_PSA {
                 convertToEbpfPSA,
         };
         psaPasses.addDebugHook(options.getDebugHook(), true);
-        program = program->apply(psaPasses);
+        tlb->apply(psaPasses);
 
         EBPF::Target* target;
         if (options.target.isNullOrEmpty() || options.target == "kernel") {
