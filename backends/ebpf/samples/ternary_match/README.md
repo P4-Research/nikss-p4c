@@ -41,10 +41,22 @@ implement in eBPF, because they use non-trivial loops, see the `naive` PoC.
 * Optimized `naive` -  see [this work](https://ieeexplore.ieee.org/document/6121294).
 
 * `Bit weaving` - see [this work](https://www.cse.msu.edu/~alexliu/publications/Bitweaving/TcamBitWeaving.pdf).
-  The idea is to swap some bits in the key and use LPM. However, this require
-  apriori knowledge about where wildcards are in the key.
+  The idea is to swap some bits in the key and then use LPM. However, this
+  require apriori knowledge about where the wildcards are in the key.
 
-# TODO
-* `LBVS` - see [this work](https://webthesis.biblio.polito.it/8475/1/tesi.pdf)
+* `DPDK` - uses multi-bit tries, see section `RT memory size limit` in
+  [DPDK guide](https://doc.dpdk.org/guides/prog_guide/packet_classif_access_ctrl.html#rt-memory-size-limit).
 
-* How it is implemented in `DPDK` or in `OvS` 
+* `Open vSwitch` - uses tries for matching fields, see [classifier.h](https://github.com/openvswitch/ovs/blob/master/lib/classifier.h)
+  and [classifier.c](https://github.com/openvswitch/ovs/blob/master/lib/classifier.c)
+  files in the `Open vSwitch` repository. There are also some dedicated
+  optimizations related with `Open Flow` specification.
+
+# Summary
+Using existing object in eBPF it is not possible to implement ternary match in
+the efficient way. Unbounded loops or high memory usage is required for
+described approaches. Only `naive` would have bounded loop, but it does not
+pass the kernel verifier.
+
+Solution for this problem would be new eBPF map type, implementing one of the
+[other approaches](#other-approaches).
