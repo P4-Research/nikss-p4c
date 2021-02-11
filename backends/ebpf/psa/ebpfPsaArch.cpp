@@ -1,6 +1,6 @@
 #include "ebpfPsaArch.h"
 #include "ebpfPsaParser.h"
-#include "ebpfPsaControl.h"
+#include "backends/ebpf/ebpfControl.h"
 #include "xdpProgram.h"
 
 namespace EBPF {
@@ -26,11 +26,18 @@ void PSAArch::emit(CodeBuilder *builder) const {
      * 2. Includes.
      */
     builder->target->emitIncludes(builder);
+    emitPSAIncludes(builder);
 
     /*
      * 3. Macro definitions (it's called "preamble")
      */
     //emitPreamble(builder);
+
+    /*
+     * 4. Headers, structs, types, PSA-specific data types.
+     */
+    emitInternalMetadata(builder);
+    emitTypes(builder);
 
     /*
      * 6. XDP helper program.
@@ -50,8 +57,60 @@ void PSAArch::emit(CodeBuilder *builder) const {
     builder->target->emitLicense(builder, xdp->license);
 }
 
+void PSAArch::emitPSAIncludes(CodeBuilder *builder) const {
+    builder->appendLine("#include <stdbool.h>");
+    builder->appendLine("#include <linux/if_ether.h>");
+//    builder->appendLine("#include \"psa.h\"");
+    builder->newline();
+}
+
+void PSAArch::emitInternalMetadata(CodeBuilder *pBuilder) const {
+    pBuilder->appendLine("struct internal_metadata {\n"
+                         "    __u16 pkt_ether_type;\n"
+                         "};");
+    pBuilder->newline();
+}
+
+void PSAArch::emitTypes(CodeBuilder *builder) const {
+    for (auto type : ebpfTypes) {
+        type->emit(builder);
+    }
+}
+
 const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
     auto xdp = new XDPProgram(options);
+
+    /*
+     * TYPES
+     */
+    std::vector<EBPFType*> ebpfTypes;
+    for (auto d : tlb->getProgram()->objects) {
+        if (d->is<IR::Type>() && !d->is<IR::IContainer>() &&
+            !d->is<IR::Type_Extern>() && !d->is<IR::Type_Parser>() &&
+            !d->is<IR::Type_Control>() &&
+            !d->is<IR::Type_Error>()) {
+            if (d->is<IR::Type_Enum>()) {
+                auto typeEnum = d->to<IR::Type_Enum>();
+                for (auto member : typeEnum->members) {
+                    ebpfTypes.push_back(new EBPFTypeName(new IR::Type_Name(typeEnum->name),
+                                        new EBPFScalarType(new IR::Type_Bits(typeEnum->width_bits(), false))));
+                }
+                continue;
+            }
+            auto type = EBPFTypeFactory::instance->create(d->to<IR::Type>());
+            if (type == nullptr)
+                continue;
+            ebpfTypes.push_back(type);
+        }
+    }
+//    std::vector<EBPFType*> ebpfTypes;
+//    for (auto kv : structure.header_types) {
+//        auto h = kv.second;
+//        auto type = EBPFTypeFactory::instance->create(h);
+//        if (type == nullptr)
+//            continue;
+//        ebpfTypes.push_back(type);
+//    }
 
     /*
      * INGRESS
@@ -69,6 +128,7 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
                    ingressControl->to<IR::ControlBlock>(), ingressDeparser->to<IR::ControlBlock>(),
                    refmap, typemap);
     ingress->apply(*ingress_pipeline_converter);
+    tlb->getProgram()->apply(*ingress_pipeline_converter);
     auto tcIngress = ingress_pipeline_converter->getEbpfPipeline();
 
     /*
@@ -87,9 +147,10 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
                     egressControl->to<IR::ControlBlock>(), egressDeparser->to<IR::ControlBlock>(),
                     refmap, typemap);
     egress->apply(*egress_pipeline_converter);
+    tlb->getProgram()->apply(*egress_pipeline_converter);
     auto tcEgress = egress_pipeline_converter->getEbpfPipeline();
 
-    return new PSAArch(xdp, tcIngress, tcEgress);
+    return new PSAArch(ebpfTypes, xdp, tcIngress, tcEgress);
 }
 
 const IR::Node * ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
@@ -142,8 +203,8 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserState *s) {
 // =====================EBPFControl=============================
 bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     control = new EBPFControl(program,
-                                    ctrl,
-                                    parserHeaders);
+                              ctrl,
+                              parserHeaders);
     control->hitVariable = refmap->newName("hit");
     auto pl = ctrl->container->type->applyParams;
     auto it = pl->parameters.begin();

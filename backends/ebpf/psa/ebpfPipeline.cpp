@@ -10,11 +10,61 @@ namespace EBPF {
         builder->spc();
         builder->blockStart();
 
+        emitHeaderInstances(builder);
+        emitLocalVariables(builder);
+
         parser->emit(builder);
+
+        builder->emitIndent();
+        builder->append(IR::ParserState::accept);
+        builder->append(":");
+        builder->newline();
+        builder->emitIndent();
+        builder->blockStart();
         control->emit(builder);
+        builder->blockEnd(true);
         // TODO: emit deparser
         // deparser->emit(builder);
 
         builder->blockEnd(true);  // end of function
+    }
+
+    void EBPFPipeline::emitLocalVariables(CodeBuilder *builder) {
+        builder->emitIndent();
+        builder->appendFormat("unsigned %s = 0;", offsetVar.c_str());
+        builder->appendFormat("unsigned %s_save = 0;", offsetVar.c_str());
+        builder->newline();
+
+        builder->emitIndent();
+        builder->appendFormat("%s %s = %s;", errorType.c_str(), errorVar.c_str(),
+                              P4::P4CoreLibrary::instance.noError.str());
+        builder->newline();
+
+        builder->emitIndent();
+        builder->appendFormat("void* %s = %s;",
+                              packetStartVar.c_str(),
+                              builder->target->dataOffset(model.CPacketName.str()).c_str());
+        builder->newline();
+        builder->emitIndent();
+        builder->appendFormat("void* %s = %s;",
+                              packetEndVar.c_str(),
+                              builder->target->dataEnd(model.CPacketName.str()).c_str());
+        builder->newline();
+
+        builder->emitIndent();
+        builder->appendFormat("u32 %s = 0;", zeroKey.c_str());
+        builder->newline();
+
+        builder->emitIndent();
+        builder->appendFormat("unsigned char %s;", byteVar.c_str());
+        builder->newline();
+    }
+
+    void EBPFPipeline::emitHeaderInstances(CodeBuilder *builder) {
+        builder->emitIndent();
+        parser->headerType->declare(builder, parser->headers->name.name, false);
+        builder->append(" = ");
+        parser->headerType->emitInitializer(builder);
+        builder->endOfStatement(true);
     }
 }

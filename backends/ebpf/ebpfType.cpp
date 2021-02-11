@@ -30,15 +30,14 @@ EBPFType* EBPFTypeFactory::create(const IR::Type* type) {
         result = new EBPFScalarType(bt);
     } else if (auto st = type->to<IR::Type_StructLike>()) {
         result = new EBPFStructType(st);
-    } else if (auto tt = type->to<IR::Type_Typedef>()) {
-        auto canon = typeMap->getTypeType(type, true);
-        result = create(canon);
-        auto path = new IR::Path(tt->name);
-        result = new EBPFTypeName(new IR::Type_Name(path), result);
     } else if (auto tn = type->to<IR::Type_Name>()) {
         auto canon = typeMap->getTypeType(type, true);
         result = create(canon);
         result = new EBPFTypeName(tn, result);
+    } else if (auto tt = type->to<IR::Type_Typedef>()) {
+        auto canon = typeMap->getTypeType(type, true);
+        result = create(canon);
+        result = new EBPFTypedefType(tt, result);
     } else if (auto te = type->to<IR::Type_Enum>()) {
         result = new EBPFEnumType(te);
     } else if (auto ts = type->to<IR::Type_Stack>()) {
@@ -46,9 +45,12 @@ EBPFType* EBPFTypeFactory::create(const IR::Type* type) {
         if (et == nullptr)
             return nullptr;
         result = new EBPFStackType(ts, et);
+    } else if (auto terr = type->to<IR::Type_Error>()) {
+        // EBPF target implements error type as scalar of witdh 8 bits
+        result = new EBPFScalarType(new IR::Type_Bits(8, false));
     } else {
-        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
-                "Type %1% not supported", type);
+            ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                    "Type %1% not supported", type);
     }
 
     return result;
@@ -285,12 +287,26 @@ void EBPFEnumType::emit(EBPF::CodeBuilder* builder) {
     builder->append("enum ");
     auto et = getType();
     builder->append(et->name);
+    builder->spc();
     builder->blockStart();
     for (auto m : et->members) {
         builder->append(m->name);
         builder->appendLine(",");
     }
-    builder->blockEnd(true);
+    builder->blockEnd(false);
+    builder->endOfStatement(true);
+}
+
+////////////////////////////////////////////////////////////////
+
+void EBPFTypedefType::emit(EBPF::CodeBuilder *builder) {
+    builder->append("typedef");
+    builder->spc();
+    auto scalar = new EBPFScalarType(new IR::Type_Bits(canonical->type->width_bits(), false));
+    scalar->emit(builder);
+    builder->spc();
+    builder->append(type->to<IR::Type_Declaration>()->name);
+    builder->endOfStatement(true);
 }
 
 }  // namespace EBPF

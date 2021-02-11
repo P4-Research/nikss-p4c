@@ -15,14 +15,21 @@ namespace EBPF {
 
 class PSAArch {
  public:
-    XDPProgram*             xdp;
+    std::vector<EBPFType*> ebpfTypes;
+
+    XDPProgram*            xdp;
     EBPFPipeline*          tcIngress;
     EBPFPipeline*          tcEgress;
 
-    PSAArch(XDPProgram* xdp, EBPFPipeline* tcIngress, EBPFPipeline* tcEgress) : xdp(xdp),
-        tcIngress(tcIngress), tcEgress(tcEgress) { }
+    PSAArch(std::vector<EBPFType*> ebpfTypes, XDPProgram* xdp, EBPFPipeline* tcIngress,
+            EBPFPipeline* tcEgress) : xdp(xdp), ebpfTypes(ebpfTypes), tcIngress(tcIngress),
+            tcEgress(tcEgress) { }
 
     void emit(CodeBuilder* builder) const;  // emits C file for eBPF program
+    void emitPreamble(CodeBuilder *builder) const;
+    void emitInternalMetadata(CodeBuilder *pBuilder) const;
+    void emitTypes(CodeBuilder *builder) const;
+    void emitPSAIncludes(CodeBuilder *builder) const;
 };
 
 class ConvertToEbpfPSA : public Transform {
@@ -116,6 +123,30 @@ class ConvertToEBPFControlPSA : public Inspector {
 
 class ConvertToEBPFDeparserPSA : public Inspector {
     // TODO: compose EBPFDeparserPSA
+};
+
+// This pass will "decompose" an enum and transform its fields to
+// a separate scalar fields.
+class TransformEnumsToScalars : public Transform {
+  public:
+    TransformEnumsToScalars() {}
+
+    const IR::Node *preorder(IR::P4Program *p) override {
+        auto new_objs = new IR::Vector<IR::Node>;
+        for (auto obj : p->objects) {
+            if (obj->is<IR::Type_Enum>()) {
+                auto typeEnum = obj->to<IR::Type_Enum>();
+                new_objs->push_back(new IR::Type_Typedef(typeEnum->getSourceInfo(), typeEnum->name, typeEnum->getP4Type()));
+                for (auto member : typeEnum->members) {
+//                    new_objs->push_back(new IR::Type_Name())
+                }
+                continue;
+            }
+            new_objs->push_back(obj);
+        }
+        p->objects = *new_objs;
+        return p;
+    }
 };
 
 }

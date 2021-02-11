@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import logging
 import subprocess
 
@@ -78,6 +79,42 @@ class EbpfTest(BaseTest):
             self.del_port(intf)
 
         super(EbpfTest, self).tearDown()
+
+class P4EbpfTest(EbpfTest):
+    """
+    Similar to EbpfTest, but generates BPF bytecode from a P4 program.
+    """
+
+    p4_file_path = ""
+
+    def setUp(self):
+        if not os.path.exists(self.p4_file_path):
+            self.fail("P4 program not found, no such file.")
+            return
+
+        if not os.path.exists("ptf_out"):
+            os.makedirs("ptf_out")
+
+        head, tail = os.path.split(self.p4_file_path)
+        filename = tail.split(".")[0]
+        c_file_path = os.path.join("ptf_out", filename + ".c")
+        cmd = ["p4c-ebpf", "--arch", "psa", "-o", c_file_path, self.p4_file_path]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        _, error = proc.communicate()
+        if error:
+            self.fail("P4 compilation error:\n%s" % error)
+            return
+        output_file_path = os.path.join("ptf_out", filename + ".o")
+
+        cmd = ["clang", "-O2", "-target", "bpf", "-c", c_file_path, "-o", output_file_path, "-I../runtime", "-I../runtime/contrib/libbpf/include/uapi/" ]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        _, error = proc.communicate()
+        if error:
+            self.fail("Clang compilation error:\n%s" % error)
+            return
+        self.test_prog_image = output_file_path
+
+        super(P4EbpfTest, self).setUp()
 
 
 class ResubmitTest(EbpfTest):
@@ -194,3 +231,10 @@ class MetadataXdpTcTest(EbpfTest):
             field1=11, field2=2, field3=3, field4=4,
             global_metadata_ok=255) / pkt
         testutils.verify_packet_any_port(self, str(pkt_with_metadata), ALL_PORTS)
+
+class PSATest(P4EbpfTest):
+
+    p4_file_path = "../../../testdata/p4_16_samples/psa-test.p4"
+
+    def runTest(self):
+        pass
