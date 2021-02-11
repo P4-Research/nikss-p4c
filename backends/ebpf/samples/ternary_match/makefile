@@ -1,7 +1,7 @@
 
 default: all
 
-all: naive expand
+all: naive expand module
 
 naive: naive_kern.o
 
@@ -21,6 +21,19 @@ expand_kern.o: expand_kern.c
 load_expand: expand_kern.o
 	nsenter --net=/var/run/netns/test0 tc qdisc add dev veth1 clsact
 	nsenter --net=/var/run/netns/test0 tc filter add dev veth1 ingress bpf da obj expand_kern.o sec tc-ingress verbose
+
+module: kmod/ternary_match.ko
+
+kmod/ternary_match.ko: kmod/ternary_match.c
+	make -C kmod
+
+load_module:
+	make -C kmod install
+	modprobe ternary_match
+
+unload_module:
+	modprobe -r ternary_match
+	make -C kmod uninstall
 
 unload_poc:
 	ip netns exec test0 tc qdisc del dev veth1 clsact || true
@@ -43,5 +56,6 @@ cleanup_env:
 clean:
 	rm -f *.o || true
 	rm -f expand || true
+	make -C kmod clean
 
-.PHONY: unload_poc read_logs setup_env cleanup_env clean
+.PHONY: unload_poc read_logs setup_env cleanup_env clean module
