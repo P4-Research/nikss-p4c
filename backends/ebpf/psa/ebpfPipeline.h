@@ -2,6 +2,7 @@
 #define BACKENDS_EBPF_PSA_EBPFPIPELINE_H_
 
 #include "backends/ebpf/ebpfProgram.h"
+#include "ebpfPsaDeparser.h"
 
 namespace EBPF {
 
@@ -14,8 +15,12 @@ class EBPFPipeline : public EBPFProgram {
  public:
     const cstring name;
     cstring sectionName;
-    // TODO: add deparser
-    // EBPFDeparser* deparser;
+    EBPFPsaDeparser* deparser;
+
+    cstring contextVar, outerHdrOffsetVar, outerHdrLengthVar;
+    cstring stdMetadataVar;
+    cstring packetTruncatedSizeVar;
+    cstring arrayIndexType = "uint32_t";
 
     EBPFPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                  P4::TypeMap* typeMap) :
@@ -24,6 +29,16 @@ class EBPFPipeline : public EBPFProgram {
         sectionName = name;
         functionName = name.replace("-", "_") + "_func";
         errorType = "ParserError_t";
+
+        packetStartVar = cstring("pkt");
+        offsetVar = cstring("packetOffsetInBits");
+        outerHdrOffsetVar = cstring("outHeaderOffset");
+        outerHdrLengthVar = cstring("outHeaderLength");
+        contextVar = cstring("ctx");
+        lengthVar = cstring("pkt_len");
+        endLabel = cstring("deparser");
+        stdMetadataVar = cstring("std_meta");
+        packetTruncatedSizeVar = cstring("packetTruncatedSize");
     }
 
     void emitHeaderInstances(CodeBuilder *builder) override;
