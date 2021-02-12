@@ -8,7 +8,7 @@ on:
 
 jobs:
   build_direct:  # Build p4c directly.
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     env:
       BAZEL: bazelisk-linux-amd64
     steps:
@@ -36,7 +36,7 @@ jobs:
       run: bazel build //... --verbose_failures --distinct_host_configuration=false
 
   build_indirect:  # Build 3rd party Bazel project depending on p4c as a subproject.
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     env:
       BAZEL: bazelisk-linux-amd64
     steps:
