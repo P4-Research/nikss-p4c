@@ -11,8 +11,11 @@ namespace EBPF {
 // Thus, we use EBPFProgram for future use.
 class XDPProgram : public EBPFProgram {
   public:
-    explicit XDPProgram(const EbpfOptions& options) : EBPFProgram(options, nullptr, nullptr, nullptr, nullptr) {
-        functionName = "xdp";
+    cstring sectionName;
+    explicit XDPProgram(const EbpfOptions& options) :
+        EBPFProgram(options, nullptr, nullptr, nullptr, nullptr) {
+        sectionName = "xdp-ingress";
+        functionName = "xdp_func";
     }
 
     void emit(CodeBuilder *builder);

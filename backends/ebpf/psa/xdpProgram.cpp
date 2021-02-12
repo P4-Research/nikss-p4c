@@ -3,10 +3,10 @@
 namespace EBPF {
 
 void XDPProgram::emit(CodeBuilder *builder) {
-    builder->target->emitCodeSection(builder, functionName);
+    builder->target->emitCodeSection(builder, sectionName);
     builder->emitIndent();
     builder->appendFormat("int %s(struct xdp_md *%s)",
-                          functionName.c_str(), model.CPacketName.str());
+                          functionName, model.CPacketName.str());
     builder->spc();
     builder->blockStart();
     builder->emitIndent();
@@ -16,7 +16,7 @@ void XDPProgram::emit(CodeBuilder *builder) {
                         "    void *data_end = (void *)(long)skb->data_end;\n"
                         "\n"
                         "    struct ethhdr *eth = data;\n"
-                        "    if (eth + 1 > data_end) {\n"
+                        "    if ((void *) eth + 1 > data_end) {\n"
                         "        return TC_ACT_SHOT;\n"
                         "    }\n"
                         "    __u16 pkt_ether_type = eth->h_proto;\n"
@@ -24,11 +24,12 @@ void XDPProgram::emit(CodeBuilder *builder) {
                         "    struct internal_metadata *meta;\n"
                         "    int ret = bpf_xdp_adjust_meta(skb, -(int)sizeof(*meta));\n"
                         "    if (ret < 0) {\n"
-                        "        bpf_debug_printk(\"[XDP] Error while adjusting meta %d\", ret);\n"
+                        "        bpf_printk(\"[XDP] Error while adjusting meta %d\", ret);\n"
                         "        return XDP_ABORTED;\n"
                         "    }\n"
                         "    meta = (void *)(unsigned long)skb->data_meta;\n"
-                        "    if (meta + 1 > skb->data)\n"
+                        "    data = (void *)(long)skb->data;\n"
+                        "    if ((void *) meta + 1 > data)\n"
                         "        return XDP_ABORTED;\n"
                         "    \n"
                         "    meta->pkt_ether_type = pkt_ether_type;\n"

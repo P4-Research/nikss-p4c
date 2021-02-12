@@ -106,7 +106,7 @@ class P4EbpfTest(EbpfTest):
             return
         output_file_path = os.path.join("ptf_out", filename + ".o")
 
-        cmd = ["clang", "-O2", "-target", "bpf", "-c", c_file_path, "-o", output_file_path, "-I../runtime", "-I../runtime/contrib/libbpf/include/uapi/" ]
+        cmd = ["clang", "-O2", "-target", "bpf", "-Werror", "-c", c_file_path, "-o", output_file_path, "-I../runtime", "-I../runtime/contrib/libbpf/include/uapi/" ]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         _, error = proc.communicate()
         if error:

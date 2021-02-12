@@ -31,7 +31,7 @@ void PSAArch::emit(CodeBuilder *builder) const {
     /*
      * 3. Macro definitions (it's called "preamble")
      */
-    //emitPreamble(builder);
+    emitPreamble(builder);
 
     /*
      * 4. Headers, structs, types, PSA-specific data types.
@@ -60,7 +60,7 @@ void PSAArch::emit(CodeBuilder *builder) const {
 void PSAArch::emitPSAIncludes(CodeBuilder *builder) const {
     builder->appendLine("#include <stdbool.h>");
     builder->appendLine("#include <linux/if_ether.h>");
-//    builder->appendLine("#include \"psa.h\"");
+    builder->appendLine("#include \"psa.h\"");
     builder->newline();
 }
 
@@ -77,6 +77,21 @@ void PSAArch::emitTypes(CodeBuilder *builder) const {
     }
 }
 
+void PSAArch::emitPreamble(CodeBuilder *builder) const {
+    builder->newline();
+    builder->appendLine("#define EBPF_MASK(t, w) ((((t)(1)) << (w)) - (t)1)");
+    builder->appendLine("#define BYTES(w) ((w) / 8)");
+    builder->appendLine(
+            "#define write_partial(a, s, v) do "
+            "{ u8 mask = EBPF_MASK(u8, s); "
+            "*((u8*)a) = ((*((u8*)a)) & ~mask) | (((v) >> (8 - (s))) & mask); "
+            "} while (0)");
+    builder->appendLine("#define write_byte(base, offset, v) do { "
+                        "*(u8*)((base) + (offset)) = (v); "
+                        "} while (0)");
+    builder->newline();
+}
+
 const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
     auto xdp = new XDPProgram(options);
 
@@ -87,30 +102,23 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
     for (auto d : tlb->getProgram()->objects) {
         if (d->is<IR::Type>() && !d->is<IR::IContainer>() &&
             !d->is<IR::Type_Extern>() && !d->is<IR::Type_Parser>() &&
-            !d->is<IR::Type_Control>() &&
+            !d->is<IR::Type_Control>() && !d->is<IR::Type_Typedef>() &&
             !d->is<IR::Type_Error>()) {
-            if (d->is<IR::Type_Enum>()) {
-                auto typeEnum = d->to<IR::Type_Enum>();
-                for (auto member : typeEnum->members) {
-                    ebpfTypes.push_back(new EBPFTypeName(new IR::Type_Name(typeEnum->name),
-                                        new EBPFScalarType(new IR::Type_Bits(typeEnum->width_bits(), false))));
+
+            if (d->srcInfo.isValid()) {
+                auto sourceFile = d->srcInfo.getSourceFile();
+                if (sourceFile.endsWith("p4include/psa.p4")) {
+                    // do not generate standard PSA types
+                    continue;
                 }
-                continue;
             }
+
             auto type = EBPFTypeFactory::instance->create(d->to<IR::Type>());
             if (type == nullptr)
                 continue;
             ebpfTypes.push_back(type);
         }
     }
-//    std::vector<EBPFType*> ebpfTypes;
-//    for (auto kv : structure.header_types) {
-//        auto h = kv.second;
-//        auto type = EBPFTypeFactory::instance->create(h);
-//        if (type == nullptr)
-//            continue;
-//        ebpfTypes.push_back(type);
-//    }
 
     /*
      * INGRESS
@@ -124,7 +132,7 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
     BUG_CHECK(ingressDeparser != nullptr, "No ingress deparser block found");
 
     auto ingress_pipeline_converter =
-           new ConvertToEbpfPipeline("tc_ingress", options, ingressParser->to<IR::ParserBlock>(),
+           new ConvertToEbpfPipeline("tc-ingress", options, ingressParser->to<IR::ParserBlock>(),
                    ingressControl->to<IR::ControlBlock>(), ingressDeparser->to<IR::ControlBlock>(),
                    refmap, typemap);
     ingress->apply(*ingress_pipeline_converter);
@@ -143,7 +151,7 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
     BUG_CHECK(egressDeparser != nullptr, "No egress deparser block found");
 
     auto egress_pipeline_converter =
-            new ConvertToEbpfPipeline("tc_egress", options, egressParser->to<IR::ParserBlock>(),
+            new ConvertToEbpfPipeline("tc-egress", options, egressParser->to<IR::ParserBlock>(),
                     egressControl->to<IR::ControlBlock>(), egressDeparser->to<IR::ControlBlock>(),
                     refmap, typemap);
     egress->apply(*egress_pipeline_converter);

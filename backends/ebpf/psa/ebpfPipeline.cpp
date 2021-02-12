@@ -4,8 +4,9 @@
 namespace EBPF {
 
     void EBPFPipeline::emit(CodeBuilder *builder) {
-        builder->target->emitCodeSection(builder, functionName);
+        builder->target->emitCodeSection(builder, sectionName);
         builder->emitIndent();
+
         builder->target->emitMain(builder, functionName, model.CPacketName.str());
         builder->spc();
         builder->blockStart();
@@ -26,6 +27,8 @@ namespace EBPF {
         // TODO: emit deparser
         // deparser->emit(builder);
 
+        builder->emitIndent();
+        builder->appendFormat("return %s;\n", builder->target->dropReturnCode().c_str());
         builder->blockEnd(true);  // end of function
     }
 

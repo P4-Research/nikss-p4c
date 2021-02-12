@@ -13,12 +13,14 @@ namespace EBPF {
 class EBPFPipeline : public EBPFProgram {
  public:
     const cstring name;
+    cstring sectionName;
     // TODO: add deparser
     //EBPFDeparser* deparser;
 
     EBPFPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap, P4::TypeMap* typeMap) :
                  EBPFProgram(options, nullptr, refMap, typeMap, nullptr), name(name) {
-        functionName = name;
+        sectionName = name;
+        functionName = name.replace("-", "_") + "_func";
         errorType = "ParserError_t";
     }
 
