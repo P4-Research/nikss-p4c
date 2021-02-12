@@ -50,8 +50,8 @@ EBPFType* EBPFTypeFactory::create(const IR::Type* type) {
         // EBPF target implements error type as scalar of witdh 8 bits
         result = new EBPFScalarType(new IR::Type_Bits(8, false));
     } else {
-            ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
-                    "Type %1% not supported", type);
+        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                "Type %1% not supported", type);
     }
 
     return result;
