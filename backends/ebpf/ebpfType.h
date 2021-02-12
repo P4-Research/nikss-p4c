@@ -163,19 +163,6 @@ class EBPFEnumType : public EBPFType, public EBPF::IHasWidth {
     const IR::Type_Enum* getType() const { return type->to<IR::Type_Enum>(); }
 };
 
-class EBPFTypedefType : public EBPFType {
-  public:
-    const IR::Type_Typedef* type;
-    EBPFType* canonical;
-    explicit EBPFTypedefType(const IR::Type_Typedef* type, EBPFType* canonical) : EBPFType(type), type(type), canonical(canonical) {}
-    void emit(CodeBuilder* builder) override;
-    void declare(CodeBuilder* builder, cstring id, bool asPointer) override {
-        BUG("%1%: only emit() method is supported", type);
-    }
-    void emitInitializer(CodeBuilder* builder) override
-    { BUG("%1%: only emit() method is supported", type); }
-};
-
 }  // namespace EBPF
 
 #endif /* _BACKENDS_EBPF_EBPFTYPE_H_ */

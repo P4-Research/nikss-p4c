@@ -30,14 +30,15 @@ EBPFType* EBPFTypeFactory::create(const IR::Type* type) {
         result = new EBPFScalarType(bt);
     } else if (auto st = type->to<IR::Type_StructLike>()) {
         result = new EBPFStructType(st);
+    } else if (auto tt = type->to<IR::Type_Typedef>()) {
+        auto canon = typeMap->getTypeType(type, true);
+        result = create(canon);
+        auto path = new IR::Path(tt->name);
+        result = new EBPFTypeName(new IR::Type_Name(path), result);
     } else if (auto tn = type->to<IR::Type_Name>()) {
         auto canon = typeMap->getTypeType(type, true);
         result = create(canon);
         result = new EBPFTypeName(tn, result);
-    } else if (auto tt = type->to<IR::Type_Typedef>()) {
-        auto canon = typeMap->getTypeType(type, true);
-        result = create(canon);
-        result = new EBPFTypedefType(tt, result);
     } else if (auto te = type->to<IR::Type_Enum>()) {
         result = new EBPFEnumType(te);
     } else if (auto ts = type->to<IR::Type_Stack>()) {
@@ -294,18 +295,6 @@ void EBPFEnumType::emit(EBPF::CodeBuilder* builder) {
         builder->appendLine(",");
     }
     builder->blockEnd(false);
-    builder->endOfStatement(true);
-}
-
-////////////////////////////////////////////////////////////////
-
-void EBPFTypedefType::emit(EBPF::CodeBuilder *builder) {
-    builder->append("typedef");
-    builder->spc();
-    auto scalar = new EBPFScalarType(new IR::Type_Bits(canonical->type->width_bits(), false));
-    scalar->emit(builder);
-    builder->spc();
-    builder->append(type->to<IR::Type_Declaration>()->name);
     builder->endOfStatement(true);
 }
 

@@ -125,30 +125,6 @@ class ConvertToEBPFDeparserPSA : public Inspector {
     // TODO: compose EBPFDeparserPSA
 };
 
-// This pass will "decompose" an enum and transform its fields to
-// a separate scalar fields.
-class TransformEnumsToScalars : public Transform {
-  public:
-    TransformEnumsToScalars() {}
-
-    const IR::Node *preorder(IR::P4Program *p) override {
-        auto new_objs = new IR::Vector<IR::Node>;
-        for (auto obj : p->objects) {
-            if (obj->is<IR::Type_Enum>()) {
-                auto typeEnum = obj->to<IR::Type_Enum>();
-                new_objs->push_back(new IR::Type_Typedef(typeEnum->getSourceInfo(), typeEnum->name, typeEnum->getP4Type()));
-                for (auto member : typeEnum->members) {
-//                    new_objs->push_back(new IR::Type_Name())
-                }
-                continue;
-            }
-            new_objs->push_back(obj);
-        }
-        p->objects = *new_objs;
-        return p;
-    }
-};
-
 }
 
 #endif //P4C_EBPFPSAARCH_H
