@@ -14,7 +14,6 @@ docker pull webhare/ccache-memcached-server:latest
 docker run --rm \
            --name ccache \
            --network host \
-           --network-alias ccache \
            -v $HOME/.ccache:/opt/memcache-data \
            --detach \
            webhare/ccache-memcached-server:latest
