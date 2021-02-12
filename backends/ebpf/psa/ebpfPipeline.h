@@ -20,6 +20,7 @@ class EBPFPipeline : public EBPFProgram {
     cstring contextVar, outerHdrOffsetVar, outerHdrLengthVar;
     cstring stdMetadataVar;
     cstring packetTruncatedSizeVar;
+    cstring returnCode;
     cstring arrayIndexType = "uint32_t";
 
     EBPFPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
@@ -34,11 +35,12 @@ class EBPFPipeline : public EBPFProgram {
         offsetVar = cstring("packetOffsetInBits");
         outerHdrOffsetVar = cstring("outHeaderOffset");
         outerHdrLengthVar = cstring("outHeaderLength");
-        contextVar = cstring("ctx");
+        contextVar = cstring("skb");
         lengthVar = cstring("pkt_len");
         endLabel = cstring("deparser");
         stdMetadataVar = cstring("std_meta");
         packetTruncatedSizeVar = cstring("packetTruncatedSize");
+        returnCode = cstring("returnCode");
     }
 
     void emitHeaderInstances(CodeBuilder *builder) override;

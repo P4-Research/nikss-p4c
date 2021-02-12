@@ -132,21 +132,9 @@ class ConvertToEBPFControlPSA : public Inspector {
                                                          typemap(typemap), refmap(refmap), p4lib(P4::P4CoreLibrary::instance) {
         }
 
-//        bool preorder(const IR::P4Action *a) override;
-//
-//        bool preorder(const IR::TableBlock *a) override;
-//
         bool preorder(const IR::ControlBlock *) override;
 
-        // Used to visit Extern declaration
-        bool preorder(const IR::Declaration_Instance *) override;
-
-        bool preorder(const IR::ExternBlock *) override;
-
         bool preorder(const IR::MethodCallExpression *expression) override;
-        bool preorder(const IR::AssignmentStatement *a) override;
-        bool preorder(const IR::ExitStatement *s) override;
-//        bool preorder(UNUSED const IR::BlockStatement *s) override;
 
         EBPF::EBPFPsaDeparser *getEBPFPsaDeparser() { return deparser; }
     };

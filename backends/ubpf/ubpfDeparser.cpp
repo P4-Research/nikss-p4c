@@ -333,9 +333,7 @@ void UBPFDeparser::emit(EBPF::CodeBuilder *builder) {
     ohs->setBuilder(builder);
 
     builder->emitIndent();
-    builder->appendLine("Tutaj patrze!!!!!!!!!!");
     controlBlock->container->body->apply(*ohs);
-    builder->appendLine("Tutaj patrze!!!!!!!!!!");
     builder->newline();
 
     builder->emitIndent();

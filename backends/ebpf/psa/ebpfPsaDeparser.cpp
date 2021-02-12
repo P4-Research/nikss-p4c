@@ -57,11 +57,23 @@ namespace EBPF {
         builder->endOfStatement(true);
 
         builder->emitIndent();
-        builder->appendFormat("%s = ubpf_adjust_head(%s, %s)",
-                              pipelineProgram->packetStartVar.c_str(),
+        builder->appendFormat("int %s = 0", pipelineProgram->returnCode.c_str());
+        builder->endOfStatement(true);
+
+        builder->emitIndent();
+        builder->appendFormat("%s = bpf_skb_adjust_room(%s, %s, 1, 0)",
+                              pipelineProgram->returnCode.c_str(),
                               pipelineProgram->contextVar.c_str(),
                               pipelineProgram->outerHdrOffsetVar.c_str());
         builder->endOfStatement(true);
+
+        builder->emitIndent();
+        builder->appendFormat("if (%s) ", pipelineProgram->returnCode.c_str());
+        builder->blockStart();
+        builder->emitIndent();
+        builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
+        builder->newline();
+        builder->blockEnd(true);
 
         builder->emitIndent();
         builder->appendFormat("%s += %s",
@@ -73,14 +85,16 @@ namespace EBPF {
         builder->appendFormat("%s = 0", pipelineProgram->offsetVar.c_str());
         builder->endOfStatement(true);
 
-        builder->emitIndent();
+        //Ebpf does not need
+        /*builder->emitIndent();
         builder->appendFormat("if (%s > 0) ", pipelineProgram->packetTruncatedSizeVar.c_str());
         builder->blockStart();
         builder->emitIndent();
         builder->appendFormat("%s -= ubpf_truncate_packet(%s, %s)", pipelineProgram->lengthVar.c_str(),
                               pipelineProgram->contextVar.c_str(), pipelineProgram->packetTruncatedSizeVar.c_str());
         builder->endOfStatement(true);
-        builder->blockEnd(true);
+        builder->blockEnd(true);*/
+
         builder->emitIndent();
         builder->newline();
 

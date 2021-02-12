@@ -292,12 +292,6 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
 
     return false;
 }
-bool ConvertToEBPFDeparserPSA::preorder(const IR::Declaration_Instance *) {
-    return false;
-}
-bool ConvertToEBPFDeparserPSA::preorder(const IR::ExternBlock *) {
-    return false;
-}
 
 bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expression) {
     auto mi = P4::MethodInstance::resolve(expression,

@@ -5,6 +5,7 @@
 
 namespace EBPF {
 
+
     void EBPFPipeline::emit(CodeBuilder *builder) {
         builder->target->emitCodeSection(builder, sectionName);
         builder->emitIndent();
