@@ -31,7 +31,7 @@ jobs:
         # To flush out issues with unified vs. non-unified builds,
         # do a non-unified build before continuing with the rest,
         # which produces a unified build.
-        docker build --network ccache_network -t p4c --build-arg IMAGE_TYPE=test --build-arg ENABLE_UNIFIED_COMPILATION=${{matrix.unified}} --build-arg ENABLE_GMP=${{ matrix.enable_gmp }} .
+        docker build --network host -t p4c --build-arg IMAGE_TYPE=test --build-arg ENABLE_UNIFIED_COMPILATION=${{matrix.unified}} --build-arg ENABLE_GMP=${{ matrix.enable_gmp }} .
 
       # run with sudo (...) --privileged
       # this is needed to create network namespaces for the ebpf tests

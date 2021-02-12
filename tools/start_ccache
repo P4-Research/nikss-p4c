@@ -3,7 +3,7 @@
 # Create a network on which the ccache server will be exposed. Docker builds
 # will connect to this network using `--network ccache_network` to access the
 # server.
-docker network create ccache_network
+#docker network create ccache_network
 
 # Pull down the ccache server.
 docker pull webhare/ccache-memcached-server:latest
@@ -13,7 +13,7 @@ docker pull webhare/ccache-memcached-server:latest
 # it'll be available for any build that runs after this point.
 docker run --rm \
            --name ccache \
-           --network ccache_network \
+           --network host \
            --network-alias ccache \
            -v $HOME/.ccache:/opt/memcache-data \
            --detach \
