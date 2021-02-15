@@ -32,4 +32,4 @@ namespace EBPF {
         control->body->apply(*codeGen);
         builder->newline();
     }
-}
+}  // namespace EBPF

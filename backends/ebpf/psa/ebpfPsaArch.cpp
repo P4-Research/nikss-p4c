@@ -104,7 +104,6 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
             !d->is<IR::Type_Extern>() && !d->is<IR::Type_Parser>() &&
             !d->is<IR::Type_Control>() && !d->is<IR::Type_Typedef>() &&
             !d->is<IR::Type_Error>()) {
-
             if (d->srcInfo.isValid()) {
                 auto sourceFile = d->srcInfo.getSourceFile();
                 if (sourceFile.endsWith("p4include/psa.p4")) {
@@ -169,7 +168,8 @@ const IR::Node * ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
 // =====================EbpfPipeline=============================
 // FIXME: probably we shouldn't have ConvertToEbpfPipeline inspector as "block" is not used here.
 // We can invoke parser/control/deparser->apply() inside the ConvertToEbpfPSA::build() method.
-// If so, EBPFPipeline construct should have the following arguments: EBPFPipeline(name, EBPFParser, EBPFControl, EBPFDeparser).
+// If so, EBPFPipeline construct should have the following arguments:
+// EBPFPipeline(name, EBPFParser, EBPFControl, EBPFDeparser).
 bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
     pipeline = new EBPFPipeline(name, options, refmap, typemap);
 
@@ -177,7 +177,9 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
     parserBlock->apply(*parser_converter);
     pipeline->parser = parser_converter->getEBPFParser();
 
-    auto control_converter = new ConvertToEBPFControlPSA(pipeline, pipeline->parser->headers, refmap, typemap);
+    auto control_converter = new ConvertToEBPFControlPSA(pipeline,
+                                                         pipeline->parser->headers,
+                                                         refmap, typemap);
     controlBlock->apply(*control_converter);
     pipeline->control = control_converter->getEBPFControl();
     return true;
@@ -228,19 +230,21 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
             this->visit(b->to<IR::Block>());
         }
     }
+    return true;
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
     auto tbl = new EBPFTable(program, tblblk, control->codeGen);
     control->tables.emplace(tblblk->container->name, tbl);
+    return true;
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::P4Action *a) {
-
+    return true;
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Instance* instance) {
-
+    return true;
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
@@ -255,14 +259,17 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
                 ::error(ErrorType::ERR_OVERLIMIT, "%1%: size too large", size);
                 return false;
             }
-            auto ctr = new EBPFCounterTable(program, name, control->codeGen, (size_t) size->asInt(), false);
+            auto ctr = new EBPFCounterTable(program, name,
+                    control->codeGen, (size_t) size->asInt(), false);
             control->counters.emplace(name, ctr);
         }
     } else {
         ::error(ErrorType::ERR_UNEXPECTED, "Unexpected block %s nested within control",
                 instance->toString());
+        return false;
     }
+    return true;
 }
 
-};
+}  // namespace EBPF
 

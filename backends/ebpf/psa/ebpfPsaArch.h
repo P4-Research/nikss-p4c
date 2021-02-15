@@ -1,5 +1,5 @@
-#ifndef P4C_EBPFPSAARCH_H
-#define P4C_EBPFPSAARCH_H
+#ifndef BACKENDS_EBPF_PSA_EBPFPSAARCH_H_
+#define BACKENDS_EBPF_PSA_EBPFPSAARCH_H_
 
 #include "backends/bmv2/psa_switch/psaSwitch.h"
 
@@ -9,7 +9,6 @@
 #include "backends/ebpf/ebpfParser.h"
 #include "xdpProgram.h"
 #include "ebpfPipeline.h"
-
 
 namespace EBPF {
 
@@ -40,12 +39,11 @@ class ConvertToEbpfPSA : public Transform {
 
     const PSAArch *ebpf_psa_arch;
 
-  public:
+ public:
     ConvertToEbpfPSA(const EbpfOptions &options,
                      BMV2::PsaProgramStructure &structure,
                      P4::ReferenceMap *refmap, P4::TypeMap *typemap)
                      : options(options), structure(structure), typemap(typemap), refmap(refmap) {
-
     }
 
     const PSAArch *build(IR::ToplevelBlock *prog);
@@ -65,14 +63,15 @@ class ConvertToEbpfPipeline : public Inspector {
 
     EBPFPipeline* pipeline;
 
-  public:
-    ConvertToEbpfPipeline(cstring name, const EbpfOptions &options, const IR::ParserBlock* parserBlock, const IR::ControlBlock* controlBlock,
-            const IR::ControlBlock* deparserBlock,  P4::ReferenceMap *refmap, P4::TypeMap *typemap) : name(name),
+ public:
+    ConvertToEbpfPipeline(cstring name, const EbpfOptions &options,
+            const IR::ParserBlock* parserBlock, const IR::ControlBlock* controlBlock,
+            const IR::ControlBlock* deparserBlock,
+            P4::ReferenceMap *refmap, P4::TypeMap *typemap) :
+            name(name),
             options(options),
             parserBlock(parserBlock), controlBlock(controlBlock),
-            deparserBlock(deparserBlock), typemap(typemap), refmap(refmap) {
-
-    }
+            deparserBlock(deparserBlock), typemap(typemap), refmap(refmap) { }
 
     bool preorder(const IR::PackageBlock *block) override;
     EBPFPipeline *getEbpfPipeline() { return pipeline; }
@@ -85,16 +84,13 @@ class ConvertToEBPFParserPSA : public Inspector {
 
     EBPF::EBPFParser* parser;
 
-  public:
+ public:
     ConvertToEBPFParserPSA(EBPF::EBPFProgram *program, P4::ReferenceMap *refmap,
-            P4::TypeMap *typemap) : program(program), typemap(typemap), refmap(refmap) {
-
-    }
+            P4::TypeMap *typemap) : program(program), typemap(typemap), refmap(refmap) { }
 
     bool preorder(const IR::ParserBlock *prsr) override;
     bool preorder(const IR::ParserState *s) override;
     EBPF::EBPFParser* getEBPFParser() { return parser; }
-
 };
 
 class ConvertToEBPFControlPSA : public Inspector {
@@ -105,11 +101,11 @@ class ConvertToEBPFControlPSA : public Inspector {
 
 
     EBPF::EBPFControl *control;
-  public:
-    ConvertToEBPFControlPSA(EBPF::EBPFProgram *program, const IR::Parameter* parserHeaders, P4::ReferenceMap *refmap,
+ public:
+    ConvertToEBPFControlPSA(EBPF::EBPFProgram *program, const IR::Parameter* parserHeaders,
+                            P4::ReferenceMap *refmap,
                             P4::TypeMap *typemap) : program(program), parserHeaders(parserHeaders),
-                            typemap(typemap), refmap(refmap) {
-    }
+                            typemap(typemap), refmap(refmap) { }
 
     bool preorder(const IR::P4Action *a) override;
     bool preorder(const IR::TableBlock *a) override;
@@ -125,6 +121,6 @@ class ConvertToEBPFDeparserPSA : public Inspector {
     // TODO: compose EBPFDeparserPSA
 };
 
-}
+}  // namespace EBPF
 
-#endif //P4C_EBPFPSAARCH_H
+#endif  /* BACKENDS_EBPF_PSA_EBPFPSAARCH_H_ */

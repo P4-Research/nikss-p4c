@@ -80,7 +80,7 @@ void emitPSAModel(const EbpfOptions& options, Target* target, const IR::Toplevel
     main->apply(*parsePsaArch);
 
     EBPFTypeFactory::createFactory(typeMap);
-    auto convertToEbpfPSA = new ConvertToEbpfPSA(options,structure, refMap, typeMap);
+    auto convertToEbpfPSA = new ConvertToEbpfPSA(options, structure, refMap, typeMap);
     PassManager psaPasses = {
             new BMV2::DiscoverStructure(&structure),
             new BMV2::InspectPsaProgram(refMap, typeMap, &structure),

@@ -1,4 +1,5 @@
 #include "ebpfPsaParser.h"
+#include "backends/ebpf/ebpfType.h"
 
 namespace EBPF {
 
@@ -26,4 +27,4 @@ namespace EBPF {
         return true;
     }
 
-}
+}  // namespace EBPF

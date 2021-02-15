@@ -39,4 +39,4 @@ void XDPProgram::emit(CodeBuilder *builder) {
     builder->blockEnd(true);  // end of function
 }
 
-}
+}  // namespace EBPF
