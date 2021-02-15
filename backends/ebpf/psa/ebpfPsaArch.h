@@ -133,9 +133,7 @@ class ConvertToEBPFControlPSA : public Inspector {
         }
 
         bool preorder(const IR::ControlBlock *) override;
-
         bool preorder(const IR::MethodCallExpression *expression) override;
-
         EBPF::EBPFPsaDeparser *getEBPFPsaDeparser() { return deparser; }
     };
 
