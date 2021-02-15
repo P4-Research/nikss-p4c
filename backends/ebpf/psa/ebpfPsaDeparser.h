@@ -8,6 +8,7 @@ namespace EBPF {
     public:
         const IR::P4Control *control;
         const IR::Parameter *packet_out;
+        EBPFType *headerType;
         std::vector<cstring> headersExpressions;
         std::vector<const IR::Type_Header *> headersToEmit;
 

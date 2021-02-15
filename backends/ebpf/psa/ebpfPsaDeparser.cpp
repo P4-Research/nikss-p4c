@@ -4,27 +4,29 @@ namespace EBPF {
 
     bool EBPFPsaDeparser::build() {
         auto params = control->type->applyParams;
-//        if (params->size() != 4) {
-//            ::error(ErrorType::ERR_EXPECTED,
-//                    "Expected control block to have exactly 4 parameters");
-//            return false;
-//        }
-
-//        auto it = params->parameters.begin();
-//        headers = *it;
+        //TODO: Add support for other PSA deparser parameters
 
         auto it = params->parameters.begin();
         packet_out = *it;
-        ++it;
-        headers = *it;
+        //TODO: fixed position for headers
+        headers = *(it + 4);
 
-        codeGen = new ControlBodyTranslator(this);
-        codeGen->substitute(headers, parserHeaders);
+        auto ht = program->typeMap->getType(headers);
+        if (ht == nullptr)
+            return false;
+        headerType = EBPFTypeFactory::instance->create(ht);
 
         return ::errorCount() == 0;
     }
 
     void EBPFPsaDeparser::emit(CodeBuilder *builder) {
+
+        builder->emitIndent();
+        this->headerType->declare(builder, this->headers->name.name, false);
+        builder->append(" = ");
+        this->headerType->emitInitializer(builder);
+        builder->endOfStatement(true);
+
         const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
         builder->emitIndent();
         builder->appendFormat("int %s = 0", pipelineProgram->outerHdrLengthVar.c_str());
@@ -84,16 +86,6 @@ namespace EBPF {
         builder->emitIndent();
         builder->appendFormat("%s = 0", pipelineProgram->offsetVar.c_str());
         builder->endOfStatement(true);
-
-        //Ebpf does not need
-        /*builder->emitIndent();
-        builder->appendFormat("if (%s > 0) ", pipelineProgram->packetTruncatedSizeVar.c_str());
-        builder->blockStart();
-        builder->emitIndent();
-        builder->appendFormat("%s -= ubpf_truncate_packet(%s, %s)", pipelineProgram->lengthVar.c_str(),
-                              pipelineProgram->contextVar.c_str(), pipelineProgram->packetTruncatedSizeVar.c_str());
-        builder->endOfStatement(true);
-        builder->blockEnd(true);*/
 
         builder->emitIndent();
         builder->newline();
@@ -214,7 +206,7 @@ namespace EBPF {
             if (alignment == 0 && bitsToWrite == 8) {  // write whole byte
                 builder->appendFormat(
                         "write_byte(%s, BYTES(%s) + %d, (%s))",
-                        program->packetStartVar.c_str(),
+                        this->headers->name.name.c_str(),
                         program->offsetVar.c_str(),
                         widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
                         program->byteVar.c_str());
@@ -222,7 +214,7 @@ namespace EBPF {
                 shift = (8 - alignment - bitsToWrite);
                 builder->appendFormat(
                         "write_partial(%s + BYTES(%s) + %d, %d, %d, (%s >> %d))",
-                        program->packetStartVar.c_str(),
+                        this->headers->name.name.c_str(),
                         program->offsetVar.c_str(),
                         widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
                         bitsToWrite,
@@ -241,7 +233,7 @@ namespace EBPF {
                 if (bitsToWrite == 8) {
                     builder->appendFormat(
                             "write_byte(%s, BYTES(%s) + %d + 1, (%s << %d))",
-                            program->packetStartVar.c_str(),
+                            this->headers->name.name.c_str(),
                             program->offsetVar.c_str(),
                             widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
                             program->byteVar.c_str(),
@@ -249,7 +241,7 @@ namespace EBPF {
                 } else {
                     builder->appendFormat(
                             "write_partial(%s + BYTES(%s) + %d + 1, %d, %d, (%s))",
-                            program->packetStartVar.c_str(),
+                            this->headers->name.name.c_str(),
                             program->offsetVar.c_str(),
                             widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
                             bitsToWrite,

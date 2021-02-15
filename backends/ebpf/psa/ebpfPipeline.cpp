@@ -29,6 +29,7 @@ namespace EBPF {
         builder->blockEnd(true);
         builder->emitIndent();
         builder->blockStart();
+
         deparser->emit(builder);
         builder->blockEnd(true);
 

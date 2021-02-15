@@ -313,7 +313,7 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expressi
                 deparser->headersToEmit.push_back(ht);
                 auto exprMemb = expr->to<IR::Member>();
                 auto headerName = exprMemb->member.name;
-                auto headersStructName = exprMemb->expr->to<IR::PathExpression>()->path->name.name;
+                auto headersStructName = deparser->parserHeaders->name.name;
                 deparser->headersExpressions.push_back(headersStructName + "." + headerName);
                 return false;
             }
