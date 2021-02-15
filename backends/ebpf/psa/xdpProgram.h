@@ -1,16 +1,16 @@
-#ifndef P4C_XDPPROGRAM_H
-#define P4C_XDPPROGRAM_H
+#ifndef BACKENDS_EBPF_PSA_XDPPROGRAM_H_
+#define BACKENDS_EBPF_PSA_XDPPROGRAM_H_
 
 #include "backends/ebpf/ebpfProgram.h"
 
 namespace EBPF {
 
-// In the current implementation, XDPProgram implements the XDP "helper" program, that makes the packet pre-processing before
-// passing it up to the TC subsystem.
+// In the current implementation, XDPProgram implements the XDP "helper" program,
+// that makes the packet pre-processing before passing it up to the TC subsystem.
 // TODO: if XDP offloading will be used, we will need to inherit from EBPFProgram or EBPFPipeline.
 // Thus, we use EBPFProgram for future use.
 class XDPProgram : public EBPFProgram {
-  public:
+ public:
     cstring sectionName;
     explicit XDPProgram(const EbpfOptions& options) :
         EBPFProgram(options, nullptr, nullptr, nullptr, nullptr) {
@@ -21,6 +21,6 @@ class XDPProgram : public EBPFProgram {
     void emit(CodeBuilder *builder);
 };
 
-}
+}  // namespace EBPF
 
-#endif //P4C_XDPPROGRAM_H
+#endif  /* BACKENDS_EBPF_PSA_XDPPROGRAM_H_ */

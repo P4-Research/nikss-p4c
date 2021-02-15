@@ -1,5 +1,7 @@
 
 #include "ebpfPipeline.h"
+#include "backends/ebpf/ebpfParser.h"
+#include "backends/ebpf/ebpfControl.h"
 
 namespace EBPF {
 
@@ -70,4 +72,4 @@ namespace EBPF {
         parser->headerType->emitInitializer(builder);
         builder->endOfStatement(true);
     }
-}
+}  // namespace EBPF

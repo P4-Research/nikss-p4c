@@ -1,5 +1,5 @@
-#ifndef P4C_EBPFPIPELINE_H
-#define P4C_EBPFPIPELINE_H
+#ifndef BACKENDS_EBPF_PSA_EBPFPIPELINE_H_
+#define BACKENDS_EBPF_PSA_EBPFPIPELINE_H_
 
 #include "backends/ebpf/ebpfProgram.h"
 
@@ -15,10 +15,12 @@ class EBPFPipeline : public EBPFProgram {
     const cstring name;
     cstring sectionName;
     // TODO: add deparser
-    //EBPFDeparser* deparser;
+    // EBPFDeparser* deparser;
 
-    EBPFPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap, P4::TypeMap* typeMap) :
-                 EBPFProgram(options, nullptr, refMap, typeMap, nullptr), name(name) {
+    EBPFPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
+                 P4::TypeMap* typeMap) :
+                 EBPFProgram(options, nullptr, refMap, typeMap, nullptr),
+                             name(name) {
         sectionName = name;
         functionName = name.replace("-", "_") + "_func";
         errorType = "ParserError_t";
@@ -29,6 +31,6 @@ class EBPFPipeline : public EBPFProgram {
     void emit(CodeBuilder* builder);
 };
 
-}
+}  // namespace EBPF
 
-#endif //P4C_EBPFPIPELINE_H
+#endif /* BACKENDS_EBPF_PSA_EBPFPIPELINE_H_ */
