@@ -90,21 +90,6 @@ void PSAArch::emitPreamble(CodeBuilder *builder) const {
                         "*(u8*)((base) + (offset)) = (v); "
                         "} while (0)");
     builder->newline();
-    builder->append("static uint32_t\n"
-                    "bpf_htonl(uint32_t val) {\n"
-                    "    return htonl(val);\n"
-                    "}");
-    builder->newline();
-    builder->append("static uint16_t\n"
-                    "bpf_htons(uint16_t val) {\n"
-                    "    return htons(val);\n"
-                    "}");
-    builder->newline();
-    builder->append("static uint64_t\n"
-                    "bpf_htonll(uint64_t val) {\n"
-                    "    return htonll(val);\n"
-                    "}\n");
-    builder->newline();
 }
 
 const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {

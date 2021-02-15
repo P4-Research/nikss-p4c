@@ -27,8 +27,10 @@ namespace EBPF {
         builder->blockStart();
         control->emit(builder);
         builder->blockEnd(true);
-        // TODO: emit deparser
-        // deparser->emit(builder);
+        builder->emitIndent();
+        builder->blockStart();
+        deparser->emit(builder);
+        builder->blockEnd(true);
 
         builder->emitIndent();
         builder->appendFormat("return %s;\n", builder->target->dropReturnCode().c_str());
