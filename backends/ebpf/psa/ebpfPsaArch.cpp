@@ -1,6 +1,7 @@
 #include "ebpfPsaArch.h"
 #include "ebpfPsaParser.h"
-#include "ebpfPsaControl.h"
+#include "backends/ebpf/ebpfControl.h"
+#include "xdpProgram.h"
 
 namespace EBPF {
 
@@ -25,16 +26,23 @@ void PSAArch::emit(CodeBuilder *builder) const {
      * 2. Includes.
      */
     builder->target->emitIncludes(builder);
+    emitPSAIncludes(builder);
 
     /*
      * 3. Macro definitions (it's called "preamble")
      */
-    //emitPreamble(builder);
+    emitPreamble(builder);
+
+    /*
+     * 4. Headers, structs, types, PSA-specific data types.
+     */
+    emitInternalMetadata(builder);
+    emitTypes(builder);
 
     /*
      * 6. XDP helper program.
      */
-    // xdpProgram->emit()
+    xdp->emit(builder);
 
     /*
      * 7. XDP helper program.
@@ -49,9 +57,68 @@ void PSAArch::emit(CodeBuilder *builder) const {
     builder->target->emitLicense(builder, xdp->license);
 }
 
+void PSAArch::emitPSAIncludes(CodeBuilder *builder) const {
+    builder->appendLine("#include <stdbool.h>");
+    builder->appendLine("#include <linux/if_ether.h>");
+    builder->appendLine("#include \"psa.h\"");
+    builder->newline();
+}
+
+void PSAArch::emitInternalMetadata(CodeBuilder *pBuilder) const {
+    pBuilder->appendLine("struct internal_metadata {\n"
+                         "    __u16 pkt_ether_type;\n"
+                         "};");
+    pBuilder->newline();
+}
+
+void PSAArch::emitTypes(CodeBuilder *builder) const {
+    for (auto type : ebpfTypes) {
+        type->emit(builder);
+    }
+}
+
+void PSAArch::emitPreamble(CodeBuilder *builder) const {
+    builder->newline();
+    builder->appendLine("#define EBPF_MASK(t, w) ((((t)(1)) << (w)) - (t)1)");
+    builder->appendLine("#define BYTES(w) ((w) / 8)");
+    builder->appendLine(
+            "#define write_partial(a, s, v) do "
+            "{ u8 mask = EBPF_MASK(u8, s); "
+            "*((u8*)a) = ((*((u8*)a)) & ~mask) | (((v) >> (8 - (s))) & mask); "
+            "} while (0)");
+    builder->appendLine("#define write_byte(base, offset, v) do { "
+                        "*(u8*)((base) + (offset)) = (v); "
+                        "} while (0)");
+    builder->newline();
+}
+
 const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
-    // TODO: use converter
-    auto xdp = new EBPFProgram(options, tlb->getProgram(), refmap, typemap, tlb);
+    auto xdp = new XDPProgram(options);
+
+    /*
+     * TYPES
+     */
+    std::vector<EBPFType*> ebpfTypes;
+    for (auto d : tlb->getProgram()->objects) {
+        if (d->is<IR::Type>() && !d->is<IR::IContainer>() &&
+            !d->is<IR::Type_Extern>() && !d->is<IR::Type_Parser>() &&
+            !d->is<IR::Type_Control>() && !d->is<IR::Type_Typedef>() &&
+            !d->is<IR::Type_Error>()) {
+
+            if (d->srcInfo.isValid()) {
+                auto sourceFile = d->srcInfo.getSourceFile();
+                if (sourceFile.endsWith("p4include/psa.p4")) {
+                    // do not generate standard PSA types
+                    continue;
+                }
+            }
+
+            auto type = EBPFTypeFactory::instance->create(d->to<IR::Type>());
+            if (type == nullptr)
+                continue;
+            ebpfTypes.push_back(type);
+        }
+    }
 
     /*
      * INGRESS
@@ -65,10 +132,11 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
     BUG_CHECK(ingressDeparser != nullptr, "No ingress deparser block found");
 
     auto ingress_pipeline_converter =
-           new ConvertToEbpfPipeline("tc_ingress", options, ingressParser->to<IR::ParserBlock>(),
+           new ConvertToEbpfPipeline("tc-ingress", options, ingressParser->to<IR::ParserBlock>(),
                    ingressControl->to<IR::ControlBlock>(), ingressDeparser->to<IR::ControlBlock>(),
                    refmap, typemap);
     ingress->apply(*ingress_pipeline_converter);
+    tlb->getProgram()->apply(*ingress_pipeline_converter);
     auto tcIngress = ingress_pipeline_converter->getEbpfPipeline();
 
     /*
@@ -83,13 +151,14 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
     BUG_CHECK(egressDeparser != nullptr, "No egress deparser block found");
 
     auto egress_pipeline_converter =
-            new ConvertToEbpfPipeline("tc_egress", options, egressParser->to<IR::ParserBlock>(),
+            new ConvertToEbpfPipeline("tc-egress", options, egressParser->to<IR::ParserBlock>(),
                     egressControl->to<IR::ControlBlock>(), egressDeparser->to<IR::ControlBlock>(),
                     refmap, typemap);
     egress->apply(*egress_pipeline_converter);
+    tlb->getProgram()->apply(*egress_pipeline_converter);
     auto tcEgress = egress_pipeline_converter->getEbpfPipeline();
 
-    return new PSAArch(xdp, tcIngress, tcEgress);
+    return new PSAArch(ebpfTypes, xdp, tcIngress, tcEgress);
 }
 
 const IR::Node * ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
@@ -142,8 +211,8 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserState *s) {
 // =====================EBPFControl=============================
 bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     control = new EBPFControl(program,
-                                    ctrl,
-                                    parserHeaders);
+                              ctrl,
+                              parserHeaders);
     control->hitVariable = refmap->newName("hit");
     auto pl = ctrl->container->type->applyParams;
     auto it = pl->parameters.begin();

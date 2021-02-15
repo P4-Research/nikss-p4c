@@ -7,6 +7,7 @@
 #include "backends/ebpf/ebpfObject.h"
 #include "backends/ebpf/ebpfOptions.h"
 #include "backends/ebpf/ebpfParser.h"
+#include "xdpProgram.h"
 #include "ebpfPipeline.h"
 
 
@@ -14,14 +15,21 @@ namespace EBPF {
 
 class PSAArch {
  public:
-    EBPFProgram*     xdp;
+    std::vector<EBPFType*> ebpfTypes;
+
+    XDPProgram*            xdp;
     EBPFPipeline*          tcIngress;
     EBPFPipeline*          tcEgress;
 
-    PSAArch(EBPFProgram* xdp, EBPFPipeline* tcIngress, EBPFPipeline* tcEgress) : xdp(xdp),
-        tcIngress(tcIngress), tcEgress(tcEgress) { }
+    PSAArch(std::vector<EBPFType*> ebpfTypes, XDPProgram* xdp, EBPFPipeline* tcIngress,
+            EBPFPipeline* tcEgress) : xdp(xdp), ebpfTypes(ebpfTypes), tcIngress(tcIngress),
+            tcEgress(tcEgress) { }
 
     void emit(CodeBuilder* builder) const;  // emits C file for eBPF program
+    void emitPreamble(CodeBuilder *builder) const;
+    void emitInternalMetadata(CodeBuilder *pBuilder) const;
+    void emitTypes(CodeBuilder *builder) const;
+    void emitPSAIncludes(CodeBuilder *builder) const;
 };
 
 class ConvertToEbpfPSA : public Transform {

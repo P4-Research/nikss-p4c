@@ -182,7 +182,7 @@ class ErrorCodesVisitor : public Inspector {
 
 void EBPFProgram::emitPreamble(CodeBuilder* builder) {
     builder->emitIndent();
-    builder->appendFormat("enum %s ", errorEnum.c_str());
+    builder->appendFormat("enum %s ", errorType.c_str());
     builder->blockStart();
 
     ErrorCodesVisitor visitor(builder);
@@ -213,7 +213,7 @@ void EBPFProgram::emitLocalVariables(CodeBuilder* builder) {
     builder->newline();
 
     builder->emitIndent();
-    builder->appendFormat("enum %s %s = %s;", errorEnum.c_str(), errorVar.c_str(),
+    builder->appendFormat("enum %s %s = %s;", errorType.c_str(), errorVar.c_str(),
                           P4::P4CoreLibrary::instance.noError.str());
     builder->newline();
 

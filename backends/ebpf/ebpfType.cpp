@@ -46,6 +46,9 @@ EBPFType* EBPFTypeFactory::create(const IR::Type* type) {
         if (et == nullptr)
             return nullptr;
         result = new EBPFStackType(ts, et);
+    } else if (auto terr = type->to<IR::Type_Error>()) {
+        // EBPF target implements error type as scalar of witdh 8 bits
+        result = new EBPFScalarType(new IR::Type_Bits(8, false));
     } else {
         ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
                 "Type %1% not supported", type);
@@ -285,12 +288,14 @@ void EBPFEnumType::emit(EBPF::CodeBuilder* builder) {
     builder->append("enum ");
     auto et = getType();
     builder->append(et->name);
+    builder->spc();
     builder->blockStart();
     for (auto m : et->members) {
         builder->append(m->name);
         builder->appendLine(",");
     }
-    builder->blockEnd(true);
+    builder->blockEnd(false);
+    builder->endOfStatement(true);
 }
 
 }  // namespace EBPF
