@@ -329,7 +329,5 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ExitStatement *s) {
     return false;
 }
 
-};
-
 }  // namespace EBPF
 

@@ -76,4 +76,5 @@ namespace EBPF {
         parser->headerType->emitInitializer(builder);
         builder->endOfStatement(true);
     }
+
 }  // namespace EBPF

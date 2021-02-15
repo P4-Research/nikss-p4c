@@ -18,10 +18,7 @@ class EBPFPipeline : public EBPFProgram {
     EBPFPsaDeparser* deparser;
 
     cstring contextVar, outerHdrOffsetVar, outerHdrLengthVar;
-    cstring stdMetadataVar;
-    cstring packetTruncatedSizeVar;
     cstring returnCode;
-    cstring arrayIndexType = "uint32_t";
 
     EBPFPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                  P4::TypeMap* typeMap) :
@@ -38,8 +35,6 @@ class EBPFPipeline : public EBPFProgram {
         contextVar = cstring("skb");
         lengthVar = cstring("pkt_len");
         endLabel = cstring("deparser");
-        stdMetadataVar = cstring("std_meta");
-        packetTruncatedSizeVar = cstring("packetTruncatedSize");
         returnCode = cstring("returnCode");
     }
 
