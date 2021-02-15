@@ -96,6 +96,23 @@ namespace EBPF {
             emitHeader(builder, headerToEmit, headerExpression);
         }
 
+        builder->newline();
+        builder->emitIndent();
+        builder->appendFormat("%s = bpf_skb_store_bytes(%s, 0, %s, %s, 0)",
+                              pipelineProgram->returnCode.c_str(),
+                              pipelineProgram->contextVar.c_str(),
+                              this->headers->name.name.c_str(),
+                              pipelineProgram->outerHdrLengthVar.c_str());
+        builder->endOfStatement(true);
+
+        builder->emitIndent();
+        builder->appendFormat("if (%s) ", pipelineProgram->returnCode.c_str());
+        builder->blockStart();
+        builder->emitIndent();
+        builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
+        builder->newline();
+        builder->blockEnd(true);
+
     }
 
     void EBPFPsaDeparser::emitHeader(CodeBuilder *builder, const IR::Type_Header *headerToEmit,
