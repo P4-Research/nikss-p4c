@@ -1,12 +1,12 @@
-name: "bazel"
-
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
-
-jobs:
+#name: "bazel"
+#
+#on:
+#  push:
+#    branches: [ master ]
+#  pull_request:
+#    branches: [ master ]
+#
+#jobs:
 #  build_direct:  # Build p4c directly.
 #    runs-on: self-hosted
 #    env:
