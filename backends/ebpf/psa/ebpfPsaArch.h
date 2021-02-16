@@ -15,7 +15,6 @@ namespace EBPF {
 class PSAArch {
  public:
     std::vector<EBPFType*> ebpfTypes;
-
     XDPProgram*            xdp;
     EBPFPipeline*          tcIngress;
     EBPFPipeline*          tcEgress;
@@ -25,19 +24,18 @@ class PSAArch {
             tcEgress(tcEgress) { }
 
     void emit(CodeBuilder* builder) const;  // emits C file for eBPF program
-    void emitPreamble(CodeBuilder *builder) const;
-    void emitInternalMetadata(CodeBuilder *pBuilder) const;
-    void emitTypes(CodeBuilder *builder) const;
-    void emitPSAIncludes(CodeBuilder *builder) const;
+    void emitPreamble(CodeBuilder* builder) const;
+    void emitInternalMetadata(CodeBuilder* builder) const;
+    void emitTypes(CodeBuilder* builder) const;
+    void emitPSAIncludes(CodeBuilder* builder) const;
 };
 
 class ConvertToEbpfPSA : public Transform {
     const EbpfOptions& options;
-    BMV2::PsaProgramStructure &structure;
-    P4::TypeMap *typemap;
-    P4::ReferenceMap *refmap;
-
-    const PSAArch *ebpf_psa_arch;
+    BMV2::PsaProgramStructure& structure;
+    P4::TypeMap* typemap;
+    P4::ReferenceMap* refmap;
+    const PSAArch* ebpf_psa_arch;
 
  public:
     ConvertToEbpfPSA(const EbpfOptions &options,
@@ -54,13 +52,11 @@ class ConvertToEbpfPSA : public Transform {
 class ConvertToEbpfPipeline : public Inspector {
     const cstring name;
     const EbpfOptions &options;
-
     const IR::ParserBlock* parserBlock;
     const IR::ControlBlock* controlBlock;
     const IR::ControlBlock* deparserBlock;
-    P4::TypeMap *typemap;
-    P4::ReferenceMap *refmap;
-
+    P4::TypeMap* typemap;
+    P4::ReferenceMap* refmap;
     EBPFPipeline* pipeline;
 
  public:
@@ -81,12 +77,11 @@ class ConvertToEBPFParserPSA : public Inspector {
     EBPF::EBPFProgram *program;
     P4::TypeMap *typemap;
     P4::ReferenceMap *refmap;
-
     EBPF::EBPFParser* parser;
 
  public:
-    ConvertToEBPFParserPSA(EBPF::EBPFProgram *program, P4::ReferenceMap *refmap,
-            P4::TypeMap *typemap) : program(program), typemap(typemap), refmap(refmap) { }
+    ConvertToEBPFParserPSA(EBPF::EBPFProgram* program, P4::ReferenceMap* refmap,
+            P4::TypeMap* typemap) : program(program), typemap(typemap), refmap(refmap) { }
 
     bool preorder(const IR::ParserBlock *prsr) override;
     bool preorder(const IR::ParserState *s) override;
@@ -98,44 +93,42 @@ class ConvertToEBPFControlPSA : public Inspector {
     const IR::Parameter* parserHeaders;
     P4::TypeMap *typemap;
     P4::ReferenceMap *refmap;
-
-
     EBPF::EBPFControl *control;
+
  public:
     ConvertToEBPFControlPSA(EBPF::EBPFProgram *program, const IR::Parameter* parserHeaders,
                             P4::ReferenceMap *refmap,
                             P4::TypeMap *typemap) : program(program), parserHeaders(parserHeaders),
                             typemap(typemap), refmap(refmap) { }
 
-    bool preorder(const IR::P4Action *a) override;
-    bool preorder(const IR::TableBlock *a) override;
+    bool preorder(const IR::P4Action *) override;
+    bool preorder(const IR::TableBlock *) override;
     bool preorder(const IR::ControlBlock *) override;
-    // Used to visit Extern declaration
     bool preorder(const IR::Declaration_Instance*) override;
     bool preorder(const IR::ExternBlock *) override;
 
     EBPF::EBPFControl *getEBPFControl() { return control; }
 };
 
-    class ConvertToEBPFDeparserPSA : public Inspector {
-        EBPF::EBPFProgram *program;
-        const IR::Parameter *parserHeaders;
-        P4::TypeMap *typemap;
-        P4::ReferenceMap *refmap;
-        P4::P4CoreLibrary &p4lib;
-
-        EBPF::EBPFPsaDeparser *deparser;
-    public:
-        ConvertToEBPFDeparserPSA(EBPF::EBPFProgram *program, const IR::Parameter *parserHeaders,
-                                 P4::ReferenceMap *refmap,
-                                 P4::TypeMap *typemap) : program(program), parserHeaders(parserHeaders),
-                                                         typemap(typemap), refmap(refmap), p4lib(P4::P4CoreLibrary::instance) {
-        }
-
-        bool preorder(const IR::ControlBlock *) override;
-        bool preorder(const IR::MethodCallExpression *expression) override;
-        EBPF::EBPFPsaDeparser *getEBPFPsaDeparser() { return deparser; }
-    };
+class ConvertToEBPFDeparserPSA : public Inspector {
+    EBPF::EBPFProgram* program;
+    const IR::Parameter* parserHeaders;
+    P4::TypeMap* typemap;
+    P4::ReferenceMap* refmap;
+    P4::P4CoreLibrary& p4lib;
+    EBPF::EBPFPsaDeparser* deparser;
+ public:
+    ConvertToEBPFDeparserPSA(EBPF::EBPFProgram* program, const IR::Parameter* parserHeaders,
+                             P4::ReferenceMap* refmap,
+                             P4::TypeMap* typemap) : program(program),
+                                                     parserHeaders(parserHeaders),
+                                                     typemap(typemap), refmap(refmap),
+                                                     p4lib(P4::P4CoreLibrary::instance) {
+    }
+    bool preorder(const IR::ControlBlock *) override;
+    bool preorder(const IR::MethodCallExpression* expression) override;
+    EBPF::EBPFPsaDeparser *getEBPFPsaDeparser() { return deparser; }
+};
 
 }  // namespace EBPF
 

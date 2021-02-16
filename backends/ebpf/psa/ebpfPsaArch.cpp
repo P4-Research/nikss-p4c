@@ -183,7 +183,8 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
     controlBlock->apply(*control_converter);
     pipeline->control = control_converter->getEBPFControl();
 
-    auto deparser_converter = new ConvertToEBPFDeparserPSA(pipeline, pipeline->parser->headers, refmap, typemap);
+    auto deparser_converter = new ConvertToEBPFDeparserPSA(pipeline, pipeline->parser->headers,
+                                                           refmap, typemap);
     deparserBlock->apply(*deparser_converter);
     pipeline->deparser = deparser_converter->getEBPFPsaDeparser();
 
@@ -319,13 +320,6 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expressi
             }
         }
     }
-    return false;
-}
-bool ConvertToEBPFDeparserPSA::preorder(const IR::AssignmentStatement *a) {
-    return false;
-}
-
-bool ConvertToEBPFDeparserPSA::preorder(const IR::ExitStatement *s) {
     return false;
 }
 

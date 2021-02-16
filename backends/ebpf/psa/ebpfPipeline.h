@@ -38,7 +38,7 @@ class EBPFPipeline : public EBPFProgram {
         returnCode = cstring("returnCode");
     }
 
-    void emitHeaderInstances(CodeBuilder *builder) override;
+    void emitHeaderInstances(CodeBuilder* builder) override;
     void emitLocalVariables(CodeBuilder* builder) override;
     void emit(CodeBuilder* builder);
 };
