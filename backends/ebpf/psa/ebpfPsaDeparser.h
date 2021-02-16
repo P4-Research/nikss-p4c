@@ -11,17 +11,16 @@ class EBPFPsaDeparser : public EBPFControl {
     EBPFType* headerType;
     std::vector<cstring> headersExpressions;
     std::vector<const IR::Type_Header *> headersToEmit;
-  	cstring outerHdrOffsetVar, outerHdrLengthVar;
-  	cstring returnCode;
+    cstring outerHdrOffsetVar, outerHdrLengthVar;
+    cstring returnCode;
 
     EBPFPsaDeparser(const EBPFProgram* program,
                     const IR::Parameter* parserHeaders) :
             EBPFControl(program, nullptr, parserHeaders) {
-
       outerHdrOffsetVar = cstring("outHeaderOffset");
-	  outerHdrLengthVar = cstring("outHeaderLength");
-	  returnCode = cstring("returnCode");
-	}
+      outerHdrLengthVar = cstring("outHeaderLength");
+      returnCode = cstring("returnCode");
+    }
 
     void emit(CodeBuilder* builder) override;
     void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,

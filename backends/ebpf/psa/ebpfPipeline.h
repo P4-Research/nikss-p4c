@@ -16,7 +16,7 @@ class EBPFPipeline : public EBPFProgram {
     const cstring name;
     cstring sectionName;
     EBPFPsaDeparser* deparser;
-  	cstring contextVar;
+    cstring contextVar;
 
     EBPFPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                  P4::TypeMap* typeMap) :
