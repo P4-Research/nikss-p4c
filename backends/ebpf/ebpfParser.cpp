@@ -436,9 +436,6 @@ void EBPFParser::emitDeclaration(CodeBuilder* builder, const IR::Declaration* de
 
 
 void EBPFParser::emit(CodeBuilder* builder) {
-    // TODO: add distinguish between ingress and egress
-    program->emitTraceMessage(builder, "Parser: parsing new packet");
-
     for (auto l : parserBlock->parserLocals)
         emitDeclaration(builder, l);
     for (auto s : states)

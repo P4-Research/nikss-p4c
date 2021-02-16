@@ -20,7 +20,7 @@ class PSAArch {
     EBPFPipeline*          tcEgress;
 
     PSAArch(std::vector<EBPFType*> ebpfTypes, XDPProgram* xdp, EBPFPipeline* tcIngress,
-            EBPFPipeline* tcEgress) : xdp(xdp), ebpfTypes(ebpfTypes), tcIngress(tcIngress),
+            EBPFPipeline* tcEgress) : ebpfTypes(ebpfTypes), xdp(xdp), tcIngress(tcIngress),
             tcEgress(tcEgress) { }
 
     void emit(CodeBuilder* builder) const;  // emits C file for eBPF program
