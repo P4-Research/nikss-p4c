@@ -12,7 +12,7 @@ class EBPFPsaDeparser : public EBPFControl {
     std::vector<cstring> headersExpressions;
     std::vector<const IR::Type_Header *> headersToEmit;
     cstring outerHdrOffsetVar, outerHdrLengthVar;
-    cstring returnCode;
+    cstring returnCode, hdrVoidPointerVar;
 
     EBPFPsaDeparser(const EBPFProgram* program,
                     const IR::Parameter* parserHeaders) :
@@ -20,6 +20,7 @@ class EBPFPsaDeparser : public EBPFControl {
       outerHdrOffsetVar = cstring("outHeaderOffset");
       outerHdrLengthVar = cstring("outHeaderLength");
       returnCode = cstring("returnCode");
+	  hdrVoidPointerVar = cstring("VoidPointerVar");
     }
 
     void emit(CodeBuilder* builder) override;

@@ -10,6 +10,11 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
     this->headerType->emitInitializer(builder);
     builder->endOfStatement(true);
 
+    this->hdrVoidPointerVar = this->headers->name.name + this->hdrVoidPointerVar;
+    builder->emitIndent();
+    builder->appendFormat("void* %s = (void*)(&%s);", this->hdrVoidPointerVar, this->headers->name.name);
+    builder->newline();
+
     const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
     builder->emitIndent();
     builder->appendFormat("int %s = 0", this->outerHdrLengthVar.c_str());
@@ -57,11 +62,11 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
     builder->newline();
     builder->blockEnd(true);
 
-    builder->emitIndent();
-    builder->appendFormat("%s += %s",
-                          pipelineProgram->lengthVar.c_str(),
-                          this->outerHdrOffsetVar.c_str());
-    builder->endOfStatement(true);
+//    builder->emitIndent();
+//    builder->appendFormat("%s += %s",
+//                          pipelineProgram->lengthVar.c_str(),
+//                          this->outerHdrOffsetVar.c_str());
+//    builder->endOfStatement(true);
     builder->emitIndent();
     builder->appendFormat("%s = 0", pipelineProgram->offsetVar.c_str());
     builder->endOfStatement(true);
@@ -79,7 +84,7 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
     builder->appendFormat("%s = bpf_skb_store_bytes(%s, 0, %s, %s, 0)",
                           this->returnCode.c_str(),
                           pipelineProgram->contextVar.c_str(),
-                          this->headers->name.name.c_str(),
+                          this->hdrVoidPointerVar.c_str(),
                           this->outerHdrLengthVar.c_str());
     builder->endOfStatement(true);
 
@@ -95,6 +100,7 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
 
 void EBPFPsaDeparser::emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                                  cstring& headerExpression) const {
+	const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
     builder->emitIndent();
     builder->append("if (");
     builder->append(headerExpression);
@@ -103,8 +109,8 @@ void EBPFPsaDeparser::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
     auto program = EBPFControl::program;
     unsigned width = headerToEmit->width_bits();
     builder->emitIndent();
-    builder->appendFormat("if (%s < BYTES(%s + %d)) ",
-                          program->lengthVar.c_str(),
+    builder->appendFormat("if (%s->len < BYTES(%s + %d)) ",
+						  pipelineProgram->contextVar.c_str(),
                           program->offsetVar.c_str(), width);
     builder->blockStart();
     builder->emitIndent();
@@ -188,7 +194,7 @@ void EBPFPsaDeparser::emitField(CodeBuilder* builder, cstring headerExpression,
         if (alignment == 0 && bitsToWrite == 8) {  // write whole byte
             builder->appendFormat(
                     "write_byte(%s, BYTES(%s) + %d, (%s))",
-                    this->headers->name.name.c_str(),
+                    this->hdrVoidPointerVar.c_str(),
                     program->offsetVar.c_str(),
                     widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
                     program->byteVar.c_str());
@@ -196,7 +202,7 @@ void EBPFPsaDeparser::emitField(CodeBuilder* builder, cstring headerExpression,
             shift = (8 - alignment - bitsToWrite);
             builder->appendFormat(
                     "write_partial(%s + BYTES(%s) + %d, %d, %d, (%s >> %d))",
-                    this->headers->name.name.c_str(),
+                    this->hdrVoidPointerVar.c_str(),
                     program->offsetVar.c_str(),
                     widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
                     bitsToWrite,
@@ -214,7 +220,7 @@ void EBPFPsaDeparser::emitField(CodeBuilder* builder, cstring headerExpression,
             if (bitsToWrite == 8) {
                 builder->appendFormat(
                         "write_byte(%s, BYTES(%s) + %d + 1, (%s << %d))",
-                        this->headers->name.name.c_str(),
+                        this->hdrVoidPointerVar.c_str(),
                         program->offsetVar.c_str(),
                         widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
                         program->byteVar.c_str(),
@@ -222,7 +228,7 @@ void EBPFPsaDeparser::emitField(CodeBuilder* builder, cstring headerExpression,
             } else {
                 builder->appendFormat(
                         "write_partial(%s + BYTES(%s) + %d + 1, %d, %d, (%s))",
-                        this->headers->name.name.c_str(),
+                        this->hdrVoidPointerVar.c_str(),
                         program->offsetVar.c_str(),
                         widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
                         bitsToWrite,
