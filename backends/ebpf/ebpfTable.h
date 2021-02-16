@@ -44,7 +44,7 @@ class EBPFTableBase : public EBPFObject {
     }
 };
 
-class EBPFTable final : public EBPFTableBase {
+class EBPFTable : public EBPFTableBase {
  public:
     const IR::Key*            keyGenerator;
     const IR::ActionList*     actionList;
@@ -56,7 +56,7 @@ class EBPFTable final : public EBPFTableBase {
 
     EBPFTable(const EBPFProgram* program, const IR::TableBlock* table, CodeGenInspector* codeGen);
     void emitTypes(CodeBuilder* builder);
-    void emitInstance(CodeBuilder* builder);
+    virtual void emitInstance(CodeBuilder* builder);
     void emitActionArguments(CodeBuilder* builder, const IR::P4Action* action, cstring name);
     void emitKeyType(CodeBuilder* builder);
     void emitValueType(CodeBuilder* builder);

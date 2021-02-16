@@ -25,6 +25,7 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     // TODO: add more info: packet length, ingress port
     msgStr = Util::printf_format("%s control: packet processing started", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
+    emitPSAControlDataTypes(builder);
     control->emit(builder);
     builder->blockEnd(true);
     msgStr = Util::printf_format("%s control: packet processing finished", sectionName);
@@ -34,7 +35,8 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     deparser->emit(builder);
     builder->blockEnd(true);
     builder->emitIndent();
-    builder->appendFormat("return %s;\n", builder->target->dropReturnCode().c_str());
+    // FIXME: it should be different for ingress and egress pipeline
+    builder->appendLine("return bpf_redirect(ostd.egress_port, 0);");
     builder->blockEnd(true);
 }
 
@@ -63,6 +65,16 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("unsigned char %s;", byteVar.c_str());
     builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat("unsigned char %s;", byteVar.c_str());
+    builder->newline();
+
+    builder->emitIndent();
+    builder->appendLine("struct psa_ingress_output_metadata_t ostd = {\n"
+                        "            .drop = true,\n"
+                        "        };");
+    builder->newline();
 }
 
 void EBPFPipeline::emitHeaderInstances(CodeBuilder* builder) {
@@ -73,4 +85,19 @@ void EBPFPipeline::emitHeaderInstances(CodeBuilder* builder) {
     builder->endOfStatement(true);
 }
 
+
+void EBPFPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
+    builder->emitIndent();
+    builder->appendLine("struct psa_ingress_input_metadata_t istd = {\n"
+                        "            .ingress_port = skb->ifindex,\n"
+                        "            .packet_path = meta->packet_path,\n"
+                        "            .ingress_timestamp = skb->tstamp,\n"
+                        "            .parser_error = NoError,\n"
+                        "    };");
+}
+
+void EBPFPipeline::emitGlobalMetadataInitializer(CodeBuilder *builder) {
+    builder->emitIndent();
+    builder->appendLine("struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->cb;");
+}
 }  // namespace EBPF

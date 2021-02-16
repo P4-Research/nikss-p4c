@@ -24,10 +24,11 @@ class PSAArch {
             tcEgress(tcEgress) { }
 
     void emit(CodeBuilder* builder) const;  // emits C file for eBPF program
-    void emitPreamble(CodeBuilder* builder) const;
-    void emitInternalMetadata(CodeBuilder* builder) const;
-    void emitTypes(CodeBuilder* builder) const;
-    void emitPSAIncludes(CodeBuilder* builder) const;
+    void emitPreamble(CodeBuilder *builder) const;
+    void emitInternalMetadata(CodeBuilder *pBuilder) const;
+    void emitTypes(CodeBuilder *builder) const;
+    void emitInstances(CodeBuilder *builder) const;
+    void emitPSAIncludes(CodeBuilder *builder) const;
 };
 
 class ConvertToEbpfPSA : public Transform {
@@ -93,8 +94,8 @@ class ConvertToEBPFControlPSA : public Inspector {
     const IR::Parameter* parserHeaders;
     P4::TypeMap *typemap;
     P4::ReferenceMap *refmap;
-    EBPF::EBPFControl *control;
 
+    EBPF::EBPFControlPSA *control;
  public:
     ConvertToEBPFControlPSA(EBPF::EBPFProgram *program, const IR::Parameter* parserHeaders,
                             P4::ReferenceMap *refmap,
@@ -107,7 +108,7 @@ class ConvertToEBPFControlPSA : public Inspector {
     bool preorder(const IR::Declaration_Instance*) override;
     bool preorder(const IR::ExternBlock *) override;
 
-    EBPF::EBPFControl *getEBPFControl() { return control; }
+    EBPF::EBPFControlPSA *getEBPFControl() { return control; }
 };
 
 class ConvertToEBPFDeparserPSA : public Inspector {

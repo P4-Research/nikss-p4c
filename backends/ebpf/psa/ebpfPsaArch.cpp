@@ -1,6 +1,7 @@
 #include "ebpfPsaArch.h"
 #include "ebpfPsaParser.h"
-#include "backends/ebpf/ebpfControl.h"
+#include "ebpfPsaObjects.h"
+#include "ebpfPsaControl.h"
 #include "xdpProgram.h"
 
 namespace EBPF {
@@ -40,6 +41,11 @@ void PSAArch::emit(CodeBuilder *builder) const {
      */
     emitInternalMetadata(builder);
     emitTypes(builder);
+
+    /*
+     * 5. BPF map definitions.
+     */
+    emitInstances(builder);
 
     /*
      * 6. XDP helper program.
@@ -89,6 +95,17 @@ void PSAArch::emitPreamble(CodeBuilder *builder) const {
     builder->appendLine("#define write_byte(base, offset, v) do { "
                         "*(u8*)((base) + (offset)) = (v); "
                         "} while (0)");
+    builder->newline();
+}
+
+void PSAArch::emitInstances(CodeBuilder *builder) const {
+    builder->newline();
+    tcIngress->control->emitTableTypes(builder);
+    tcEgress->control->emitTableTypes(builder);
+    builder->appendLine("REGISTER_START()");
+    tcIngress->control->emitTableInstances(builder);
+    tcEgress->control->emitTableInstances(builder);
+    builder->appendLine("REGISTER_END()");
     builder->newline();
 }
 
@@ -218,9 +235,9 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserState *s) {
 
 // =====================EBPFControl=============================
 bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
-    control = new EBPFControl(program,
-                              ctrl,
-                              parserHeaders);
+    control = new EBPFControlPSA(program,
+                                 ctrl,
+                                 parserHeaders);
     control->hitVariable = refmap->newName("hit");
     auto pl = ctrl->container->type->applyParams;
     auto it = pl->parameters.begin();
@@ -240,7 +257,35 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
-    auto tbl = new EBPFTable(program, tblblk, control->codeGen);
+    // use HASH_MAP as default type
+    TableKind tableKind = TableHash;
+
+    // If any key field is LPM we will generate an LPM table
+    auto keyGenerator = tblblk->container->getKey();
+    if (keyGenerator != nullptr) {
+        for (auto it : keyGenerator->keyElements) {
+            auto mtdecl = refmap->getDeclaration(it->matchType->path, true);
+            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
+            if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
+                if (tableKind == TableLPMTrie) {
+                    ::error(ErrorType::ERR_UNSUPPORTED,
+                            "%1%: only one LPM field allowed", it->matchType);
+                    return false;
+                }
+                tableKind = TableLPMTrie;
+            }
+        }
+    }
+
+    // use 1024 by default
+    size_t size = 1024;
+    auto sizeProperty = tblblk->container->properties->getProperty(tblblk->container->properties->sizePropertyName);
+    if (sizeProperty != nullptr) {
+        size = sizeProperty->value->to<IR::ExpressionValue>()->expression->to<IR::Constant>()->asInt();
+    }
+
+    cstring name = EBPFObject::externalName(tblblk->container);
+    auto tbl = new EBPFTablePSA(program, tblblk, control->codeGen, name, tableKind, size);
     control->tables.emplace(tblblk->container->name, tbl);
     return true;
 }
