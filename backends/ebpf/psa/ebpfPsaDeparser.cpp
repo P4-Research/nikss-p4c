@@ -1,4 +1,5 @@
 #include "ebpfPsaDeparser.h"
+#include "ebpfPipeline.h"
 
 namespace EBPF {
 
