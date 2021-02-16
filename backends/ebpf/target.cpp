@@ -80,6 +80,24 @@ void KernelSamplesTarget::emitMain(Util::SourceCodeBuilder* builder,
                           functionName.c_str(), argName.c_str());
 }
 
+void KernelSamplesTarget::emitPreamble(Util::SourceCodeBuilder* builder,
+                                       const EbpfOptions& options) const {
+    if (options.emitTraceMessages) {
+        builder->appendLine("#define bpf_trace_message(fmt, ...)                              \\");
+        builder->appendLine("  ({                                                             \\");
+        builder->appendLine("      char ____fmt[] = fmt;                                      \\");
+        builder->appendLine("      bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \\");
+        builder->appendLine("  })");
+        builder->newline();
+    }
+}
+
+void KernelSamplesTarget::emitTraceMessage(Util::SourceCodeBuilder* builder, cstring msg) const {
+    builder->emitIndent();
+    builder->appendFormat("bpf_trace_message(%s);", msg);
+    builder->newline();
+}
+
 //////////////////////////////////////////////////////////////
 
 void TestTarget::emitIncludes(Util::SourceCodeBuilder* builder) const {
@@ -95,6 +113,17 @@ void TestTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
     builder->appendFormat("sizeof(%s), sizeof(%s), %d)",
                           keyType.c_str(), valueType.c_str(), size);
     builder->newline();
+}
+
+void TestTarget::emitPreamble(Util::SourceCodeBuilder* builder,
+                              const EbpfOptions& options) const {
+    (void) builder;
+    (void) options;
+}
+
+void TestTarget::emitTraceMessage(Util::SourceCodeBuilder* builder, cstring msg) const {
+    (void) builder;
+    (void) msg;
 }
 
 //////////////////////////////////////////////////////////////
@@ -149,6 +178,18 @@ void BccTarget::emitMain(Util::SourceCodeBuilder* builder,
                                    cstring argName) const {
     builder->appendFormat("int %s(struct __sk_buff* %s)",
                           functionName.c_str(), argName.c_str());
+}
+
+
+void BccTarget::emitPreamble(Util::SourceCodeBuilder* builder,
+                             const EbpfOptions& options) const {
+    (void) builder;
+    (void) options;
+}
+
+void BccTarget::emitTraceMessage(Util::SourceCodeBuilder* builder, cstring msg) const {
+    (void) builder;
+    (void) msg;
 }
 
 }  // namespace EBPF

@@ -20,6 +20,7 @@ limitations under the License.
 #include "lib/cstring.h"
 #include "lib/sourceCodeBuilder.h"
 #include "lib/exceptions.h"
+#include "ebpfOptions.h"
 
 // We are prepared to support code generation using multiple styles
 // (e.g., using BCC or using CLANG).
@@ -56,6 +57,9 @@ class Target {
     virtual void emitMain(Util::SourceCodeBuilder* builder,
                           cstring functionName,
                           cstring argName) const = 0;
+    virtual void emitPreamble(Util::SourceCodeBuilder* builder,
+                              const EbpfOptions& options) const = 0;
+    virtual void emitTraceMessage(Util::SourceCodeBuilder* builder, cstring msg) const = 0;
     virtual cstring dataOffset(cstring base) const = 0;
     virtual cstring dataEnd(cstring base) const = 0;
     virtual cstring forwardReturnCode() const = 0;
@@ -85,6 +89,9 @@ class KernelSamplesTarget : public Target {
     void emitMain(Util::SourceCodeBuilder* builder,
                   cstring functionName,
                   cstring argName) const override;
+    void emitPreamble(Util::SourceCodeBuilder* builder,
+                      const EbpfOptions& options) const override;
+    void emitTraceMessage(Util::SourceCodeBuilder* builder, cstring msg) const override;
     cstring dataOffset(cstring base) const override
     { return cstring("((void*)(long)")+ base + "->data)"; }
     cstring dataEnd(cstring base) const override
@@ -114,6 +121,9 @@ class BccTarget : public Target {
     void emitMain(Util::SourceCodeBuilder* builder,
                   cstring functionName,
                   cstring argName) const override;
+    void emitPreamble(Util::SourceCodeBuilder* builder,
+                      const EbpfOptions& options) const override;
+    void emitTraceMessage(Util::SourceCodeBuilder* builder, cstring msg) const override;
     cstring dataOffset(cstring base) const override { return base; }
     cstring dataEnd(cstring base) const override
     { return cstring("(") + base + " + " + base + "->len)"; }
@@ -132,6 +142,9 @@ class TestTarget : public EBPF::KernelSamplesTarget {
     void emitTableDecl(Util::SourceCodeBuilder* builder,
                        cstring tblName, TableKind tableKind,
                        cstring keyType, cstring valueType, unsigned size) const override;
+    void emitPreamble(Util::SourceCodeBuilder* builder,
+                      const EbpfOptions& options) const override;
+    void emitTraceMessage(Util::SourceCodeBuilder* builder, cstring msg) const override;
     cstring dataOffset(cstring base) const override
     { return cstring("((void*)(long)")+ base + "->data)"; }
     cstring dataEnd(cstring base) const override
