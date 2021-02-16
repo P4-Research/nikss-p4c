@@ -7,17 +7,22 @@ namespace EBPF {
 
 class EBPFPsaDeparser : public EBPFControl {
  public:
-    const IR::P4Control *control;
-    const IR::Parameter *packet_out;
-    EBPFType *headerType;
+    const IR::Parameter* packet_out;
+    EBPFType* headerType;
     std::vector<cstring> headersExpressions;
     std::vector<const IR::Type_Header *> headersToEmit;
+  	cstring outerHdrOffsetVar, outerHdrLengthVar;
+  	cstring returnCode;
 
-    EBPFPsaDeparser(const EBPFProgram *program, const IR::P4Control *control,
-                    const IR::Parameter *parserHeaders) :
-            EBPFControl(program, nullptr, parserHeaders), control(control) {}
+    EBPFPsaDeparser(const EBPFProgram* program,
+                    const IR::Parameter* parserHeaders) :
+            EBPFControl(program, nullptr, parserHeaders) {
 
-    bool build() override;
+      outerHdrOffsetVar = cstring("outHeaderOffset");
+	  outerHdrLengthVar = cstring("outHeaderLength");
+	  returnCode = cstring("returnCode");
+	}
+
     void emit(CodeBuilder* builder) override;
     void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                     cstring &headerExpression) const;

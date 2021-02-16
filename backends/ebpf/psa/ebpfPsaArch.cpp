@@ -277,17 +277,23 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
     return true;
 }
 
-
+// =====================EBPFDeparser=============================
 bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
-    deparser = new EBPFPsaDeparser(program, ctrl->container, parserHeaders);
-    bool success = deparser->build();
-    if (!success) {
-        return false;
-    }
+	deparser = new EBPFPsaDeparser(program, parserHeaders);
+	auto params = ctrl->container->type->applyParams;
+	// TODO: Add support for other PSA deparser parameters
+	auto it = params->parameters.begin();
+  	deparser->packet_out = *it;
+	// TODO: fixed position for headers
+	deparser->headers = *(it + 4);
+	auto ht = program->typeMap->getType(deparser->headers);
+	if (ht == nullptr) {
+	  return false;
+	}
+  	deparser->headerType = EBPFTypeFactory::instance->create(ht);
 
     if (ctrl->container->is<IR::P4Control>()) {
         auto p4Control = ctrl->container->to<IR::P4Control>();
-
         this->visit(p4Control->body);
     }
 

@@ -2,20 +2,6 @@
 
 namespace EBPF {
 
-bool EBPFPsaDeparser::build() {
-    auto params = control->type->applyParams;
-    // TODO: Add support for other PSA deparser parameters
-    auto it = params->parameters.begin();
-    packet_out = *it;
-    // TODO: fixed position for headers
-    headers = *(it + 4);
-    auto ht = program->typeMap->getType(headers);
-    if (ht == nullptr)
-        return false;
-    headerType = EBPFTypeFactory::instance->create(ht);
-    return ::errorCount() == 0;
-}
-
 void EBPFPsaDeparser::emit(CodeBuilder* builder) {
     builder->emitIndent();
     this->headerType->declare(builder, this->headers->name.name, false);
@@ -25,7 +11,7 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
 
     const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
     builder->emitIndent();
-    builder->appendFormat("int %s = 0", pipelineProgram->outerHdrLengthVar.c_str());
+    builder->appendFormat("int %s = 0", this->outerHdrLengthVar.c_str());
     builder->endOfStatement(true);
 
     builder->emitIndent();
@@ -39,7 +25,7 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
         builder->append(".ebpf_valid) ");
         builder->newline();
         builder->emitIndent();
-        builder->appendFormat("%s += %d;", pipelineProgram->outerHdrLengthVar.c_str(), width);
+        builder->appendFormat("%s += %d;", this->outerHdrLengthVar.c_str(), width);
         builder->newline();
     }
     builder->decreaseIndent();
@@ -47,23 +33,23 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
     builder->newline();
     builder->emitIndent();
     builder->appendFormat("int %s = BYTES(%s) - BYTES(%s)",
-                          pipelineProgram->outerHdrOffsetVar.c_str(),
-                          pipelineProgram->outerHdrLengthVar.c_str(),
+                          this->outerHdrOffsetVar.c_str(),
+                          this->outerHdrLengthVar.c_str(),
                           pipelineProgram->offsetVar.c_str());
     builder->endOfStatement(true);
     builder->emitIndent();
-    builder->appendFormat("int %s = 0", pipelineProgram->returnCode.c_str());
+    builder->appendFormat("int %s = 0", this->returnCode.c_str());
     builder->endOfStatement(true);
 
     builder->emitIndent();
     builder->appendFormat("%s = bpf_skb_adjust_room(%s, %s, 1, 0)",
-                          pipelineProgram->returnCode.c_str(),
+                          this->returnCode.c_str(),
                           pipelineProgram->contextVar.c_str(),
-                          pipelineProgram->outerHdrOffsetVar.c_str());
+                          this->outerHdrOffsetVar.c_str());
     builder->endOfStatement(true);
 
     builder->emitIndent();
-    builder->appendFormat("if (%s) ", pipelineProgram->returnCode.c_str());
+    builder->appendFormat("if (%s) ", this->returnCode.c_str());
     builder->blockStart();
     builder->emitIndent();
     builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
@@ -73,7 +59,7 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("%s += %s",
                           pipelineProgram->lengthVar.c_str(),
-                          pipelineProgram->outerHdrOffsetVar.c_str());
+                          this->outerHdrOffsetVar.c_str());
     builder->endOfStatement(true);
     builder->emitIndent();
     builder->appendFormat("%s = 0", pipelineProgram->offsetVar.c_str());
@@ -90,14 +76,14 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
 
     builder->emitIndent();
     builder->appendFormat("%s = bpf_skb_store_bytes(%s, 0, %s, %s, 0)",
-                          pipelineProgram->returnCode.c_str(),
+                          this->returnCode.c_str(),
                           pipelineProgram->contextVar.c_str(),
                           this->headers->name.name.c_str(),
-                          pipelineProgram->outerHdrLengthVar.c_str());
+                          this->outerHdrLengthVar.c_str());
     builder->endOfStatement(true);
 
     builder->emitIndent();
-    builder->appendFormat("if (%s) ", pipelineProgram->returnCode.c_str());
+    builder->appendFormat("if (%s) ", this->returnCode.c_str());
     builder->blockStart();
 
     builder->emitIndent();

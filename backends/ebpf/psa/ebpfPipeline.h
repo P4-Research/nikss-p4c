@@ -16,9 +16,7 @@ class EBPFPipeline : public EBPFProgram {
     const cstring name;
     cstring sectionName;
     EBPFPsaDeparser* deparser;
-
-    cstring contextVar, outerHdrOffsetVar, outerHdrLengthVar;
-    cstring returnCode;
+  	cstring contextVar;
 
     EBPFPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                  P4::TypeMap* typeMap) :
@@ -29,13 +27,9 @@ class EBPFPipeline : public EBPFProgram {
         errorType = "ParserError_t";
 
         packetStartVar = cstring("pkt");
-        offsetVar = cstring("packetOffsetInBits");
-        outerHdrOffsetVar = cstring("outHeaderOffset");
-        outerHdrLengthVar = cstring("outHeaderLength");
         contextVar = cstring("skb");
         lengthVar = cstring("pkt_len");
         endLabel = cstring("deparser");
-        returnCode = cstring("returnCode");
     }
 
     void emitHeaderInstances(CodeBuilder* builder) override;
