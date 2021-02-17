@@ -34,11 +34,30 @@ class EBPFPipeline : public EBPFProgram {
         endLabel = cstring("deparser");
     }
 
-    void emitHeaderInstances(CodeBuilder* builder) override;
+    virtual void emitTrafficManager(CodeBuilder *builder) = 0;
+    void emitHeaderInstances(CodeBuilder *builder) override;
     void emitLocalVariables(CodeBuilder* builder) override;
     void emitGlobalMetadataInitializer(CodeBuilder *builder);
     void emitPSAControlDataTypes(CodeBuilder* builder);
     void emit(CodeBuilder* builder);
+};
+
+class EBPFIngressPipeline : public EBPFPipeline {
+ public:
+    EBPFIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
+                        P4::TypeMap* typeMap) :
+            EBPFPipeline(name, options, refMap, typeMap) { }
+
+    void emitTrafficManager(CodeBuilder *builder) override;
+};
+
+class EBPFEgressPipeline : public EBPFPipeline {
+ public:
+    EBPFEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
+                       P4::TypeMap* typeMap) :
+            EBPFPipeline(name, options, refMap, typeMap) { }
+
+    void emitTrafficManager(CodeBuilder *builder) override;
 };
 
 }  // namespace EBPF

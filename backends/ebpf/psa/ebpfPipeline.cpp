@@ -11,6 +11,7 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     builder->target->emitMain(builder, functionName, model.CPacketName.str());
     builder->spc();
     builder->blockStart();
+    emitGlobalMetadataInitializer(builder);
     emitHeaderInstances(builder);
     emitLocalVariables(builder);
     msgStr = Util::printf_format("%s parser: parsing new packet", sectionName);
@@ -34,9 +35,7 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     builder->blockStart();
     deparser->emit(builder);
     builder->blockEnd(true);
-    builder->emitIndent();
-    // FIXME: it should be different for ingress and egress pipeline
-    builder->appendLine("return bpf_redirect(ostd.egress_port, 0);");
+    this->emitTrafficManager(builder);
     builder->blockEnd(true);
 }
 
@@ -100,4 +99,18 @@ void EBPFPipeline::emitGlobalMetadataInitializer(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendLine("struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->cb;");
 }
+
+// =====================EBPFIngressPipeline=============================
+void EBPFIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
+    builder->emitIndent();
+    builder->appendLine("return bpf_redirect(ostd.egress_port, 0);");
+}
+
+// =====================EBPFEgressPipeline=============================
+void EBPFEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
+    builder->emitIndent();
+    builder->appendLine("return TC_ACT_OK;");
+}
+
+>>>>>>> ec6235ad0... further modifications
 }  // namespace EBPF

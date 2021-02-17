@@ -12,6 +12,11 @@
 
 namespace EBPF {
 
+enum gress_t {
+    INGRESS = 0,
+    EGRESS = 1,
+};
+
 class PSAArch {
  public:
     std::vector<EBPFType*> ebpfTypes;
@@ -52,6 +57,7 @@ class ConvertToEbpfPSA : public Transform {
 
 class ConvertToEbpfPipeline : public Inspector {
     const cstring name;
+    const gress_t type;
     const EbpfOptions &options;
     const IR::ParserBlock* parserBlock;
     const IR::ControlBlock* controlBlock;
@@ -61,11 +67,12 @@ class ConvertToEbpfPipeline : public Inspector {
     EBPFPipeline* pipeline;
 
  public:
-    ConvertToEbpfPipeline(cstring name, const EbpfOptions &options,
+    ConvertToEbpfPipeline(cstring name, gress_t type, const EbpfOptions &options,
             const IR::ParserBlock* parserBlock, const IR::ControlBlock* controlBlock,
             const IR::ControlBlock* deparserBlock,
             P4::ReferenceMap *refmap, P4::TypeMap *typemap) :
             name(name),
+            type(type),
             options(options),
             parserBlock(parserBlock), controlBlock(controlBlock),
             deparserBlock(deparserBlock), typemap(typemap), refmap(refmap) { }

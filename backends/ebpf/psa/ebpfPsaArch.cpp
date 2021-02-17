@@ -75,7 +75,7 @@ void PSAArch::emitPSAIncludes(CodeBuilder *builder) const {
 void PSAArch::emitInternalMetadata(CodeBuilder *pBuilder) const {
     pBuilder->appendLine("struct internal_metadata {\n"
                          "    __u16 pkt_ether_type;\n"
-                         "};");
+                         "} __attribute__((aligned(4)));");
     pBuilder->newline();
 }
 
@@ -148,8 +148,10 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
     BUG_CHECK(ingressDeparser != nullptr, "No ingress deparser block found");
 
     auto ingress_pipeline_converter =
-           new ConvertToEbpfPipeline("tc-ingress", options, ingressParser->to<IR::ParserBlock>(),
-                   ingressControl->to<IR::ControlBlock>(), ingressDeparser->to<IR::ControlBlock>(),
+           new ConvertToEbpfPipeline("tc-ingress", INGRESS, options,
+                   ingressParser->to<IR::ParserBlock>(),
+                   ingressControl->to<IR::ControlBlock>(),
+                   ingressDeparser->to<IR::ControlBlock>(),
                    refmap, typemap);
     ingress->apply(*ingress_pipeline_converter);
     tlb->getProgram()->apply(*ingress_pipeline_converter);
@@ -167,8 +169,10 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
     BUG_CHECK(egressDeparser != nullptr, "No egress deparser block found");
 
     auto egress_pipeline_converter =
-            new ConvertToEbpfPipeline("tc-egress", options, egressParser->to<IR::ParserBlock>(),
-                    egressControl->to<IR::ControlBlock>(), egressDeparser->to<IR::ControlBlock>(),
+            new ConvertToEbpfPipeline("tc-egress", EGRESS, options,
+                    egressParser->to<IR::ParserBlock>(),
+                    egressControl->to<IR::ControlBlock>(),
+                    egressDeparser->to<IR::ControlBlock>(),
                     refmap, typemap);
     egress->apply(*egress_pipeline_converter);
     tlb->getProgram()->apply(*egress_pipeline_converter);
@@ -188,7 +192,14 @@ const IR::Node * ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
 // If so, EBPFPipeline construct should have the following arguments:
 // EBPFPipeline(name, EBPFParser, EBPFControl, EBPFDeparser).
 bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
-    pipeline = new EBPFPipeline(name, options, refmap, typemap);
+    if (type == INGRESS) {
+        pipeline = new EBPFIngressPipeline(name, options, refmap, typemap);
+    } else if (type == EGRESS) {
+        pipeline = new EBPFEgressPipeline(name, options, refmap, typemap);
+    } else {
+        ::error(ErrorType::ERR_INVALID, "unknown type of pipeline");
+        return false;
+    }
 
     auto parser_converter = new ConvertToEBPFParserPSA(pipeline, refmap, typemap);
     parserBlock->apply(*parser_converter);
@@ -279,9 +290,11 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
 
     // use 1024 by default
     size_t size = 1024;
-    auto sizeProperty = tblblk->container->properties->getProperty(tblblk->container->properties->sizePropertyName);
+    auto sizeProperty = tblblk->container->properties->getProperty(
+            tblblk->container->properties->sizePropertyName);
     if (sizeProperty != nullptr) {
-        size = sizeProperty->value->to<IR::ExpressionValue>()->expression->to<IR::Constant>()->asInt();
+        auto expr = sizeProperty->value->to<IR::ExpressionValue>()->expression;
+        size = expr->to<IR::Constant>()->asInt();
     }
 
     cstring name = EBPFObject::externalName(tblblk->container);
