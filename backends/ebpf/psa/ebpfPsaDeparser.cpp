@@ -12,7 +12,8 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
 
     this->hdrVoidPointerVar = this->headers->name.name + this->hdrVoidPointerVar;
     builder->emitIndent();
-    builder->appendFormat("void* %s = (void*)(&%s);", this->hdrVoidPointerVar, this->headers->name.name);
+    builder->appendFormat("void* %s = (void*)(&%s);",
+                          this->hdrVoidPointerVar, this->headers->name.name);
     builder->newline();
 
     const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
@@ -81,7 +82,7 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
     builder->newline();
 
     builder->emitIndent();
-    builder->appendFormat("%s = bpf_skb_store_bytes(%s, 0, %s, %s, 0)",
+    builder->appendFormat("%s = bpf_skb_store_bytes(%s, 0, %s, BYTES(%s), 0)",
                           this->returnCode.c_str(),
                           pipelineProgram->contextVar.c_str(),
                           this->hdrVoidPointerVar.c_str(),
@@ -100,7 +101,7 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
 
 void EBPFPsaDeparser::emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                                  cstring& headerExpression) const {
-	const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
+    const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
     builder->emitIndent();
     builder->append("if (");
     builder->append(headerExpression);
@@ -110,7 +111,7 @@ void EBPFPsaDeparser::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
     unsigned width = headerToEmit->width_bits();
     builder->emitIndent();
     builder->appendFormat("if (%s->len < BYTES(%s + %d)) ",
-						  pipelineProgram->contextVar.c_str(),
+                          pipelineProgram->contextVar.c_str(),
                           program->offsetVar.c_str(), width);
     builder->blockStart();
     builder->emitIndent();

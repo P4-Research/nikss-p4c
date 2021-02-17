@@ -119,10 +119,6 @@ control IngressDeparserImpl(packet_out buffer,
                             in metadata meta,
                             in psa_ingress_output_metadata_t istd)
 {
-    //CommonDeparserImpl() cp;
-    //apply {
-    //    cp.apply(buffer, hdr);
-    //}
     apply {
         buffer.emit(hdr.ethernet);
     }

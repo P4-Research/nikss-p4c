@@ -20,7 +20,7 @@ class EBPFPsaDeparser : public EBPFControl {
       outerHdrOffsetVar = cstring("outHeaderOffset");
       outerHdrLengthVar = cstring("outHeaderLength");
       returnCode = cstring("returnCode");
-	  hdrVoidPointerVar = cstring("VoidPointerVar");
+      hdrVoidPointerVar = cstring("VoidPointerVar");
     }
 
     void emit(CodeBuilder* builder) override;
