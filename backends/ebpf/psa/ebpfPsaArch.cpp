@@ -280,10 +280,13 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
     deparser = new EBPFPsaDeparser(program, parserHeaders);
     auto params = ctrl->container->type->applyParams;
     // TODO: Add support for other PSA deparser parameters
-    auto it = params->parameters.begin();
-    deparser->packet_out = *it;
-    // TODO: fixed position for headers
-    deparser->headers = *(it + 4);
+    deparser->packet_out = params->parameters.front();
+    for (auto param : params->parameters) {
+        // TODO: figure out how better find headers param
+        if (param->direction == IR::Direction::InOut) {
+            deparser->headers = param;
+        }
+    }
     auto ht = program->typeMap->getType(deparser->headers);
     if (ht == nullptr) {
       return false;
