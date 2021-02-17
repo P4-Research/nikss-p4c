@@ -21,21 +21,20 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
     builder->appendFormat("int %s = 0", this->outerHdrLengthVar.c_str());
     builder->endOfStatement(true);
 
-    builder->emitIndent();
-    builder->increaseIndent();
     for (unsigned long i = 0; i < this->headersToEmit.size(); i++) {
         auto headerToEmit = headersToEmit[i];
         auto headerExpression = headersExpressions[i];
         unsigned width = headerToEmit->width_bits();
+        builder->emitIndent();
         builder->append("if (");
         builder->append(headerExpression);
         builder->append(".ebpf_valid) ");
         builder->newline();
         builder->emitIndent();
+        builder->emitIndent();
         builder->appendFormat("%s += %d;", this->outerHdrLengthVar.c_str(), width);
         builder->newline();
     }
-    builder->decreaseIndent();
 
     builder->newline();
     builder->emitIndent();
