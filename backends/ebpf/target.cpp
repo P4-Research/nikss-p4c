@@ -189,16 +189,4 @@ void BccTarget::emitMain(Util::SourceCodeBuilder* builder,
                           functionName.c_str(), argName.c_str());
 }
 
-
-void BccTarget::emitPreamble(Util::SourceCodeBuilder* builder) const {
-    (void) builder;
-}
-
-void BccTarget::emitTraceMessage(Util::SourceCodeBuilder* builder, const char* format,
-                                 int argc, ...) const {
-    (void) builder;
-    (void) format;
-    (void) argc;
-}
-
 }  // namespace EBPF

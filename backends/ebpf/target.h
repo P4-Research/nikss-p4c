@@ -56,9 +56,15 @@ class Target {
     virtual void emitMain(Util::SourceCodeBuilder* builder,
                           cstring functionName,
                           cstring argName) const = 0;
-    virtual void emitPreamble(Util::SourceCodeBuilder* builder) const = 0;
+    virtual void emitPreamble(Util::SourceCodeBuilder* builder) const {
+        (void) builder;
+    }
     virtual void emitTraceMessage(Util::SourceCodeBuilder* builder, const char* format,
-                                  int argc = 0, ...) const = 0;
+                                  int argc = 0, ...) const {
+        (void) builder;
+        (void) format;
+        (void) argc;
+    }
     virtual cstring dataOffset(cstring base) const = 0;
     virtual cstring dataEnd(cstring base) const = 0;
     virtual cstring forwardReturnCode() const = 0;
@@ -126,9 +132,6 @@ class BccTarget : public Target {
     void emitMain(Util::SourceCodeBuilder* builder,
                   cstring functionName,
                   cstring argName) const override;
-    void emitPreamble(Util::SourceCodeBuilder* builder) const override;
-    void emitTraceMessage(Util::SourceCodeBuilder* builder, const char* format,
-                          int argc = 0, ...) const override;
     cstring dataOffset(cstring base) const override { return base; }
     cstring dataEnd(cstring base) const override
     { return cstring("(") + base + " + " + base + "->len)"; }
