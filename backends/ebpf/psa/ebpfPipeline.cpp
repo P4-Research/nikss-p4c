@@ -66,10 +66,6 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     builder->newline();
 
     builder->emitIndent();
-    builder->appendFormat("unsigned char %s;", byteVar.c_str());
-    builder->newline();
-
-    builder->emitIndent();
     builder->appendLine("struct psa_ingress_output_metadata_t ostd = {\n"
                         "            .drop = true,\n"
                         "        };");
