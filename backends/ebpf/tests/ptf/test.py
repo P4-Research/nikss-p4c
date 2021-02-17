@@ -232,13 +232,6 @@ class MetadataXdpTcTest(EbpfTest):
             global_metadata_ok=255) / pkt
         testutils.verify_packet_any_port(self, str(pkt_with_metadata), ALL_PORTS)
 
-class PSATest(P4EbpfTest):
-
-    p4_file_path = "../../../testdata/p4_16_samples/psa-test.p4"
-
-    def runTest(self):
-        pass
-
 class SimpleForwardingPSATest(P4EbpfTest):
 
     p4_file_path = "samples/p4testdata/simple-fwd.p4"
