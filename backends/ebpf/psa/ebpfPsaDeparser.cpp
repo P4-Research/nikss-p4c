@@ -25,13 +25,13 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
         auto headerToEmit = headersToEmit[i];
         auto headerExpression = headersExpressions[i];
         unsigned width = headerToEmit->width_bits();
-		builder->emitIndent();
+        builder->emitIndent();
         builder->append("if (");
         builder->append(headerExpression);
         builder->append(".ebpf_valid) ");
         builder->newline();
-		builder->emitIndent();
-		builder->emitIndent();
+        builder->emitIndent();
+        builder->emitIndent();
         builder->appendFormat("%s += %d;", this->outerHdrLengthVar.c_str(), width);
         builder->newline();
     }
