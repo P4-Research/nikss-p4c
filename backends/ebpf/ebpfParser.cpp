@@ -448,7 +448,13 @@ void EBPFParser::emit(CodeBuilder* builder) {
     builder->spc();
     builder->blockStart();
 
-    builder->target->emitTraceMessage(builder, "Parser: packet rejected");
+    // This state may be called from deparser, so do not explicitly tell source of this event.
+    if (auto psaPipeline = dynamic_cast<const EBPFPipeline *>(this->program)) {
+        cstring msgStr = Util::printf_format("%s: packet rejected", psaPipeline->sectionName);
+        builder->target->emitTraceMessage(builder, msgStr.c_str());
+    } else {
+        builder->target->emitTraceMessage(builder, "Packet rejected");
+    }
 
     builder->emitIndent();
     builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
