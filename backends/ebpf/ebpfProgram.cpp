@@ -165,32 +165,6 @@ void EBPFProgram::emitTypes(CodeBuilder* builder) {
     }
 }
 
-void EBPFProgram::emitTraceMessage(CodeBuilder* builder,
-                                   const char* format,
-                                   int argc, ...) const {
-    if (!options.emitTraceMessages)
-        return;
-
-    cstring msg = format;
-    va_list ap;
-
-    // ensure that printed message ends with '\n'
-    if (!msg.endsWith("\\n"))
-        msg = msg + "\\n";
-    msg = cstring("\"") + msg + "\"";
-
-    va_start(ap, argc);
-    for (int i = 0; i < argc; ++i) {
-        auto arg = va_arg(ap, const char *);
-        if (!arg)
-            break;
-        msg = msg + ", " + cstring(arg);
-    }
-    va_end(ap);
-
-    builder->target->emitTraceMessage(builder, msg);
-}
-
 namespace {
 class ErrorCodesVisitor : public Inspector {
     CodeBuilder* builder;
@@ -279,10 +253,10 @@ void EBPFProgram::emitPipeline(CodeBuilder* builder) {
     builder->newline();
     builder->emitIndent();
     builder->blockStart();
-    emitTraceMessage(builder, "Control: packet processing started");
+    builder->target->emitTraceMessage(builder, "Control: packet processing started");
     control->emit(builder);
     builder->blockEnd(true);
-    emitTraceMessage(builder, "Control: packet processing finished");
+    builder->target->emitTraceMessage(builder, "Control: packet processing finished");
 }
 
 }  // namespace EBPF

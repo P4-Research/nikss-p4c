@@ -53,7 +53,7 @@ StateTranslationVisitor::compileLookahead(const IR::Expression* destination) {
     cstring msgStr = Util::printf_format("Parser: lookahead for %s %s",
          state->parser->typeMap->getType(destination)->toString(),
          destination->toString());
-    state->parser->program->emitTraceMessage(builder, msgStr.c_str());
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     builder->emitIndent();
     builder->blockStart();
@@ -104,7 +104,7 @@ bool StateTranslationVisitor::preorder(const IR::ParserState* parserState) {
     builder->blockStart();
 
     cstring msgStr = Util::printf_format("Parser: state %s", parserState->name.name);
-    state->parser->program->emitTraceMessage(builder, msgStr.c_str());
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     visit(parserState->components, "components");
     if (parserState->selectExpression == nullptr) {
@@ -179,7 +179,7 @@ StateTranslationVisitor::compileExtractField(
     cstring msgStr;
 
     msgStr = Util::printf_format("Parser: extracting field %s", field);
-    program->emitTraceMessage(builder, msgStr.c_str());
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     if (widthToExtract <= 64) {
         unsigned lastBitIndex = widthToExtract + alignment - 1;
@@ -270,10 +270,10 @@ StateTranslationVisitor::compileExtractField(
         cstring tmp = Util::printf_format("(unsigned long long) %s.%s", expr->toString(), field);
         msgStr = Util::printf_format("Parser: extracted %s=0x%%llx (%u bits)",
                                      field, widthToExtract);
-        program->emitTraceMessage(builder, msgStr.c_str(), 1, tmp.c_str());
+        builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, tmp.c_str());
     } else {
         msgStr = Util::printf_format("Parser: extracted %s (%u bits)", field, widthToExtract);
-        program->emitTraceMessage(builder, msgStr.c_str());
+        builder->target->emitTraceMessage(builder, msgStr.c_str());
     }
 
     builder->newline();
@@ -296,7 +296,7 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
     cstring offsetStr = Util::printf_format("BYTES(%s + %s)",
                                             program->offsetVar, cstring::to_cstring(width));
     // FIXME: program->lengthVariable should be used instead of difference of end and start
-    program->emitTraceMessage(builder, "Parser: check pkt_len=%%d < last_read_byte=%%d", 2,
+    builder->target->emitTraceMessage(builder, "Parser: check pkt_len=%%d < last_read_byte=%%d", 2,
                               (program->packetEndVar + " - " + program->packetStartVar).c_str(),
                               offsetStr.c_str());
 
@@ -307,7 +307,7 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
                           program->offsetVar.c_str(), width);
     builder->blockStart();
 
-    program->emitTraceMessage(builder, "Parser: invalid packet (packet too short)");
+    builder->target->emitTraceMessage(builder, "Parser: invalid packet (packet too short)");
 
     builder->emitIndent();
     builder->appendFormat("%s = %s;", program->errorVar.c_str(),
@@ -320,7 +320,7 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
     builder->blockEnd(true);
 
     msgStr = Util::printf_format("Parser: extracting header %s", destination->toString());
-    program->emitTraceMessage(builder, msgStr.c_str());
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
     builder->newline();
 
     unsigned alignment = 0;
@@ -345,7 +345,7 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
     }
 
     msgStr = Util::printf_format("Parser: extracted %s", destination->toString());
-    program->emitTraceMessage(builder, msgStr.c_str());
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     builder->newline();
 }
@@ -448,7 +448,7 @@ void EBPFParser::emit(CodeBuilder* builder) {
     builder->spc();
     builder->blockStart();
 
-    program->emitTraceMessage(builder, "Parser: packet rejected");
+    builder->target->emitTraceMessage(builder, "Parser: packet rejected");
 
     builder->emitIndent();
     builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());

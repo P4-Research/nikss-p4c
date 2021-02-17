@@ -33,7 +33,7 @@ void PSAArch::emit(CodeBuilder *builder) const {
      */
     emitPreamble(builder);
     // target-specific "preamble"; TODO: move to emitPreamble()
-    builder->target->emitPreamble(builder, xdp->options);
+    builder->target->emitPreamble(builder);
 
     /*
      * 4. Headers, structs, types, PSA-specific data types.
