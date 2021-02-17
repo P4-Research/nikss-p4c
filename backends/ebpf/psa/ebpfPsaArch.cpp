@@ -182,6 +182,12 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
                                                          refmap, typemap);
     controlBlock->apply(*control_converter);
     pipeline->control = control_converter->getEBPFControl();
+
+    auto deparser_converter = new ConvertToEBPFDeparserPSA(pipeline, pipeline->parser->headers,
+                                                           refmap, typemap);
+    deparserBlock->apply(*deparser_converter);
+    pipeline->deparser = deparser_converter->getEBPFPsaDeparser();
+
     return true;
 }
 
@@ -269,6 +275,57 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
         return false;
     }
     return true;
+}
+
+// =====================EBPFDeparser=============================
+bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
+    deparser = new EBPFPsaDeparser(program, parserHeaders);
+    auto params = ctrl->container->type->applyParams;
+    // TODO: Add support for other PSA deparser parameters
+    auto it = params->parameters.begin();
+    deparser->packet_out = *it;
+    // TODO: fixed position for headers
+    deparser->headers = *(it + 4);
+    auto ht = program->typeMap->getType(deparser->headers);
+    if (ht == nullptr) {
+      return false;
+    }
+    deparser->headerType = EBPFTypeFactory::instance->create(ht);
+    if (ctrl->container->is<IR::P4Control>()) {
+        auto p4Control = ctrl->container->to<IR::P4Control>();
+        this->visit(p4Control->body);
+    }
+
+    return false;
+}
+
+bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expression) {
+    auto mi = P4::MethodInstance::resolve(expression,
+                                          deparser->program->refMap,
+                                          deparser->program->typeMap);
+    auto extMethod = mi->to<P4::ExternMethod>();
+    if (extMethod != nullptr) {
+        auto decl = extMethod->object;
+        if (decl == deparser->packet_out) {
+            if (extMethod->method->name.name == p4lib.packetOut.emit.name) {
+                auto expr = extMethod->expr->arguments->at(0)->expression;
+                auto type = deparser->program->typeMap->getType(expr);
+                auto ht = type->to<IR::Type_Header>();
+                if (ht == nullptr) {
+                    ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                            "Cannot emit a non-header type %1%", expr);
+                    return false;
+                }
+                deparser->headersToEmit.push_back(ht);
+                auto exprMemb = expr->to<IR::Member>();
+                auto headerName = exprMemb->member.name;
+                auto headersStructName = deparser->parserHeaders->name.name;
+                deparser->headersExpressions.push_back(headersStructName + "." + headerName);
+                return false;
+            }
+        }
+    }
+    return false;
 }
 
 }  // namespace EBPF

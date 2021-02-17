@@ -52,6 +52,7 @@ set (P4C_EBPF_SRCS
   psa/xdpProgram.cpp
   psa/ebpfPipeline.cpp
   psa/ebpfPsaParser.cpp
+  psa/ebpfPsaDeparser.cpp
   psa/ebpfPsaControl.cpp
   )
 
@@ -95,6 +96,7 @@ set (P4C_EBPF_HDRS
   psa/xdpProgram.h
   psa/ebpfPipeline.h
   psa/ebpfPsaParser.h
+  psa/ebpfPsaDeparser.h
   psa/ebpfPsaControl.h
   )
 

@@ -19,7 +19,6 @@ class EBPFPsaControl : public EBPFControl {
     void emit(CodeBuilder* builder) override;
 };
 
-
 }  // namespace EBPF
 
 #endif  /* BACKENDS_EBPF_PSA_EBPFPSACONTROL_H_ */
