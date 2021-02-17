@@ -112,5 +112,4 @@ void EBPFEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->appendLine("return TC_ACT_OK;");
 }
 
->>>>>>> ec6235ad0... further modifications
 }  // namespace EBPF
