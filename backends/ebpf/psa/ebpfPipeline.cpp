@@ -23,9 +23,6 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     builder->newline();
     builder->emitIndent();
     builder->blockStart();
-    // TODO: add more info: packet length, ingress port
-    msgStr = Util::printf_format("%s control: packet processing started", sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
     emitPSAControlDataTypes(builder);
     // TODO: add more info: packet length, ingress port
     msgStr = Util::printf_format("%s control: packet processing started", sectionName);

@@ -12,7 +12,7 @@
 
 namespace EBPF {
 
-enum gress_t {
+enum pipeline_type {
     INGRESS = 0,
     EGRESS = 1,
 };
@@ -57,7 +57,7 @@ class ConvertToEbpfPSA : public Transform {
 
 class ConvertToEbpfPipeline : public Inspector {
     const cstring name;
-    const gress_t type;
+    const pipeline_type type;
     const EbpfOptions &options;
     const IR::ParserBlock* parserBlock;
     const IR::ControlBlock* controlBlock;
@@ -67,10 +67,10 @@ class ConvertToEbpfPipeline : public Inspector {
     EBPFPipeline* pipeline;
 
  public:
-    ConvertToEbpfPipeline(cstring name, gress_t type, const EbpfOptions &options,
-            const IR::ParserBlock* parserBlock, const IR::ControlBlock* controlBlock,
-            const IR::ControlBlock* deparserBlock,
-            P4::ReferenceMap *refmap, P4::TypeMap *typemap) :
+    ConvertToEbpfPipeline(cstring name, pipeline_type type, const EbpfOptions &options,
+                          const IR::ParserBlock* parserBlock, const IR::ControlBlock* controlBlock,
+                          const IR::ControlBlock* deparserBlock,
+                          P4::ReferenceMap *refmap, P4::TypeMap *typemap) :
             name(name),
             type(type),
             options(options),
