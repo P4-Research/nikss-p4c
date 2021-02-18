@@ -29,11 +29,11 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
         builder->append("if (");
         builder->append(headerExpression);
         builder->append(".ebpf_valid) ");
-        builder->newline();
-        builder->emitIndent();
+        builder->blockStart();
         builder->emitIndent();
         builder->appendFormat("%s += %d;", this->outerHdrLengthVar.c_str(), width);
         builder->newline();
+        builder->blockEnd(true);
     }
 
     builder->newline();
@@ -62,11 +62,6 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
     builder->newline();
     builder->blockEnd(true);
 
-//    builder->emitIndent();
-//    builder->appendFormat("%s += %s",
-//                          pipelineProgram->lengthVar.c_str(),
-//                          this->outerHdrOffsetVar.c_str());
-//    builder->endOfStatement(true);
     builder->emitIndent();
     builder->appendFormat("%s = 0", pipelineProgram->offsetVar.c_str());
     builder->endOfStatement(true);
@@ -91,11 +86,16 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("if (%s) ", this->returnCode.c_str());
     builder->blockStart();
-
     builder->emitIndent();
     builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
     builder->newline();
     builder->blockEnd(true);
+
+    // TODO: Implement port forwarding based on metadatas
+    builder->emitIndent();
+    builder->appendFormat("return bpf_redirect(skb->ifindex + 1, 0);");
+    builder->newline();
+
 }
 
 void EBPFPsaDeparser::emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
