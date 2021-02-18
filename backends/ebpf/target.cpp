@@ -80,6 +80,44 @@ void KernelSamplesTarget::emitMain(Util::SourceCodeBuilder* builder,
                           functionName.c_str(), argName.c_str());
 }
 
+void KernelSamplesTarget::emitPreamble(Util::SourceCodeBuilder* builder) const {
+    if (emitTraceMessages) {
+        builder->appendLine("#define bpf_trace_message(fmt, ...)                              \\");
+        builder->appendLine("  ({                                                             \\");
+        builder->appendLine("      char ____fmt[] = fmt;                                      \\");
+        builder->appendLine("      bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \\");
+        builder->appendLine("  })");
+        builder->newline();
+    }
+}
+
+void KernelSamplesTarget::emitTraceMessage(Util::SourceCodeBuilder* builder, const char* format,
+                                           int argc, ...) const {
+    if (!emitTraceMessages)
+        return;
+
+    cstring msg = format;
+    va_list ap;
+
+    // ensure that printed message ends with '\n'
+    if (!msg.endsWith("\\n"))
+        msg = msg + "\\n";
+    msg = cstring("\"") + msg + "\"";
+
+    va_start(ap, argc);
+    for (int i = 0; i < argc; ++i) {
+        auto arg = va_arg(ap, const char *);
+        if (!arg)
+            break;
+        msg = msg + ", " + cstring(arg);
+    }
+    va_end(ap);
+
+    builder->emitIndent();
+    builder->appendFormat("bpf_trace_message(%s);", msg);
+    builder->newline();
+}
+
 //////////////////////////////////////////////////////////////
 
 void TestTarget::emitIncludes(Util::SourceCodeBuilder* builder) const {

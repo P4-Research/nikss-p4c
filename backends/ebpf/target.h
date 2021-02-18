@@ -56,6 +56,15 @@ class Target {
     virtual void emitMain(Util::SourceCodeBuilder* builder,
                           cstring functionName,
                           cstring argName) const = 0;
+    virtual void emitPreamble(Util::SourceCodeBuilder* builder) const {
+        (void) builder;
+    }
+    virtual void emitTraceMessage(Util::SourceCodeBuilder* builder, const char* format,
+                                  int argc = 0, ...) const {
+        (void) builder;
+        (void) format;
+        (void) argc;
+    }
     virtual cstring dataOffset(cstring base) const = 0;
     virtual cstring dataEnd(cstring base) const = 0;
     virtual cstring forwardReturnCode() const = 0;
@@ -68,8 +77,14 @@ class Target {
 // Represents a target that is compiled within the kernel
 // source tree samples folder and which attaches to a socket
 class KernelSamplesTarget : public Target {
+ protected:
+    bool emitTraceMessages;
+
  public:
-    explicit KernelSamplesTarget(cstring name = "Linux kernel") : Target(name) {}
+    explicit KernelSamplesTarget(bool emitTrace = false, cstring name = "Linux kernel")
+        : Target(name) {
+        emitTraceMessages = emitTrace;
+    }
     void emitLicense(Util::SourceCodeBuilder* builder, cstring license) const override;
     void emitCodeSection(Util::SourceCodeBuilder* builder, cstring sectionName) const override;
     void emitIncludes(Util::SourceCodeBuilder* builder) const override;
@@ -85,6 +100,9 @@ class KernelSamplesTarget : public Target {
     void emitMain(Util::SourceCodeBuilder* builder,
                   cstring functionName,
                   cstring argName) const override;
+    void emitPreamble(Util::SourceCodeBuilder* builder) const override;
+    void emitTraceMessage(Util::SourceCodeBuilder* builder, const char* format,
+                          int argc = 0, ...) const override;
     cstring dataOffset(cstring base) const override
     { return cstring("((void*)(long)")+ base + "->data)"; }
     cstring dataEnd(cstring base) const override
@@ -127,7 +145,7 @@ class BccTarget : public Target {
 // Compiles with gcc
 class TestTarget : public EBPF::KernelSamplesTarget {
  public:
-    TestTarget() : KernelSamplesTarget("Userspace Test") {}
+    TestTarget() : KernelSamplesTarget(false, "Userspace Test") {}
     void emitIncludes(Util::SourceCodeBuilder* builder) const override;
     void emitTableDecl(Util::SourceCodeBuilder* builder,
                        cstring tblName, TableKind tableKind,

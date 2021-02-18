@@ -4,6 +4,8 @@
 namespace EBPF {
 
 void EBPFPipeline::emit(CodeBuilder* builder) {
+    cstring msgStr;
+
     builder->target->emitCodeSection(builder, sectionName);
     builder->emitIndent();
     builder->target->emitMain(builder, functionName, model.CPacketName.str());
@@ -11,6 +13,8 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     builder->blockStart();
     emitHeaderInstances(builder);
     emitLocalVariables(builder);
+    msgStr = Util::printf_format("%s parser: parsing new packet", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
     parser->emit(builder);
     builder->emitIndent();
     builder->append(IR::ParserState::accept);
@@ -18,8 +22,13 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     builder->newline();
     builder->emitIndent();
     builder->blockStart();
+    // TODO: add more info: packet length, ingress port
+    msgStr = Util::printf_format("%s control: packet processing started", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
     control->emit(builder);
     builder->blockEnd(true);
+    msgStr = Util::printf_format("%s control: packet processing finished", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
     builder->emitIndent();
     builder->blockStart();
     deparser->emit(builder);

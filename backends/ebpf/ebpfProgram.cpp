@@ -253,8 +253,10 @@ void EBPFProgram::emitPipeline(CodeBuilder* builder) {
     builder->newline();
     builder->emitIndent();
     builder->blockStart();
+    builder->target->emitTraceMessage(builder, "Control: packet processing started");
     control->emit(builder);
     builder->blockEnd(true);
+    builder->target->emitTraceMessage(builder, "Control: packet processing finished");
 }
 
 }  // namespace EBPF

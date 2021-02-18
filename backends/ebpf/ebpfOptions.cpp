@@ -20,4 +20,7 @@ EbpfOptions::EbpfOptions() {
         registerOption("--emit-externs", nullptr,
                 [this](const char*) { emitExterns = true; return true; },
                 "[ebpf back-end] Allow for user-provided implementation of extern functions.");
+        registerOption("--trace", nullptr,
+                [this](const char*) { emitTraceMessages = true; return true; },
+                "Enable tracing of packet flow");
 }

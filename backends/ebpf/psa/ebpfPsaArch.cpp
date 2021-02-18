@@ -32,6 +32,8 @@ void PSAArch::emit(CodeBuilder *builder) const {
      * 3. Macro definitions (it's called "preamble")
      */
     emitPreamble(builder);
+    // target-specific "preamble"; TODO: move to emitPreamble()
+    builder->target->emitPreamble(builder);
 
     /*
      * 4. Headers, structs, types, PSA-specific data types.
