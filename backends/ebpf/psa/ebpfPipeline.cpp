@@ -96,7 +96,8 @@ void EBPFPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
 
 void EBPFPipeline::emitGlobalMetadataInitializer(CodeBuilder *builder) {
     builder->emitIndent();
-    builder->appendLine("struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->cb;");
+    builder->appendLine(
+            "struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->cb;");
 }
 
 // =====================EBPFIngressPipeline=============================
