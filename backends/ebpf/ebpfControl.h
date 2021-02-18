@@ -73,7 +73,7 @@ class EBPFControl : public EBPFObject {
     void emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl);
     void emitTableTypes(CodeBuilder* builder);
     void emitTableInitializers(CodeBuilder* builder);
-    void emitTableInstances(CodeBuilder* builder);
+    virtual void emitTableInstances(CodeBuilder* builder);
     virtual bool build();
     EBPFTable* getTable(cstring name) const {
         auto result = ::get(tables, name);

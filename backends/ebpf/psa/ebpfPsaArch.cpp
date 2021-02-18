@@ -1,6 +1,7 @@
 #include "ebpfPsaArch.h"
 #include "ebpfPsaParser.h"
-#include "backends/ebpf/ebpfControl.h"
+#include "ebpfPsaObjects.h"
+#include "ebpfPsaControl.h"
 #include "xdpProgram.h"
 
 namespace EBPF {
@@ -42,6 +43,11 @@ void PSAArch::emit(CodeBuilder *builder) const {
     emitTypes(builder);
 
     /*
+     * 5. BPF map definitions.
+     */
+    emitInstances(builder);
+
+    /*
      * 6. XDP helper program.
      */
     xdp->emit(builder);
@@ -69,7 +75,7 @@ void PSAArch::emitPSAIncludes(CodeBuilder *builder) const {
 void PSAArch::emitInternalMetadata(CodeBuilder *pBuilder) const {
     pBuilder->appendLine("struct internal_metadata {\n"
                          "    __u16 pkt_ether_type;\n"
-                         "};");
+                         "} __attribute__((aligned(4)));");
     pBuilder->newline();
 }
 
@@ -89,6 +95,17 @@ void PSAArch::emitPreamble(CodeBuilder *builder) const {
     builder->appendLine("#define write_byte(base, offset, v) do { "
                         "*(u8*)((base) + (offset)) = (v); "
                         "} while (0)");
+    builder->newline();
+}
+
+void PSAArch::emitInstances(CodeBuilder *builder) const {
+    builder->newline();
+    tcIngress->control->emitTableTypes(builder);
+    tcEgress->control->emitTableTypes(builder);
+    builder->appendLine("REGISTER_START()");
+    tcIngress->control->emitTableInstances(builder);
+    tcEgress->control->emitTableInstances(builder);
+    builder->appendLine("REGISTER_END()");
     builder->newline();
 }
 
@@ -131,8 +148,10 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
     BUG_CHECK(ingressDeparser != nullptr, "No ingress deparser block found");
 
     auto ingress_pipeline_converter =
-           new ConvertToEbpfPipeline("tc-ingress", options, ingressParser->to<IR::ParserBlock>(),
-                   ingressControl->to<IR::ControlBlock>(), ingressDeparser->to<IR::ControlBlock>(),
+           new ConvertToEbpfPipeline("tc-ingress", INGRESS, options,
+                   ingressParser->to<IR::ParserBlock>(),
+                   ingressControl->to<IR::ControlBlock>(),
+                   ingressDeparser->to<IR::ControlBlock>(),
                    refmap, typemap);
     ingress->apply(*ingress_pipeline_converter);
     tlb->getProgram()->apply(*ingress_pipeline_converter);
@@ -150,8 +169,10 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
     BUG_CHECK(egressDeparser != nullptr, "No egress deparser block found");
 
     auto egress_pipeline_converter =
-            new ConvertToEbpfPipeline("tc-egress", options, egressParser->to<IR::ParserBlock>(),
-                    egressControl->to<IR::ControlBlock>(), egressDeparser->to<IR::ControlBlock>(),
+            new ConvertToEbpfPipeline("tc-egress", EGRESS, options,
+                    egressParser->to<IR::ParserBlock>(),
+                    egressControl->to<IR::ControlBlock>(),
+                    egressDeparser->to<IR::ControlBlock>(),
                     refmap, typemap);
     egress->apply(*egress_pipeline_converter);
     tlb->getProgram()->apply(*egress_pipeline_converter);
@@ -171,7 +192,14 @@ const IR::Node * ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
 // If so, EBPFPipeline construct should have the following arguments:
 // EBPFPipeline(name, EBPFParser, EBPFControl, EBPFDeparser).
 bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
-    pipeline = new EBPFPipeline(name, options, refmap, typemap);
+    if (type == INGRESS) {
+        pipeline = new EBPFIngressPipeline(name, options, refmap, typemap);
+    } else if (type == EGRESS) {
+        pipeline = new EBPFEgressPipeline(name, options, refmap, typemap);
+    } else {
+        ::error(ErrorType::ERR_INVALID, "unknown type of pipeline");
+        return false;
+    }
 
     auto parser_converter = new ConvertToEBPFParserPSA(pipeline, refmap, typemap);
     parserBlock->apply(*parser_converter);
@@ -218,9 +246,9 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserState *s) {
 
 // =====================EBPFControl=============================
 bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
-    control = new EBPFControl(program,
-                              ctrl,
-                              parserHeaders);
+    control = new EBPFControlPSA(program,
+                                 ctrl,
+                                 parserHeaders);
     control->hitVariable = refmap->newName("hit");
     auto pl = ctrl->container->type->applyParams;
     auto it = pl->parameters.begin();
@@ -240,7 +268,37 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
-    auto tbl = new EBPFTable(program, tblblk, control->codeGen);
+    // use HASH_MAP as default type
+    TableKind tableKind = TableHash;
+
+    // If any key field is LPM we will generate an LPM table
+    auto keyGenerator = tblblk->container->getKey();
+    if (keyGenerator != nullptr) {
+        for (auto it : keyGenerator->keyElements) {
+            auto mtdecl = refmap->getDeclaration(it->matchType->path, true);
+            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
+            if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
+                if (tableKind == TableLPMTrie) {
+                    ::error(ErrorType::ERR_UNSUPPORTED,
+                            "%1%: only one LPM field allowed", it->matchType);
+                    return false;
+                }
+                tableKind = TableLPMTrie;
+            }
+        }
+    }
+
+    // use 1024 by default
+    size_t size = 1024;
+    auto sizeProperty = tblblk->container->properties->getProperty(
+            tblblk->container->properties->sizePropertyName);
+    if (sizeProperty != nullptr) {
+        auto expr = sizeProperty->value->to<IR::ExpressionValue>()->expression;
+        size = expr->to<IR::Constant>()->asInt();
+    }
+
+    cstring name = EBPFObject::externalName(tblblk->container);
+    auto tbl = new EBPFTablePSA(program, tblblk, control->codeGen, name, tableKind, size);
     control->tables.emplace(tblblk->container->name, tbl);
     return true;
 }

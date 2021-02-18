@@ -1,6 +1,7 @@
 #ifndef BACKENDS_EBPF_PSA_EBPFPIPELINE_H_
 #define BACKENDS_EBPF_PSA_EBPFPIPELINE_H_
 
+#include "ebpfPsaControl.h"
 #include "backends/ebpf/ebpfProgram.h"
 #include "ebpfPsaDeparser.h"
 
@@ -15,8 +16,10 @@ class EBPFPipeline : public EBPFProgram {
  public:
     const cstring name;
     cstring sectionName;
-    EBPFPsaDeparser* deparser;
     cstring contextVar;
+
+    EBPFControlPSA* control;
+    EBPFPsaDeparser* deparser;
 
     EBPFPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                  P4::TypeMap* typeMap) :
@@ -25,16 +28,36 @@ class EBPFPipeline : public EBPFProgram {
         sectionName = name;
         functionName = name.replace("-", "_") + "_func";
         errorType = "ParserError_t";
-
         packetStartVar = cstring("pkt");
         contextVar = cstring("skb");
         lengthVar = cstring("pkt_len");
         endLabel = cstring("deparser");
     }
 
-    void emitHeaderInstances(CodeBuilder* builder) override;
+    virtual void emitTrafficManager(CodeBuilder *builder) = 0;
+    void emitHeaderInstances(CodeBuilder *builder) override;
     void emitLocalVariables(CodeBuilder* builder) override;
+    void emitGlobalMetadataInitializer(CodeBuilder *builder);
+    void emitPSAControlDataTypes(CodeBuilder* builder);
     void emit(CodeBuilder* builder);
+};
+
+class EBPFIngressPipeline : public EBPFPipeline {
+ public:
+    EBPFIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
+                        P4::TypeMap* typeMap) :
+            EBPFPipeline(name, options, refMap, typeMap) { }
+
+    void emitTrafficManager(CodeBuilder *builder) override;
+};
+
+class EBPFEgressPipeline : public EBPFPipeline {
+ public:
+    EBPFEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
+                       P4::TypeMap* typeMap) :
+            EBPFPipeline(name, options, refMap, typeMap) { }
+
+    void emitTrafficManager(CodeBuilder *builder) override;
 };
 
 }  // namespace EBPF

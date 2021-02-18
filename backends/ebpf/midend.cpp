@@ -102,12 +102,22 @@ const IR::ToplevelBlock* MidEnd::run(EbpfOptions& options,
             new P4::ConstantFolding(&refMap, &typeMap),
             new P4::SimplifyControlFlow(&refMap, &typeMap),
             new P4::TableHit(&refMap, &typeMap),
-            new P4::ValidateTableProperties({"implementation"}),
             new P4::RemoveLeftSlices(&refMap, &typeMap),
             new EBPF::Lower(&refMap, &typeMap),
             evaluator,
             new P4::MidEndLast()
         });
+
+        if (options.arch == "psa") {
+            midEnd.addPasses({
+                new P4::ValidateTableProperties({"size"})
+            });
+        } else {
+            midEnd.addPasses({
+                new P4::ValidateTableProperties({"implementation"})
+            });
+        }
+
         if (options.listMidendPasses) {
             midEnd.listPasses(*outStream, "\n");
             *outStream << std::endl;

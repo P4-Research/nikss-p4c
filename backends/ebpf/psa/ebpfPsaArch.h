@@ -12,6 +12,11 @@
 
 namespace EBPF {
 
+enum pipeline_type {
+    INGRESS = 0,
+    EGRESS = 1,
+};
+
 class PSAArch {
  public:
     std::vector<EBPFType*> ebpfTypes;
@@ -24,10 +29,11 @@ class PSAArch {
             tcEgress(tcEgress) { }
 
     void emit(CodeBuilder* builder) const;  // emits C file for eBPF program
-    void emitPreamble(CodeBuilder* builder) const;
-    void emitInternalMetadata(CodeBuilder* builder) const;
-    void emitTypes(CodeBuilder* builder) const;
-    void emitPSAIncludes(CodeBuilder* builder) const;
+    void emitPreamble(CodeBuilder *builder) const;
+    void emitInternalMetadata(CodeBuilder *pBuilder) const;
+    void emitTypes(CodeBuilder *builder) const;
+    void emitInstances(CodeBuilder *builder) const;
+    void emitPSAIncludes(CodeBuilder *builder) const;
 };
 
 class ConvertToEbpfPSA : public Transform {
@@ -51,6 +57,7 @@ class ConvertToEbpfPSA : public Transform {
 
 class ConvertToEbpfPipeline : public Inspector {
     const cstring name;
+    const pipeline_type type;
     const EbpfOptions &options;
     const IR::ParserBlock* parserBlock;
     const IR::ControlBlock* controlBlock;
@@ -60,11 +67,12 @@ class ConvertToEbpfPipeline : public Inspector {
     EBPFPipeline* pipeline;
 
  public:
-    ConvertToEbpfPipeline(cstring name, const EbpfOptions &options,
-            const IR::ParserBlock* parserBlock, const IR::ControlBlock* controlBlock,
-            const IR::ControlBlock* deparserBlock,
-            P4::ReferenceMap *refmap, P4::TypeMap *typemap) :
+    ConvertToEbpfPipeline(cstring name, pipeline_type type, const EbpfOptions &options,
+                          const IR::ParserBlock* parserBlock, const IR::ControlBlock* controlBlock,
+                          const IR::ControlBlock* deparserBlock,
+                          P4::ReferenceMap *refmap, P4::TypeMap *typemap) :
             name(name),
+            type(type),
             options(options),
             parserBlock(parserBlock), controlBlock(controlBlock),
             deparserBlock(deparserBlock), typemap(typemap), refmap(refmap) { }
@@ -93,8 +101,8 @@ class ConvertToEBPFControlPSA : public Inspector {
     const IR::Parameter* parserHeaders;
     P4::TypeMap *typemap;
     P4::ReferenceMap *refmap;
-    EBPF::EBPFControl *control;
 
+    EBPF::EBPFControlPSA *control;
  public:
     ConvertToEBPFControlPSA(EBPF::EBPFProgram *program, const IR::Parameter* parserHeaders,
                             P4::ReferenceMap *refmap,
@@ -107,7 +115,7 @@ class ConvertToEBPFControlPSA : public Inspector {
     bool preorder(const IR::Declaration_Instance*) override;
     bool preorder(const IR::ExternBlock *) override;
 
-    EBPF::EBPFControl *getEBPFControl() { return control; }
+    EBPF::EBPFControlPSA *getEBPFControl() { return control; }
 };
 
 class ConvertToEBPFDeparserPSA : public Inspector {

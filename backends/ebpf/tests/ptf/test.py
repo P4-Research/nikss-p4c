@@ -232,9 +232,15 @@ class MetadataXdpTcTest(EbpfTest):
             global_metadata_ok=255) / pkt
         testutils.verify_packet_any_port(self, str(pkt_with_metadata), ALL_PORTS)
 
-class PSATest(P4EbpfTest):
+class SimpleForwardingPSATest(P4EbpfTest):
 
-    p4_file_path = "../../../testdata/p4_16_samples/psa-test.p4"
+    p4_file_path = "samples/p4testdata/simple-fwd.p4"
 
     def runTest(self):
-        pass
+        pkt = testutils.simple_ip_packet()
+        # initialize default action
+        # TODO: we need to come up with a better solution to initialize default action.
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_defaultAction "
+                         "key 00 00 00 00 value 00 00 00 00 05 00 00 00")
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT1)

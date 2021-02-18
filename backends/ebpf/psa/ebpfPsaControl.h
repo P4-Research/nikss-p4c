@@ -1,22 +1,24 @@
 #ifndef BACKENDS_EBPF_PSA_EBPFPSACONTROL_H_
 #define BACKENDS_EBPF_PSA_EBPFPSACONTROL_H_
 
+#include "ebpfPsaObjects.h"
 #include "backends/ebpf/ebpfControl.h"
 
 namespace EBPF {
 
-class EBPFPsaControl : public EBPFControl {
+class EBPFControlPSA : public EBPFControl {
  public:
-    // FIXME: this should not be part of EBPFPsaControl object.
+    // FIXME: this should not be part of EBPFControlPSA object.
     // It should be moved to ConvertToEBPFPsaControl.
-    const IR::P4Control* control;
+    const IR::P4Control* p4Control;
 
-    EBPFPsaControl(const EBPFProgram* program, const IR::P4Control* control,
+    EBPFControlPSA(const EBPFProgram* program, const IR::ControlBlock* control,
                    const IR::Parameter* parserHeaders) :
-        EBPFControl(program, nullptr, parserHeaders), control(control) {}
+        EBPFControl(program, control, parserHeaders), p4Control(control->container) {}
 
     bool build() override;
     void emit(CodeBuilder* builder) override;
+    void emitTableInstances(CodeBuilder* builder) override;
 };
 
 }  // namespace EBPF
