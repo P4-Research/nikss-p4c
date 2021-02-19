@@ -90,12 +90,6 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
     builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
     builder->newline();
     builder->blockEnd(true);
-
-    // TODO: Implement port forwarding based on metadatas
-    builder->emitIndent();
-    builder->appendFormat("return bpf_redirect(skb->ifindex + 1, 0);");
-    builder->newline();
-
 }
 
 void EBPFPsaDeparser::emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,

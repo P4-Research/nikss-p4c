@@ -52,7 +52,7 @@ class EbpfTest(BaseTest):
         return process.returncode
 
     def add_port(self, dev, image):
-        # self.exec_ns_cmd("ip link set dev {} xdp obj {} sec xdp-ingress".format(dev, image))
+        self.exec_ns_cmd("ip link set dev {} xdp obj {} sec xdp-ingress".format(dev, image))
         self.exec_ns_cmd("tc qdisc add dev {} clsact".format(dev))
         self.exec_ns_cmd("tc filter add dev {} ingress bpf da obj {} sec tc-ingress".format(dev, image))
         self.exec_ns_cmd("tc filter add dev {} egress bpf da obj {} sec tc-egress".format(dev, image))
@@ -100,7 +100,7 @@ class P4EbpfTest(EbpfTest):
         head, tail = os.path.split(self.p4_file_path)
         filename = tail.split(".")[0]
         c_file_path = os.path.join("ptf_out", filename + ".c")
-        cmd = ["p4c-ebpf", "--arch", "psa", "-o", c_file_path, self.p4_file_path]
+        cmd = ["p4c-ebpf", "--trace", "--arch", "psa", "-o", c_file_path, self.p4_file_path]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         _, error = proc.communicate()
         if error:
@@ -264,5 +264,5 @@ class SimpleTunnelingPSATest(P4EbpfTest):
             ip_dst="192.168.1.1")
 
         testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet(self, str(exp_pkt), ALL_PORTS)
+        testutils.verify_packet(self, str(exp_pkt), PORT1)
 

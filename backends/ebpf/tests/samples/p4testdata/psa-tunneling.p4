@@ -129,6 +129,7 @@ control ingress(inout headers hdr,
         } else {
             mpls_encap();
         }
+        send_to_port(ostd, (PortId_t) 5);
     }
 }
 
