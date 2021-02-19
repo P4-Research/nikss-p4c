@@ -317,10 +317,10 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
 
         cstring msgStr, varStr;
         if (memcpy) {
-            msgStr = Util::printf_format("Used key %s", c->expression->toString());
+            msgStr = Util::printf_format("Control: key %s", c->expression->toString());
             builder->target->emitTraceMessage(builder, msgStr.c_str());
         } else {
-            msgStr = Util::printf_format("Used key %s=0x%%llx", c->expression->toString());
+            msgStr = Util::printf_format("Control: key %s=0x%%llx", c->expression->toString());
             varStr = Util::printf_format("(unsigned long long) %s.%s",
                                          keyName.c_str(), fieldName.c_str());
             builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, varStr.c_str());
@@ -350,11 +350,11 @@ void EBPFTable::emitAction(CodeBuilder* builder, cstring valueName) {
             if (width <= 64) {
                 convStr = Util::printf_format("(unsigned long long) (%s->u.%s.%s)",
                                               valueName, name, param->toString());
-                msgStr = Util::printf_format("Action param %s=0x%%llx (%d bits)",
+                msgStr = Util::printf_format("Control: param %s=0x%%llx (%d bits)",
                                              param->toString(), width);
                 builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, convStr.c_str());
             } else {
-                msgStr = Util::printf_format("Action param %s (%d bits)",
+                msgStr = Util::printf_format("Control: param %s (%d bits)",
                                              param->toString(), width);
                 builder->target->emitTraceMessage(builder, msgStr.c_str());
             }
