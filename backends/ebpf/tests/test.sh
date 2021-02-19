@@ -77,7 +77,6 @@ silent_echo_conf
 
 # Start tests
 ptf \
-  test.SimpleTunnelingPSATest \
   --relax `# Allows for other packets, especially injected by the system`\
   --test-dir ptf/ \
   --test-params='interfaces="'"$interface_list"'";namespace="switch"' \
