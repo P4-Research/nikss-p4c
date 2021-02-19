@@ -311,6 +311,14 @@ bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Instance* instance)
     return true;
 }
 
+bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Variable* decl) {
+    if (decl->type->to<IR::Type_Name>()->path->name.name == "psa_ingress_output_metadata_t") {
+        control->codeGen->asPointerVariables.insert(decl->name.name);
+    }
+
+    return true;
+}
+
 bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
     if (instance->type->getName().name == "Counter") {
         // FIXME: move to a separate function

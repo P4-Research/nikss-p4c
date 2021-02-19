@@ -39,16 +39,24 @@ class EBPFPipeline : public EBPFProgram {
     void emitLocalVariables(CodeBuilder* builder) override;
     void emitGlobalMetadataInitializer(CodeBuilder *builder);
     void emitPSAControlDataTypes(CodeBuilder* builder);
-    void emit(CodeBuilder* builder);
+    virtual void emit(CodeBuilder* builder);
 };
 
 class EBPFIngressPipeline : public EBPFPipeline {
  public:
+    cstring processFunctionName;
+    unsigned int maxResubmitDepth;
+
     EBPFIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                         P4::TypeMap* typeMap) :
-            EBPFPipeline(name, options, refMap, typeMap) { }
+            EBPFPipeline(name, options, refMap, typeMap) {
+        processFunctionName = "process";
+        // FIXME: hardcded
+        maxResubmitDepth = 4;
+    }
 
     void emitTrafficManager(CodeBuilder *builder) override;
+    void emit(CodeBuilder *builder) override;
 };
 
 class EBPFEgressPipeline : public EBPFPipeline {

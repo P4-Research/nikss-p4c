@@ -334,6 +334,7 @@ void EBPFTable::emitAction(CodeBuilder* builder, cstring valueName) {
         ActionTranslationVisitor visitor(valueName, program);
         visitor.setBuilder(builder);
         visitor.copySubstitutions(codeGen);
+        visitor.copyPointerVariables(codeGen);
 
         action->apply(visitor);
         builder->newline();
