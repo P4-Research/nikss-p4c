@@ -98,7 +98,7 @@ class P4EbpfTest(EbpfTest):
         head, tail = os.path.split(self.p4_file_path)
         filename = tail.split(".")[0]
         c_file_path = os.path.join("ptf_out", filename + ".c")
-        cmd = ["p4c-ebpf", "--arch", "psa", "-o", c_file_path, self.p4_file_path]
+        cmd = ["p4c-ebpf", "--trace", "--arch", "psa", "-o", c_file_path, self.p4_file_path]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         _, error = proc.communicate()
         if error:
@@ -244,3 +244,13 @@ class SimpleForwardingPSATest(P4EbpfTest):
                          "key 00 00 00 00 value 00 00 00 00 05 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT1)
+
+class PSAResubmitTest(P4EbpfTest):
+
+    p4_file_path = "samples/p4testdata/resubmit.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_eth_packet()
+        testutils.send_packet(self, PORT0, pkt)
+        pkt[Ether].dst = "11:22:33:44:55:66"
+        testutils.verify_packet(self, pkt, PORT1)

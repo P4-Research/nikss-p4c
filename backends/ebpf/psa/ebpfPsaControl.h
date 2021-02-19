@@ -12,6 +12,9 @@ class EBPFControlPSA : public EBPFControl {
     // It should be moved to ConvertToEBPFPsaControl.
     const IR::P4Control* p4Control;
 
+    const IR::Parameter* inputStandardMetadata;
+    const IR::Parameter* outputStandardMetadata;
+
     EBPFControlPSA(const EBPFProgram* program, const IR::ControlBlock* control,
                    const IR::Parameter* parserHeaders) :
         EBPFControl(program, control, parserHeaders), p4Control(control->container) {}

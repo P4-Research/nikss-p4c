@@ -73,17 +73,6 @@ void EBPFPipeline::emitHeaderInstances(CodeBuilder* builder) {
     builder->endOfStatement(true);
 }
 
-
-void EBPFPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
-    builder->emitIndent();
-    builder->appendLine("struct psa_ingress_input_metadata_t istd = {\n"
-                        "            .ingress_port = skb->ifindex,\n"
-                        "            .packet_path = meta->packet_path,\n"
-                        "            .ingress_timestamp = skb->tstamp,\n"
-                        "            .parser_error = NoError,\n"
-                        "    };");
-}
-
 void EBPFPipeline::emitGlobalMetadataInitializer(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendLine(
@@ -98,11 +87,34 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->append("static __always_inline");
     builder->spc();
     builder->appendFormat(
-            "int %s(SK_BUFF *%s, struct psa_ingress_output_metadata_t *ostd)",
-            processFunctionName, model.CPacketName.str());
+            "int %s(SK_BUFF *%s, struct psa_ingress_output_metadata_t *%s)",
+            processFunctionName, model.CPacketName.str(),
+            control->outputStandardMetadata->name.name);
     builder->newline();
     builder->blockStart();
     emitGlobalMetadataInitializer(builder);
+
+    // workaround to make TC protocol-independent, DO NOT REMOVE
+    builder->emitIndent();
+    // replace ether_type only if a packet comes from XDP
+    builder->append("if (meta->packet_path == NORMAL) ");
+    builder->blockStart();
+    builder->emitIndent();
+    builder->append("struct internal_metadata *md = "
+                        "(struct internal_metadata *)(unsigned long)skb->data_meta;\n");
+    builder->emitIndent();
+    builder->append("if ((void *) ((struct internal_metadata *) md + 1) > "
+                        "(void *)(long)skb->data) {\n"
+                        "           return TC_ACT_SHOT;\n"
+                        "       }\n");
+    builder->append("    __u16 *ether_type = (__u16 *) ((void *) (long)skb->data + 12);\n"
+                        "    if ((void *) ((__u16 *) ether_type + 1) > "
+                        "    (void *) (long) skb->data_end) {\n"
+                        "        return TC_ACT_SHOT;\n"
+                        "    }\n"
+                        "    *ether_type = md->pkt_ether_type;\n");
+    builder->blockEnd(true);
+
     emitHeaderInstances(builder);
     emitLocalVariables(builder);
     msgStr = Util::printf_format("%s parser: parsing new packet", sectionName);
@@ -124,12 +136,20 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder, msgStr.c_str());
     builder->emitIndent();
     builder->blockStart();
+
+    // if packet should be resubmitted, we skip deparser
+    builder->emitIndent();
+    builder->appendFormat("if (%s->resubmit) {\n"
+                          "     meta->packet_path = RESUBMIT;\n"
+                        "       return TC_ACT_UNSPEC;\n"
+                        "   }", control->outputStandardMetadata->name.name);
+    builder->newline();
+
     deparser->emit(builder);
     builder->blockEnd(true);
     builder->emitIndent();
     builder->appendLine("return TC_ACT_UNSPEC;");
     builder->blockEnd(true);
-
 
     builder->target->emitCodeSection(builder, sectionName);
     builder->emitIndent();
@@ -142,6 +162,7 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
                         "            .drop = true,\n"
                         "    };");
     builder->newline();
+
     builder->appendFormat("int i = 0;\n"
                         "    int ret = TC_ACT_UNSPEC;\n"
                         "    #pragma clang loop unroll(disable)\n"
@@ -163,6 +184,17 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->blockEnd(true);
 }
 
+void EBPFIngressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
+    builder->emitIndent();
+    builder->appendFormat("struct psa_ingress_input_metadata_t %s = {\n"
+                        "            .ingress_port = skb->ifindex,\n"
+                        "            .packet_path = meta->packet_path,\n"
+                        "            .ingress_timestamp = skb->tstamp,\n"
+                        "            .parser_error = %s,\n"
+                        "    };", control->inputStandardMetadata->name.name, errorVar.c_str());
+    builder->newline();
+}
+
 void EBPFIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendLine("return bpf_redirect(ostd.egress_port, 0);");
@@ -172,6 +204,19 @@ void EBPFIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
 void EBPFEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendLine("return TC_ACT_OK;");
+}
+
+void EBPFEgressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
+    builder->emitIndent();
+    builder->appendFormat("struct psa_egress_input_metadata_t %s = {\n"
+                          "        .class_of_service = meta->class_of_service,\n"
+                          "        .egress_port = skb->ifindex,\n"
+                          "        .packet_path = meta->packet_path,\n"
+                          "        .instance = meta->instance,\n"
+                          "        .egress_timestamp = skb->tstamp,\n"
+                          "        .parser_error = %s,\n"
+                          "    };", control->inputStandardMetadata->name.name, errorVar.c_str());
+    builder->newline();
 }
 
 }  // namespace EBPF

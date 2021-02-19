@@ -211,6 +211,7 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
     controlBlock->apply(*control_converter);
     pipeline->control = control_converter->getEBPFControl();
 
+
     auto deparser_converter = new ConvertToEBPFDeparserPSA(pipeline, pipeline->parser->headers,
                                                            refmap, typemap);
     deparserBlock->apply(*deparser_converter);
@@ -253,9 +254,14 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     auto pl = ctrl->container->type->applyParams;
     auto it = pl->parameters.begin();
     control->headers = *it;
+    it += 2;
+    control->inputStandardMetadata = *it;
+    ++it;
+    control->outputStandardMetadata = *it;
 
     auto codegen = new ControlBodyTranslator(control);
     codegen->substitute(control->headers, parserHeaders);
+    codegen->asPointerVariables.insert(control->outputStandardMetadata->name.name);
     control->codeGen = codegen;
 
     for (auto a : ctrl->constantValue) {

@@ -38,7 +38,7 @@ class EBPFPipeline : public EBPFProgram {
     void emitHeaderInstances(CodeBuilder *builder) override;
     void emitLocalVariables(CodeBuilder* builder) override;
     void emitGlobalMetadataInitializer(CodeBuilder *builder);
-    void emitPSAControlDataTypes(CodeBuilder* builder);
+    virtual void emitPSAControlDataTypes(CodeBuilder* builder) = 0;
     virtual void emit(CodeBuilder* builder);
 };
 
@@ -57,6 +57,7 @@ class EBPFIngressPipeline : public EBPFPipeline {
 
     void emitTrafficManager(CodeBuilder *builder) override;
     void emit(CodeBuilder *builder) override;
+    void emitPSAControlDataTypes(CodeBuilder *builder) override;
 };
 
 class EBPFEgressPipeline : public EBPFPipeline {
@@ -66,6 +67,7 @@ class EBPFEgressPipeline : public EBPFPipeline {
             EBPFPipeline(name, options, refMap, typeMap) { }
 
     void emitTrafficManager(CodeBuilder *builder) override;
+    void emitPSAControlDataTypes(CodeBuilder *builder) override;
 };
 
 }  // namespace EBPF
