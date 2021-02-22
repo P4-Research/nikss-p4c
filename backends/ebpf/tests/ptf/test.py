@@ -17,6 +17,7 @@ from scapy.fields import (
 from ptf.base_tests import BaseTest
 
 from scapy.layers.l2 import Ether
+from ptf.packet import MPLS
 
 logger = logging.getLogger('eBPFTest')
 if not len(logger.handlers):
@@ -80,6 +81,7 @@ class EbpfTest(BaseTest):
 
         super(EbpfTest, self).tearDown()
 
+
 class P4EbpfTest(EbpfTest):
     """
     Similar to EbpfTest, but generates BPF bytecode from a P4 program.
@@ -98,7 +100,7 @@ class P4EbpfTest(EbpfTest):
         head, tail = os.path.split(self.p4_file_path)
         filename = tail.split(".")[0]
         c_file_path = os.path.join("ptf_out", filename + ".c")
-        cmd = ["p4c-ebpf", "--arch", "psa", "-o", c_file_path, self.p4_file_path]
+        cmd = ["p4c-ebpf", "--trace", "--arch", "psa", "-o", c_file_path, self.p4_file_path]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         _, error = proc.communicate()
         if error:
@@ -106,7 +108,7 @@ class P4EbpfTest(EbpfTest):
             return
         output_file_path = os.path.join("ptf_out", filename + ".o")
 
-        cmd = ["clang", "-O2", "-target", "bpf", "-Werror", "-c", c_file_path, "-o", output_file_path, "-I../runtime", "-I../runtime/contrib/libbpf/include/uapi/" ]
+        cmd = ["clang", "-O2", "-target", "bpf", "-Werror", "-c", c_file_path, "-o", output_file_path, "-I../runtime", "-I../runtime/contrib/libbpf/include/uapi/", "-I../runtime/contrib/libbpf/src/" ]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         _, error = proc.communicate()
         if error:
@@ -162,6 +164,7 @@ class RecirculateTest(EbpfTest):
         pkt[Ether].src = '00:44:33:22:11:00'
         testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
 
+
 class PacketCloningTest(EbpfTest):
     """
     1. Send packet destined to MAC address equals to 'ff:ff:ff:ff:ff:ff'.
@@ -178,6 +181,7 @@ class PacketCloningTest(EbpfTest):
         pkt = testutils.simple_ip_packet(eth_dst='ff:ff:ff:ff:ff:ff', eth_src='55:44:33:22:11:00')
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packets(self, str(pkt), [PORT1, PORT2])
+
 
 class CloneE2ETest(EbpfTest):
     """
@@ -199,6 +203,7 @@ class CloneE2ETest(EbpfTest):
         testutils.verify_packet(self, str(pkt), PORT2)
         pkt[Ether].dst = 'aa:bb:cc:dd:ee:ff'
         testutils.verify_packet(self, str(pkt), PORT1)
+
 
 class MetadataXdpTcTest(EbpfTest):
     """
@@ -232,6 +237,7 @@ class MetadataXdpTcTest(EbpfTest):
             global_metadata_ok=255) / pkt
         testutils.verify_packet_any_port(self, str(pkt_with_metadata), ALL_PORTS)
 
+
 class SimpleForwardingPSATest(P4EbpfTest):
 
     p4_file_path = "samples/p4testdata/simple-fwd.p4"
@@ -244,3 +250,19 @@ class SimpleForwardingPSATest(P4EbpfTest):
                          "key 00 00 00 00 value 00 00 00 00 05 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT1)
+        pass
+
+
+class SimpleTunnelingPSATest(P4EbpfTest):
+
+    p4_file_path = "samples/p4testdata/psa-tunneling.p4"
+
+    def runTest(self):
+        pkt = Ether(dst="11:11:11:11:11:11") / testutils.simple_ip_only_packet(ip_dst="192.168.1.1")
+
+        exp_pkt = Ether(dst="11:11:11:11:11:11") / MPLS(label=20, cos=5, s=1, ttl=64) / testutils.simple_ip_only_packet(
+            ip_dst="192.168.1.1")
+
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(exp_pkt), PORT1)
+
