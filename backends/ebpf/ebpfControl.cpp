@@ -121,6 +121,9 @@ bool ControlBodyTranslator::preorder(const IR::MethodCallExpression* expression)
         // Action arguments have been eliminated by the mid-end.
         BUG_CHECK(expression->arguments->size() == 0,
                   "%1%: unexpected arguments for action call", expression);
+        cstring msg = Util::printf_format("Control: explicit calling action %s()",
+                                          ac->action->name.name);
+        builder->target->emitTraceMessage(builder, msg.c_str());
         visit(ac->action->body);
         return false;
     }
@@ -273,12 +276,16 @@ void ControlBodyTranslator::processMethod(const P4::ExternMethod* method) {
 }
 
 void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
-    builder->emitIndent();
+    P4::ParameterSubstitution binding;
+    cstring actionVariableName, msgStr;
     auto table = control->getTable(method->object->getName().name);
     BUG_CHECK(table != nullptr, "No table for %1%", method->expr);
 
-    P4::ParameterSubstitution binding;
-    cstring actionVariableName;
+    msgStr = Util::printf_format("Control: applying %s", method->object->getName().name);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+
+    builder->emitIndent();
+
     if (!saveAction.empty()) {
         actionVariableName = saveAction.at(saveAction.size() - 1);
         if (!actionVariableName.isNullOrEmpty()) {
@@ -309,6 +316,7 @@ void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
     if (table->keyGenerator != nullptr) {
         builder->emitIndent();
         builder->appendLine("/* perform lookup */");
+        builder->target->emitTraceMessage(builder, "Control: performing table lookup");
         builder->emitIndent();
         builder->target->emitTableLookup(builder, table->dataMapName, keyname, valueName);
         builder->endOfStatement(true);
@@ -320,6 +328,7 @@ void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
 
     builder->emitIndent();
     builder->appendLine("/* miss; find default action */");
+    builder->target->emitTraceMessage(builder, "Control: Entry not found, going to default action");
     builder->emitIndent();
     builder->appendFormat("%s = 0", control->hitVariable.c_str());
     builder->endOfStatement(true);
@@ -350,12 +359,19 @@ void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
     }
     toDereference.clear();
 
-    builder->blockEnd(true);
+    builder->blockEnd(false);
+    builder->appendFormat(" else ");
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder, "Control: Entry not found, aborting");
     builder->emitIndent();
-    builder->appendFormat("else return %s", builder->target->abortReturnCode().c_str());
+    builder->appendFormat("return %s", builder->target->abortReturnCode().c_str());
     builder->endOfStatement(true);
+    builder->blockEnd(true);
 
     builder->blockEnd(true);
+
+    msgStr = Util::printf_format("Control: %s applied", method->object->getName().name);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
 }
 
 bool ControlBodyTranslator::preorder(const IR::ExitStatement*) {

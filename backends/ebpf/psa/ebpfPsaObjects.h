@@ -13,8 +13,8 @@ class EBPFTablePSA : public EBPFTable {
 
     EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* table,
                  CodeGenInspector* codeGen, cstring name, TableKind tableKind, size_t size) :
-                 EBPFTable(program, table, codeGen), tableKind(tableKind),
-                 name(name), size(size) { }
+                 EBPFTable(program, table, codeGen), name(name),
+                 tableKind(tableKind), size(size) { }
 
     void emitInstance(CodeBuilder* builder) override;
 };

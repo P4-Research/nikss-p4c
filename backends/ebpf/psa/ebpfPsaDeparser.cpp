@@ -51,11 +51,11 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
         builder->append("if (");
         builder->append(headerExpression);
         builder->append(".ebpf_valid) ");
-        builder->newline();
-        builder->emitIndent();
+        builder->blockStart();
         builder->emitIndent();
         builder->appendFormat("%s += %d;", this->outerHdrLengthVar.c_str(), width);
         builder->newline();
+        builder->blockEnd(true);
     }
 
     builder->newline();
@@ -65,6 +65,9 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
                           this->outerHdrLengthVar.c_str(),
                           pipelineProgram->offsetVar.c_str());
     builder->endOfStatement(true);
+    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusting by %d B",
+                                      1, this->outerHdrOffsetVar.c_str());
+
     builder->emitIndent();
     builder->appendFormat("int %s = 0", this->returnCode.c_str());
     builder->endOfStatement(true);
@@ -79,16 +82,13 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("if (%s) ", this->returnCode.c_str());
     builder->blockStart();
+    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjust failed");
     builder->emitIndent();
     builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
     builder->newline();
     builder->blockEnd(true);
+    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusted");
 
-//    builder->emitIndent();
-//    builder->appendFormat("%s += %s",
-//                          pipelineProgram->lengthVar.c_str(),
-//                          this->outerHdrOffsetVar.c_str());
-//    builder->endOfStatement(true);
     builder->emitIndent();
     builder->appendFormat("%s = 0", pipelineProgram->offsetVar.c_str());
     builder->endOfStatement(true);
@@ -102,6 +102,9 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     }
     builder->newline();
 
+    cstring msgArg = Util::printf_format("BYTES(%s)", this->outerHdrLengthVar);
+    builder->target->emitTraceMessage(builder, "Deparser: writing %d bytes to pkt",
+                                      1, msgArg.c_str());
     builder->emitIndent();
     builder->appendFormat("%s = bpf_skb_store_bytes(%s, 0, %s, BYTES(%s), 0)",
                           this->returnCode.c_str(),
@@ -113,16 +116,18 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("if (%s) ", this->returnCode.c_str());
     builder->blockStart();
-
+    builder->target->emitTraceMessage(builder, "Deparser: write bytes failed");
     builder->emitIndent();
     builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
     builder->newline();
     builder->blockEnd(true);
+    builder->target->emitTraceMessage(builder, "Deparser: bytes written");
 }
 
 void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                                  cstring& headerExpression) const {
     const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
+    cstring msgStr;
     builder->emitIndent();
     builder->append("if (");
     builder->append(headerExpression);
@@ -130,11 +135,14 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
     builder->blockStart();
     auto program = EBPFControl::program;
     unsigned width = headerToEmit->width_bits();
+    msgStr = Util::printf_format("Deparser: emitting header %s", headerExpression);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
     builder->emitIndent();
     builder->appendFormat("if (%s->len < BYTES(%s + %d)) ",
                           pipelineProgram->contextVar.c_str(),
                           program->offsetVar.c_str(), width);
     builder->blockStart();
+    builder->target->emitTraceMessage(builder, "Deparser: invalid packet (packet too short)");
     builder->emitIndent();
     builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
     builder->newline();
@@ -155,6 +163,8 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
         alignment += et->widthInBits();
         alignment %= 8;
     }
+    msgStr = Util::printf_format("Deparser: emitted %s", headerExpression);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
     builder->blockEnd(true);
 }
 
@@ -169,7 +179,11 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
     }
     unsigned widthToEmit = et->widthInBits();
     unsigned loadSize = 0;
-    cstring swap = "";
+    cstring swap = "", msgStr;
+
+    msgStr = Util::printf_format("Deparser: emitting field %s", field);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+
     if (widthToEmit <= 8) {
         loadSize = 8;
     } else if (widthToEmit <= 16) {
@@ -266,6 +280,18 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
     builder->appendFormat("%s += %d", program->offsetVar.c_str(),
                           widthToEmit);
     builder->endOfStatement(true);
+
+    if (widthToEmit <= 64) {
+        cstring tmp = Util::printf_format("(unsigned long long) %s.%s",
+                                          headerExpression, field);
+        msgStr = Util::printf_format("Deparser: emitted %s=0x%%llx (%u bits)",
+                                     field, widthToEmit);
+        builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, tmp.c_str());
+    } else {
+        msgStr = Util::printf_format("Deparser: emitted %s (%u bits)", field, widthToEmit);
+        builder->target->emitTraceMessage(builder, msgStr.c_str());
+    }
+
     builder->newline();
 }
 

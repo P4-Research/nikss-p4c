@@ -14,6 +14,21 @@ function exit_on_error() {
       fi
 }
 
+function cleanup() {
+      echo "Cleaning...."
+      for intf in "${INTERFACES[@]}" ; do
+        ip link del "s1-$intf"
+      done
+      ip netns exec switch ip link del psa_recirc
+      ip netns exec switch ip link del psa_cpu
+      ip netns pids switch | (xargs kill 2>/dev/null)
+      ip netns del switch
+      echo "Cleaning finished"
+}
+
+cleanup
+trap cleanup EXIT
+
 # Trace all command from this point
 set -x
 
@@ -66,12 +81,3 @@ ptf \
   --test-dir ptf/ \
   --test-params='interfaces="'"$interface_list"'";namespace="switch"' \
   --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2
-
-# cleanup
-for intf in "${INTERFACES[@]}" ; do
-  ip link del "s1-$intf"
-done
-ip netns exec switch ip link del psa_recirc
-ip netns exec switch ip link del psa_cpu
-ip netns pids switch | (xargs kill 2>/dev/null)
-ip netns del switch

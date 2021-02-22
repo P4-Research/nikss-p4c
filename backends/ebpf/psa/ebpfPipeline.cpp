@@ -32,8 +32,12 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     builder->target->emitTraceMessage(builder, msgStr.c_str());
     builder->emitIndent();
     builder->blockStart();
+    msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
     deparser->emit(builder);
     builder->blockEnd(true);
+    msgStr = Util::printf_format("%s deparser: packet deparsing finished", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
     this->emitTrafficManager(builder);
     builder->blockEnd(true);
 }

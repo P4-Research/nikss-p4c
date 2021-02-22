@@ -81,14 +81,18 @@ void KernelSamplesTarget::emitMain(Util::SourceCodeBuilder* builder,
 }
 
 void KernelSamplesTarget::emitPreamble(Util::SourceCodeBuilder* builder) const {
+    cstring macro;
     if (emitTraceMessages) {
-        builder->appendLine("#define bpf_trace_message(fmt, ...)                              \\");
-        builder->appendLine("  ({                                                             \\");
-        builder->appendLine("      char ____fmt[] = fmt;                                      \\");
-        builder->appendLine("      bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \\");
-        builder->appendLine("  })");
-        builder->newline();
+        macro = "#define bpf_trace_message(fmt, ...)                                \\\n"
+                "    do {                                                           \\\n"
+                "        char ____fmt[] = fmt;                                      \\\n"
+                "        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \\\n"
+                "    } while(0)";
+    } else {
+        macro = "#define bpf_trace_message(fmt, ...)";
     }
+    builder->appendLine(macro);
+    builder->newline();
 }
 
 void KernelSamplesTarget::emitTraceMessage(Util::SourceCodeBuilder* builder, const char* format,
