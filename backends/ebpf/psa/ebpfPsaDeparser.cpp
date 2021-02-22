@@ -94,12 +94,7 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("if (%s) ", this->returnCode.c_str());
     builder->blockStart();
-<<<<<<< HEAD
-=======
-
     builder->target->emitTraceMessage(builder, "Deparser: write bytes failed");
-
->>>>>>> Add deparser tracing
     builder->emitIndent();
     builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
     builder->newline();
