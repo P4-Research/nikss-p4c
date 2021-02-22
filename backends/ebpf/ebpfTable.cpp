@@ -345,7 +345,8 @@ void EBPFTable::emitAction(CodeBuilder* builder, cstring valueName) {
         msgStr = Util::printf_format("Control: executing action %s", name);
         builder->target->emitTraceMessage(builder, msgStr.c_str());
         for (auto param : *(action->parameters)) {
-            int width = param->type->width_bits();
+            auto etype = EBPFTypeFactory::instance->create(param->type);
+            int width = dynamic_cast<IHasWidth*>(etype)->widthInBits();
 
             if (width <= 64) {
                 convStr = Util::printf_format("(unsigned long long) (%s->u.%s.%s)",
