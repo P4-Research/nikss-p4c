@@ -4,6 +4,7 @@ import os
 import logging
 import subprocess
 import copy
+import shlex
 
 import ptf
 # from ptf import config
@@ -34,9 +35,14 @@ class EbpfTest(BaseTest):
     switch_ns = 'test'
     test_prog_image = 'generic.o'  # default, if test case not specify program
 
-    def exec_ns_cmd(self, command='echo me'):
+    def exec_ns_cmd(self, command='echo me', do_fail=None):
         command = "nsenter --net=/var/run/netns/" + self.switch_ns + " " + command
-        process = subprocess.Popen(command.split(),
+        return self.exec_cmd(command, do_fail)
+
+    def exec_cmd(self, command='echo me', do_fail=None):
+        if isinstance(command, str):
+            command = shlex.split(command)
+        process = subprocess.Popen(command,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         stdout_data, stderr_data = process.communicate()
@@ -49,7 +55,8 @@ class EbpfTest(BaseTest):
             logger.info("Return code: %d", process.returncode)
             logger.info("STDOUT: %s", stdout_data)
             logger.info("STDERR: %s", stderr_data)
-            # TODO: Maybe we should raise an exception instead of silent fail?
+            if do_fail:
+                self.fail("Command failed (see above for details): {}".format(str(do_fail)))
         return process.returncode
 
     def add_port(self, dev, image):
@@ -102,19 +109,11 @@ class P4EbpfTest(EbpfTest):
         filename = tail.split(".")[0]
         c_file_path = os.path.join("ptf_out", filename + ".c")
         cmd = ["p4c-ebpf", "--trace", "--arch", "psa", "-o", c_file_path, self.p4_file_path]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        _, error = proc.communicate()
-        if error:
-            self.fail("P4 compilation error:\n%s" % error)
-            return
+        self.exec_cmd(cmd, "P4 compilation error")
         output_file_path = os.path.join("ptf_out", filename + ".o")
 
-        cmd = ["clang", "-O2", "-target", "bpf", "-Werror", "-c", c_file_path, "-o", output_file_path, "-I../runtime", "-I../runtime/contrib/libbpf/include/uapi/", "-I../runtime/contrib/libbpf/src/" ]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        _, error = proc.communicate()
-        if error:
-            self.fail("Clang compilation error:\n%s" % error)
-            return
+        cmd = ["clang", "-O2", "-target", "bpf", "-Werror", "-DPSA_PORT_RECIRCULATE=2", "-c", c_file_path, "-o", output_file_path, "-I../runtime", "-I../runtime/contrib/libbpf/include/uapi/", "-I../runtime/contrib/libbpf/src/" ]
+        self.exec_cmd(cmd, "Clang compilation error")
         self.test_prog_image = output_file_path
 
         super(P4EbpfTest, self).setUp()
@@ -147,30 +146,6 @@ class ResubmitTest(EbpfTest):
         testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
 
 
-class RecirculateTest(EbpfTest):
-    """
-    Test resubmit packet path. eBPF program should do following operation:
-    1. In NORMAL path: In all packet set source MAC to starts with '00:44'.
-        Test if destination MAC address ends with 'FE:F0' - in this case recirculate.
-    2. In RECIRCULATE path destination MAC set to zero.
-    Any packet modification should be done on egress.
-    Open question: how to verify here that the eBPF program did above operations?
-    """
-    test_prog_image = 'samples/recirculate_test.o'
-
-    def runTest(self):
-        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55', eth_src='55:44:33:22:11:00')
-        testutils.send_packet(self, PORT0, str(pkt))
-        pkt[Ether].src = '00:44:33:22:11:00'
-        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
-
-        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:FE:F0', eth_src='55:44:33:22:11:00')
-        testutils.send_packet(self, PORT0, str(pkt))
-        pkt[Ether].dst = '00:00:00:00:00:00'
-        pkt[Ether].src = '00:44:33:22:11:00'
-        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
-
-
 class CloneE2ETest(EbpfTest):
     """
     1. Send packet to interface PORT1 (bpf ifindex = 5) with destination MAC address equals to aa:bb:cc:dd:ee:ff.
@@ -183,14 +158,21 @@ class CloneE2ETest(EbpfTest):
     test_prog_image = '../samples/full-arch/full.o'
     user_space_cmd = '../samples/full-arch/a.out'
 
-    def runTest(self):
+    def setUp(self):
+        super(CloneE2ETest, self).setUp()
         self.exec_ns_cmd("{} session-add-member 1 6 1 1".format(self.user_space_cmd))
+
+    def runTest(self):
         pkt = testutils.simple_ip_packet(eth_dst='aa:bb:cc:dd:ee:ff', eth_src='55:44:33:22:11:00')
         testutils.send_packet(self, PORT1, str(pkt))
         pkt[Ether].dst = '00:00:00:00:00:11'
         testutils.verify_packet(self, str(pkt), PORT2)
         pkt[Ether].dst = 'aa:bb:cc:dd:ee:ff'
         testutils.verify_packet(self, str(pkt), PORT1)
+
+    def tearDown(self):
+        self.exec_ns_cmd("{} session-delete-member 1 0".format(self.user_space_cmd))
+        super(CloneE2ETest, self).tearDown()
 
 
 class MetadataXdpTcTest(EbpfTest):
@@ -299,3 +281,60 @@ class PSACloneI2E(P4EbpfTest):
     def tearDown(self):
         self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/clone_session_8")
         super(P4EbpfTest, self).tearDown()
+
+
+class EgressTrafficManagerDropPSATest(P4EbpfTest):
+    p4_file_path = "samples/p4testdata/etm-drop.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55', eth_src='55:44:33:22:11:00')
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+        pkt[Ether].src = '00:44:33:22:FF:FF'
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_no_other_packets(self);
+
+
+class EgressTrafficManagerClonePSATest(P4EbpfTest):
+    p4_file_path = "samples/p4testdata/etm-clone-e2e.p4"
+    user_space_cmd = '../samples/full-arch/a.out'
+
+    def setUp(self):
+        super(EgressTrafficManagerClonePSATest, self).setUp()
+        self.exec_ns_cmd("{} session-add-member 1 6 1 1".format(self.user_space_cmd))
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet(eth_dst='aa:bb:cc:dd:ee:ff', eth_src='55:44:33:22:11:00')
+        testutils.send_packet(self, PORT1, str(pkt))
+        pkt[Ether].dst = '00:00:00:00:00:11'
+        testutils.verify_packet(self, str(pkt), PORT2)
+        pkt[Ether].dst = '00:00:00:00:00:12'
+        testutils.verify_packet(self, str(pkt), PORT1)
+
+    def tearDown(self):
+        self.exec_ns_cmd("{} session-delete-member 1 0".format(self.user_space_cmd))
+        super(EgressTrafficManagerClonePSATest, self).tearDown()
+
+
+class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
+    """
+    Test resubmit packet path. eBPF program should do following operation:
+    1. In NORMAL path: In all packet set source MAC to starts with '00:44'.
+        Test if destination MAC address ends with 'FE:F0' - in this case recirculate.
+    2. In RECIRCULATE path destination MAC set to zero.
+    Any packet modification should be done on egress.
+    Open question: how to verify here that the eBPF program did above operations?
+    """
+    p4_file_path = "samples/p4testdata/etm-recirc.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55', eth_src='55:44:33:22:11:00')
+        testutils.send_packet(self, PORT0, str(pkt))
+        pkt[Ether].src = '00:44:33:22:11:00'
+        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+
+        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:FE:F0', eth_src='55:44:33:22:11:00')
+        testutils.send_packet(self, PORT0, str(pkt))
+        pkt[Ether].dst = '00:00:00:00:00:00'
+        pkt[Ether].src = '00:44:33:22:11:00'
+        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)

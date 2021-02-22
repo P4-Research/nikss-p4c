@@ -136,10 +136,9 @@ class ConvertToEBPFDeparserPSA : public Inspector {
                              const IR::Parameter* istd,
                              P4::ReferenceMap* refmap,
                              P4::TypeMap* typemap) : program(program),
-                                                     parserHeaders(parserHeaders),
+                                                     parserHeaders(parserHeaders), istd(istd),
                                                      typemap(typemap), refmap(refmap),
-                                                     p4lib(P4::P4CoreLibrary::instance),
-                                                     istd(istd) {
+                                                     p4lib(P4::P4CoreLibrary::instance) {
         if (program->is<EBPFIngressPipeline>()) {
             type = INGRESS;
         } else if (program->is<EBPFEgressPipeline>()) {

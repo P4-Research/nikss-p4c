@@ -2,7 +2,10 @@ INTERFACES = eth0 eth1 eth2
 
 default: all
 
-all: full.o
+all: full.o a.out
+
+a.out: full-user.c
+	clang -lbpf full-user.c
 
 full.o: full-kern.c
 	clang -target bpf -Wall -Wextra -Wno-unused-parameter -O2 -g -c -o full.o full-kern.c

@@ -217,6 +217,14 @@ void PSAArch::emitPreamble(CodeBuilder *builder) const {
     builder->appendLine("#define CLONE_MAX_SESSIONS 1024");
     builder->newline();
 
+    builder->appendLine("#ifndef PSA_PORT_RECIRCULATE\n"
+        "#error \"PSA_PORT_RECIRCULATE not specified, "
+            "please use -DPSA_PORT_RECIRCULATE=n option to specify index of recirculation "
+            "interface (see the result of command 'ip link')\"\n"
+        "#endif");
+    builder->appendLine("#define P4C_PSA_PORT_RECIRCULATE 0xfffffffa");
+    builder->newline();
+
     // target-specific "preamble"
     builder->target->emitPreamble(builder);
 }
@@ -235,6 +243,65 @@ void PSAArch::emitInstances(CodeBuilder *builder) const {
     tcEgress->control->emitTableInstances(builder);
     builder->appendLine("REGISTER_END()");
     builder->newline();
+}
+
+void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
+    // Function to perform cloning, common for ingress and egress
+    cstring cloneProg =
+    "static __always_inline int do_packet_clones(SK_BUFF * skb, __u32 session_id, "
+        "PSA_PacketPath_t new_pkt_path, __u8 caller_id)\n"
+    "{\n"
+        "%trace_msg_clone_requested%"
+    "    struct psa_global_metadata * meta = (struct psa_global_metadata *) skb->cb;\n"
+    "    struct bpf_elf_map * inner_map;\n"
+    "    inner_map = bpf_map_lookup_elem(&%clone_session_tbl%, &session_id);\n"
+    "    if (inner_map != NULL) {\n"
+    "        PSA_PacketPath_t original_pkt_path = meta->packet_path;\n"
+    "        meta->packet_path = new_pkt_path;\n"
+    "        for (__u32 i  = 0; i < CLONE_MAX_CLONES; i++) {\n"
+    "            __u32 idx = i;\n"
+    "            struct clone_session_entry * pair = (struct clone_session_entry *) "
+                    "bpf_map_lookup_elem(inner_map, &idx);\n"
+    "            if (!pair) {\n"
+                    "%trace_msg_no_pair%"
+    "                break;\n"
+    "            }\n"
+                "%trace_msg_pair_found%"
+    // TODO: add support for packet truncation
+    "            bpf_clone_redirect(skb, pair->egress_port, 0);\n"
+    "        }\n"
+    "        meta->packet_path = original_pkt_path;\n"
+    "    } else {\n"
+            "%trace_msg_no_session%"
+    "    }\n"
+        "%trace_msg_cloning_done%"
+    "    return 0;\n"
+    " }";
+
+    if (tcIngress->options.emitTraceMessages) {
+        cloneProg = cloneProg.replace(cstring("%trace_msg_clone_requested%"),
+            "    bpf_trace_message(\"Clone#%d: pkt clone requested, session=%d\\n\", "
+            "caller_id, session_id);\n");
+        cloneProg = cloneProg.replace(cstring("%trace_msg_no_pair%"),
+            "                bpf_trace_message(\"Clone#%d: no more entries for "
+            "clone session\\n\", caller_id);\n");
+        cloneProg = cloneProg.replace(cstring("%trace_msg_pair_found%"),
+            "            bpf_trace_message(\"Clone#%d: cloning pkt, egress_port=%d, "
+            "cos=%d\\n\", caller_id, pair->egress_port, pair->class_of_service);\n");
+        cloneProg = cloneProg.replace(cstring("%trace_msg_no_session%"),
+            "        bpf_trace_message(\"Clone#%d: session_id not found, "
+            "no clones created\\n\", caller_id);\n");
+        cloneProg = cloneProg.replace(cstring("%trace_msg_cloning_done%"),
+            "    bpf_trace_message(\"Clone#%d: packet cloning finished\\n\", caller_id);\n");
+    } else {
+        cloneProg = cloneProg.replace(cstring("%trace_msg_clone_requested%"), "");
+        cloneProg = cloneProg.replace(cstring("%trace_msg_no_pair%"), "");
+        cloneProg = cloneProg.replace(cstring("%trace_msg_pair_found%"), "");
+        cloneProg = cloneProg.replace(cstring("%trace_msg_no_session%"), "");
+        cloneProg = cloneProg.replace(cstring("%trace_msg_cloning_done%"), "");
+    }
+    cloneProg = cloneProg.replace(cstring("%clone_session_tbl%"), "clone_session_tbl");
+    builder->appendLine(cloneProg);
 }
 
 const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {

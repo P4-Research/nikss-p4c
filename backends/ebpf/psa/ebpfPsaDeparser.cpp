@@ -158,8 +158,16 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
     unsigned loadSize = 0;
     cstring swap = "", msgStr;
 
-    msgStr = Util::printf_format("Deparser: emitting field %s", field);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    if (widthToEmit <= 64) {
+        cstring tmp = Util::printf_format("(unsigned long long) %s.%s",
+                                          headerExpression, field);
+        msgStr = Util::printf_format("Deparser: emitting field %s=0x%%llx (%u bits)",
+                                     field, widthToEmit);
+        builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, tmp.c_str());
+    } else {
+        msgStr = Util::printf_format("Deparser: emitting field %s (%u bits)", field, widthToEmit);
+        builder->target->emitTraceMessage(builder, msgStr.c_str());
+    }
 
     if (widthToEmit <= 8) {
         loadSize = 8;
@@ -258,16 +266,8 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
                           widthToEmit);
     builder->endOfStatement(true);
 
-    if (widthToEmit <= 64) {
-        cstring tmp = Util::printf_format("(unsigned long long) %s.%s",
-                                          headerExpression, field);
-        msgStr = Util::printf_format("Deparser: emitted %s=0x%%llx (%u bits)",
-                                     field, widthToEmit);
-        builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, tmp.c_str());
-    } else {
-        msgStr = Util::printf_format("Deparser: emitted %s (%u bits)", field, widthToEmit);
-        builder->target->emitTraceMessage(builder, msgStr.c_str());
-    }
+    msgStr = Util::printf_format("Deparser: emitted %s", field);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     builder->newline();
 }

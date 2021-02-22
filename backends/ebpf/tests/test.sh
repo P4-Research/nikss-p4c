@@ -35,6 +35,8 @@ set -x
 # make eBPF programs
 make -C samples
 exit_on_error $?
+make -C ../samples/full-arch
+exit_on_error $?
 
 declare -a INTERFACES=("eth0" "eth1" "eth2")
 # For PTF tests parameter
