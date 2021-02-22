@@ -80,16 +80,21 @@ void EBPFPipeline::emitGlobalMetadataInitializer(CodeBuilder *builder) {
 }
 
 // =====================EBPFIngressPipeline=============================
-
 void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     cstring msgStr;
     // firstly emit process() in-lined function and then the actual BPF section.
     builder->append("static __always_inline");
     builder->spc();
     builder->appendFormat(
-            "int %s(SK_BUFF *%s, struct psa_ingress_output_metadata_t *%s)",
+            "int %s(SK_BUFF *%s, struct psa_ingress_output_metadata_t *%s, ",
             processFunctionName, model.CPacketName.str(),
             control->outputStandardMetadata->name.name);
+    auto type = EBPFTypeFactory::instance->create(
+            deparser->to<EBPFIngressDeparserPSA>()->resubmit_meta->type);
+    type->declare(builder,
+            deparser->to<EBPFIngressDeparserPSA>()->resubmit_meta->name.name,
+            true);
+    builder->append(")");
     builder->newline();
     builder->blockStart();
     emitGlobalMetadataInitializer(builder);
@@ -137,14 +142,6 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->emitIndent();
     builder->blockStart();
 
-    // if packet should be resubmitted, we skip deparser
-    builder->emitIndent();
-    builder->appendFormat("if (%s->resubmit) {\n"
-                          "     meta->packet_path = RESUBMIT;\n"
-                        "       return TC_ACT_UNSPEC;\n"
-                        "   }", control->outputStandardMetadata->name.name);
-    builder->newline();
-
     deparser->emit(builder);
     builder->blockEnd(true);
     builder->emitIndent();
@@ -163,16 +160,20 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
                         "    };");
     builder->newline();
 
+    builder->emitIndent();
+    deparser->to<EBPFIngressDeparserPSA>()->emitSharedMetadataInitializer(builder);
+
     builder->appendFormat("int i = 0;\n"
                         "    int ret = TC_ACT_UNSPEC;\n"
                         "    #pragma clang loop unroll(disable)\n"
                         "    for (i = 0; i < %d; i++) {\n"
                         "        ostd.resubmit = 0;\n"
-                        "        ret = %s(skb, &ostd);\n"
+                        "        ret = %s(skb, &ostd, &%s);\n"
                         "        if (ostd.resubmit == 0) {\n"
                         "            break;\n"
                         "        }\n"
-                        "    }", maxResubmitDepth, processFunctionName);
+                        "    }", maxResubmitDepth, processFunctionName,
+                        deparser->to<EBPFIngressDeparserPSA>()->resubmit_meta->name.name);
     builder->newline();
 
     builder->appendLine("if (ret != TC_ACT_UNSPEC) {\n"

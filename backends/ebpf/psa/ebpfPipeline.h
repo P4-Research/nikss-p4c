@@ -19,7 +19,7 @@ class EBPFPipeline : public EBPFProgram {
     cstring contextVar;
 
     EBPFControlPSA* control;
-    EBPFPsaDeparser* deparser;
+    EBPFDeparserPSA* deparser;
 
     EBPFPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                  P4::TypeMap* typeMap) :

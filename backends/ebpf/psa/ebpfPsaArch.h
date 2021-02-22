@@ -121,22 +121,36 @@ class ConvertToEBPFControlPSA : public Inspector {
 
 class ConvertToEBPFDeparserPSA : public Inspector {
     EBPF::EBPFProgram* program;
+    pipeline_type type;
+
     const IR::Parameter* parserHeaders;
+    const IR::Parameter* istd;
     P4::TypeMap* typemap;
     P4::ReferenceMap* refmap;
     P4::P4CoreLibrary& p4lib;
-    EBPF::EBPFPsaDeparser* deparser;
+    EBPF::EBPFDeparserPSA* deparser;
+
  public:
-    ConvertToEBPFDeparserPSA(EBPF::EBPFProgram* program, const IR::Parameter* parserHeaders,
+    ConvertToEBPFDeparserPSA(EBPFProgram* program, const IR::Parameter* parserHeaders,
+                             const IR::Parameter* istd,
                              P4::ReferenceMap* refmap,
                              P4::TypeMap* typemap) : program(program),
                                                      parserHeaders(parserHeaders),
                                                      typemap(typemap), refmap(refmap),
-                                                     p4lib(P4::P4CoreLibrary::instance) {
+                                                     p4lib(P4::P4CoreLibrary::instance),
+                                                     istd(istd) {
+        if (program->is<EBPFIngressPipeline>()) {
+            type = INGRESS;
+        } else if (program->is<EBPFEgressPipeline>()) {
+            type = EGRESS;
+        } else {
+            BUG("undefined pipeline type, cannot build deparser");
+        }
     }
+
     bool preorder(const IR::ControlBlock *) override;
     bool preorder(const IR::MethodCallExpression* expression) override;
-    EBPF::EBPFPsaDeparser *getEBPFPsaDeparser() { return deparser; }
+    EBPF::EBPFDeparserPSA *getEBPFPsaDeparser() { return deparser; }
 };
 
 }  // namespace EBPF

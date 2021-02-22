@@ -12,7 +12,8 @@ header ethernet_t {
 struct empty_t {}
 
 struct resubmit_metadata_t {
-
+    bit<8> selector;
+    ethernet_t eth_hdr;
 }
 
 struct metadata {
@@ -101,6 +102,12 @@ control IngressDeparserImpl(packet_out buffer,
 {
     CommonDeparserImpl() cp;
     apply {
+        if (psa_resubmit(istd)) {
+            resubmit_meta.selector = 5;
+            resubmit_meta.eth_hdr = hdr.ethernet;
+        } else {
+            resubmit_meta.selector = 0;
+        }
         cp.apply(buffer, hdr);
     }
 }

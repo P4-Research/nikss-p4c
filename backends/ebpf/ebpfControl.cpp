@@ -77,26 +77,10 @@ void ControlBodyTranslator::processCustomExternFunction(const P4::ExternFunction
 }
 
 void ControlBodyTranslator::processFunction(const P4::ExternFunction* function) {
-    if (!control->emitExterns)
-        ::error(ErrorType::ERR_UNSUPPORTED, "%1%: Not supported", function->method);
     processCustomExternFunction(function, EBPFTypeFactory::instance);
 }
 
 bool ControlBodyTranslator::preorder(const IR::MethodCallExpression* expression) {
-    builder->append("/* ");
-    visit(expression->method);
-    builder->append("(");
-    bool first = true;
-    for (auto a  : *expression->arguments) {
-        if (!first)
-            builder->append(", ");
-        first = false;
-        visit(a);
-    }
-    builder->append(")");
-    builder->append("*/");
-    builder->newline();
-
     auto mi = P4::MethodInstance::resolve(expression,
                                           control->program->refMap,
                                           control->program->typeMap);

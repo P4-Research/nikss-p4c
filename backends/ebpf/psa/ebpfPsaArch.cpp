@@ -212,8 +212,10 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
     pipeline->control = control_converter->getEBPFControl();
 
 
-    auto deparser_converter = new ConvertToEBPFDeparserPSA(pipeline, pipeline->parser->headers,
-                                                           refmap, typemap);
+    auto deparser_converter = new ConvertToEBPFDeparserPSA(
+            pipeline,
+            pipeline->parser->headers, pipeline->control->outputStandardMetadata,
+            refmap, typemap);
     deparserBlock->apply(*deparser_converter);
     pipeline->deparser = deparser_converter->getEBPFPsaDeparser();
 
@@ -351,21 +353,18 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
 
 // =====================EBPFDeparser=============================
 bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
-    deparser = new EBPFPsaDeparser(program, parserHeaders);
-    auto params = ctrl->container->type->applyParams;
-    // TODO: Add support for other PSA deparser parameters
-    deparser->packet_out = params->parameters.front();
-    for (auto param : params->parameters) {
-        // TODO: figure out how better find headers param
-        if (param->direction == IR::Direction::InOut) {
-            deparser->headers = param;
-        }
+    // if type is INGRESS create IngressDeparser, otherwise create EgressDeparser
+    // constructor of ConvertToEBPFDeparserPSA ensures that no other type can be set.
+    type == INGRESS ?
+            deparser = new EBPFIngressDeparserPSA(program, ctrl, parserHeaders, istd) :
+            deparser = new EBPFEgressDeparserPSA(program, ctrl, parserHeaders, istd);
+
+    auto codegen = new DeparserBodyTranslator(deparser);
+    deparser->codeGen = codegen;
+    if (!deparser->build()) {
+        BUG("failed to build deparser");
     }
-    auto ht = program->typeMap->getType(deparser->headers);
-    if (ht == nullptr) {
-      return false;
-    }
-    deparser->headerType = EBPFTypeFactory::instance->create(ht);
+
     if (ctrl->container->is<IR::P4Control>()) {
         auto p4Control = ctrl->container->to<IR::P4Control>();
         this->visit(p4Control->body);
