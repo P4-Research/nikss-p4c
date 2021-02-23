@@ -21,22 +21,7 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     for (auto a : controlBlock->container->controlLocals)
         emitDeclaration(builder, a);
 
-    controlBlock->container->body->apply(*codeGen);
-    builder->newline();
-
     emitPreDeparser(builder);
-
-    builder->emitIndent();
-    this->headerType->declare(builder, this->headers->name.name, false);
-    builder->append(" = ");
-    this->headerType->emitInitializer(builder);
-    builder->endOfStatement(true);
-
-    this->hdrVoidPointerVar = this->headers->name.name + this->hdrVoidPointerVar;
-    builder->emitIndent();
-    builder->appendFormat("void* %s = (void*)(&%s);",
-                          this->hdrVoidPointerVar, this->headers->name.name);
-    builder->newline();
 
     const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
     builder->emitIndent();
@@ -90,38 +75,52 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusted");
 
     builder->emitIndent();
+    builder->appendFormat("%s = %s;",
+                          program->packetStartVar,
+                          builder->target->dataOffset(program->model.CPacketName.str()));
+    builder->newline();
+    builder->emitIndent();
+    builder->appendFormat("%s = %s;",
+                          program->packetEndVar,
+                          builder->target->dataEnd(program->model.CPacketName.str()));
+    builder->newline();
+
+    builder->emitIndent();
     builder->appendFormat("%s = 0", pipelineProgram->offsetVar.c_str());
     builder->endOfStatement(true);
 
-    builder->emitIndent();
-    builder->newline();
-    for (unsigned long i = 0; i < this->headersToEmit.size(); i++) {
-        auto headerToEmit = headersToEmit[i];
-        auto headerExpression = headersExpressions[i];
-        emitHeader(builder, headerToEmit, headerExpression);
-    }
+    controlBlock->container->body->apply(*codeGen);
     builder->newline();
 
-    cstring msgArg = Util::printf_format("BYTES(%s)", this->outerHdrLengthVar);
-    builder->target->emitTraceMessage(builder, "Deparser: writing %d bytes to pkt",
-                                      1, msgArg.c_str());
-    builder->emitIndent();
-    builder->appendFormat("%s = bpf_skb_store_bytes(%s, 0, %s, BYTES(%s), 0)",
-                          this->returnCode.c_str(),
-                          pipelineProgram->contextVar.c_str(),
-                          this->hdrVoidPointerVar.c_str(),
-                          this->outerHdrLengthVar.c_str());
-    builder->endOfStatement(true);
-
-    builder->emitIndent();
-    builder->appendFormat("if (%s) ", this->returnCode.c_str());
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder, "Deparser: write bytes failed");
-    builder->emitIndent();
-    builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
-    builder->newline();
-    builder->blockEnd(true);
-    builder->target->emitTraceMessage(builder, "Deparser: bytes written");
+//    builder->emitIndent();
+//    builder->newline();
+//    for (unsigned long i = 0; i < this->headersToEmit.size(); i++) {
+//        auto headerToEmit = headersToEmit[i];
+//        auto headerExpression = headersExpressions[i];
+//        emitHeader(builder, headerToEmit, headerExpression);
+//    }
+//    builder->newline();
+//
+//    cstring msgArg = Util::printf_format("BYTES(%s)", this->outerHdrLengthVar);
+//    builder->target->emitTraceMessage(builder, "Deparser: writing %d bytes to pkt",
+//                                      1, msgArg.c_str());
+//    builder->emitIndent();
+//    builder->appendFormat("%s = bpf_skb_store_bytes(%s, 0, %s, BYTES(%s), 0)",
+//                          this->returnCode.c_str(),
+//                          pipelineProgram->contextVar.c_str(),
+//                          this->hdrVoidPointerVar.c_str(),
+//                          this->outerHdrLengthVar.c_str());
+//    builder->endOfStatement(true);
+//
+//    builder->emitIndent();
+//    builder->appendFormat("if (%s) ", this->returnCode.c_str());
+//    builder->blockStart();
+//    builder->target->emitTraceMessage(builder, "Deparser: write bytes failed");
+//    builder->emitIndent();
+//    builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
+//    builder->newline();
+//    builder->blockEnd(true);
+//    builder->target->emitTraceMessage(builder, "Deparser: bytes written");
 }
 
 void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
