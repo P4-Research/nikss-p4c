@@ -250,9 +250,19 @@ class SimpleForwardingPSATest(P4EbpfTest):
                          "key 00 00 00 00 value 00 00 00 00 05 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT1)
-        pass
 
+        
+class PSAResubmitTest(P4EbpfTest):
 
+    p4_file_path = "samples/p4testdata/resubmit.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_eth_packet()
+        testutils.send_packet(self, PORT0, pkt)
+        pkt[Ether].dst = "11:22:33:44:55:66"
+        testutils.verify_packet(self, pkt, PORT1)
+
+        
 class SimpleTunnelingPSATest(P4EbpfTest):
 
     p4_file_path = "samples/p4testdata/psa-tunneling.p4"
@@ -265,4 +275,3 @@ class SimpleTunnelingPSATest(P4EbpfTest):
 
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(exp_pkt), PORT1)
-

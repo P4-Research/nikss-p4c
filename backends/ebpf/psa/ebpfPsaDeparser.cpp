@@ -3,7 +3,29 @@
 
 namespace EBPF {
 
-void EBPFPsaDeparser::emit(CodeBuilder* builder) {
+DeparserBodyTranslator::DeparserBodyTranslator(const EBPFDeparserPSA *deparser) :
+                        ControlBodyTranslator(deparser), deparser(deparser) {
+    setName("DeparserBodyTranslator");
+}
+
+void DeparserBodyTranslator::processFunction(const P4::ExternFunction *function) {
+    if (function->method->name.name == "psa_resubmit") {
+        builder->appendFormat("!%s->drop && %s->resubmit",
+                              deparser->istd->name.name, deparser->istd->name.name);
+    }
+}
+
+void EBPFDeparserPSA::emit(CodeBuilder* builder) {
+    codeGen->setBuilder(builder);
+
+    for (auto a : controlBlock->container->controlLocals)
+        emitDeclaration(builder, a);
+
+    controlBlock->container->body->apply(*codeGen);
+    builder->newline();
+
+    emitPreDeparser(builder);
+
     builder->emitIndent();
     this->headerType->declare(builder, this->headers->name.name, false);
     builder->append(" = ");
@@ -102,7 +124,7 @@ void EBPFPsaDeparser::emit(CodeBuilder* builder) {
     builder->target->emitTraceMessage(builder, "Deparser: bytes written");
 }
 
-void EBPFPsaDeparser::emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
+void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                                  cstring& headerExpression) const {
     const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
     cstring msgStr;
@@ -146,7 +168,7 @@ void EBPFPsaDeparser::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
     builder->blockEnd(true);
 }
 
-void EBPFPsaDeparser::emitField(CodeBuilder* builder, cstring headerExpression,
+void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
                                 cstring field, unsigned int alignment,
                                 EBPF::EBPFType* type) const {
     auto et = dynamic_cast<EBPF::IHasWidth *>(type);
@@ -273,4 +295,54 @@ void EBPFPsaDeparser::emitField(CodeBuilder* builder, cstring headerExpression,
     builder->newline();
 }
 
+// =====================EBPFIngressDeparserPSA=============================
+bool EBPFIngressDeparserPSA::build() {
+    auto pl = controlBlock->container->type->applyParams;
+    auto it = pl->parameters.begin();
+    packet_out = *it;
+    headers = *(it + 4);
+    resubmit_meta = *(it + 2);
+
+    auto ht = program->typeMap->getType(headers);
+    if (ht == nullptr) {
+        return false;
+    }
+    headerType = EBPFTypeFactory::instance->create(ht);
+
+    codeGen->asPointerVariables.insert(resubmit_meta->name.name);
+    codeGen->substitute(this->headers, parserHeaders);
+    return true;
+}
+
+void EBPFIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
+    // if packet should be resubmitted, we skip deparser
+    builder->emitIndent();
+    builder->appendFormat("if (%s->resubmit) {\n"
+                          "     meta->packet_path = RESUBMIT;\n"
+                          "       return TC_ACT_UNSPEC;\n"
+                          "   }", istd->name.name);
+    builder->newline();
+}
+
+void EBPFIngressDeparserPSA::emitSharedMetadataInitializer(CodeBuilder *builder) {
+    auto type = EBPFTypeFactory::instance->create(resubmit_meta->type);
+    type->declare(builder, resubmit_meta->name.name, false);
+    builder->endOfStatement(true);
+}
+
+// =====================EBPFEgressDeparserPSA=============================
+bool EBPFEgressDeparserPSA::build() {
+    auto pl = controlBlock->container->type->applyParams;
+    auto it = pl->parameters.begin();
+    packet_out = *it;
+    headers = *(it + 3);
+
+    auto ht = program->typeMap->getType(headers);
+    if (ht == nullptr) {
+        return false;
+    }
+    headerType = EBPFTypeFactory::instance->create(ht);
+
+    return true;
+}
 }  // namespace EBPF

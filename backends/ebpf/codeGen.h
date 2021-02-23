@@ -46,6 +46,7 @@ class CodeGenInspector : public Inspector {
     std::map<const IR::Parameter*, const IR::Parameter*> substitution;
 
  public:
+    std::set<cstring> asPointerVariables;
     int expressionPrecedence;  /// precedence of current IR::Operation
     CodeGenInspector(P4::ReferenceMap* refMap, P4::TypeMap* typeMap) :
         builder(nullptr), refMap(refMap), typeMap(typeMap),
@@ -63,6 +64,12 @@ class CodeGenInspector : public Inspector {
     void copySubstitutions(CodeGenInspector* other) {
         for (auto s : other->substitution)
             substitute(s.first, s.second);
+    }
+
+    void copyPointerVariables(CodeGenInspector *other) {
+        for (auto s : other->asPointerVariables) {
+            this->asPointerVariables.insert(s);
+        }
     }
 
     bool notSupported(const IR::Expression* expression)
