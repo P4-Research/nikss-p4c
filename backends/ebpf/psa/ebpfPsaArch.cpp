@@ -230,6 +230,8 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     auto it = pl->parameters.begin();
     parser->packet = *it; ++it;
     parser->headers = *it;
+    auto resubmit_meta = *(it + 3);
+
     for (auto state : prsr->container->states) {
         auto ps = new EBPFParserState(state, parser);
         parser->states.push_back(ps);
@@ -239,6 +241,8 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     if (ht == nullptr)
         return false;
     parser->headerType = EBPFTypeFactory::instance->create(ht);
+
+    parser->visitor->asPointerVariables.insert(resubmit_meta->name.name);
 
     return true;
 }
@@ -255,10 +259,9 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     control->hitVariable = refmap->newName("hit");
     auto pl = ctrl->container->type->applyParams;
     auto it = pl->parameters.begin();
-    control->headers = *it;
-    it += 2;
-    control->inputStandardMetadata = *it;
-    ++it;
+    control->headers = *it; ++it;
+    control->user_metadata = *it; ++it;
+    control->inputStandardMetadata = *it; ++it;
     control->outputStandardMetadata = *it;
 
     auto codegen = new ControlBodyTranslator(control);

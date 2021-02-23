@@ -12,11 +12,11 @@ header ethernet_t {
 struct empty_t {}
 
 struct resubmit_metadata_t {
-    bit<8> selector;
-    ethernet_t eth_hdr;
+    bit<48> dst_addr;
 }
 
 struct metadata {
+    bit<48> dst_addr;
 }
 
 struct headers {
@@ -31,6 +31,8 @@ parser IngressParserImpl(packet_in buffer,
                          in empty_t recirculate_meta)
 {
     state start {
+        user_meta.dst_addr = resubmit_meta.dst_addr;
+
         buffer.extract(parsed_hdr.ethernet);
         transition accept;
     }
@@ -70,7 +72,7 @@ control ingress(inout headers hdr,
              // Any assignments that modify the packet contents in this
              // part of the code _should_ affect the output packet
              // contents, because we are not resubmitting it again.
-             hdr.ethernet.dstAddr = 0x112233445566;
+             hdr.ethernet.dstAddr = user_meta.dst_addr;
              send_to_port(ostdx, (PortId_t) 5);
          }
     }
@@ -103,10 +105,9 @@ control IngressDeparserImpl(packet_out buffer,
     CommonDeparserImpl() cp;
     apply {
         if (psa_resubmit(istd)) {
-            resubmit_meta.selector = 5;
-            resubmit_meta.eth_hdr = hdr.ethernet;
+            resubmit_meta.dst_addr = 0x112233445566;
         } else {
-            resubmit_meta.selector = 0;
+            resubmit_meta.dst_addr = 0;
         }
         cp.apply(buffer, hdr);
     }

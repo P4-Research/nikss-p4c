@@ -22,32 +22,6 @@ limitations under the License.
 
 namespace EBPF {
 
-namespace {
-class StateTranslationVisitor : public CodeGenInspector {
-    bool hasDefault;
-    P4::P4CoreLibrary& p4lib;
-    const EBPFParserState* state;
-
-    void compileExtractField(const IR::Expression* expr, cstring name,
-                             unsigned alignment, EBPFType* type);
-    void compileExtract(const IR::Expression* destination);
-    void compileLookahead(const IR::Expression* destination);
-
- public:
-    explicit StateTranslationVisitor(const EBPFParserState* state) :
-            CodeGenInspector(state->parser->program->refMap, state->parser->program->typeMap),
-            hasDefault(false), p4lib(P4::P4CoreLibrary::instance), state(state) {}
-    bool preorder(const IR::ParserState* state) override;
-    bool preorder(const IR::SelectCase* selectCase) override;
-    bool preorder(const IR::SelectExpression* expression) override;
-    bool preorder(const IR::Member* expression) override;
-    bool preorder(const IR::MethodCallExpression* expression) override;
-    bool preorder(const IR::MethodCallStatement* stat) override
-    { visit(stat->methodCall); return false; }
-    bool preorder(const IR::AssignmentStatement* stat) override;
-};
-}  // namespace
-
 void
 StateTranslationVisitor::compileLookahead(const IR::Expression* destination) {
     cstring msgStr = Util::printf_format("Parser: lookahead for %s %s",
@@ -401,24 +375,17 @@ bool StateTranslationVisitor::preorder(const IR::Member* expression) {
         }
     }
 
-    visit(expression->expr);
-    builder->append(".");
-    builder->append(expression->member);
-    return false;
+    return CodeGenInspector::preorder(expression);
 }
 
 //////////////////////////////////////////////////////////////////
 
-void EBPFParserState::emit(CodeBuilder* builder) {
-    StateTranslationVisitor visitor(this);
-    visitor.setBuilder(builder);
-    state->apply(visitor);
-}
-
 EBPFParser::EBPFParser(const EBPFProgram* program, const IR::P4Parser* block,
                        const P4::TypeMap* typeMap) :
         program(program), typeMap(typeMap), parserBlock(block),
-        packet(nullptr), headers(nullptr), headerType(nullptr) {}
+        packet(nullptr), headers(nullptr), headerType(nullptr) {
+    visitor = new StateTranslationVisitor(program->refMap, program->typeMap);
+}
 
 void EBPFParser::emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl) {
     if (decl->is<IR::Declaration_Variable>()) {
@@ -438,8 +405,13 @@ void EBPFParser::emitDeclaration(CodeBuilder* builder, const IR::Declaration* de
 void EBPFParser::emit(CodeBuilder* builder) {
     for (auto l : parserBlock->parserLocals)
         emitDeclaration(builder, l);
-    for (auto s : states)
-        s->emit(builder);
+
+    visitor->setBuilder(builder);
+    for (auto s : states) {
+        visitor->setState(s);
+        s->state->apply(*visitor);
+    }
+
     builder->newline();
 
     // Create a synthetic reject state

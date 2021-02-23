@@ -125,6 +125,18 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->blockEnd(true);
 
     emitHeaderInstances(builder);
+
+    builder->emitIndent();
+    auto user_md_type = typeMap->getType(control->user_metadata);
+    if (user_md_type == nullptr) {
+        ::error("cannot emit user metadata");
+    }
+    auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
+    userMetadataType->declare(builder, control->user_metadata->name.name, false);
+    builder->append(" = ");
+    userMetadataType->emitInitializer(builder);
+    builder->endOfStatement(true);
+
     emitLocalVariables(builder);
     msgStr = Util::printf_format("%s parser: parsing new packet", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());

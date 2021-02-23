@@ -24,6 +24,35 @@ limitations under the License.
 namespace EBPF {
 
 class EBPFParser;
+class EBPFParserState;
+
+class StateTranslationVisitor : public CodeGenInspector {
+    bool hasDefault;
+    P4::P4CoreLibrary& p4lib;
+    const EBPFParserState* state;
+
+    void compileExtractField(const IR::Expression* expr, cstring name,
+                             unsigned alignment, EBPFType* type);
+    void compileExtract(const IR::Expression* destination);
+    void compileLookahead(const IR::Expression* destination);
+
+ public:
+    explicit StateTranslationVisitor(P4::ReferenceMap* refMap, P4::TypeMap* typeMap) :
+            CodeGenInspector(refMap, typeMap),
+            hasDefault(false), p4lib(P4::P4CoreLibrary::instance) {}
+
+    void setState(const EBPFParserState* state) {
+        this->state = state;
+    }
+    bool preorder(const IR::ParserState* state) override;
+    bool preorder(const IR::SelectCase* selectCase) override;
+    bool preorder(const IR::SelectExpression* expression) override;
+    bool preorder(const IR::Member* expression) override;
+    bool preorder(const IR::MethodCallExpression* expression) override;
+    bool preorder(const IR::MethodCallStatement* stat) override
+    { visit(stat->methodCall); return false; }
+    bool preorder(const IR::AssignmentStatement* stat) override;
+};
 
 class EBPFParserState : public EBPFObject {
  public:
@@ -44,6 +73,8 @@ class EBPFParser : public EBPFObject {
     const IR::Parameter*          packet;
     const IR::Parameter*          headers;
     EBPFType*                     headerType;
+
+    StateTranslationVisitor*      visitor;
 
     explicit EBPFParser(const EBPFProgram* program, const IR::P4Parser* block,
                         const P4::TypeMap* typeMap);

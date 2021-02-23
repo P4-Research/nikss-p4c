@@ -12,6 +12,7 @@ class EBPFControlPSA : public EBPFControl {
     // It should be moved to ConvertToEBPFPsaControl.
     const IR::P4Control* p4Control;
 
+    const IR::Parameter* user_metadata;
     const IR::Parameter* inputStandardMetadata;
     const IR::Parameter* outputStandardMetadata;
 
