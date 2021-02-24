@@ -275,3 +275,18 @@ class SimpleTunnelingPSATest(P4EbpfTest):
 
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(exp_pkt), PORT1)
+
+
+class PSACloneI2E(P4EbpfTest):
+
+    p4_file_path = "../../../testdata/p4_16_samples/psa-i2e-cloning-basic-bmv2.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_eth_packet(eth_dst='00:00:00:00:00:05')
+        testutils.send_packet(self, PORT0, pkt)
+        pkt[Ether].src = "00:00:00:00:ca:fe"
+        testutils.verify_packet(self, pkt, PORT1)
+
+        pkt = testutils.simple_eth_packet(eth_dst='00:00:00:00:00:09')
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_no_packet(self, pkt, PORT1)
