@@ -332,7 +332,7 @@ class SimpleLpmPSATest(EbpfTest):
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='10.11.11.11')
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd "
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm "
                          "key hex 08 00 00 00 0a 0a 0a 0a value hex 00 00 00 00 06 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT2)

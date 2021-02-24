@@ -54,7 +54,7 @@ struct headers {
     struct ethernet_t ethernet; /* ethernet_t */
     struct ipv4_h ipv4; /* ipv4_h */
 };
-struct ingress_tbl_fwd_key {
+struct ingress_tbl_fwd_lpm_key {
     u32	prefixlen;
     u32 field0; /* hdr.ipv4.dstAddr */
 };
@@ -63,7 +63,7 @@ enum tbl_fwd_0_actions {
     ingress_do_drop,
     _NoAction,
 };
-struct ingress_tbl_fwd_value {
+struct ingress_tbl_fwd_lpm_value {
     enum tbl_fwd_0_actions action;
     union {
         struct {
@@ -75,16 +75,16 @@ struct ingress_tbl_fwd_value {
         } _NoAction;
     } u;
 };
-struct bpf_elf_map SEC("maps") ingress_tbl_fwd = {
+struct bpf_elf_map SEC("maps") ingress_tbl_fwd_lpm = {
         .type        = BPF_MAP_TYPE_LPM_TRIE,
-        .size_key    = sizeof(struct ingress_tbl_fwd_key),
-        .size_value  = sizeof(struct ingress_tbl_fwd_value),
+        .size_key    = sizeof(struct ingress_tbl_fwd_lpm_key),
+        .size_value  = sizeof(struct ingress_tbl_fwd_lpm_value),
         .max_elem    = 100,
         .pinning     = 2,
         .flags       = BPF_F_NO_PREALLOC,
 };
 REGISTER_START()
-REGISTER_TABLE(ingress_tbl_fwd_defaultAction, BPF_MAP_TYPE_ARRAY, sizeof(u32), sizeof(struct ingress_tbl_fwd_value), 1)
+REGISTER_TABLE(ingress_tbl_fwd_lpm_defaultAction, BPF_MAP_TYPE_ARRAY, sizeof(u32), sizeof(struct ingress_tbl_fwd_lpm_value), 1)
 REGISTER_END()
 
 SEC("xdp-ingress")
@@ -266,19 +266,19 @@ int tc_ingress_func(SK_BUFF *skb) {
 /* tbl_fwd_0.apply()*/
             {
                 /* construct key */
-                struct ingress_tbl_fwd_key key = {};
+                struct ingress_tbl_fwd_lpm_key key = {};
                 key.prefixlen = 32;
                 key.field0 = bpf_htonl(parsed_hdr.ipv4.dstAddr);
 //                key.field1 = parsed_hdr.ipv4.srcAddr;
                 /* value */
-                struct ingress_tbl_fwd_value *value = NULL;
+                struct ingress_tbl_fwd_lpm_value *value = NULL;
                 /* perform lookup */
-                value = BPF_MAP_LOOKUP_ELEM(ingress_tbl_fwd, &key);
+                value = BPF_MAP_LOOKUP_ELEM(ingress_tbl_fwd_lpm, &key);
                 if (value == NULL) {
                     bpf_trace_message("Control: value jest NULL\n");
                     /* miss; find default action */
                     hit_1 = 0;
-                    value = BPF_MAP_LOOKUP_ELEM(ingress_tbl_fwd_defaultAction, &ebpf_zero);
+                    value = BPF_MAP_LOOKUP_ELEM(ingress_tbl_fwd_lpm_defaultAction, &ebpf_zero);
                 } else {
                     bpf_trace_message("Control: value jest git\n");
                     hit_1 = 1;
