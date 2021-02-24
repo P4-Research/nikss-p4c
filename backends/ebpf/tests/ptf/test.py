@@ -192,7 +192,7 @@ class SimpleForwardingPSATest(P4EbpfTest):
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT1)
 
-        
+
 class PSAResubmitTest(P4EbpfTest):
 
     p4_file_path = "samples/p4testdata/resubmit.p4"
@@ -203,7 +203,7 @@ class PSAResubmitTest(P4EbpfTest):
         pkt[Ether].dst = "11:22:33:44:55:66"
         testutils.verify_packet(self, pkt, PORT1)
 
-        
+
 class SimpleTunnelingPSATest(P4EbpfTest):
 
     p4_file_path = "samples/p4testdata/psa-tunneling.p4"
@@ -325,3 +325,14 @@ class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
         pkt[Ether].dst = '00:00:00:00:00:00'
         pkt[Ether].src = '00:44:33:22:11:00'
         testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+
+class SimpleLpmPSATest(EbpfTest):
+
+    test_prog_image = "samples/lpm_test.o"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='10.11.11.11')
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd "
+                         "key hex 08 00 00 00 0a 0a 0a 0a value hex 00 00 00 00 06 00 00 00")
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT2)
