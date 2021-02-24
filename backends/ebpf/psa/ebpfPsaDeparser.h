@@ -15,7 +15,13 @@ class DeparserBodyTranslator : public ControlBodyTranslator {
     explicit DeparserBodyTranslator(const EBPFDeparserPSA* deparser);
 
     void processFunction(const P4::ExternFunction* function) override;
-    void processMethod(const P4::ExternMethod* method) override { };
+    void processMethod(const P4::ExternMethod* method) override {
+        if (method->method->name.name == "emit") {
+            // do not use visitor to generate emit() methods
+            return;
+        }
+        ControlBodyTranslator::processMethod(method);
+    };
 };
 
 class EBPFDeparserPSA : public EBPFControl {
@@ -27,7 +33,7 @@ class EBPFDeparserPSA : public EBPFControl {
     std::vector<cstring> headersExpressions;
     std::vector<const IR::Type_Header *> headersToEmit;
     cstring outerHdrOffsetVar, outerHdrLengthVar;
-    cstring returnCode, hdrVoidPointerVar;
+    cstring returnCode;
 
     EBPFDeparserPSA(const EBPFProgram* program, const IR::ControlBlock* control,
                     const IR::Parameter* parserHeaders, const IR::Parameter *istd) :
@@ -35,7 +41,6 @@ class EBPFDeparserPSA : public EBPFControl {
       outerHdrOffsetVar = cstring("outHeaderOffset");
       outerHdrLengthVar = cstring("outHeaderLength");
       returnCode = cstring("returnCode");
-      hdrVoidPointerVar = cstring("VoidPointerVar");
     }
 
     void emit(CodeBuilder* builder) override;

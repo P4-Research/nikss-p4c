@@ -26,18 +26,6 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
 
     emitPreDeparser(builder);
 
-    builder->emitIndent();
-    this->headerType->declare(builder, this->headers->name.name, false);
-    builder->append(" = ");
-    this->headerType->emitInitializer(builder);
-    builder->endOfStatement(true);
-
-    this->hdrVoidPointerVar = this->headers->name.name + this->hdrVoidPointerVar;
-    builder->emitIndent();
-    builder->appendFormat("void* %s = (void*)(&%s);",
-                          this->hdrVoidPointerVar, this->headers->name.name);
-    builder->newline();
-
     const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
     builder->emitIndent();
     builder->appendFormat("int %s = 0", this->outerHdrLengthVar.c_str());
@@ -90,43 +78,30 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusted");
 
     builder->emitIndent();
+    builder->appendFormat("%s = %s;",
+                          program->packetStartVar,
+                          builder->target->dataOffset(program->model.CPacketName.str()));
+    builder->newline();
+    builder->emitIndent();
+    builder->appendFormat("%s = %s;",
+                          program->packetEndVar,
+                          builder->target->dataEnd(program->model.CPacketName.str()));
+    builder->newline();
+
+    builder->emitIndent();
     builder->appendFormat("%s = 0", pipelineProgram->offsetVar.c_str());
     builder->endOfStatement(true);
 
-    builder->emitIndent();
-    builder->newline();
     for (unsigned long i = 0; i < this->headersToEmit.size(); i++) {
         auto headerToEmit = headersToEmit[i];
         auto headerExpression = headersExpressions[i];
         emitHeader(builder, headerToEmit, headerExpression);
     }
     builder->newline();
-
-    cstring msgArg = Util::printf_format("BYTES(%s)", this->outerHdrLengthVar);
-    builder->target->emitTraceMessage(builder, "Deparser: writing %d bytes to pkt",
-                                      1, msgArg.c_str());
-    builder->emitIndent();
-    builder->appendFormat("%s = bpf_skb_store_bytes(%s, 0, %s, BYTES(%s), 0)",
-                          this->returnCode.c_str(),
-                          pipelineProgram->contextVar.c_str(),
-                          this->hdrVoidPointerVar.c_str(),
-                          this->outerHdrLengthVar.c_str());
-    builder->endOfStatement(true);
-
-    builder->emitIndent();
-    builder->appendFormat("if (%s) ", this->returnCode.c_str());
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder, "Deparser: write bytes failed");
-    builder->emitIndent();
-    builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
-    builder->newline();
-    builder->blockEnd(true);
-    builder->target->emitTraceMessage(builder, "Deparser: bytes written");
 }
 
 void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                                  cstring& headerExpression) const {
-    const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
     cstring msgStr;
     builder->emitIndent();
     builder->append("if (");
@@ -137,9 +112,11 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
     unsigned width = headerToEmit->width_bits();
     msgStr = Util::printf_format("Deparser: emitting header %s", headerExpression);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
+
     builder->emitIndent();
-    builder->appendFormat("if (%s->len < BYTES(%s + %d)) ",
-                          pipelineProgram->contextVar.c_str(),
+    builder->appendFormat("if (%s < %s + BYTES(%s + %d)) ",
+                          program->packetEndVar.c_str(),
+                          program->packetStartVar.c_str(),
                           program->offsetVar.c_str(), width);
     builder->blockStart();
     builder->target->emitTraceMessage(builder, "Deparser: invalid packet (packet too short)");
@@ -230,7 +207,7 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
         if (alignment == 0 && bitsToWrite == 8) {  // write whole byte
             builder->appendFormat(
                     "write_byte(%s, BYTES(%s) + %d, (%s))",
-                    this->hdrVoidPointerVar.c_str(),
+                    program->packetStartVar.c_str(),
                     program->offsetVar.c_str(),
                     widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
                     program->byteVar.c_str());
@@ -238,7 +215,7 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
             shift = (8 - alignment - bitsToWrite);
             builder->appendFormat(
                     "write_partial(%s + BYTES(%s) + %d, %d, %d, (%s >> %d))",
-                    this->hdrVoidPointerVar.c_str(),
+                    program->packetStartVar.c_str(),
                     program->offsetVar.c_str(),
                     widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
                     bitsToWrite,
@@ -256,7 +233,7 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
             if (bitsToWrite == 8) {
                 builder->appendFormat(
                         "write_byte(%s, BYTES(%s) + %d + 1, (%s << %d))",
-                        this->hdrVoidPointerVar.c_str(),
+                        program->packetStartVar.c_str(),
                         program->offsetVar.c_str(),
                         widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
                         program->byteVar.c_str(),
@@ -264,7 +241,7 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
             } else {
                 builder->appendFormat(
                         "write_partial(%s + BYTES(%s) + %d + 1, %d, %d, (%s))",
-                        this->hdrVoidPointerVar.c_str(),
+                        program->packetStartVar.c_str(),
                         program->offsetVar.c_str(),
                         widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
                         bitsToWrite,
