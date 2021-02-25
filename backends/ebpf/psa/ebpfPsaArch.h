@@ -30,10 +30,11 @@ class PSAArch {
 
     void emit(CodeBuilder* builder) const;  // emits C file for eBPF program
     void emitPreamble(CodeBuilder *builder) const;
-    void emitInternalMetadata(CodeBuilder *pBuilder) const;
+    void emitInternalStructures(CodeBuilder *pBuilder) const;
     void emitTypes(CodeBuilder *builder) const;
     void emitInstances(CodeBuilder *builder) const;
     void emitPSAIncludes(CodeBuilder *builder) const;
+    void emitHelperFunctions(CodeBuilder *builder) const;
 };
 
 class ConvertToEbpfPSA : public Transform {
