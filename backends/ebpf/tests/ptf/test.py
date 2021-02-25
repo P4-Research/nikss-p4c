@@ -333,7 +333,7 @@ class SimpleLpmPSATest(EbpfTest):
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='10.11.11.11')
-        #This command adds LPM entry 10.10.10.10/8 with action forwarding on port 6 (PORT2 in ptf)
+        # This command adds LPM entry 10.10.10.10/8 with action forwarding on port 6 (PORT2 in ptf)
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm "
                          "key hex 08 00 00 00 0a 0a 0a 0a value hex 00 00 00 00 06 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
@@ -368,3 +368,16 @@ class MulticastPSATest(P4EbpfTest):
     def tearDown(self):
         self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/mcast_grp_8")
         super(MulticastPSATest, self).tearDown()
+
+
+class SimpleLpmP4PSATest(P4EbpfTest):
+
+    p4_file_path = "samples/p4testdata/psa-lpm.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='10.10.11.11')
+        # This command adds LPM entry 10.10.10.10/16 with action forwarding on port 6 (PORT2 in ptf)
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm "
+                         "key hex 10 00 00 00 0a 0a 0a 0a value hex 00 00 00 00 06 00 00 00")
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT2)

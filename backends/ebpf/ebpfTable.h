@@ -45,6 +45,9 @@ class EBPFTableBase : public EBPFObject {
 };
 
 class EBPFTable : public EBPFTableBase {
+    const cstring prefixFieldName = "prefixlen";
+    const int prefixLenFieldWidth = 32;
+    bool isLPMTable();
  public:
     const IR::Key*            keyGenerator;
     const IR::ActionList*     actionList;
@@ -63,6 +66,12 @@ class EBPFTable : public EBPFTableBase {
     void emitKey(CodeBuilder* builder, cstring keyName);
     void emitAction(CodeBuilder* builder, cstring valueName);
     void emitInitializer(CodeBuilder* builder);
+ private:
+    cstring getByteSwapMethod(unsigned int width) const;
+    void declareTmpLpmKey(CodeBuilder *builder, const IR::KeyElement *c, std::string &tmpVar);
+    void emitLpmKeyField(CodeBuilder *builder,
+                         const cstring &swap,
+                         const std::string &tmpVar) const;
 };
 
 class EBPFCounterTable final : public EBPFTableBase {

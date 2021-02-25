@@ -48,17 +48,27 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
                                         cstring keyType, cstring valueType,
                                         unsigned size) const {
     cstring kind;
+    cstring registerTable = "REGISTER_TABLE(%s, %s, sizeof(%s), sizeof(%s), %d)";
+    cstring registerTableWithFlags = "REGISTER_TABLE_FLAGS(%s, %s, sizeof(%s), "
+                                        "sizeof(%s), %d, %s)";
     if (tableKind == TableHash)
         kind = "BPF_MAP_TYPE_HASH";
     else if (tableKind == TableArray)
         kind = "BPF_MAP_TYPE_ARRAY";
-    else if (tableKind == TableLPMTrie)
+    else if (tableKind == TableLPMTrie) {
         kind = "BPF_MAP_TYPE_LPM_TRIE";
+
+        builder->appendFormat(registerTableWithFlags, tblName.c_str(),
+                              kind.c_str(), keyType.c_str(),
+                              valueType.c_str(), size, "BPF_F_NO_PREALLOC");
+        builder->newline();
+        return;
+    }
     else
         BUG("%1%: unsupported table kind", tableKind);
-    builder->appendFormat("REGISTER_TABLE(%s, %s, ", tblName.c_str(), kind.c_str());
-    builder->appendFormat("sizeof(%s), sizeof(%s), %d)",
-                          keyType.c_str(), valueType.c_str(), size);
+    builder->appendFormat(registerTable, tblName.c_str(),
+                          kind.c_str(), keyType.c_str(),
+                          valueType.c_str(), size);
     builder->newline();
 }
 
