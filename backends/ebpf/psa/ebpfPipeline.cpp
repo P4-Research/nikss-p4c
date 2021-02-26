@@ -4,7 +4,10 @@
 namespace EBPF {
 
 void EBPFPipeline::emit(CodeBuilder* builder) {
-    cstring msgStr;
+    cstring msgStr, varStr;
+    // Ingress and egress has different variables which are pointers,
+    // clearing is needed to not preserving them between pipelines
+    control->codeGen->asPointerVariables.clear();
     builder->target->emitCodeSection(builder, sectionName);
     builder->emitIndent();
     builder->target->emitMain(builder, functionName, model.CPacketName.str());
@@ -13,8 +16,10 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     emitGlobalMetadataInitializer(builder);
     emitHeaderInstances(builder);
     emitLocalVariables(builder);
-    msgStr = Util::printf_format("%s parser: parsing new packet", sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    emitPSAControlDataTypes(builder);
+    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d", sectionName);
+    varStr = Util::printf_format("%s.packet_path", control->inputStandardMetadata->name.name);
+    builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, varStr.c_str());
     parser->emit(builder);
     builder->emitIndent();
     builder->append(IR::ParserState::accept);
@@ -22,7 +27,6 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     builder->newline();
     builder->emitIndent();
     builder->blockStart();
-    emitPSAControlDataTypes(builder);
     // TODO: add more info: packet length, ingress port
     msgStr = Util::printf_format("%s control: packet processing started", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
@@ -138,8 +142,8 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->endOfStatement(true);
 
     emitLocalVariables(builder);
-    msgStr = Util::printf_format("%s parser: parsing new packet", sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, "meta->packet_path");
     parser->emit(builder);
     builder->emitIndent();
     builder->append(IR::ParserState::accept);
@@ -225,12 +229,11 @@ void EBPFIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
 }
 
 // =====================EBPFEgressPipeline=============================
-void EBPFEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
-    builder->emitIndent();
-    builder->appendLine("return TC_ACT_OK;");
-}
+void EBPFEgressPipeline::emitPSAControlDataTypes(CodeBuilder* builder) {
+    cstring outputMdVar, inputMdVar;
+    outputMdVar = control->outputStandardMetadata->name.name;
+    inputMdVar = control->inputStandardMetadata->name.name;
 
-void EBPFEgressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("struct psa_egress_input_metadata_t %s = {\n"
                           "        .class_of_service = meta->class_of_service,\n"
@@ -239,8 +242,82 @@ void EBPFEgressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
                           "        .instance = meta->instance,\n"
                           "        .egress_timestamp = skb->tstamp,\n"
                           "        .parser_error = %s,\n"
-                          "    };", control->inputStandardMetadata->name.name, errorVar.c_str());
+                          "    };", inputMdVar.c_str(), errorVar.c_str());
     builder->newline();
+    builder->emitIndent();
+    builder->appendFormat("if (%s.egress_port == PSA_PORT_RECIRCULATE) ", inputMdVar.c_str());
+    builder->blockStart();
+    builder->emitIndent();
+    // To be conformant with psa.p4, where PSA_PORT_RECIRCULATE is constant
+    builder->appendFormat("%s.egress_port = P4C_PSA_PORT_RECIRCULATE", inputMdVar.c_str());
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
+
+    builder->emitIndent();
+    builder->appendFormat("struct psa_egress_output_metadata_t %s = {\n", outputMdVar.c_str());
+    builder->appendLine("        .clone = false,\n"
+                        "        .drop = false,\n"
+                        "    };");
+
+    builder->newline();
+}
+
+void EBPFEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
+    cstring varStr, outputMdVar, inputMdVar;
+    outputMdVar = control->outputStandardMetadata->name.name;
+    inputMdVar = control->inputStandardMetadata->name.name;
+
+    // clone support
+    builder->emitIndent();
+    builder->appendFormat("if (%s.clone) ", outputMdVar.c_str());
+    builder->blockStart();
+
+    builder->emitIndent();
+    builder->appendFormat("do_packet_clones(%s, %s.clone_session_id, CLONE_E2E, 3)",
+                          contextVar.c_str(), outputMdVar.c_str());
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
+
+    builder->newline();
+
+    // drop support
+    builder->emitIndent();
+    builder->appendFormat("if (%s.drop) ", outputMdVar.c_str());
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder, "EgressTM: Packet dropped due to metadata");
+    builder->emitIndent();
+    builder->appendFormat("return %s", builder->target->dropReturnCode().c_str());
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
+
+    builder->newline();
+
+    // recirculation support
+    // TODO: pass recirculation metadata
+    // TODO: there is parameter type `psa_egress_deparser_input_metadata_t` to the deparser,
+    //  maybe it should be used instead of `istd`?
+    builder->emitIndent();
+    builder->appendFormat("if (%s.egress_port == P4C_PSA_PORT_RECIRCULATE) ", inputMdVar.c_str());
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder, "EgressTM: recirculating packet");
+    builder->emitIndent();
+    builder->appendFormat("meta->packet_path = RECIRCULATE");
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->appendFormat("return bpf_redirect(PSA_PORT_RECIRCULATE, BPF_F_INGRESS)",
+                          contextVar.c_str());
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
+
+    builder->newline();
+
+    // normal packet to port
+    varStr = Util::printf_format("%s->ifindex", contextVar);
+    builder->target->emitTraceMessage(builder, "EgressTM: output packet to port %d",
+                                      1, varStr.c_str());
+    builder->emitIndent();
+    builder->appendFormat("return %s", builder->target->forwardReturnCode());
+    builder->endOfStatement(true);
 }
 
 }  // namespace EBPF

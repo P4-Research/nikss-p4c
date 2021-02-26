@@ -72,8 +72,8 @@ void PSAArch::emit(CodeBuilder *builder) const {
 void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
     cstring forEachFunc ="static __always_inline\n"
                         "int do_for_each(struct __sk_buff *skb, struct bpf_elf_map *map, "
-                        "                unsigned int max_iter, "
-                        "                void (*a)(struct __sk_buff *, void *))\n"
+                                        "unsigned int max_iter, "
+                                        "void (*a)(struct __sk_buff *, void *))\n"
                         "{\n"
                         "    __u32 zero_key = 0;\n"
                         "    struct element *elem = bpf_map_lookup_elem(map, &zero_key);\n"
@@ -215,6 +215,14 @@ void PSAArch::emitPreamble(CodeBuilder *builder) const {
     builder->appendLine("#define CLONE_MAX_INSTANCES 1");
     builder->appendLine("#define CLONE_MAX_CLONES (CLONE_MAX_PORTS * CLONE_MAX_INSTANCES)");
     builder->appendLine("#define CLONE_MAX_SESSIONS 1024");
+    builder->newline();
+
+    builder->appendLine("#ifndef PSA_PORT_RECIRCULATE\n"
+        "#error \"PSA_PORT_RECIRCULATE not specified, "
+            "please use -DPSA_PORT_RECIRCULATE=n option to specify index of recirculation "
+            "interface (see the result of command 'ip link')\"\n"
+        "#endif");
+    builder->appendLine("#define P4C_PSA_PORT_RECIRCULATE 0xfffffffa");
     builder->newline();
 
     // target-specific "preamble"
