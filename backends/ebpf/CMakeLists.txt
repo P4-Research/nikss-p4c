@@ -102,6 +102,12 @@ set (P4C_EBPF_HDRS
   psa/ebpfPsaObjects.h
   )
 
+set (PRECTL_SRCS
+  runtime/prectl/common.c
+  runtime/prectl/clone_session.c
+  runtime/prectl/prectl.c)
+add_executable(prectl ${PRECTL_SRCS})
+
 add_cpplint_files(${CMAKE_CURRENT_SOURCE_DIR} "${P4C_EBPF_SRCS};${P4C_EBPF_HDRS}")
 
 set (P4C_EBPF_DIST_HEADERS p4include/ebpf_model.p4)
@@ -110,6 +116,9 @@ build_unified(P4C_EBPF_SRCS)
 add_executable(p4c-ebpf ${P4C_EBPF_SRCS})
 target_link_libraries (p4c-ebpf ${P4C_LIBRARIES} ${P4C_LIB_DEPS})
 add_dependencies(p4c-ebpf genIR frontend)
+
+install (TARGETS prectl
+        RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
 
 install (TARGETS p4c-ebpf
   RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
@@ -132,6 +141,7 @@ file(RELATIVE_PATH
 # binary to be in the top level directory. This should go away when we
 # remove automake and fix the scripts.
 add_custom_target(linkp4cebpf
+  COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/prectl ${P4C_BINARY_DIR}/prectl
   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/p4c-ebpf ${P4C_BINARY_DIR}/p4c-ebpf
   COMMAND ${CMAKE_COMMAND} -E make_directory ${P4C_BINARY_DIR}/p4include &&
           ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${P4C_EBPF_DIST_HEADERS} ${P4C_BINARY_DIR}/p4include
@@ -217,6 +227,8 @@ else()
   "${CMAKE_CURRENT_SOURCE_DIR}/runtime folder.")
   set (SUPPORTS_KERNEL False)
 endif()
+
+target_link_libraries (prectl z elf ${LIBBPF})
 
 # Only add the kernel tests if the two requirements are met
 if (SUPPORTS_KERNEL)

@@ -19,28 +19,7 @@ static int last_argc;
 static char **last_argv;
 static int (*last_do_help)(int argc, char **argv);
 
-static int do_help(int argc, char **argv)
-{
-    // TODO: do help here
-    fprintf(stderr, "HELP\n");
-
-    return 0;
-}
-
-static int do_clone_session(int argc, char **argv)
-{
-    fprintf(stderr, "do clone session\n");
-
-    printf("argc: %d, argv: %s\n", argc, *argv);
-
-    if (argc < 3) {
-        fprintf(stderr, "too few parameters for clone-session\n");
-        return -1;
-    }
-
-    return cmd_select(clone_session_cmds, argc, argv, do_help);
-}
-
+static const char *bin_name;
 
 int cmd_select(const struct cmd *cmds, int argc, char **argv,
                int (*help)(int argc, char **argv))
@@ -68,6 +47,34 @@ int cmd_select(const struct cmd *cmds, int argc, char **argv,
     return -1;
 }
 
+static int do_help(int argc, char **argv)
+{
+    fprintf(stderr,
+            "Usage: %s OBJECT COMMAND { id OBJECT_ID | help }\n"
+            "       %s help\n"
+            "\n"
+            "       OBJECT := { clone-session | multicast-group }\n"
+            "       COMMAND := { create | delete | add-member | del-member }\n"
+                                        "",
+            bin_name, bin_name);
+
+    return 0;
+}
+
+static int do_clone_session(int argc, char **argv)
+{
+    fprintf(stderr, "do clone session\n");
+
+    printf("argc: %d, argv: %s\n", argc, *argv);
+
+    if (argc < 3) {
+        fprintf(stderr, "too few parameters for clone-session\n");
+        return -1;
+    }
+
+    return cmd_select(clone_session_cmds, argc, argv, do_help);
+}
+
 static const struct cmd cmds[] = {
         { "help",	        do_help },
         { "clone-session",	do_clone_session },
@@ -77,6 +84,7 @@ static const struct cmd cmds[] = {
 int main(int argc, char **argv)
 {
     int ret;
+    bin_name = argv[0];
 
     argc -= optind;
     argv += optind;

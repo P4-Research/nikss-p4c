@@ -5,8 +5,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <unistd.h>
 
-#include "psa.h"
+#include "backends/ebpf/runtime/psa.h"
 #include "clone_session.h"
 
 /**
@@ -168,10 +169,10 @@ int do_delete(int argc, char **argv)
 
 int do_add_member(int argc, char **argv)
 {
-
+    return 0;
 }
 
 int do_del_member(int argc, char **argv)
 {
-
+    return 0;
 }
