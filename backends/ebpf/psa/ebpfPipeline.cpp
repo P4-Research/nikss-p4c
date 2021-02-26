@@ -284,7 +284,7 @@ void EBPFEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("if (%s.drop) ", outputMdVar.c_str());
     builder->blockStart();
-    builder->target->emitTraceMessage(builder, "ETM: Packet dropped due to metadata");
+    builder->target->emitTraceMessage(builder, "EgressTM: Packet dropped due to metadata");
     builder->emitIndent();
     builder->appendFormat("return %s", builder->target->dropReturnCode().c_str());
     builder->endOfStatement(true);
@@ -299,7 +299,7 @@ void EBPFEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("if (%s.egress_port == P4C_PSA_PORT_RECIRCULATE) ", inputMdVar.c_str());
     builder->blockStart();
-    builder->target->emitTraceMessage(builder, "ETM: recirculating packet");
+    builder->target->emitTraceMessage(builder, "EgressTM: recirculating packet");
     builder->emitIndent();
     builder->appendFormat("meta->packet_path = RECIRCULATE");
     builder->endOfStatement(true);
@@ -313,7 +313,7 @@ void EBPFEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
 
     // normal packet to port
     varStr = Util::printf_format("%s->ifindex", contextVar);
-    builder->target->emitTraceMessage(builder, "ETM: output packet to port %d", 1, varStr.c_str());
+    builder->target->emitTraceMessage(builder, "EgressTM: output packet to port %d", 1, varStr.c_str());
     builder->emitIndent();
     builder->appendFormat("return %s", builder->target->forwardReturnCode());
     builder->endOfStatement(true);
