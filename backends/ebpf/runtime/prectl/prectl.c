@@ -63,10 +63,6 @@ static int do_help(int argc, char **argv)
 
 static int do_clone_session(int argc, char **argv)
 {
-    fprintf(stderr, "do clone session\n");
-
-    printf("argc: %d, argv: %s\n", argc, *argv);
-
     if (argc < 3) {
         fprintf(stderr, "too few parameters for clone-session\n");
         return -1;
