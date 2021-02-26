@@ -146,35 +146,6 @@ class ResubmitTest(EbpfTest):
         testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
 
 
-class CloneE2ETest(EbpfTest):
-    """
-    1. Send packet to interface PORT1 (bpf ifindex = 5) with destination MAC address equals to aa:bb:cc:dd:ee:ff.
-    2. Observe that:
-      2.1. Original packet was sent back through interface PORT1 (bpf ifindex = 5).
-      2.2. Packet was cloned at egress and processed by egress pipeline at interface PORT2 (bpf ifindex = 6).
-           The cloned packet should have destination MAC address set to '00:00:00:00:00:11'.
-    """
-
-    test_prog_image = '../samples/full-arch/full.o'
-    user_space_cmd = '../samples/full-arch/a.out'
-
-    def setUp(self):
-        super(CloneE2ETest, self).setUp()
-        self.exec_ns_cmd("{} session-add-member 1 6 1 1".format(self.user_space_cmd))
-
-    def runTest(self):
-        pkt = testutils.simple_ip_packet(eth_dst='aa:bb:cc:dd:ee:ff', eth_src='55:44:33:22:11:00')
-        testutils.send_packet(self, PORT1, str(pkt))
-        pkt[Ether].dst = '00:00:00:00:00:11'
-        testutils.verify_packet(self, str(pkt), PORT2)
-        pkt[Ether].dst = 'aa:bb:cc:dd:ee:ff'
-        testutils.verify_packet(self, str(pkt), PORT1)
-
-    def tearDown(self):
-        self.exec_ns_cmd("{} session-delete-member 1 0".format(self.user_space_cmd))
-        super(CloneE2ETest, self).tearDown()
-
-
 class MetadataXdpTcTest(EbpfTest):
     """
     Test global and user metadata consists of three phases:
@@ -296,14 +267,30 @@ class EgressTrafficManagerDropPSATest(P4EbpfTest):
 
 
 class EgressTrafficManagerClonePSATest(P4EbpfTest):
+    """
+    1. Send packet to interface PORT1 (bpf ifindex = 5) with destination MAC address equals to aa:bb:cc:dd:ee:ff.
+    2. Observe that:
+      2.1. Original packet was sent back through interface PORT1 (bpf ifindex = 5).
+           The packet should have destination MAC address set to '00:00:00:00:00:12'.
+      2.2. Packet was cloned at egress and processed by egress pipeline at interface PORT2 (bpf ifindex = 6).
+           The cloned packet should have destination MAC address set to '00:00:00:00:00:11'.
+    """
     p4_file_path = "samples/p4testdata/etm-clone-e2e.p4"
-    user_space_cmd = '../samples/full-arch/a.out'
-
-    def setUp(self):
-        super(EgressTrafficManagerClonePSATest, self).setUp()
-        self.exec_ns_cmd("{} session-add-member 1 6 1 1".format(self.user_space_cmd))
 
     def runTest(self):
+        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/tc/globals/clone_session_8 type "
+                         "array key 4 value 16 entries 64 name clone_session_8")
+        # add PORT2 (intf number = 6) to clone session 8
+        # TODO: use prectl to handle linked list specifics (set next id)
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/clone_session_8 "
+                         "key 01 00 00 00 value 06 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00")
+        # set next_id of head as id of above rule
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/clone_session_8 "
+                         "key 00 00 00 00 value 00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00")
+        # insert clone session table at index 8 (clone_session_id = 8)
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/clone_session_tbl "
+                         "key 8 0 0 0 value pinned /sys/fs/bpf/tc/globals/clone_session_8 any")
+
         pkt = testutils.simple_ip_packet(eth_dst='aa:bb:cc:dd:ee:ff', eth_src='55:44:33:22:11:00')
         testutils.send_packet(self, PORT1, str(pkt))
         pkt[Ether].dst = '00:00:00:00:00:11'
@@ -312,7 +299,7 @@ class EgressTrafficManagerClonePSATest(P4EbpfTest):
         testutils.verify_packet(self, str(pkt), PORT1)
 
     def tearDown(self):
-        self.exec_ns_cmd("{} session-delete-member 1 0".format(self.user_space_cmd))
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/clone_session_8")
         super(EgressTrafficManagerClonePSATest, self).tearDown()
 
 

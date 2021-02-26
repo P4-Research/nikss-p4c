@@ -90,7 +90,7 @@ control egress(inout headers hdr,
             hdr.ethernet.dstAddr = (EthernetAddress) 0x11;
         } else {
             ostd.clone = true;
-            ostd.clone_session_id = (CloneSessionId_t) 1;
+            ostd.clone_session_id = (CloneSessionId_t) 8;
             hdr.ethernet.dstAddr = (EthernetAddress) 0x12;
         }
     }
