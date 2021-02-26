@@ -2,6 +2,7 @@
 #define BACKENDS_EBPF_PSA_EBPFPSADEPARSER_H_
 
 #include "backends/ebpf/ebpfControl.h"
+#include "ebpfPsaControl.h"
 
 namespace EBPF {
 
