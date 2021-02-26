@@ -307,9 +307,8 @@ void EBPFIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->appendFormat("if (%s->clone) ", istd->name.name);
     builder->blockStart();
     builder->emitIndent();
-    builder->appendFormat("do_packet_clones(%s, %s->clone_session_id, CLONE_I2E, 1);",
-            program->model.CPacketName.str(),
-            istd->name.name);
+    builder->appendFormat("do_packet_clones(%s, &clone_session_tbl, %s->clone_session_id,"
+                          " CLONE_I2E, 1);", program->model.CPacketName.str(), istd->name.name);
     builder->newline();
     builder->blockEnd(true);
 
