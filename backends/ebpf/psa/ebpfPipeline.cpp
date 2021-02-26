@@ -185,7 +185,7 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
                         "    for (i = 0; i < %d; i++) {\n"
                         "        ostd.resubmit = 0;\n"
                         "        ret = %s(skb, &ostd, &%s);\n"
-                        "        if (ostd.resubmit == 0) {\n"
+                        "        if (ostd.drop == 1 || ostd.resubmit == 0) {\n"
                         "            break;\n"
                         "        }\n"
                         "    }", maxResubmitDepth, processFunctionName,

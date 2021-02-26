@@ -100,7 +100,7 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
                         "}";
     if (tcIngress->options.emitTraceMessages) {
         forEachFunc = forEachFunc.replace("%trace_msg_no_elements%",
-                      "bpf_trace_message(\"No elements found in list\");\n");
+                          "bpf_trace_message(\"No elements found in list\\n\");\n");
     } else {
         forEachFunc = forEachFunc.replace("%trace_msg_no_elements%", "");
     }
