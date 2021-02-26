@@ -3,6 +3,7 @@
 import os
 import logging
 import subprocess
+import copy
 
 import ptf
 # from ptf import config
@@ -118,6 +119,11 @@ class P4EbpfTest(EbpfTest):
 
         super(P4EbpfTest, self).setUp()
 
+    def tearDown(self):
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/clone_session_tbl")
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/clone_session_tbl_inner")
+        super(P4EbpfTest, self).tearDown()
+
 
 class ResubmitTest(EbpfTest):
     """
@@ -163,24 +169,6 @@ class RecirculateTest(EbpfTest):
         pkt[Ether].dst = '00:00:00:00:00:00'
         pkt[Ether].src = '00:44:33:22:11:00'
         testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
-
-
-class PacketCloningTest(EbpfTest):
-    """
-    1. Send packet destined to MAC address equals to 'ff:ff:ff:ff:ff:ff'.
-    2. Verify that packet has been cloned to PORT1 and PORT2.
-    """
-
-    # NOTE: you need to invoke `make` from ../samples/full-arch/ before.
-    test_prog_image = '../samples/full-arch/full.o'
-    user_space_cmd = '../samples/full-arch/a.out'
-    def runTest(self):
-        self.exec_ns_cmd("{} session-add-member 1 5 1 1".format(self.user_space_cmd))
-        self.exec_ns_cmd("{} session-add-member 1 6 1 1".format(self.user_space_cmd))
-
-        pkt = testutils.simple_ip_packet(eth_dst='ff:ff:ff:ff:ff:ff', eth_src='55:44:33:22:11:00')
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packets(self, str(pkt), [PORT1, PORT2])
 
 
 class CloneE2ETest(EbpfTest):
@@ -275,3 +263,39 @@ class SimpleTunnelingPSATest(P4EbpfTest):
 
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(exp_pkt), PORT1)
+
+
+class PSACloneI2E(P4EbpfTest):
+
+    p4_file_path = "../../../testdata/p4_16_samples/psa-i2e-cloning-basic-bmv2.p4"
+
+    def runTest(self):
+        # create clone session table
+        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/tc/globals/clone_session_8 type "
+                         "array key 4 value 16 entries 64 name clone_session_8")
+        # add PORT2 (intf number = 6) to clone session 8
+        # TODO: use prectl to handle linked list specifics (set next id)
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/clone_session_8 "
+                         "key 01 00 00 00 value 06 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00")
+        # set next_id of head as id of above rule
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/clone_session_8 "
+                         "key 00 00 00 00 value 00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00")
+        # insert clone session table at index 8 (clone_session_id = 8)
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/clone_session_tbl "
+                         "key 8 0 0 0 value pinned /sys/fs/bpf/tc/globals/clone_session_8 any")
+
+        pkt = testutils.simple_eth_packet(eth_dst='00:00:00:00:00:05')
+        testutils.send_packet(self, PORT0, pkt)
+        cloned_pkt = copy.deepcopy(pkt)
+        cloned_pkt[Ether].type = 0xface
+        testutils.verify_packet(self, cloned_pkt, PORT2)
+        pkt[Ether].src = "00:00:00:00:ca:fe"
+        testutils.verify_packet(self, pkt, PORT1)
+
+        pkt = testutils.simple_eth_packet(eth_dst='00:00:00:00:00:09')
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_no_packet(self, pkt, PORT1)
+
+    def tearDown(self):
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/clone_session_8")
+        super(P4EbpfTest, self).tearDown()

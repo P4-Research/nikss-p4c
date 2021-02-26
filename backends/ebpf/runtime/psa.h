@@ -115,6 +115,6 @@ struct clone_session_entry {
     __u8  class_of_service;
     __u8  truncate;
     __u16 packet_length_bytes;
-};
+} __attribute__((aligned(4)));
 
 #endif //P4C_PSA_H

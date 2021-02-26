@@ -74,6 +74,8 @@ struct bpf_elf_map {
     __u32 flags;
     __u32 id;
     __u32 pinning;
+    __u32 inner_id;
+    __u32 inner_idx;
 };
 
 /* simple descriptor which replaces the kernel sk_buff structure */
@@ -89,6 +91,27 @@ struct bpf_elf_map SEC("maps") NAME = {          \
     .max_elem    = MAX_ENTRIES,      \
     .pinning     = 2,                \
     .flags       = 0,                \
+};
+#define REGISTER_TABLE_INNER(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, ID, INNER_IDX) \
+struct bpf_elf_map SEC("maps") NAME = {          \
+    .type        = TYPE,             \
+    .size_key    = KEY_SIZE,         \
+    .size_value  = VALUE_SIZE,       \
+    .max_elem    = MAX_ENTRIES,      \
+    .pinning     = 2,                \
+    .flags       = 0,                \
+    .id          = ID,               \
+    .inner_idx   = INNER_IDX,        \
+};
+#define REGISTER_TABLE_OUTER(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, INNER_ID) \
+struct bpf_elf_map SEC("maps") NAME = {          \
+    .type        = TYPE,             \
+    .size_key    = KEY_SIZE,         \
+    .size_value  = VALUE_SIZE,       \
+    .max_elem    = MAX_ENTRIES,      \
+    .pinning     = 2,                \
+    .flags       = 0,                \
+    .inner_id    = INNER_ID,         \
 };
 #define REGISTER_END()
 

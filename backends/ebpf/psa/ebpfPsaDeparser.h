@@ -2,6 +2,7 @@
 #define BACKENDS_EBPF_PSA_EBPFPSADEPARSER_H_
 
 #include "backends/ebpf/ebpfControl.h"
+#include "ebpfPsaControl.h"
 
 namespace EBPF {
 
@@ -24,7 +25,7 @@ class DeparserBodyTranslator : public ControlBodyTranslator {
     };
 };
 
-class EBPFDeparserPSA : public EBPFControl {
+class EBPFDeparserPSA : public EBPFControlPSA {
  public:
     const IR::Parameter* packet_out;
     const IR::Parameter* istd;
@@ -37,7 +38,7 @@ class EBPFDeparserPSA : public EBPFControl {
 
     EBPFDeparserPSA(const EBPFProgram* program, const IR::ControlBlock* control,
                     const IR::Parameter* parserHeaders, const IR::Parameter *istd) :
-            EBPFControl(program, control, parserHeaders), istd(istd) {
+            EBPFControlPSA(program, control, parserHeaders), istd(istd) {
       outerHdrOffsetVar = cstring("outHeaderOffset");
       outerHdrLengthVar = cstring("outHeaderLength");
       returnCode = cstring("returnCode");

@@ -185,7 +185,7 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
                         "    for (i = 0; i < %d; i++) {\n"
                         "        ostd.resubmit = 0;\n"
                         "        ret = %s(skb, &ostd, &%s);\n"
-                        "        if (ostd.resubmit == 0) {\n"
+                        "        if (ostd.drop == 1 || ostd.resubmit == 0) {\n"
                         "            break;\n"
                         "        }\n"
                         "    }", maxResubmitDepth, processFunctionName,
@@ -212,7 +212,14 @@ void EBPFIngressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
     builder->newline();
 }
 
+/*
+ * The Traffic Manager for Ingress pipeline implements:
+ * - Multicast handling
+ * - send to port
+ */
 void EBPFIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
+    builder->target->emitTraceMessage(builder,
+            "Ingress TrafficManager: Sending packet out of port %d", 1, "ostd.egress_port");
     builder->emitIndent();
     builder->appendLine("return bpf_redirect(ostd.egress_port, 0);");
 }
