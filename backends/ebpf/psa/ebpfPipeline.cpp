@@ -313,7 +313,8 @@ void EBPFEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
 
     // normal packet to port
     varStr = Util::printf_format("%s->ifindex", contextVar);
-    builder->target->emitTraceMessage(builder, "EgressTM: output packet to port %d", 1, varStr.c_str());
+    builder->target->emitTraceMessage(builder, "EgressTM: output packet to port %d",
+                                      1, varStr.c_str());
     builder->emitIndent();
     builder->appendFormat("return %s", builder->target->forwardReturnCode());
     builder->endOfStatement(true);
