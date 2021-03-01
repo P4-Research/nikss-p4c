@@ -224,33 +224,28 @@ class PSACloneI2E(P4EbpfTest):
 
     def runTest(self):
         # create clone session table
-        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/tc/globals/clone_session_8 type "
-                         "array key 4 value 16 entries 64 name clone_session_8")
-        # add PORT2 (intf number = 6) to clone session 8
-        # TODO: use prectl to handle linked list specifics (set next id)
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/clone_session_8 "
-                         "key 01 00 00 00 value 06 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00")
-        # set next_id of head as id of above rule
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/clone_session_8 "
-                         "key 00 00 00 00 value 00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00")
-        # insert clone session table at index 8 (clone_session_id = 8)
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/clone_session_tbl "
-                         "key 8 0 0 0 value pinned /sys/fs/bpf/tc/globals/clone_session_8 any")
+        self.exec_ns_cmd("prectl clone-session create id 8")
+        # add egress_port=6 (PORT2), instance=1 as clone session member, cos = 0
+        self.exec_ns_cmd("prectl clone-session add-member id 8 egress-port 6 instance 1 cos 0")
+        # add egress_port=6 (PORT2), instance=2 as clone session member, cos = 1
+        self.exec_ns_cmd("prectl clone-session add-member id 8 egress-port 6 instance 2 cos 1")
 
         pkt = testutils.simple_eth_packet(eth_dst='00:00:00:00:00:05')
         testutils.send_packet(self, PORT0, pkt)
         cloned_pkt = copy.deepcopy(pkt)
         cloned_pkt[Ether].type = 0xface
         testutils.verify_packet(self, cloned_pkt, PORT2)
+        testutils.verify_packet(self, cloned_pkt, PORT2)
         pkt[Ether].src = "00:00:00:00:ca:fe"
         testutils.verify_packet(self, pkt, PORT1)
+
 
         pkt = testutils.simple_eth_packet(eth_dst='00:00:00:00:00:09')
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_packet(self, pkt, PORT1)
 
     def tearDown(self):
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/clone_session_8")
+        self.exec_ns_cmd("prectl clone-session delete id 8")
         super(P4EbpfTest, self).tearDown()
 
 

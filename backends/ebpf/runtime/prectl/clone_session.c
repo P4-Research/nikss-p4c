@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 #include "backends/ebpf/runtime/psa.h"
 #include "clone_session.h"
@@ -21,20 +22,36 @@ static const char *TC_GLOBAL_NS = "/sys/fs/bpf/tc/globals";
  */
 static const char *CLONE_SESSION_TABLE = "clone_session_tbl";
 
+struct list_key_t {
+    __u32 port;
+    __u16 instance;
+};
+typedef struct list_key_t next_elem_t;
+
 struct element {
     struct clone_session_entry entry;
-    __u32 next_id;
+    next_elem_t next_id;
 } __attribute__((aligned(4)));
+
+double get_current_time() {
+    struct timeval t;
+    gettimeofday(&t, 0);
+    return t.tv_sec + t.tv_usec*1e-6;
+}
+static double start_time;
+static double end_time;
+
 
 int clone_session_create(__u32 clone_session_id)
 {
-    int error = 0;
+    start_time = get_current_time();
+    int error;
     struct bpf_create_map_attr attr = { NULL, };
-    attr.map_type = BPF_MAP_TYPE_ARRAY;
+    attr.map_type = BPF_MAP_TYPE_HASH;
     char name[256];
     snprintf(name, sizeof(name), "clone_session_%d", clone_session_id);
     attr.name = name;
-    attr.key_size = sizeof(__u32);
+    attr.key_size = sizeof(next_elem_t);
     attr.value_size = sizeof(struct element);
     attr.max_entries = MAX_CLONE_SESSION_MEMBERS;
     attr.map_flags = 0;
@@ -49,33 +66,21 @@ int clone_session_create(__u32 clone_session_id)
     snprintf(path, sizeof(path), "%s/clone_session_%d", TC_GLOBAL_NS, clone_session_id);
     error = bpf_obj_pin(inner_map_fd, path);
     if (error < 0) {
-        printf("failed to pin new clone session to a file\n");
+        printf("failed to pin new clone session to a file [%s]\n", strerror(errno));
         goto ret;
     }
 
-    int map_size = MAX_CLONE_SESSION_MEMBERS;
-    int free_slots_map_fd = bpf_create_map(BPF_MAP_TYPE_QUEUE, 0,
-                                sizeof(__u32), map_size, 0);
-    if (free_slots_map_fd < 0) {
-        fprintf(stderr, "failed to create free-slots map for clone session\n");
-        return -1;
-    }
-
-    char p[256];
-    snprintf(p, sizeof(p), "%s/clone_session_%d_free_slots", TC_GLOBAL_NS, clone_session_id);
-    error = bpf_obj_pin(free_slots_map_fd, p);
+    next_elem_t head_idx = {};
+    head_idx.instance = 0;
+    head_idx.port = 0;
+    struct element head_elem =  {
+            .entry = { 0 },
+            .next_id = { 0 },
+    };
+    error = bpf_map_update_elem(inner_map_fd, &head_idx, &head_elem, 0);
     if (error < 0) {
-        printf("failed to pin free-slots map to a file\n");
+        printf("failed to add head to the list [%s]\n", strerror(errno));
         goto ret;
-    }
-
-    for (int i = 1; i < map_size; i++) {
-        int k = i;
-        int ret = bpf_map_update_elem(free_slots_map_fd, NULL, &k, 0);
-        if (ret < 0) {
-            error = -1;
-            goto ret;
-        }
     }
 
     char pinned_file[256];
@@ -98,15 +103,16 @@ int clone_session_create(__u32 clone_session_id)
     }
 
     printf("Clone session ID %d successfully created\n", clone_session_id);
+
     close(inner_map_fd);
     close(outer_map_fd);
 ret:
+    end_time = get_current_time();
+    printf("Completed in %fs\n", end_time-start_time);
     if (inner_map_fd > 0) {
         close(inner_map_fd);
     }
-    if (free_slots_map_fd > 0) {
-        close(free_slots_map_fd);
-    }
+
     if (outer_map_fd > 0) {
         close(outer_map_fd);
     }
@@ -116,14 +122,10 @@ ret:
 
 int clone_session_delete(__u32 clone_session_id)
 {
+    start_time = get_current_time();
     int error = 0;
     char session_map_path[256];
     snprintf(session_map_path, sizeof(session_map_path), "%s/clone_session_%d", TC_GLOBAL_NS,
-             clone_session_id);
-    char session_free_slots_path[256];
-    snprintf(session_free_slots_path, sizeof(session_free_slots_path),
-             "%s/clone_session_%d_free_slots",
-             TC_GLOBAL_NS,
              clone_session_id);
 
     char pinned_file[256];
@@ -137,9 +139,7 @@ int clone_session_delete(__u32 clone_session_id)
         goto ret;
     }
 
-    __u32 zero_fd = 0;
-    __u32 id = clone_session_id;
-    error = bpf_map_delete_elem((int)outer_map_fd, &id);
+    error = bpf_map_delete_elem((int)outer_map_fd, &clone_session_id);
     if (error < 0) {
         fprintf(stderr, "failed to clear clone session with id %u [%s].\n",
                 clone_session_id, strerror(errno));
@@ -153,16 +153,11 @@ int clone_session_delete(__u32 clone_session_id)
         goto ret;
     }
 
-    if (remove(session_free_slots_path)) {
-        fprintf(stderr, "failed to delete clone session free slots %u [%s].\n",
-                clone_session_id, strerror(errno));
-        error = -1;
-        goto ret;
-    }
-
     printf("Successfully deleted clone session with ID %d\n", clone_session_id);
 
 ret:
+    end_time = get_current_time();
+    printf("Completed in %fs\n", end_time-start_time);
     if (outer_map_fd > 0) {
         close(outer_map_fd);
     }
@@ -172,40 +167,22 @@ ret:
 
 int clone_session_add_member(__u32 clone_session_id, struct clone_session_entry entry)
 {
+    start_time = get_current_time();
     int error = 0;
-
-    int free_index = 0;
-    char free_slots_array[256];
-    snprintf(free_slots_array, sizeof(free_slots_array), "%s/clone_session_%d_free_slots",
-             TC_GLOBAL_NS,
-             clone_session_id);
-    long free_slots_fd = bpf_obj_get(free_slots_array);
-    if (free_slots_fd < 0) {
-        fprintf(stderr, "could not find map with free slots for a clone session %d. [%s].\n",
-                clone_session_id, strerror(errno));
-        return -1;
-    }
-
-    error = bpf_map_lookup_and_delete_elem(free_slots_fd, NULL, &free_index);
-    if (error < 0) {
-        fprintf(stderr, "No slots in array. We reached max size of clone session %d.\n",
-                clone_session_id);
-        return -1;
-    }
 
     char pinned_file[256];
     snprintf(pinned_file, sizeof(pinned_file), "%s/%s", TC_GLOBAL_NS,
              CLONE_SESSION_TABLE);
 
-    long fd = bpf_obj_get(pinned_file);
-    if (fd < 0) {
+    long outer_map_fd = bpf_obj_get(pinned_file);
+    if (outer_map_fd < 0) {
         fprintf(stderr, "could not find map %s. Clone session doesn't exists? [%s].\n",
                 CLONE_SESSION_TABLE, strerror(errno));
         return -1;
     }
 
     uint32_t inner_map_id;
-    int ret = bpf_map_lookup_elem(fd, &clone_session_id, &inner_map_id);
+    int ret = bpf_map_lookup_elem(outer_map_fd, &clone_session_id, &inner_map_id);
     if (ret < 0) {
         fprintf(stderr, "could not find inner map [%s]\n", strerror(errno));
         return -1;
@@ -214,7 +191,7 @@ int clone_session_add_member(__u32 clone_session_id, struct clone_session_entry 
     int inner_fd = bpf_map_get_fd_by_id(inner_map_id);
 
     /* 1. Gead head. */
-    int head_idx = 0;
+    next_elem_t head_idx = { 0, 0};
     struct element head;
     ret = bpf_map_lookup_elem(inner_fd, &head_idx, &head);
     if (ret < 0) {
@@ -228,31 +205,40 @@ int clone_session_add_member(__u32 clone_session_id, struct clone_session_entry 
             /* 3. Make next of new node as next of head */
             .next_id = head.next_id,
     };
-    ret = bpf_map_update_elem(inner_fd, &free_index, &el, 0);
-    if (ret < 0) {
-        printf("error creating list element, err = %d, errno = %d\n", ret, errno);
+    next_elem_t idx;
+    idx.port = entry.egress_port;
+    idx.instance = entry.instance;
+    ret = bpf_map_update_elem(inner_fd, &idx, &el, BPF_NOEXIST);
+    if (ret < 0 && errno == EEXIST) {
+        fprintf(stderr, "Clone session member [port=%d, instance=%d] already exists. "
+                        "Increment 'instance' to clone more than one packet to the same port.\n",
+                        entry.egress_port,
+                        entry.instance);
         return -1;
+    } else if (ret < 0) {
+            printf("error creating list element, err = %d, errno = %d\n", ret, errno);
+            return -1;
     }
 
     /* 4. move the head to point to the new node */
-    head.next_id = free_index;
+    head.next_id = idx;
     ret = bpf_map_update_elem(inner_fd, &head_idx, &head, 0);
     if (ret < 0) {
         printf("error updating head, err = %d [%s]\n", ret, strerror(errno));
         return -1;
     }
 
-    fprintf(stdout, "New member of clone session %d added successfully at handle %d\n",
-            clone_session_id, free_index);
-
-    free_index++;
+    end_time = get_current_time();
+    printf("Completed in %fs\n", end_time-start_time);
+    fprintf(stdout, "New member of clone session %d added successfully\n",
+            clone_session_id);
 
     return error;
 }
 
 int do_create(int argc, char **argv)
 {
-    if (!is_prefix(*argv, "id")) {
+    if (!is_keyword(*argv, "id")) {
         fprintf(stderr, "expected 'id', got: %s\n", *argv);
         return -1;
     }
@@ -271,7 +257,7 @@ int do_create(int argc, char **argv)
 
 int do_delete(int argc, char **argv)
 {
-    if (!is_prefix(*argv, "id")) {
+    if (!is_keyword(*argv, "id")) {
         fprintf(stderr, "expected 'id', got: %s\n", *argv);
         return -1;
     }
@@ -291,7 +277,7 @@ int do_delete(int argc, char **argv)
 
 int do_add_member(int argc, char **argv)
 {
-    if (!is_prefix(*argv, "id")) {
+    if (!is_keyword(*argv, "id")) {
         fprintf(stderr, "expected 'id', got: %s\n", *argv);
         return -1;
     }
@@ -306,7 +292,7 @@ int do_add_member(int argc, char **argv)
     }
 
     NEXT_ARG();
-    if (!is_prefix(*argv, "egress-port")) {
+    if (!is_keyword(*argv, "egress-port")) {
         fprintf(stderr, "expected 'egress-port', got: %s\n", *argv);
         return -1;
     }
@@ -318,7 +304,7 @@ int do_add_member(int argc, char **argv)
     }
 
     NEXT_ARG();
-    if (!is_prefix(*argv, "instance")) {
+    if (!is_keyword(*argv, "instance")) {
         fprintf(stderr, "expected 'instance', got: %s\n", *argv);
         return -1;
     }
@@ -329,13 +315,25 @@ int do_add_member(int argc, char **argv)
         return -1;
     }
 
+    NEXT_ARG();
+    if (!is_keyword(*argv, "cos")) {
+        fprintf(stderr, "expected 'cos', got: %s\n", *argv);
+        return -1;
+    }
+    NEXT_ARG();
+    __u32 cos = strtoul(*argv, &endptr, 0);
+    if (*endptr) {
+        fprintf(stderr, "can't parse '%s'\n", *argv);
+        return -1;
+    }
+
     bool truncate = false;
     __u16 plen_bytes = 0;
 
     NEXT_ARG();
-    if (is_prefix(*argv, "truncate")) {
+    if (is_keyword(*argv, "truncate")) {
         NEXT_ARG();
-        if (!is_prefix(*argv, "plen_bytes")) {
+        if (!is_keyword(*argv, "plen_bytes")) {
             fprintf(stderr, "truncate requested, but no 'plen_bytes' provided\n");
             return -1;
         }
@@ -350,7 +348,7 @@ int do_add_member(int argc, char **argv)
     struct clone_session_entry entry = {
         .egress_port = egress_port,
         .instance = instance,
-        .class_of_service = 2,
+        .class_of_service = cos,
         .truncate = truncate,
         .packet_length_bytes = plen_bytes,
     };

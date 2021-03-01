@@ -1,16 +1,16 @@
-//
-// Created by dev on 26.02.2021.
-//
+
 #include <string.h>
 
 #include "common.h"
 
-bool is_prefix(const char *pfx, const char *str)
+bool is_keyword(const char *word, const char *str)
 {
-    if (!pfx)
-        return false;
-    if (strlen(str) < strlen(pfx))
+    if (!word)
         return false;
 
-    return !memcmp(str, pfx, strlen(pfx));
+    if (strlen(word) < strlen(str)) {
+        return false;
+    }
+
+    return !memcmp(str, word, strlen(str));
 }

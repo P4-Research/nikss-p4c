@@ -1,7 +1,5 @@
-#include <errno.h>
 #include <getopt.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "common.h"
 #include "clone_session.h"
@@ -34,7 +32,7 @@ int cmd_select(const struct cmd *cmds, int argc, char **argv,
         return cmds[0].func(argc, argv);
 
     for (i = 0; cmds[i].cmd; i++) {
-        if (is_prefix(*argv, cmds[i].cmd)) {
+        if (is_keyword(*argv, cmds[i].cmd)) {
             if (!cmds[i].func) {
                 return -1;
             }

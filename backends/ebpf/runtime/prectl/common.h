@@ -15,6 +15,6 @@ struct cmd {
     int (*func)(int argc, char **argv);
 };
 
-bool is_prefix(const char *pfx, const char *str);
+bool is_keyword(const char *word, const char *str);
 
 #endif //P4C_COMMON_H
