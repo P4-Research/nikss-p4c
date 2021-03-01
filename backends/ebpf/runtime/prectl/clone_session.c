@@ -1,4 +1,4 @@
-#include "bpf/bpf.h"
+#include "bpf.h"
 #include <errno.h>
 #include <getopt.h>
 #include <math.h>
