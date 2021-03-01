@@ -71,9 +71,9 @@ void PSAArch::emit(CodeBuilder *builder) const {
 
 void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
     cstring forEachFunc ="static __always_inline\n"
-                        "int do_for_each(struct __sk_buff *skb, struct bpf_elf_map *map, "
+                        "int do_for_each(SK_BUFF *skb, struct bpf_elf_map *map, "
                                         "unsigned int max_iter, "
-                                        "void (*a)(struct __sk_buff *, void *))\n"
+                                        "void (*a)(SK_BUFF *, void *))\n"
                         "{\n"
                         "    __u32 zero_key = 0;\n"
                         "    struct element *elem = bpf_map_lookup_elem(map, &zero_key);\n"
@@ -81,11 +81,11 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
                         "        return -1;\n"
                         "    }\n"
                         "    if (elem->next_id == 0) {\n"
-                        "%trace_msg_no_elements%"
+                                "%trace_msg_no_elements%"
                         "        return 0;\n"
                         "    }\n"
                         "    __u32 next_id = elem->next_id;\n"
-                        "    for (int i = 0; i < max_iter; i++) {\n"
+                        "    for (unsigned int i = 0; i < max_iter; i++) {\n"
                         "        struct element *elem = bpf_map_lookup_elem(map, &next_id);\n"
                         "        if (!elem) {\n"
                         "            break;\n"
@@ -100,7 +100,7 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
                         "}";
     if (tcIngress->options.emitTraceMessages) {
         forEachFunc = forEachFunc.replace("%trace_msg_no_elements%",
-                          "bpf_trace_message(\"No elements found in list\\n\");\n");
+            "        bpf_trace_message(\"do_for_each: No elements found in list\\n\");\n");
     } else {
         forEachFunc = forEachFunc.replace("%trace_msg_no_elements%", "");
     }
@@ -110,16 +110,16 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
     // Function to perform cloning, common for ingress and egress
     cstring cloneFunction =
             "static __always_inline\n"
-            "void do_clone(struct __sk_buff *skb, void *data)\n"
+            "void do_clone(SK_BUFF *skb, void *data)\n"
             "{\n"
             "    struct clone_session_entry *entry = (struct clone_session_entry *) data;\n"
-            "    %trace_msg_redirect%"
+                "%trace_msg_redirect%"
             "    bpf_clone_redirect(skb, entry->egress_port, 0);\n"
             "}";
     if (tcIngress->options.emitTraceMessages) {
         cloneFunction = cloneFunction.replace(cstring("%trace_msg_redirect%"),
-                      "bpf_trace_message(\"Clone: cloning pkt, egress_port=%d, "
-                             "cos=%d\\n\", entry->egress_port, entry->class_of_service);\n");
+            "    bpf_trace_message(\"do_clone: cloning pkt, egress_port=%d, cos=%d\\n\", "
+            "entry->egress_port, entry->class_of_service);\n");
     } else {
         cloneFunction = cloneFunction.replace(cstring("%trace_msg_redirect%"), "");
     }
@@ -127,38 +127,39 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
     builder->newline();
 
     cstring pktClonesFunc =
-            "static __always_inline int do_packet_clones(SK_BUFF * skb, __u32 session_id, "
-            "PSA_PacketPath_t new_pkt_path, __u8 caller_id)\n"
+            "static __always_inline\n"
+            "int do_packet_clones(SK_BUFF * skb, struct bpf_elf_map * map, __u32 session_id, "
+                "PSA_PacketPath_t new_pkt_path, __u8 caller_id)\n"
             "{\n"
-            "%trace_msg_clone_requested%"
+                "%trace_msg_clone_requested%"
             "    struct psa_global_metadata * meta = (struct psa_global_metadata *) skb->cb;\n"
             "    struct bpf_elf_map * inner_map;\n"
-            "    inner_map = bpf_map_lookup_elem(&%clone_session_tbl%, &session_id);\n"
+            "    inner_map = bpf_map_lookup_elem(map, &session_id);\n"
             "    if (inner_map != NULL) {\n"
             "        PSA_PacketPath_t original_pkt_path = meta->packet_path;\n"
             "        meta->packet_path = new_pkt_path;\n"
             "        if (do_for_each(skb, inner_map, CLONE_MAX_CLONES, &do_clone) < 0) {\n"
-            "%trace_msg_clone_failed%"
+                        "%trace_msg_clone_failed%"
             "            return -1;\n"
             "        }\n"
             "        meta->packet_path = original_pkt_path;\n"
             "    } else {\n"
-            "%trace_msg_no_session%"
+                    "%trace_msg_no_session%"
             "    }\n"
-            "%trace_msg_cloning_done%"
+                "%trace_msg_cloning_done%"
             "    return 0;\n"
             " }";
     if (tcIngress->options.emitTraceMessages) {
         pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_clone_requested%"),
-                          "    bpf_trace_message(\"Clone#%d: pkt clone requested, session=%d\\n\", "
-                                  "caller_id, session_id);\n");
+            "    bpf_trace_message(\"Clone#%d: pkt clone requested, session=%d\\n\", "
+            "caller_id, session_id);\n");
         pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_clone_failed%"),
-                          "bpf_trace_message(\"Clone#%d: failed to clone packet\");\n");
+            "            bpf_trace_message(\"Clone#%d: failed to clone packet\", caller_id);\n");
         pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_no_session%"),
-                          "        bpf_trace_message(\"Clone#%d: session_id not found, "
-                                 "no clones created\\n\", caller_id);\n");
+            "        bpf_trace_message(\"Clone#%d: session_id not found, "
+            "no clones created\\n\", caller_id);\n");
         pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_cloning_done%"),
-                  "    bpf_trace_message(\"Clone#%d: packet cloning finished\\n\", caller_id);\n");
+            "    bpf_trace_message(\"Clone#%d: packet cloning finished\\n\", caller_id);\n");
     } else {
         pktClonesFunc = pktClonesFunc.replace(
                 cstring("%trace_msg_clone_requested%"), "");
@@ -168,7 +169,6 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
         pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_cloning_done%"), "");
     }
 
-    pktClonesFunc = pktClonesFunc.replace(cstring("%clone_session_tbl%"), "clone_session_tbl");
     builder->appendLine(pktClonesFunc);
     builder->newline();
 }
@@ -239,6 +239,11 @@ void PSAArch::emitInstances(CodeBuilder *builder) const {
                         "CLONE_MAX_CLONES, 1, 1)");
     builder->appendLine("REGISTER_TABLE_OUTER(clone_session_tbl, BPF_MAP_TYPE_ARRAY_OF_MAPS, "
                         "sizeof(__u32), sizeof(__u32), CLONE_MAX_SESSIONS, 1)");
+    builder->appendLine("REGISTER_TABLE_INNER(multicast_grp_tbl_inner, BPF_MAP_TYPE_ARRAY, "
+                        "sizeof(__u32), sizeof(struct element), "
+                        "CLONE_MAX_CLONES, 2, 1)");
+    builder->appendLine("REGISTER_TABLE_OUTER(multicast_grp_tbl, BPF_MAP_TYPE_ARRAY_OF_MAPS, "
+                        "sizeof(__u32), sizeof(__u32), CLONE_MAX_SESSIONS, 2)");
     tcIngress->control->emitTableInstances(builder);
     tcEgress->control->emitTableInstances(builder);
     builder->appendLine("REGISTER_END()");

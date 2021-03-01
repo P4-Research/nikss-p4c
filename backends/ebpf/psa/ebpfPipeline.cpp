@@ -196,10 +196,10 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
                         deparser->to<EBPFIngressDeparserPSA>()->resubmit_meta->name.name);
     builder->newline();
 
+    builder->emitIndent();
     builder->appendLine("if (ret != TC_ACT_UNSPEC) {\n"
                         "        return ret;\n"
                         "    }");
-
 
     this->emitTrafficManager(builder);
     builder->blockEnd(true);
@@ -222,8 +222,25 @@ void EBPFIngressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
  * - send to port
  */
 void EBPFIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
+    cstring mcast_grp = Util::printf_format("ostd.multicast_group");
+    builder->emitIndent();
+    builder->appendFormat("if (%s != 0) ", mcast_grp.c_str());
+    builder->blockStart();
     builder->target->emitTraceMessage(builder,
-            "Ingress TrafficManager: Sending packet out of port %d", 1, "ostd.egress_port");
+        "IngressTM: Performing multicast, multicast_group=%u", 1, mcast_grp.c_str());
+    builder->emitIndent();
+    builder->appendFormat("do_packet_clones(%s, &multicast_grp_tbl, %s, NORMAL_MULTICAST, 2)",
+                          contextVar.c_str(), mcast_grp.c_str());
+    builder->endOfStatement(true);
+    // In multicast mode, unicast packet is not send
+    builder->target->emitTraceMessage(builder, "IngressTM: Multicast done, dropping source packet");
+    builder->emitIndent();
+    builder->appendFormat("return %s", builder->target->dropReturnCode());
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
+
+    builder->target->emitTraceMessage(builder,
+            "IngressTM: Sending packet out of port %d", 1, "ostd.egress_port");
     builder->emitIndent();
     builder->appendLine("return bpf_redirect(ostd.egress_port, 0);");
 }
@@ -273,7 +290,8 @@ void EBPFEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->blockStart();
 
     builder->emitIndent();
-    builder->appendFormat("do_packet_clones(%s, %s.clone_session_id, CLONE_E2E, 3)",
+    builder->appendFormat("do_packet_clones(%s, &clone_session_tbl, %s.clone_session_id, "
+                          "CLONE_E2E, 3)",
                           contextVar.c_str(), outputMdVar.c_str());
     builder->endOfStatement(true);
     builder->blockEnd(true);
