@@ -263,7 +263,7 @@ class EgressTrafficManagerDropPSATest(P4EbpfTest):
         testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
         pkt[Ether].src = '00:44:33:22:FF:FF'
         testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_no_other_packets(self);
+        testutils.verify_no_other_packets(self)
 
 
 class EgressTrafficManagerClonePSATest(P4EbpfTest):
@@ -338,3 +338,33 @@ class SimpleLpmPSATest(EbpfTest):
                          "key hex 08 00 00 00 0a 0a 0a 0a value hex 00 00 00 00 06 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT2)
+
+
+class MulticastPSATest(P4EbpfTest):
+    p4_file_path = "../../../testdata/p4_16_samples/psa-multicast-basic-bmv2.p4"
+
+    def runTest(self):
+        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/tc/globals/mcast_grp_8 type "
+                         "array key 4 value 16 entries 64 name clone_session_8")
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/mcast_grp_8 "
+                         "key 02 00 00 00 value 06 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00")
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/mcast_grp_8 "
+                         "key 01 00 00 00 value 05 00 00 00 00 00 05 00 00 00 00 00 02 00 00 00")
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/mcast_grp_8 "
+                         "key 00 00 00 00 value 00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00")
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/multicast_grp_tbl "
+                         "key 8 0 0 0 value pinned /sys/fs/bpf/tc/globals/mcast_grp_8 any")
+
+        pkt = testutils.simple_eth_packet(eth_dst='00:00:00:00:00:05')
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_no_other_packets(self)
+
+        pkt = testutils.simple_eth_packet(eth_dst='00:00:00:00:00:08')
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
+        testutils.verify_packet(self, pkt, PORT2)
+        testutils.verify_no_other_packets(self)
+
+    def tearDown(self):
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/mcast_grp_8")
+        super(MulticastPSATest, self).tearDown()

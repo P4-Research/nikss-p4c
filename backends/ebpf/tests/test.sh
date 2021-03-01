@@ -77,7 +77,6 @@ silent_echo_conf
 
 # Start tests
 ptf \
-  --relax `# Allows for other packets, especially injected by the system`\
   --test-dir ptf/ \
   --test-params='interfaces="'"$interface_list"'";namespace="switch"' \
   --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2
