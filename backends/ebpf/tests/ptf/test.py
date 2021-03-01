@@ -326,12 +326,14 @@ class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
         pkt[Ether].src = '00:44:33:22:11:00'
         testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
 
+
 class SimpleLpmPSATest(EbpfTest):
 
     test_prog_image = "samples/lpm_test.o"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='10.11.11.11')
+        #This command adds LPM entry 10.10.10.10/8 with action forwarding on port 6 (PORT2 in ptf)
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm "
                          "key hex 08 00 00 00 0a 0a 0a 0a value hex 00 00 00 00 06 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
