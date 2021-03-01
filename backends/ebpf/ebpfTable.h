@@ -74,6 +74,7 @@ class EBPFTable : public EBPFTableBase {
     void emitLpmKeyField(CodeBuilder *builder,
                          const cstring &swap,
                          const std::string &tmpVar) const;
+    void validateKeys(const EBPFProgram *program) const;
 };
 
 class EBPFCounterTable final : public EBPFTableBase {

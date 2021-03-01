@@ -75,6 +75,21 @@ EBPFTable::EBPFTable(const EBPFProgram* program, const IR::TableBlock* table,
 
     keyGenerator = table->container->getKey();
     actionList = table->container->getActionList();
+    validateKeys(program);
+}
+
+void EBPFTable::validateKeys(const EBPFProgram *program) const {
+    if (keyGenerator != nullptr) {
+        for (auto it : keyGenerator->keyElements) {
+            auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
+            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
+            if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
+                if (it == keyGenerator->keyElements.end().operator*()) {
+                    error(ErrorType::ERR_UNSUPPORTED, "LPM field key must be at the end of whole key");
+                }
+            }
+        }
+    }
 }
 
 void EBPFTable::emitKeyType(CodeBuilder* builder) {
@@ -361,6 +376,7 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
         }
     }
 }
+
 void EBPFTable::emitLpmKeyField(CodeBuilder *builder,
                                 const cstring &swap,
                                 const std::string &tmpVar) const {
@@ -370,6 +386,7 @@ void EBPFTable::emitLpmKeyField(CodeBuilder *builder,
         builder->append(tmpVar);
     }
 }
+
 void EBPFTable::declareTmpLpmKey(CodeBuilder *builder,
                                  const IR::KeyElement *c,
                                  std::string &tmpVar) {
@@ -380,6 +397,7 @@ void EBPFTable::declareTmpLpmKey(CodeBuilder *builder,
     codeGen->visit(c->expression);
     builder->endOfStatement(true);
 }
+
 cstring EBPFTable::getByteSwapMethod(unsigned int width) const {
     cstring swap;
     if (width <= 16) {
@@ -589,6 +607,7 @@ void EBPFTable::emitInitializer(CodeBuilder* builder) {
     }
     builder->blockEnd(true);
 }
+
 bool EBPFTable::isLPMTable() {
     if (keyGenerator != nullptr) {
         // If any key field is LPM we will generate an LPM table
