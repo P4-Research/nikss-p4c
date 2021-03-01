@@ -106,7 +106,7 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
         }
 
         if (isLPMTable()) {
-            //For LPM kind key we need an additional 32 bit field - prefixlen
+            // For LPM kind key we need an additional 32 bit field - prefixlen
             auto prefixType = EBPFTypeFactory::instance->create(IR::Type_Bits::get(32));
             builder->emitIndent();
             prefixType->declare(builder, prefixFieldName, false);
