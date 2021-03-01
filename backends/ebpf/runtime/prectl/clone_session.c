@@ -26,11 +26,11 @@ struct list_key_t {
     __u32 port;
     __u16 instance;
 };
-typedef struct list_key_t next_elem_t;
+typedef struct list_key_t elem_t;
 
 struct element {
     struct clone_session_entry entry;
-    next_elem_t next_id;
+    elem_t next_id;
 } __attribute__((aligned(4)));
 
 double get_current_time() {
@@ -51,7 +51,7 @@ int clone_session_create(__u32 clone_session_id)
     char name[256];
     snprintf(name, sizeof(name), "clone_session_%d", clone_session_id);
     attr.name = name;
-    attr.key_size = sizeof(next_elem_t);
+    attr.key_size = sizeof(elem_t);
     attr.value_size = sizeof(struct element);
     attr.max_entries = MAX_CLONE_SESSION_MEMBERS;
     attr.map_flags = 0;
@@ -70,7 +70,7 @@ int clone_session_create(__u32 clone_session_id)
         goto ret;
     }
 
-    next_elem_t head_idx = {};
+    elem_t head_idx = {};
     head_idx.instance = 0;
     head_idx.port = 0;
     struct element head_elem =  {
@@ -191,7 +191,7 @@ int clone_session_add_member(__u32 clone_session_id, struct clone_session_entry 
     int inner_fd = bpf_map_get_fd_by_id(inner_map_id);
 
     /* 1. Gead head. */
-    next_elem_t head_idx = { 0, 0};
+    elem_t head_idx = {0, 0};
     struct element head;
     ret = bpf_map_lookup_elem(inner_fd, &head_idx, &head);
     if (ret < 0) {
@@ -205,7 +205,7 @@ int clone_session_add_member(__u32 clone_session_id, struct clone_session_entry 
             /* 3. Make next of new node as next of head */
             .next_id = head.next_id,
     };
-    next_elem_t idx;
+    elem_t idx;
     idx.port = entry.egress_port;
     idx.instance = entry.instance;
     ret = bpf_map_update_elem(inner_fd, &idx, &el, BPF_NOEXIST);
@@ -356,7 +356,127 @@ int do_add_member(int argc, char **argv)
     return clone_session_add_member(id, entry);
 }
 
+int clone_session_del_member(__u32 clone_session_id, __u32 egress_port, __u16 instance)
+{
+    if (egress_port == 0 || instance == 0) {
+        fprintf(stderr, "Invalid value of 'egress-port' or 'instance' provided");
+        return -1;
+    }
+
+    start_time = get_current_time();
+    int error = 0;
+
+    char pinned_file[256];
+    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", TC_GLOBAL_NS,
+             CLONE_SESSION_TABLE);
+
+    long outer_map_fd = bpf_obj_get(pinned_file);
+    if (outer_map_fd < 0) {
+        fprintf(stderr, "could not find map %s. Clone session doesn't exists? [%s].\n",
+                CLONE_SESSION_TABLE, strerror(errno));
+        return -1;
+    }
+
+    uint32_t inner_map_id;
+    int ret = bpf_map_lookup_elem(outer_map_fd, &clone_session_id, &inner_map_id);
+    if (ret < 0) {
+        fprintf(stderr, "could not find inner map [%s]\n", strerror(errno));
+        return -1;
+    }
+
+    int inner_fd = bpf_map_get_fd_by_id(inner_map_id);
+
+    elem_t prev_elem_key = {0, 0};
+    struct element elem;
+    elem_t key = {0, 0};
+    do {
+        ret = bpf_map_lookup_elem(inner_fd, &key, &elem);
+        if (ret < 0) {
+            fprintf(stderr, "error getting element from list (egress_port=%d, instance=%d), does it exist?, "
+                            "err = %d, errno = %d\n", elem.next_id.port, elem.next_id.instance, ret, errno);
+            return -1;
+        }
+
+        if (elem.next_id.instance == instance && elem.next_id.port == egress_port) {
+            prev_elem_key = key;
+            break;
+        }
+        key = elem.next_id;
+    } while (elem.next_id.port != 0 && elem.next_id.instance != 0);
+
+    struct element elem_to_delete;
+    elem_t key_to_del = {egress_port, instance};
+    ret = bpf_map_lookup_elem(inner_fd, &key_to_del, &elem_to_delete);
+    if (ret < 0) {
+        fprintf(stderr, "error getting element to delete, err = %d, errno = %d\n", ret, errno);
+        return -1;
+    }
+
+    struct element prev_elem;
+    ret = bpf_map_lookup_elem(inner_fd, &prev_elem_key, &prev_elem);
+    if (ret < 0) {
+        fprintf(stderr, "error getting previous element, err = %d, errno = %d\n", ret, errno);
+        return -1;
+    }
+
+    prev_elem.next_id = elem_to_delete.next_id;
+
+    ret = bpf_map_update_elem(inner_fd, &prev_elem_key, &prev_elem, BPF_ANY);
+    if (ret < 0) {
+        fprintf(stderr, "failed to update previous element, err = %d, errno = %d\n", ret, errno);
+        return -1;
+    }
+
+    ret = bpf_map_delete_elem(inner_fd, &key_to_del);
+    if (ret < 0) {
+        fprintf(stderr, "failed to delete element, err = %d, errno = %d\n", ret, errno);
+        return -1;
+    }
+
+    fprintf(stdout, "Clone session member (egress_port=%d, instance=%d) successfully deleted.\n",
+            egress_port, instance);
+
+}
+
 int do_del_member(int argc, char **argv)
 {
-    return 0;
+    if (!is_keyword(*argv, "id")) {
+        fprintf(stderr, "expected 'id', got: %s\n", *argv);
+        return -1;
+    }
+
+    NEXT_ARG();
+
+    char *endptr;
+    __u32 id = strtoul(*argv, &endptr, 0);
+    if (*endptr) {
+        fprintf(stderr, "can't parse '%s'\n", *argv);
+        return -1;
+    }
+
+    NEXT_ARG();
+    if (!is_keyword(*argv, "egress-port")) {
+        fprintf(stderr, "expected 'egress-port', got: %s\n", *argv);
+        return -1;
+    }
+    NEXT_ARG();
+    __u32 egress_port = strtoul(*argv, &endptr, 0);
+    if (*endptr) {
+        fprintf(stderr, "can't parse '%s'\n", *argv);
+        return -1;
+    }
+
+    NEXT_ARG();
+    if (!is_keyword(*argv, "instance")) {
+        fprintf(stderr, "expected 'instance', got: %s\n", *argv);
+        return -1;
+    }
+    NEXT_ARG();
+    __u32 instance = strtoul(*argv, &endptr, 0);
+    if (*endptr) {
+        fprintf(stderr, "can't parse '%s'\n", *argv);
+        return -1;
+    }
+
+    return clone_session_del_member(id, egress_port, instance);
 }
