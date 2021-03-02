@@ -102,11 +102,15 @@ set (P4C_EBPF_HDRS
   psa/ebpfPsaObjects.h
   )
 
-set (PRECTL_SRCS
-  runtime/prectl/common.c
-  runtime/prectl/clone_session.c
-  runtime/prectl/prectl.c)
-add_executable(prectl ${PRECTL_SRCS})
+if (LIBBPF)
+  set (PRECTL_SRCS
+    runtime/prectl/common.c
+    runtime/prectl/clone_session.c
+    runtime/prectl/prectl.c)
+  add_executable(prectl ${PRECTL_SRCS})
+  include_directories(${LIBBPF_INCLUDE_DIR})
+  target_link_libraries (prectl z elf ${LIBBPF})
+endif()
 
 add_cpplint_files(${CMAKE_CURRENT_SOURCE_DIR} "${P4C_EBPF_SRCS};${P4C_EBPF_HDRS}")
 
@@ -227,8 +231,6 @@ else()
   "${CMAKE_CURRENT_SOURCE_DIR}/runtime folder.")
   set (SUPPORTS_KERNEL False)
 endif()
-
-target_link_libraries (prectl z elf ${LIBBPF})
 
 # Only add the kernel tests if the two requirements are met
 if (SUPPORTS_KERNEL)
