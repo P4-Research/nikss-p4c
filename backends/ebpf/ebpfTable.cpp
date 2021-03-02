@@ -102,8 +102,15 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
     commentGen.setBuilder(builder);
 
     if (keyGenerator != nullptr) {
-        // Use this to order elements by size
-        std::multimap<size_t, const IR::KeyElement*> ordered;
+
+        if (isLPMTable()) {
+            // For LPM kind key we need an additional 32 bit field - prefixlen
+            auto prefixType = EBPFTypeFactory::instance->create(IR::Type_Bits::get(32));
+            builder->emitIndent();
+            prefixType->declare(builder, prefixFieldName, false);
+            builder->endOfStatement(true);
+        }
+
         unsigned fieldNumber = 0;
         for (auto c : keyGenerator->keyElements) {
             auto type = program->typeMap->getType(c->expression);
@@ -114,28 +121,11 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
                         "%1%: illegal type %2% for key field", c, type);
                 return;
             }
-            unsigned width = ebpfType->to<IHasWidth>()->widthInBits();
-            ordered.emplace(width, c);
             keyTypes.emplace(c, ebpfType);
             keyFieldNames.emplace(c, fieldName);
             fieldNumber++;
-        }
 
-        if (isLPMTable()) {
-            // For LPM kind key we need an additional 32 bit field - prefixlen
-            auto prefixType = EBPFTypeFactory::instance->create(IR::Type_Bits::get(32));
             builder->emitIndent();
-            prefixType->declare(builder, prefixFieldName, false);
-            builder->endOfStatement(true);
-        }
-
-        // Emit key in decreasing order size - this way there will be no gaps
-        for (auto it = ordered.rbegin(); it != ordered.rend(); ++it) {
-            auto c = it->second;
-
-            auto ebpfType = ::get(keyTypes, c);
-            builder->emitIndent();
-            cstring fieldName = ::get(keyFieldNames, c);
             ebpfType->declare(builder, fieldName, false);
             builder->append("; /* ");
             c->expression->apply(commentGen);
@@ -145,13 +135,14 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
             auto mtdecl = program->refMap->getDeclaration(c->matchType->path, true);
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
             if (matchType->name.name != P4::P4CoreLibrary::instance.exactMatch.name &&
-                matchType->name.name != P4::P4CoreLibrary::instance.lpmMatch.name)
+                    matchType->name.name != P4::P4CoreLibrary::instance.lpmMatch.name)
                 ::error(ErrorType::ERR_UNSUPPORTED,
                         "Match of type %1% not supported", c->matchType);
         }
     }
 
     builder->blockEnd(false);
+    builder->append(" __attribute__((aligned(4)))");
     builder->endOfStatement(true);
 }
 

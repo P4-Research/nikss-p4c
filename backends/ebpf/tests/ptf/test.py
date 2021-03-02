@@ -378,9 +378,16 @@ class SimpleLpmP4PSATest(P4EbpfTest):
         pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='10.10.11.11')
         # This command adds LPM entry 10.10.10.10/16 with action forwarding on port 6 (PORT2 in ptf)
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm "
-                         "key hex 10 00 00 00 0a 0a 0a 0a value hex 00 00 00 00 06 00 00 00")
+                         "key hex 10 00 00 00 0a 0a 00 00 value hex 00 00 00 00 06 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT2)
+
+        pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='192.168.2.1')
+        # This command adds LPM entry 192.168.2.1/24 with action forwarding on port 5 (PORT1 in ptf)
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm "
+                         "key hex 18 00 00 00 c0 a8 02 00 value hex 00 00 00 00 05 00 00 00")
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT1)
 
 
 class SimpleLpmP4TwoKeysPSATest(P4EbpfTest):
@@ -388,10 +395,20 @@ class SimpleLpmP4TwoKeysPSATest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/psa-lpm-two-keys.p4"
 
     def runTest(self):
-        pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='10.10.11.11')
-        # This command adds LPM entry 10.10.10.10/16 with action forwarding on port 6 (PORT2 in ptf)
+        pkt = testutils.simple_ip_packet(ip_src='1.2.3.4', ip_dst='10.10.11.11')
+        # This command adds LPM entry 10.10.11.0/24 with action forwarding on port 6 (PORT2 in ptf)
+        # Note that prefix value has to be a sum of exact fields size and lpm prefix
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm "
-                         "key hex 10 00 00 00 0a 0a 0a 0a 01 01 01 01 "
+                         "key hex 38 00 00 00 01 02 03 04 0a 0a 0b 00 "
                          "value hex 00 00 00 00 06 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT2)
+
+        pkt = testutils.simple_ip_packet(ip_src='1.2.3.4', ip_dst='192.168.2.1')
+        # This command adds LPM entry 192.168.2.1/24 with action forwarding on port 5 (PORT1 in ptf)
+        # Note that prefix value has to be a sum of exact fields size and lpm prefix
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm "
+                         "key hex 38 00 00 00 01 02 03 04 c0 a8 02 00 "
+                         "value hex 00 00 00 00 05 00 00 00")
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT1)
