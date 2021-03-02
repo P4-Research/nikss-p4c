@@ -225,7 +225,7 @@ if (LIBBPF)
           runtime/prectl/clone_session.c
           runtime/prectl/prectl.c)
   add_executable(prectl ${PRECTL_SRCS})
-  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/usr/include)
+  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/runtime/usr/include)
   target_link_libraries (prectl z elf ${LIBBPF})
   install (TARGETS prectl
           RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
