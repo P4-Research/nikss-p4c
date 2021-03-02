@@ -246,8 +246,8 @@ void PSAArch::emitInstances(CodeBuilder *builder) const {
                         "CLONE_MAX_CLONES, 1, 1)");
     builder->appendLine("REGISTER_TABLE_OUTER(clone_session_tbl, BPF_MAP_TYPE_ARRAY_OF_MAPS, "
                         "sizeof(__u32), sizeof(__u32), CLONE_MAX_SESSIONS, 1)");
-    builder->appendLine("REGISTER_TABLE_INNER(multicast_grp_tbl_inner, BPF_MAP_TYPE_ARRAY, "
-                        "sizeof(__u32), sizeof(struct element), "
+    builder->appendLine("REGISTER_TABLE_INNER(multicast_grp_tbl_inner, BPF_MAP_TYPE_HASH, "
+                        "sizeof(elem_t), sizeof(struct element), "
                         "CLONE_MAX_CLONES, 2, 1)");
     builder->appendLine("REGISTER_TABLE_OUTER(multicast_grp_tbl, BPF_MAP_TYPE_ARRAY_OF_MAPS, "
                         "sizeof(__u32), sizeof(__u32), CLONE_MAX_SESSIONS, 2)");

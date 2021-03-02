@@ -121,6 +121,8 @@ class P4EbpfTest(EbpfTest):
     def tearDown(self):
         self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/clone_session_tbl")
         self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/clone_session_tbl_inner")
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/multicast_grp_tbl")
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/multicast_grp_tbl_inner")
         super(P4EbpfTest, self).tearDown()
 
 
@@ -339,14 +341,15 @@ class MulticastPSATest(P4EbpfTest):
     p4_file_path = "../../../testdata/p4_16_samples/psa-multicast-basic-bmv2.p4"
 
     def runTest(self):
+        # TODO: replace bpftool with prectl
         self.exec_ns_cmd("bpftool map create /sys/fs/bpf/tc/globals/mcast_grp_8 type "
-                         "array key 4 value 16 entries 64 name clone_session_8")
+                         "hash key 8 value 20 entries 64 name clone_session_8")
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/mcast_grp_8 "
-                         "key 02 00 00 00 value 06 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00")
+                         "key 02 00 00 00 01 00 00 00 value 06 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00 00 00 00 00")
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/mcast_grp_8 "
-                         "key 01 00 00 00 value 05 00 00 00 00 00 05 00 00 00 00 00 02 00 00 00")
+                         "key 01 00 00 00 01 00 00 00 value 05 00 00 00 00 00 05 00 00 00 00 00 02 00 00 00 01 00 00 00")
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/mcast_grp_8 "
-                         "key 00 00 00 00 value 00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00")
+                         "key 00 00 00 00 00 00 00 00 value 00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00 01 00 00 00")
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/multicast_grp_tbl "
                          "key 8 0 0 0 value pinned /sys/fs/bpf/tc/globals/mcast_grp_8 any")
 
