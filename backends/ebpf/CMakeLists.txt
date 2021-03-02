@@ -102,16 +102,6 @@ set (P4C_EBPF_HDRS
   psa/ebpfPsaObjects.h
   )
 
-if (LIBBPF)
-  set (PRECTL_SRCS
-    runtime/prectl/common.c
-    runtime/prectl/clone_session.c
-    runtime/prectl/prectl.c)
-  add_executable(prectl ${PRECTL_SRCS})
-  include_directories(${LIBBPF_INCLUDE_DIR})
-  target_link_libraries (prectl z elf ${LIBBPF})
-endif()
-
 add_cpplint_files(${CMAKE_CURRENT_SOURCE_DIR} "${P4C_EBPF_SRCS};${P4C_EBPF_HDRS}")
 
 set (P4C_EBPF_DIST_HEADERS p4include/ebpf_model.p4)
@@ -120,9 +110,6 @@ build_unified(P4C_EBPF_SRCS)
 add_executable(p4c-ebpf ${P4C_EBPF_SRCS})
 target_link_libraries (p4c-ebpf ${P4C_LIBRARIES} ${P4C_LIB_DEPS})
 add_dependencies(p4c-ebpf genIR frontend)
-
-install (TARGETS prectl
-        RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
 
 install (TARGETS p4c-ebpf
   RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
@@ -230,6 +217,18 @@ else()
   " You can install libbpf by running './build_libbpf' in the "
   "${CMAKE_CURRENT_SOURCE_DIR}/runtime folder.")
   set (SUPPORTS_KERNEL False)
+endif()
+
+if (LIBBPF)
+  set (PRECTL_SRCS
+          runtime/prectl/common.c
+          runtime/prectl/clone_session.c
+          runtime/prectl/prectl.c)
+  add_executable(prectl ${PRECTL_SRCS})
+  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/usr/include)
+  target_link_libraries (prectl z elf ${LIBBPF})
+  install (TARGETS prectl
+          RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
 endif()
 
 # Only add the kernel tests if the two requirements are met

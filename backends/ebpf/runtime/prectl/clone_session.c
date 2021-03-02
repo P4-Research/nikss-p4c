@@ -1,5 +1,4 @@
-#include "linux/bpf.h"
-#include "bpf_helpers.h"
+#include "bpf/bpf.h"
 #include <errno.h>
 #include <getopt.h>
 #include <math.h>
