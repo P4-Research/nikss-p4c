@@ -75,6 +75,22 @@ EBPFTable::EBPFTable(const EBPFProgram* program, const IR::TableBlock* table,
 
     keyGenerator = table->container->getKey();
     actionList = table->container->getActionList();
+    validateKeys(program);
+}
+
+void EBPFTable::validateKeys(const EBPFProgram *program) const {
+    if (keyGenerator != nullptr) {
+        for (auto it : keyGenerator->keyElements) {
+            auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
+            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
+            if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
+                if (it == keyGenerator->keyElements.end().operator*()) {
+                    error(ErrorType::ERR_UNSUPPORTED,
+                          "LPM field key must be at the end of whole key");
+                }
+            }
+        }
+    }
 }
 
 void EBPFTable::emitKeyType(CodeBuilder* builder) {
@@ -86,8 +102,14 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
     commentGen.setBuilder(builder);
 
     if (keyGenerator != nullptr) {
-        // Use this to order elements by size
-        std::multimap<size_t, const IR::KeyElement*> ordered;
+        if (isLPMTable()) {
+            // For LPM kind key we need an additional 32 bit field - prefixlen
+            auto prefixType = EBPFTypeFactory::instance->create(IR::Type_Bits::get(32));
+            builder->emitIndent();
+            prefixType->declare(builder, prefixFieldName, false);
+            builder->endOfStatement(true);
+        }
+
         unsigned fieldNumber = 0;
         for (auto c : keyGenerator->keyElements) {
             auto type = program->typeMap->getType(c->expression);
@@ -98,20 +120,11 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
                         "%1%: illegal type %2% for key field", c, type);
                 return;
             }
-            unsigned width = ebpfType->to<IHasWidth>()->widthInBits();
-            ordered.emplace(width, c);
             keyTypes.emplace(c, ebpfType);
             keyFieldNames.emplace(c, fieldName);
             fieldNumber++;
-        }
 
-        // Emit key in decreasing order size - this way there will be no gaps
-        for (auto it = ordered.rbegin(); it != ordered.rend(); ++it) {
-            auto c = it->second;
-
-            auto ebpfType = ::get(keyTypes, c);
             builder->emitIndent();
-            cstring fieldName = ::get(keyFieldNames, c);
             ebpfType->declare(builder, fieldName, false);
             builder->append("; /* ");
             c->expression->apply(commentGen);
@@ -128,6 +141,7 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
     }
 
     builder->blockEnd(false);
+    builder->append(" __attribute__((aligned(4)))");
     builder->endOfStatement(true);
 }
 
@@ -289,8 +303,18 @@ void EBPFTable::emitInstance(CodeBuilder* builder) {
 }
 
 void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
-    if (keyGenerator == nullptr)
+    if (keyGenerator == nullptr) {
         return;
+    }
+
+    if (isLPMTable()) {
+        builder->emitIndent();
+        builder->appendFormat("%s.%s = sizeof(%s)*8 - %d",
+                              keyName.c_str(), prefixFieldName,
+                              keyName, prefixLenFieldWidth);
+        builder->endOfStatement(true);
+    }
+
     for (auto c : keyGenerator->keyElements) {
         auto ebpfType = ::get(keyTypes, c);
         cstring fieldName = ::get(keyFieldNames, c);
@@ -298,20 +322,36 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
         bool memcpy = false;
         EBPFScalarType* scalar = nullptr;
         unsigned width = 0;
+        cstring swap;
         if (ebpfType->is<EBPFScalarType>()) {
             scalar = ebpfType->to<EBPFScalarType>();
             width = scalar->implementationWidthInBits();
             memcpy = !EBPFScalarType::generatesScalar(width);
+
+            swap = getByteSwapMethod(width);
+        }
+
+        auto tmpVar = "tmp_" + fieldName;
+        if (isLPMTable()) {
+            declareTmpLpmKey(builder, c, tmpVar);
         }
 
         builder->emitIndent();
         if (memcpy) {
             builder->appendFormat("memcpy(&%s.%s, &", keyName.c_str(), fieldName.c_str());
-            codeGen->visit(c->expression);
+            if (isLPMTable()) {
+                emitLpmKeyField(builder, swap, tmpVar);
+            } else {
+                codeGen->visit(c->expression);
+            }
             builder->appendFormat(", %d)", scalar->bytesRequired());
         } else {
             builder->appendFormat("%s.%s = ", keyName.c_str(), fieldName.c_str());
-            codeGen->visit(c->expression);
+            if (isLPMTable()) {
+                emitLpmKeyField(builder, swap, tmpVar);
+            } else {
+                codeGen->visit(c->expression);
+            }
         }
         builder->endOfStatement(true);
 
@@ -326,6 +366,39 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
             builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, varStr.c_str());
         }
     }
+}
+
+void EBPFTable::emitLpmKeyField(CodeBuilder *builder,
+                                const cstring &swap,
+                                const std::string &tmpVar) const {
+    if (!swap.isNullOrEmpty()) {
+        builder->appendFormat("%s(%s)", swap.c_str(), tmpVar.c_str());
+    } else {
+        builder->append(tmpVar);
+    }
+}
+
+void EBPFTable::declareTmpLpmKey(CodeBuilder *builder,
+                                 const IR::KeyElement *c,
+                                 std::string &tmpVar) {
+    auto lpmField = EBPFTypeFactory::instance->create(IR::Type_Bits::get(32));
+    builder->emitIndent();
+    lpmField->declare(builder, tmpVar, false);
+    builder->append(" = ");
+    codeGen->visit(c->expression);
+    builder->endOfStatement(true);
+}
+
+cstring EBPFTable::getByteSwapMethod(unsigned int width) const {
+    cstring swap;
+    if (width <= 16) {
+        swap = "bpf_htons";
+    } else if (width <= 32) {
+        swap = "bpf_htonl";
+    } else if (width <= 64) {
+        swap = "bpf_htonll";
+    }
+    return swap;
 }
 
 void EBPFTable::emitAction(CodeBuilder* builder, cstring valueName) {
@@ -524,6 +597,21 @@ void EBPFTable::emitInitializer(CodeBuilder* builder) {
         builder->blockEnd(true);
     }
     builder->blockEnd(true);
+}
+
+bool EBPFTable::isLPMTable() {
+    if (keyGenerator != nullptr) {
+        // If any key field is LPM we will generate an LPM table
+        for (auto it : keyGenerator->keyElements) {
+            auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
+            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
+            if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 ////////////////////////////////////////////////////////////////

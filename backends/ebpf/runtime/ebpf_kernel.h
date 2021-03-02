@@ -113,6 +113,15 @@ struct bpf_elf_map SEC("maps") NAME = {          \
     .flags       = 0,                \
     .inner_id    = INNER_ID,         \
 };
+#define REGISTER_TABLE_FLAGS(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, FLAGS) \
+struct bpf_elf_map SEC("maps") NAME = {          \
+    .type        = TYPE,             \
+    .size_key    = KEY_SIZE,         \
+    .size_value  = VALUE_SIZE,       \
+    .max_elem    = MAX_ENTRIES,      \
+    .pinning     = 2,                \
+    .flags       = FLAGS,            \
+};
 #define REGISTER_END()
 
 #define BPF_MAP_LOOKUP_ELEM(table, key) \

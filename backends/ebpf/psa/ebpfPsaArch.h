@@ -52,6 +52,7 @@ class ConvertToEbpfPSA : public Transform {
     }
 
     const PSAArch *build(IR::ToplevelBlock *prog);
+    const void emit(CodeBuilder *builder);
     const IR::Node *preorder(IR::ToplevelBlock *p) override;
     const PSAArch *getPSAArchForEBPF() { return ebpf_psa_arch; }
 };

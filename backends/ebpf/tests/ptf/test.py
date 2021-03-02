@@ -327,19 +327,6 @@ class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
         testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
 
 
-class SimpleLpmPSATest(EbpfTest):
-
-    test_prog_image = "samples/lpm_test.o"
-
-    def runTest(self):
-        pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='10.11.11.11')
-        #This command adds LPM entry 10.10.10.10/8 with action forwarding on port 6 (PORT2 in ptf)
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm "
-                         "key hex 08 00 00 00 0a 0a 0a 0a value hex 00 00 00 00 06 00 00 00")
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT2)
-
-
 class MulticastPSATest(P4EbpfTest):
     p4_file_path = "../../../testdata/p4_16_samples/psa-multicast-basic-bmv2.p4"
 
@@ -368,3 +355,60 @@ class MulticastPSATest(P4EbpfTest):
     def tearDown(self):
         self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/mcast_grp_8")
         super(MulticastPSATest, self).tearDown()
+
+
+class SimpleLpmP4PSATest(P4EbpfTest):
+
+    p4_file_path = "samples/p4testdata/psa-lpm.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='10.10.11.11')
+        # This command adds LPM entry 10.10.0.0/16 with action forwarding on port 6 (PORT2 in ptf)
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm "
+                         "key hex 10 00 00 00 0a 0a 00 00 value hex 00 00 00 00 06 00 00 00")
+        # This command adds 10.10.10.10/8 entry with not existing port number (0)
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm "
+                         "key hex 08 00 00 00 0a 0a 0a 0a value hex 00 00 00 00 00 00 00 00")
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT2)
+
+        pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='192.168.2.1')
+        # This command adds LPM entry 192.168.2.1/24 with action forwarding on port 5 (PORT1 in ptf)
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm "
+                         "key hex 18 00 00 00 c0 a8 02 00 value hex 00 00 00 00 05 00 00 00")
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT1)
+
+    def tearDown(self):
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm")
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm_defaultAction")
+        super(SimpleLpmP4PSATest, self).tearDown()
+
+
+class SimpleLpmP4TwoKeysPSATest(P4EbpfTest):
+
+    p4_file_path = "samples/p4testdata/psa-lpm-two-keys.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet(ip_src='1.2.3.4', ip_dst='10.10.11.11')
+        # This command adds LPM entry 10.10.11.0/24 with action forwarding on port 6 (PORT2 in ptf)
+        # Note that prefix value has to be a sum of exact fields size and lpm prefix
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm "
+                         "key hex 38 00 00 00 01 02 03 04 0a 0a 0b 00 "
+                         "value hex 00 00 00 00 06 00 00 00")
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT2)
+
+        pkt = testutils.simple_ip_packet(ip_src='1.2.3.4', ip_dst='192.168.2.1')
+        # This command adds LPM entry 192.168.2.1/24 with action forwarding on port 5 (PORT1 in ptf)
+        # Note that prefix value has to be a sum of exact fields size and lpm prefix
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm "
+                         "key hex 38 00 00 00 01 02 03 04 c0 a8 02 00 "
+                         "value hex 00 00 00 00 05 00 00 00")
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT1)
+
+    def tearDown(self):
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm")
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm_defaultAction")
+        super(SimpleLpmP4TwoKeysPSATest, self).tearDown()
