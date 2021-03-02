@@ -1,3 +1,4 @@
+#include <linux/bpf.h>
 #include "bpf/bpf.h"
 #include <errno.h>
 #include <getopt.h>
