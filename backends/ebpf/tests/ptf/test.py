@@ -389,6 +389,11 @@ class SimpleLpmP4PSATest(P4EbpfTest):
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT1)
 
+    def tearDown(self):
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm")
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm_defaultAction")
+        super(SimpleLpmP4PSATest, self).tearDown()
+
 
 class SimpleLpmP4TwoKeysPSATest(P4EbpfTest):
 
@@ -412,3 +417,8 @@ class SimpleLpmP4TwoKeysPSATest(P4EbpfTest):
                          "value hex 00 00 00 00 05 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT1)
+
+    def tearDown(self):
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm")
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm_defaultAction")
+        super(SimpleLpmP4TwoKeysPSATest, self).tearDown()
