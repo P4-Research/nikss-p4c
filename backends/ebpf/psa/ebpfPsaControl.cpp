@@ -2,6 +2,21 @@
 
 namespace EBPF {
 
+void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
+    auto decl = method->object;
+    auto declType = method->originalExternType;
+    cstring name = EBPFObject::externalName(decl);
+
+    // TODO: make something similar to EBPFModel instead of hardcoded extern name
+    if (declType->name.name == "Counter") {
+        auto counterMap = control->getCounter(name);
+        counterMap->emitMethodInvocation(builder, method);
+        return;
+    }
+
+    ControlBodyTranslator::processMethod(method);
+}
+
 bool EBPFControlPSA::build() {
     auto params = p4Control->type->applyParams;
     if (params->size() != 4) {
@@ -13,7 +28,7 @@ bool EBPFControlPSA::build() {
     auto it = params->parameters.begin();
     headers = *it;
 
-    codeGen = new ControlBodyTranslator(this);
+    codeGen = new ControlBodyTranslatorPSA(this);
     codeGen->substitute(headers, parserHeaders);
 
     return ::errorCount() == 0;

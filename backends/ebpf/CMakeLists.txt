@@ -55,6 +55,7 @@ set (P4C_EBPF_SRCS
   psa/ebpfPsaDeparser.cpp
   psa/ebpfPsaControl.cpp
   psa/ebpfPsaObjects.cpp
+  psa/externs/ebpfPsaCounter.cpp
   )
 
 set (P4C_EBPF_HDRS
@@ -100,6 +101,7 @@ set (P4C_EBPF_HDRS
   psa/ebpfPsaDeparser.h
   psa/ebpfPsaControl.h
   psa/ebpfPsaObjects.h
+  psa/externs/ebpfPsaCounter.h
   )
 
 add_cpplint_files(${CMAKE_CURRENT_SOURCE_DIR} "${P4C_EBPF_SRCS};${P4C_EBPF_HDRS}")
