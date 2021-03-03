@@ -46,7 +46,7 @@ def main():
     # Create the libbpf build directory
     create_dir(libbpf_build_dir)
     # Build libbpf
-    mk_cmd = "make -C %s install " % libbpf_src_dir
+    mk_cmd = "make -C %s install install_uapi_headers " % libbpf_src_dir
     mk_cmd += "BUILD_STATIC_ONLY=y "
     mk_cmd += "OBJDIR=%s " % libbpf_build_dir
     mk_cmd += "DESTDIR=%s " % libbpf_target_dir

@@ -75,23 +75,23 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
                                         "unsigned int max_iter, "
                                         "void (*a)(SK_BUFF *, void *))\n"
                         "{\n"
-                        "    __u32 zero_key = 0;\n"
-                        "    struct element *elem = bpf_map_lookup_elem(map, &zero_key);\n"
+                        "    elem_t head_idx = {0, 0};\n"
+                        "    struct element *elem = bpf_map_lookup_elem(map, &head_idx);\n"
                         "    if (!elem) {\n"
                         "        return -1;\n"
                         "    }\n"
-                        "    if (elem->next_id == 0) {\n"
-                                "%trace_msg_no_elements%"
+                        "    if (elem->next_id.port == 0 && elem->next_id.instance == 0) {\n"
+                        "       %trace_msg_no_elements%"
                         "        return 0;\n"
                         "    }\n"
-                        "    __u32 next_id = elem->next_id;\n"
+                        "    elem_t next_id = elem->next_id;\n"
                         "    for (unsigned int i = 0; i < max_iter; i++) {\n"
                         "        struct element *elem = bpf_map_lookup_elem(map, &next_id);\n"
                         "        if (!elem) {\n"
                         "            break;\n"
                         "        }\n"
                         "        a(skb, &elem->entry);\n"
-                        "        if (elem->next_id == 0) {\n"
+                        "        if (elem->next_id.port == 0 && elem->next_id.instance == 0) {\n"
                         "            break;\n"
                         "        }\n"
                         "        next_id = elem->next_id;\n"
@@ -185,10 +185,17 @@ void PSAArch::emitInternalStructures(CodeBuilder *pBuilder) const {
                          "    __u16 pkt_ether_type;\n"
                          "} __attribute__((aligned(4)));");
     pBuilder->newline();
+
     // emit helper struct for clone sessions
-    pBuilder->appendLine("struct element {\n"
+    pBuilder->appendLine("struct list_key_t {\n"
+                         "    __u32 port;\n"
+                         "    __u16 instance;\n"
+                         "};\n"
+                         "typedef struct list_key_t elem_t;\n"
+                         "\n"
+                         "struct element {\n"
                          "    struct clone_session_entry entry;\n"
-                         "    __u32        next_id;\n"
+                         "    elem_t next_id;\n"
                          "} __attribute__((aligned(4)));");
     pBuilder->newline();
 }
@@ -234,13 +241,13 @@ void PSAArch::emitInstances(CodeBuilder *builder) const {
     tcIngress->control->emitTableTypes(builder);
     tcEgress->control->emitTableTypes(builder);
     builder->appendLine("REGISTER_START()");
-    builder->appendLine("REGISTER_TABLE_INNER(clone_session_tbl_inner, BPF_MAP_TYPE_ARRAY, "
-                        "sizeof(__u32), sizeof(struct element), "
+    builder->appendLine("REGISTER_TABLE_INNER(clone_session_tbl_inner, BPF_MAP_TYPE_HASH, "
+                        "sizeof(elem_t), sizeof(struct element), "
                         "CLONE_MAX_CLONES, 1, 1)");
     builder->appendLine("REGISTER_TABLE_OUTER(clone_session_tbl, BPF_MAP_TYPE_ARRAY_OF_MAPS, "
                         "sizeof(__u32), sizeof(__u32), CLONE_MAX_SESSIONS, 1)");
-    builder->appendLine("REGISTER_TABLE_INNER(multicast_grp_tbl_inner, BPF_MAP_TYPE_ARRAY, "
-                        "sizeof(__u32), sizeof(struct element), "
+    builder->appendLine("REGISTER_TABLE_INNER(multicast_grp_tbl_inner, BPF_MAP_TYPE_HASH, "
+                        "sizeof(elem_t), sizeof(struct element), "
                         "CLONE_MAX_CLONES, 2, 1)");
     builder->appendLine("REGISTER_TABLE_OUTER(multicast_grp_tbl, BPF_MAP_TYPE_ARRAY_OF_MAPS, "
                         "sizeof(__u32), sizeof(__u32), CLONE_MAX_SESSIONS, 2)");
