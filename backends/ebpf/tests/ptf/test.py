@@ -57,7 +57,7 @@ class EbpfTest(BaseTest):
             logger.info("STDERR: %s", stderr_data)
             if do_fail:
                 self.fail("Command failed (see above for details): {}".format(str(do_fail)))
-        return process.returncode
+        return process.returncode, stdout_data, stderr_data
 
     def add_port(self, dev, image):
         self.exec_ns_cmd("ip link set dev {} xdp obj {} sec xdp-ingress".format(dev, image))
@@ -100,7 +100,6 @@ class P4EbpfTest(EbpfTest):
     def setUp(self):
         if not os.path.exists(self.p4_file_path):
             self.fail("P4 program not found, no such file.")
-            return
 
         if not os.path.exists("ptf_out"):
             os.makedirs("ptf_out")
@@ -410,3 +409,55 @@ class SimpleLpmP4TwoKeysPSATest(P4EbpfTest):
         self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm")
         self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm_defaultAction")
         super(SimpleLpmP4TwoKeysPSATest, self).tearDown()
+
+
+class CountersPSATest(P4EbpfTest):
+    import json
+
+    p4_file_path = "samples/p4testdata/counters.p4"
+
+    def get_counter_value(self, name, id):
+        # convert number into hex stream and compose into separate bytes
+        id = ['{}{}'.format(a, b) for a, b in zip(*[iter('{:08x}'.format(id))]*2)]
+        id = [format(int(v, 16), 'd') for v in id]
+        id.reverse()
+        id = ' '.join(id)
+        cmd = "bpftool -j map lookup pinned /sys/fs/bpf/tc/globals/{} key {}".format(name, id)
+        _, stdout, _ = self.exec_ns_cmd(cmd, "Failed to get counter")
+        # create hex string from value
+        value = [format(int(v, 0), '02x') for v in self.json.loads(stdout)['value']]
+        value.reverse()
+        return ''.join(value)
+
+    def verify_counter(self, name, id, expected_value):
+        value = self.get_counter_value(name, id)
+        if expected_value != value:
+            self.fail("Counter {}.{} does not have correct value. Expected {}; got {}"
+                      .format(name, id, expected_value, value))
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55',
+                                         eth_src='00:AA:00:00:00:01',
+                                         pktlen=100)
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+
+        self.verify_counter("ingress_test1_cnt", 1, "00000064")
+        self.verify_counter("ingress_test2_cnt", 1, "00000001")
+        self.verify_counter("ingress_test3_cnt", 1, "0000000100000064")
+
+        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55',
+                                         eth_src='00:AA:00:00:01:FE',
+                                         pktlen=199)
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+
+        self.verify_counter("ingress_test1_cnt", 510, "000000c7")
+        self.verify_counter("ingress_test2_cnt", 510, "00000001")
+        self.verify_counter("ingress_test3_cnt", 510, "00000001000000c7")
+
+    def tearDown(self):
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_test1_cnt")
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_test2_cnt")
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_test3_cnt")
+        super(CountersPSATest, self).tearDown()
