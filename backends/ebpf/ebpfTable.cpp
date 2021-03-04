@@ -617,8 +617,11 @@ bool EBPFTable::isLPMTable() {
 ////////////////////////////////////////////////////////////////
 
 EBPFCounterTable::EBPFCounterTable(const EBPFProgram* program, const IR::ExternBlock* block,
-                                   cstring name, CodeGenInspector* codeGen) :
+                                   cstring name, CodeGenInspector* codeGen, bool initialize) :
         EBPFTableBase(program, name, codeGen) {
+    if (!initialize)
+        return;
+
     auto sz = block->getParameterValue(program->model.counterArray.max_index.name);
     if (sz == nullptr || !sz->is<IR::Constant>()) {
         ::error(ErrorType::ERR_INVALID,

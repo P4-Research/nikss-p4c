@@ -417,7 +417,7 @@ class CountersPSATest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/counters.p4"
 
     def get_counter_value(self, name, id):
-        # convert number into hex stream and compose into separate bytes
+        # convert number into hex stream and compose separate bytes as decimal values
         id = ['{}{}'.format(a, b) for a, b in zip(*[iter('{:08x}'.format(id))]*2)]
         id = [format(int(v, 16), 'd') for v in id]
         id.reverse()
@@ -442,7 +442,7 @@ class CountersPSATest(P4EbpfTest):
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
 
-        self.verify_counter("ingress_test1_cnt", 1, "00000064")
+        self.verify_counter("ingress_test1_cnt", 1, "0000000000000064")
         self.verify_counter("ingress_test2_cnt", 1, "00000001")
         self.verify_counter("ingress_test3_cnt", 1, "0000000100000064")
 
@@ -452,7 +452,7 @@ class CountersPSATest(P4EbpfTest):
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
 
-        self.verify_counter("ingress_test1_cnt", 510, "000000c7")
+        self.verify_counter("ingress_test1_cnt", 510, "00000000000000c7")
         self.verify_counter("ingress_test2_cnt", 510, "00000001")
         self.verify_counter("ingress_test3_cnt", 510, "00000001000000c7")
 

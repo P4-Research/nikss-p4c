@@ -58,7 +58,7 @@ control ingress(inout headers hdr,
                 in  psa_ingress_input_metadata_t  istd,
                 inout psa_ingress_output_metadata_t ostd)
 {
-    Counter<bit<32>, bit<32>>(1024, PSA_CounterType_t.BYTES) test1_cnt;
+    Counter<bit<64>, bit<32>>(1024, PSA_CounterType_t.BYTES) test1_cnt;
     Counter<bit<32>, bit<32>>(1024, PSA_CounterType_t.PACKETS) test2_cnt;
     Counter<bit<32>, bit<32>>(1024, PSA_CounterType_t.PACKETS_AND_BYTES) test3_cnt;
 

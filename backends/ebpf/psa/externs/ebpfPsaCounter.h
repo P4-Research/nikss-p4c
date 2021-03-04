@@ -7,6 +7,9 @@ namespace EBPF {
 
 class EBPFCounterPSA : public EBPFCounterTable {
  protected:
+    EBPFType* dataplaneWidthType;
+    EBPFType* indexWidthType;
+
  public:
     enum CounterType {
         PACKETS,
@@ -17,16 +20,18 @@ class EBPFCounterPSA : public EBPFCounterTable {
 
     EBPFCounterPSA(const EBPFProgram* program, const IR::ExternBlock* block,
                      cstring name, CodeGenInspector* codeGen);
-    EBPFCounterPSA(const EBPFProgram* program, cstring name, CodeGenInspector* codeGen,
-                     size_t size, CounterType cntrType) :
-                     EBPFCounterTable(program, name, codeGen, size, false), type(cntrType) {}
 
-    static CounterType toCounterType(const int type);
+    static CounterType toCounterType(int type);
 
     void emitTypes(CodeBuilder* builder) override;
-    void emitMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method) override;
+    virtual void emitKeyType(CodeBuilder* builder);
+    virtual void emitValueType(CodeBuilder* builder);
 
+    void emitMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method) override;
     virtual void emitCount(CodeBuilder* builder, const IR::MethodCallExpression *expression);
+    virtual void emitCounterUpdate(CodeBuilder* builder, cstring target, bool targetIsPtr,
+                                   cstring contextVar, cstring keyName);
+    virtual void emitCounterInitializer(CodeBuilder* builder, cstring contextVar);
 };
 
 }

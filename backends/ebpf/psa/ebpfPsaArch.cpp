@@ -481,19 +481,10 @@ bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Variable* decl) {
 
 bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
     if (instance->type->getName().name == "Counter") {
-        // TODO: move to Counter ctor
-        auto node = instance->node;
-        if (node->is<IR::Declaration_Instance>()) {
-            auto di = node->to<IR::Declaration_Instance>();
+        if (instance->node->is<IR::Declaration_Instance>()) {
+            auto di = instance->node->to<IR::Declaration_Instance>();
             cstring name = EBPFObject::externalName(di);
-            auto size = (*di->arguments)[0]->expression->to<IR::Constant>();
-            if (!size->fitsInt()) {
-                ::error(ErrorType::ERR_OVERLIMIT, "%1%: size too large", size);
-                return false;
-            }
-            int type = (*di->arguments)[1]->expression->to<IR::Constant>()->asInt();
-            auto ctr = new EBPFCounterPSA(program, name, control->codeGen,
-                    (size_t) size->asInt(), EBPFCounterPSA::toCounterType(type));
+            auto ctr = new EBPFCounterPSA(program, instance, name, control->codeGen);
             control->counters.emplace(name, ctr);
         }
     } else {

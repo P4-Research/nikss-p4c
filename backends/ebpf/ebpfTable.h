@@ -84,7 +84,7 @@ class EBPFCounterTable : public EBPFTableBase {
 
  public:
     EBPFCounterTable(const EBPFProgram* program, const IR::ExternBlock* block,
-                     cstring name, CodeGenInspector* codeGen);
+                     cstring name, CodeGenInspector* codeGen, bool initialize = true);
     EBPFCounterTable(const EBPFProgram* program, cstring name, CodeGenInspector* codeGen,
                      size_t size, bool isHash) :
             EBPFTableBase(program, name, codeGen), size(size), isHash(isHash) { }
