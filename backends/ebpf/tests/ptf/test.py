@@ -510,9 +510,9 @@ class TernaryTSSTest(EbpfTest):
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/masks_tbl "
                          "key 0x0 0x3 0xf0 0xf0 value 02 00 00 00 00 00 00 00")
 
-        # inserting the following rule:
+        # inserting the following rule:  => value = 5, priority = 1
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/tuple_0 "
-                         "key 0x1 0xf0 0x0 value 05 00 00 00")
+                         "key 0x1 0xf0 0x0 value 05 00 00 00 01 00 00 00")
 
         pkt = testutils.simple_eth_packet(eth_dst='00:00:00:00:00:05')
         testutils.send_packet(self, PORT0, pkt)

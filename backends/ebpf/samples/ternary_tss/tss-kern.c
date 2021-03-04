@@ -70,6 +70,7 @@ struct tuple_key {
 
 struct tuple_value {
     __u32 action;
+    __u32 priority;
 };
 
 struct bpf_elf_map SEC("maps") masks_tbl = {
@@ -104,7 +105,7 @@ struct bpf_elf_map SEC("maps") tuples_map = {
 static __always_inline void * ternary_lookup(struct tuple_key *key, __u32 iterations)
 {
     __u64 start = bpf_ktime_get_ns();
-    void *entry = NULL;
+    struct tuple_value *entry = NULL;
     struct tuple_list_key zero_key = {0};
     struct tuple_list_value *elem = bpf_map_lookup_elem(&masks_tbl, &zero_key);
     if (!elem) {
@@ -147,7 +148,10 @@ static __always_inline void * ternary_lookup(struct tuple_key *key, __u32 iterat
             return NULL;
         }
 //        bpf_debug_printk("Found entry");
-        entry = (struct tuple_value *) data;
+        struct tuple_value * tuple_entry = (struct tuple_value *) data;
+        if (entry == NULL || tuple_entry->priority > entry->priority) {
+            entry = tuple_entry;
+        }
 
         if (elem->next_tuple_mask == 0) {
             break;
