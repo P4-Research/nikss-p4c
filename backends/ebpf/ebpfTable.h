@@ -59,7 +59,7 @@ class EBPFTable : public EBPFTableBase {
     std::map<const IR::KeyElement*, EBPFType*> keyTypes;
 
     EBPFTable(const EBPFProgram* program, const IR::TableBlock* table, CodeGenInspector* codeGen);
-    void emitTypes(CodeBuilder* builder);
+    virtual void emitTypes(CodeBuilder* builder);
     virtual void emitInstance(CodeBuilder* builder);
     void emitActionArguments(CodeBuilder* builder, const IR::P4Action* action, cstring name);
     void emitKeyType(CodeBuilder* builder);
@@ -77,20 +77,23 @@ class EBPFTable : public EBPFTableBase {
     void validateKeys(const EBPFProgram *program) const;
 };
 
-class EBPFCounterTable final : public EBPFTableBase {
+class EBPFCounterTable : public EBPFTableBase {
+ protected:
     size_t    size;
     bool      isHash;
+
  public:
     EBPFCounterTable(const EBPFProgram* program, const IR::ExternBlock* block,
-                     cstring name, CodeGenInspector* codeGen);
+                     cstring name, CodeGenInspector* codeGen, bool initialize = true);
     EBPFCounterTable(const EBPFProgram* program, cstring name, CodeGenInspector* codeGen,
                      size_t size, bool isHash) :
             EBPFTableBase(program, name, codeGen), size(size), isHash(isHash) { }
-    void emitTypes(CodeBuilder*);
-    void emitInstance(CodeBuilder* builder);
-    void emitCounterIncrement(CodeBuilder* builder, const IR::MethodCallExpression* expression);
-    void emitCounterAdd(CodeBuilder* builder, const IR::MethodCallExpression* expression);
-    void emitMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method);
+    virtual void emitTypes(CodeBuilder*);
+    virtual void emitInstance(CodeBuilder* builder);
+    virtual void emitCounterIncrement(CodeBuilder* builder,
+                                      const IR::MethodCallExpression* expression);
+    virtual void emitCounterAdd(CodeBuilder* builder, const IR::MethodCallExpression* expression);
+    virtual void emitMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method);
 };
 
 }  // namespace EBPF

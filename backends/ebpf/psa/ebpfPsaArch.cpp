@@ -3,6 +3,7 @@
 #include "ebpfPsaObjects.h"
 #include "ebpfPsaControl.h"
 #include "xdpProgram.h"
+#include "externs/ebpfPsaCounter.h"
 
 namespace EBPF {
 
@@ -412,7 +413,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     control->inputStandardMetadata = *it; ++it;
     control->outputStandardMetadata = *it;
 
-    auto codegen = new ControlBodyTranslator(control);
+    auto codegen = new ControlBodyTranslatorPSA(control);
     codegen->substitute(control->headers, parserHeaders);
     codegen->asPointerVariables.insert(control->outputStandardMetadata->name.name);
     control->codeGen = codegen;
@@ -480,18 +481,10 @@ bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Variable* decl) {
 
 bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
     if (instance->type->getName().name == "Counter") {
-        // FIXME: move to a separate function
-        auto node = instance->node;
-        if (node->is<IR::Declaration_Instance>()) {
-            auto di = node->to<IR::Declaration_Instance>();
+        if (instance->node->is<IR::Declaration_Instance>()) {
+            auto di = instance->node->to<IR::Declaration_Instance>();
             cstring name = EBPFObject::externalName(di);
-            auto size = (*di->arguments)[0]->expression->to<IR::Constant>();
-            if (!size->fitsInt()) {
-                ::error(ErrorType::ERR_OVERLIMIT, "%1%: size too large", size);
-                return false;
-            }
-            auto ctr = new EBPFCounterTable(program, name,
-                    control->codeGen, (size_t) size->asInt(), false);
+            auto ctr = new EBPFCounterPSA(program, instance, name, control->codeGen);
             control->counters.emplace(name, ctr);
         }
     } else {

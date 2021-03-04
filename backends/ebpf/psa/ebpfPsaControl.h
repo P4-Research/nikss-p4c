@@ -6,6 +6,14 @@
 
 namespace EBPF {
 
+class ControlBodyTranslatorPSA : public ControlBodyTranslator {
+ public:
+    explicit ControlBodyTranslatorPSA(const EBPFControl* control) :
+            ControlBodyTranslator(control) {}
+
+    void processMethod(const P4::ExternMethod* method) override;
+};
+
 class EBPFControlPSA : public EBPFControl {
  public:
     // FIXME: this should not be part of EBPFControlPSA object.
