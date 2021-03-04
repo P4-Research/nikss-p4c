@@ -274,18 +274,10 @@ class EgressTrafficManagerClonePSATest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/etm-clone-e2e.p4"
 
     def runTest(self):
-        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/tc/globals/clone_session_8 type "
-                         "array key 4 value 16 entries 64 name clone_session_8")
-        # add PORT2 (intf number = 6) to clone session 8
-        # TODO: use prectl to handle linked list specifics (set next id)
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/clone_session_8 "
-                         "key 01 00 00 00 value 06 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00")
-        # set next_id of head as id of above rule
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/clone_session_8 "
-                         "key 00 00 00 00 value 00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00")
-        # insert clone session table at index 8 (clone_session_id = 8)
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/clone_session_tbl "
-                         "key 8 0 0 0 value pinned /sys/fs/bpf/tc/globals/clone_session_8 any")
+        # create clone session table
+        self.exec_ns_cmd("prectl clone-session create id 8")
+        # add egress_port=6 (PORT2), instance=1 as clone session member, cos = 0
+        self.exec_ns_cmd("prectl clone-session add-member id 8 egress-port 6 instance 1 cos 0")
 
         pkt = testutils.simple_ip_packet(eth_dst='aa:bb:cc:dd:ee:ff', eth_src='55:44:33:22:11:00')
         testutils.send_packet(self, PORT1, str(pkt))
@@ -295,7 +287,7 @@ class EgressTrafficManagerClonePSATest(P4EbpfTest):
         testutils.verify_packet(self, str(pkt), PORT1)
 
     def tearDown(self):
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/clone_session_8")
+        self.exec_ns_cmd("prectl clone-session delete id 8")
         super(EgressTrafficManagerClonePSATest, self).tearDown()
 
 
@@ -329,7 +321,7 @@ class MulticastPSATest(P4EbpfTest):
     def runTest(self):
         # TODO: replace bpftool with prectl
         self.exec_ns_cmd("bpftool map create /sys/fs/bpf/tc/globals/mcast_grp_8 type "
-                         "hash key 8 value 20 entries 64 name clone_session_8")
+                         "hash key 8 value 20 entries 64 name mcast_grp_8")
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/mcast_grp_8 "
                          "key 02 00 00 00 01 00 00 00 value 06 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00 00 00 00 00")
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/mcast_grp_8 "
