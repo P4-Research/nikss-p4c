@@ -242,4 +242,4 @@ void EBPFCounterPSA::emitCounterInitializer(CodeBuilder* builder, const cstring 
     builder->blockEnd(false);
 }
 
-}
+}  // namespace EBPF

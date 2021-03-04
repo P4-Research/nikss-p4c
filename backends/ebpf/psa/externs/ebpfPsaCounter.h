@@ -1,5 +1,5 @@
-#ifndef BACKENDS_EBPF_PSA_EBPFPSACOUNTER_H_
-#define BACKENDS_EBPF_PSA_EBPFPSACOUNTER_H_
+#ifndef BACKENDS_EBPF_PSA_EXTERNS_EBPFPSACOUNTER_H_
+#define BACKENDS_EBPF_PSA_EXTERNS_EBPFPSACOUNTER_H_
 
 #include "backends/ebpf/ebpfTable.h"
 
@@ -34,6 +34,6 @@ class EBPFCounterPSA : public EBPFCounterTable {
     virtual void emitCounterInitializer(CodeBuilder* builder, cstring contextVar);
 };
 
-}
+}  // namespace EBPF
 
-#endif //BACKENDS_EBPF_PSA_EBPFPSACOUNTER_H_
+#endif  /* BACKENDS_EBPF_PSA_EXTERNS_EBPFPSACOUNTER_H_ */
