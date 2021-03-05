@@ -438,13 +438,25 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
         for (auto it : keyGenerator->keyElements) {
             auto mtdecl = refmap->getDeclaration(it->matchType->path, true);
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
+            if (matchType->name.name != P4::P4CoreLibrary::instance.exactMatch.name &&
+                matchType->name.name != P4::P4CoreLibrary::instance.lpmMatch.name &&
+                matchType->name.name != P4::P4CoreLibrary::instance.ternaryMatch.name)
+                ::error(ErrorType::ERR_UNSUPPORTED,
+                        "Match of type %1% not supported", it->matchType);
+
             if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
                 if (tableKind == TableLPMTrie) {
                     ::error(ErrorType::ERR_UNSUPPORTED,
                             "%1%: only one LPM field allowed", it->matchType);
                     return false;
                 }
+                if (tableKind == TableTernary) {
+                    // if at least one field is ternary, the whole table should be ternary
+                    continue;
+                }
                 tableKind = TableLPMTrie;
+            } else if (matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name) {
+                tableKind = TableTernary;
             }
         }
     }
@@ -459,8 +471,15 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
     }
 
     cstring name = EBPFObject::externalName(tblblk->container);
-    auto tbl = new EBPFTablePSA(program, tblblk, control->codeGen, name, tableKind, size);
-    control->tables.emplace(tblblk->container->name, tbl);
+
+    EBPFTablePSA *table;
+    if (tableKind == TableTernary) {
+        table = new EBPFTernaryTablePSA(program, tblblk, control->codeGen, name, size);
+    } else {
+        table = new EBPFTablePSA(program, tblblk, control->codeGen, name, tableKind, size);
+    }
+
+    control->tables.emplace(tblblk->container->name, table);
     return true;
 }
 

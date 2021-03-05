@@ -48,6 +48,7 @@ class EBPFTable : public EBPFTableBase {
     const cstring prefixFieldName = "prefixlen";
     const int prefixLenFieldWidth = 32;
     bool isLPMTable();
+    bool isTernaryTable();
 
  public:
     const IR::Key*            keyGenerator;
@@ -62,7 +63,7 @@ class EBPFTable : public EBPFTableBase {
     virtual void emitTypes(CodeBuilder* builder);
     virtual void emitInstance(CodeBuilder* builder);
     void emitActionArguments(CodeBuilder* builder, const IR::P4Action* action, cstring name);
-    void emitKeyType(CodeBuilder* builder);
+    virtual void emitKeyType(CodeBuilder* builder);
     void emitValueType(CodeBuilder* builder);
     void emitKey(CodeBuilder* builder, cstring keyName);
     void emitAction(CodeBuilder* builder, cstring valueName);

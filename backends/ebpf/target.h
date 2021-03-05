@@ -29,7 +29,8 @@ namespace EBPF {
 enum TableKind {
     TableHash,
     TableArray,
-    TableLPMTrie  // longest prefix match trie
+    TableLPMTrie,  // longest prefix match trie
+    TableTernary
 };
 
 class Target {

@@ -505,6 +505,7 @@ class TernaryTSSTest(EbpfTest):
     test_prog_image = "../samples/ternary_tss/tss.o"
 
     def runTest(self):
+        self.exec_ns_cmd("bpftool map show")
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/masks_tbl "
                          "key 00 00 00 00 value 00 00 00 00 0x0 0x3 0xf0 0xf0")
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/masks_tbl "
@@ -522,3 +523,11 @@ class TernaryTSSTest(EbpfTest):
         self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/tuples_map")
         self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/tuple_0")
         super(TernaryTSSTest, self).tearDown()
+
+
+class PSATernaryTest(P4EbpfTest):
+
+    p4_file_path = "samples/p4testdata/psa-ternary.p4"
+
+    def runTest(self):
+        pass

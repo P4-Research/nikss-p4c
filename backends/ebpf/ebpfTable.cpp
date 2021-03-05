@@ -102,7 +102,7 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
     commentGen.setBuilder(builder);
 
     if (keyGenerator != nullptr) {
-        if (isLPMTable()) {
+        if (isLPMTable() && !isTernaryTable()) {
             // For LPM kind key we need an additional 32 bit field - prefixlen
             auto prefixType = EBPFTypeFactory::instance->create(IR::Type_Bits::get(32));
             builder->emitIndent();
@@ -130,13 +130,6 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
             c->expression->apply(commentGen);
             builder->append(" */");
             builder->newline();
-
-            auto mtdecl = program->refMap->getDeclaration(c->matchType->path, true);
-            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
-            if (matchType->name.name != P4::P4CoreLibrary::instance.exactMatch.name &&
-                matchType->name.name != P4::P4CoreLibrary::instance.lpmMatch.name)
-                ::error(ErrorType::ERR_UNSUPPORTED,
-                        "Match of type %1% not supported", c->matchType);
         }
     }
 
@@ -192,6 +185,12 @@ void EBPFTable::emitValueType(CodeBuilder* builder) {
     builder->append("unsigned int action;");
     builder->newline();
 
+    if (isTernaryTable()) {
+        builder->emitIndent();
+        builder->append("__u32 priority;");
+        builder->newline();
+    }
+
     builder->emitIndent();
     builder->append("union ");
     builder->blockStart();
@@ -208,6 +207,23 @@ void EBPFTable::emitValueType(CodeBuilder* builder) {
     builder->appendLine("u;");
     builder->blockEnd(false);
     builder->endOfStatement(true);
+
+    if (isTernaryTable()) {
+        // emit ternary mask value
+        builder->emitIndent();
+        builder->appendFormat("struct %s_mask ", valueTypeName.c_str());
+        builder->blockStart();
+
+        builder->emitIndent();
+        builder->appendLine("__u32 tuple_id;");
+        builder->emitIndent();
+        builder->appendFormat("struct %s_mask next_tuple_mask;", keyTypeName.c_str());
+        builder->newline();
+        builder->emitIndent();
+        builder->appendLine("__u8 has_next;");
+        builder->blockEnd(false);
+        builder->endOfStatement(true);
+    }
 }
 
 void EBPFTable::emitTypes(CodeBuilder* builder) {
@@ -615,6 +631,21 @@ bool EBPFTable::isLPMTable() {
             auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
             if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool EBPFTable::isTernaryTable() {
+    if (keyGenerator != nullptr) {
+        // If any key field is LPM we will generate an LPM table
+        for (auto it : keyGenerator->keyElements) {
+            auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
+            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
+            if (matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name) {
                 return true;
             }
         }

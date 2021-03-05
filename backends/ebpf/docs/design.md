@@ -122,3 +122,40 @@ invoking `bpf_redirect()` to the `PSA_PORT_RECIRCULATE` port with `BPF_F_INGRESS
 There are some global metadata defined for the PSA architecture. For example, `packet_path` must be shared among different pipelines.
 To share a global metadata between pipelines we will use `skb->cb` (control buffer), which gives us 20B that are free to use.
 
+# Match-Action tables
+
+## Ternary
+
+If one of the key fields has type ternary, the whole table becomes ternary table. As there is no built-in 
+ternary lookup algorithm, the p4c-ebpf-psa compiler use a combination of hash and array maps to implement
+Tuple Space Search (TSS) algorithm. 
+
+
+
+When inserting a new table entry to a ternary table a control plane must construct map key similarily to how 
+p4c-ebpf-psa does it. Basically, p4c-ebpf-psa sorts key in descending order of key width to avoid gaps. 
+See the example below:
+
+```
+bit<8>  hdr.ipv4.protocol;
+bit<8>  hdr.ipv4.diffserv;
+bit<32> hdr.ipv4.dstAddr;
+key = {
+    hdr.ipv4.protocol : exact;
+    hdr.ipv4.diffserv : ternary;
+    hdr.ipv4.dstAddr :  lpm;
+}
+```
+
+The above P4 table's key will be translated to:
+
+```c
+struct tbl_ternary_key {
+    __u32 field3;
+    __u8  field1;
+    __u8  field2;
+};
+```
+
+Note that key fields of equal width will not be shuffled.
+

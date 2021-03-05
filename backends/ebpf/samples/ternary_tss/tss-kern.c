@@ -9,9 +9,9 @@
 /*
  * Assuming the following P4 table:
  *
- * bit<4> field1;
- * bit<8> field2;
- * bit<8> field3;
+ * bit<8> field1;
+ * bit<32> field2;
+ * bit<16> field3;
  *
  * p4table {
  *
@@ -52,20 +52,24 @@ struct bpf_elf_map {
 
 #define BITMASK_CLEAR(x,y) ((x) &= ((y)))
 
-struct tuple_list_key {
-    // we store 20 bits (4 + 8 + 8) in unsigned int32
-    __u32 mask;
+struct tuple_mask {
+    // we store 56 bits (8 + 32 + 16) as byte array
+    __u8 mask1[1];
+    __u8 mask2[2];
+    __u8 pad[1];
+    __u8 mask3[4];
 };
 
-struct tuple_list_value {
+struct tuple_mask_value {
     __u32 tuple_id;
-    __u32 next_tuple_mask;
+    struct tuple_mask next_tuple_mask;
+    __u8 has_next;
 };
 
 struct tuple_key {
     __u8 field1;
-    __u8 field2;
-    __u8 field3;
+    __u16 field2;
+    __u32 field3;
 };
 
 struct tuple_value {
@@ -75,8 +79,8 @@ struct tuple_value {
 
 struct bpf_elf_map SEC("maps") masks_tbl = {
         .type = BPF_MAP_TYPE_HASH,
-        .size_key = sizeof(struct tuple_list_key),
-        .size_value = sizeof(struct tuple_list_value),
+        .size_key = sizeof(struct tuple_mask),
+        .size_value = sizeof(struct tuple_mask_value),
         .max_elem = MAX_TUPLES,
         .pinning = 2,
         .id = 5,
@@ -88,8 +92,8 @@ struct bpf_elf_map SEC("maps") tuple_0 = {
         .size_value = sizeof(struct tuple_value),
         .max_elem = MAX_TUPLES,
         .pinning = 2,
-        .id = 2,
-        .inner_idx = 2,
+        .id = MAX_TUPLES-1,
+        .inner_idx = MAX_TUPLES-1,
 };
 
 struct bpf_elf_map SEC("maps") tuples_map = {
@@ -98,7 +102,7 @@ struct bpf_elf_map SEC("maps") tuples_map = {
         .size_value = sizeof(__u32),
         .max_elem = MAX_TUPLES,
         .flags = 0,
-        .inner_id = 2,
+        .inner_id = MAX_TUPLES-1,
         .pinning = 2,
 };
 
@@ -106,16 +110,16 @@ static __always_inline void * ternary_lookup(struct tuple_key *key, __u32 iterat
 {
     __u64 start = bpf_ktime_get_ns();
     struct tuple_value *entry = NULL;
-    struct tuple_list_key zero_key = {0};
-    struct tuple_list_value *elem = bpf_map_lookup_elem(&masks_tbl, &zero_key);
+    struct tuple_mask zero_key = {0};
+    struct tuple_mask_value *elem = bpf_map_lookup_elem(&masks_tbl, &zero_key);
     if (!elem) {
         return NULL;
     }
 
-    struct tuple_list_key next_id = { .mask = elem->next_tuple_mask };
+    struct tuple_mask next_id = elem->next_tuple_mask;
     #pragma clang loop unroll(disable)
     for (int i = 0; i < MAX_TUPLES; i++) {
-        struct tuple_list_value *elem = bpf_map_lookup_elem(&masks_tbl, &next_id);
+        struct tuple_mask_value *elem = bpf_map_lookup_elem(&masks_tbl, &next_id);
         if (!elem) {
             return NULL;
         }
@@ -124,10 +128,10 @@ static __always_inline void * ternary_lookup(struct tuple_key *key, __u32 iterat
         #pragma clang loop unroll(disable)
         for (int i = 0; i < iterations; i++) {
             __u32 *tmp = ((__u32 *) &k);
-            __u32 mask = next_id.mask >> 8;
+            __u32 *mask = (__u32 *) &next_id;
 //            bpf_debug_printk("Using mask: %llx", mask);
 //            bpf_debug_printk("Masking: %llx", ((__u32 *) key)[i]);
-            *tmp = ((__u32 *) key)[i] & mask;
+            *tmp = ((__u32 *) key)[i] & mask[i];
             tmp++;
         }
 
@@ -153,10 +157,10 @@ static __always_inline void * ternary_lookup(struct tuple_key *key, __u32 iterat
             entry = tuple_entry;
         }
 
-        if (elem->next_tuple_mask == 0) {
+        if (elem->has_next == 0) {
             break;
         }
-        next_id.mask = elem->next_tuple_mask;
+        next_id = elem->next_tuple_mask;
     }
     __u64 end = bpf_ktime_get_ns();
     bpf_debug_printk("Classified in %u", end - start);

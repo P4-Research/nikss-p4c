@@ -51,6 +51,11 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
     cstring registerTable = "REGISTER_TABLE(%s, %s, sizeof(%s), sizeof(%s), %d)";
     cstring registerTableWithFlags = "REGISTER_TABLE_FLAGS(%s, %s, sizeof(%s), "
                                         "sizeof(%s), %d, %s)";
+    cstring registerOuterTable = "REGISTER_TABLE_OUTER(%s, %s_OF_MAPS, sizeof(%s), "
+                                 "sizeof(%s), %d, %d);";
+    cstring registerInnerTable = "REGISTER_TABLE_INNER(%s, $s, sizeof(%s), "
+                                 "sizeof(%s), %d, %d, %d);";
+
     if (tableKind == TableHash) {
         kind = "BPF_MAP_TYPE_HASH";
     } else if (tableKind == TableArray) {
@@ -60,6 +65,20 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
         builder->appendFormat(registerTableWithFlags, tblName.c_str(),
                               kind.c_str(), keyType.c_str(),
                               valueType.c_str(), size, "BPF_F_NO_PREALLOC");
+        builder->newline();
+        return;
+    } else if (tableKind == TableTernary) {
+        // ternary table is decomposed into 3 BPF maps
+        cstring name = tblName.c_str() + cstring("_prefixes");
+        builder->appendFormat(registerTable, name,
+                              "BPF_MAP_TYPE_HASH", keyType.c_str(),
+                              valueType.c_str(), size);
+        builder->newline();
+
+        name = tblName.c_str() + cstring("_tuples_map");
+        builder->appendFormat(registerOuterTable, name,
+                              "BPF_MAP_TYPE_ARRAY", "__u32",
+                              "__u32", size);
         builder->newline();
         return;
     } else {

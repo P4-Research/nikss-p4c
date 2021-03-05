@@ -19,6 +19,17 @@ class EBPFTablePSA : public EBPFTable {
     void emitInstance(CodeBuilder* builder) override;
 };
 
+class EBPFTernaryTablePSA : public EBPFTablePSA {
+
+ public:
+    EBPFTernaryTablePSA(const EBPFProgram* program, const IR::TableBlock* table,
+                 CodeGenInspector* codeGen, cstring name, size_t size) :
+            EBPFTablePSA(program, table, codeGen, name, TableTernary, size) { }
+
+    void emitInstance(CodeBuilder* builder) override;
+    void emitKeyType(CodeBuilder* builder) override;
+};
+
 }  // namespace EBPF
 
 #endif /* BACKENDS_EBPF_PSA_EBPFPSAOBJECTS_H_ */
