@@ -20,6 +20,14 @@ class DeparserBodyTranslator : public ControlBodyTranslator {
         if (method->method->name.name == "emit") {
             // do not use visitor to generate emit() methods
             return;
+        } else if (method->method->name.name == "pack") {
+            auto obj = method->object;
+            auto di = obj->to<IR::Declaration_Instance>();
+            auto arg = method->expr->arguments->front();
+            builder->appendFormat("bpf_map_push_elem(&%s, &", di->name.name);
+            this->visit(arg);
+            builder->appendFormat(", BPF_EXIST)");
+            return;
         }
         ControlBodyTranslator::processMethod(method);
     };
@@ -35,6 +43,7 @@ class EBPFDeparserPSA : public EBPFControlPSA {
     std::vector<const IR::Type_Header *> headersToEmit;
     cstring outerHdrOffsetVar, outerHdrLengthVar;
     cstring returnCode;
+    std::map<cstring, const IR::Type *> digests;
 
     EBPFDeparserPSA(const EBPFProgram* program, const IR::ControlBlock* control,
                     const IR::Parameter* parserHeaders, const IR::Parameter *istd) :
@@ -53,6 +62,7 @@ class EBPFDeparserPSA : public EBPFControlPSA {
                     cstring &headerExpression) const;
     void emitField(CodeBuilder* builder, cstring headerExpression,
                    cstring field, unsigned alignment, EBPF::EBPFType* type) const;
+    void emitDigestInstances(CodeBuilder* builder) const;
 };
 
 class EBPFIngressDeparserPSA : public EBPFDeparserPSA {

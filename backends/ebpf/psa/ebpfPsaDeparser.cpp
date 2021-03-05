@@ -272,6 +272,16 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
     builder->newline();
 }
 
+void EBPFDeparserPSA::emitDigestInstances(CodeBuilder* builder) const {
+    for (auto it = digests.begin(); it != digests.end(); it++) {
+        builder->appendFormat("REGISTER_TABLE(%s, %s, 0, sizeof( ", it->first, "BPF_MAP_TYPE_QUEUE");
+        auto type = EBPFTypeFactory::instance->create(it->second->to<IR::Type_Type>()->type);
+        type->declare(builder, "", false);
+        builder->appendFormat("), 100)");// TODO magic number of max size of queue
+        builder->newline();
+    }
+}
+
 // =====================EBPFIngressDeparserPSA=============================
 bool EBPFIngressDeparserPSA::build() {
     auto pl = controlBlock->container->type->applyParams;

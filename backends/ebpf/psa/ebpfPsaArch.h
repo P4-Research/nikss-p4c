@@ -52,7 +52,6 @@ class ConvertToEbpfPSA : public Transform {
     }
 
     const PSAArch *build(IR::ToplevelBlock *prog);
-    const void emit(CodeBuilder *builder);
     const IR::Node *preorder(IR::ToplevelBlock *p) override;
     const PSAArch *getPSAArchForEBPF() { return ebpf_psa_arch; }
 };
@@ -151,6 +150,14 @@ class ConvertToEBPFDeparserPSA : public Inspector {
 
     bool preorder(const IR::ControlBlock *) override;
     bool preorder(const IR::MethodCallExpression* expression) override;
+    bool preorder(const IR::Declaration_Instance* instance) {
+
+        return true;
+    }
+    bool preorder(const IR::Declaration_Variable* decl) {
+
+        return true;
+    }
     EBPF::EBPFDeparserPSA *getEBPFPsaDeparser() { return deparser; }
 };
 
