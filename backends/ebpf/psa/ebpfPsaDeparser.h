@@ -16,16 +16,13 @@ class DeparserBodyTranslator : public ControlBodyTranslator {
     explicit DeparserBodyTranslator(const EBPFDeparserPSA* deparser);
 
     void processFunction(const P4::ExternFunction* function) override;
-    void processMethod(const P4::ExternMethod* method) override {
-        if (method->method->name.name == "emit") {
-            // do not use visitor to generate emit() methods
-            return;
-        }
-        ControlBodyTranslator::processMethod(method);
-    };
+    void processMethod(const P4::ExternMethod* method) override;
 };
 
 class EBPFDeparserPSA : public EBPFControlPSA {
+ private:
+    int maxDigestQueueSize = 100;
+
  public:
     const IR::Parameter* packet_out;
     const IR::Parameter* istd;
@@ -35,6 +32,7 @@ class EBPFDeparserPSA : public EBPFControlPSA {
     std::vector<const IR::Type_Header *> headersToEmit;
     cstring outerHdrOffsetVar, outerHdrLengthVar;
     cstring returnCode;
+    std::map<cstring, const IR::Type *> digests;
 
     EBPFDeparserPSA(const EBPFProgram* program, const IR::ControlBlock* control,
                     const IR::Parameter* parserHeaders, const IR::Parameter *istd) :
@@ -53,6 +51,7 @@ class EBPFDeparserPSA : public EBPFControlPSA {
                     cstring &headerExpression) const;
     void emitField(CodeBuilder* builder, cstring headerExpression,
                    cstring field, unsigned alignment, EBPF::EBPFType* type) const;
+    void emitDigestInstances(CodeBuilder* builder) const;
 };
 
 class EBPFIngressDeparserPSA : public EBPFDeparserPSA {

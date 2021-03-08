@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import ctypes
 import os
 import logging
 import subprocess
@@ -17,6 +17,8 @@ from scapy.fields import (
     ShortField,
 )
 from ptf.base_tests import BaseTest
+import ctypes as c
+import struct
 
 from scapy.layers.l2 import Ether
 from ptf.packet import MPLS
@@ -34,6 +36,7 @@ ALL_PORTS = [PORT0, PORT1, PORT2]
 class EbpfTest(BaseTest):
     switch_ns = 'test'
     test_prog_image = 'generic.o'  # default, if test case not specify program
+    ctool_file_path = ""
 
     def exec_ns_cmd(self, command='echo me', do_fail=None):
         command = "nsenter --net=/var/run/netns/" + self.switch_ns + " " + command
@@ -82,6 +85,14 @@ class EbpfTest(BaseTest):
 
         for intf in self.interfaces:
             self.add_port(dev=intf, image=self.test_prog_image)
+
+        if self.ctool_file_path:
+            head, tail = os.path.split(self.ctool_file_path)
+            filename = tail.split(".")[0]
+            so_file_path = head + "/" + filename + ".so"
+            cmd = ["clang", "-fPIC", "-l", "bpf", "-shared", "-o", so_file_path, self.ctool_file_path]
+            self.exec_cmd(cmd, "Ctool compilation error")
+            self.so_file_path = so_file_path
 
     def tearDown(self):
         for intf in self.interfaces:
@@ -453,3 +464,37 @@ class CountersPSATest(P4EbpfTest):
         self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_test2_cnt")
         self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_test3_cnt")
         super(CountersPSATest, self).tearDown()
+
+
+class DigestPSATest(P4EbpfTest):
+
+    p4_file_path = "samples/p4testdata/digest.p4"
+    ctool_file_path = "ptf/tools/read_digest.c"
+
+    def double_to_hex(self, f):
+        return hex(struct.unpack('<Q', struct.pack('<d', f))[0])
+
+    def get_digest_value(self):
+        class Digest(c.Structure):
+            pass
+        Digest._fields_ = [("mac", c.c_long), ("port", c.c_int)]
+        my_functions = c.CDLL(self.so_file_path)
+        my_functions.pop_value.restype = Digest
+
+        return my_functions.pop_value()
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet(eth_src="ff:ff:ff:ff:ff:ff")
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.send_packet(self, PORT0, str(pkt))
+
+        for i in range(0, 3):
+            value = self.get_digest_value()
+            if hex(value.mac) != "0xffffffffffff" or value.port != 4:
+                self.fail("Digest map stored wrong values: mac->%s, port->%s" %
+                          (hex(value.mac), value.port))
+
+    def tearDown(self):
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/mac_learn_digest_0")
+        super(DigestPSATest, self).tearDown()

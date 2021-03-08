@@ -253,6 +253,7 @@ void PSAArch::emitInstances(CodeBuilder *builder) const {
     builder->appendLine("REGISTER_TABLE_OUTER(multicast_grp_tbl, BPF_MAP_TYPE_ARRAY_OF_MAPS, "
                         "sizeof(__u32), sizeof(__u32), CLONE_MAX_SESSIONS, 2)");
     tcIngress->control->emitTableInstances(builder);
+    tcIngress->deparser->emitDigestInstances(builder);
     tcEgress->control->emitTableInstances(builder);
     builder->appendLine("REGISTER_END()");
     builder->newline();
@@ -511,10 +512,33 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
 
     if (ctrl->container->is<IR::P4Control>()) {
         auto p4Control = ctrl->container->to<IR::P4Control>();
+        findDigests(p4Control);
         this->visit(p4Control->body);
     }
 
     return false;
+}
+void ConvertToEBPFDeparserPSA::findDigests(const IR::P4Control *p4Control) {
+    // Digests are only at ingress
+    if (type == INGRESS) {
+        for (auto decl : p4Control->controlLocals) {
+            auto name = decl->name.name;
+            if (decl->is<IR::Declaration_Instance>()) {
+                auto di = decl->to<IR::Declaration_Instance>();
+                if (di->type->is<IR::Type_Specialized>()) {
+                    auto typeSpec = di->type->to<IR::Type_Specialized>();
+                    auto baseType = typeSpec->baseType;
+                    auto typeName = baseType->to<IR::Type_Name>();
+                    auto digest = typeName->path->name.name;
+                    if (digest == "Digest") {
+                        auto messageArg = typeSpec->arguments->front();
+                        auto messageType = typemap->getType(messageArg);
+                        deparser->digests.emplace(di->name.name, messageType);
+                    }
+                }
+            }
+        }
+    }
 }
 
 bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expression) {
