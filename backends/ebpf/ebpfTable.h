@@ -68,6 +68,10 @@ class EBPFTable : public EBPFTableBase {
     void emitKey(CodeBuilder* builder, cstring keyName);
     void emitAction(CodeBuilder* builder, cstring valueName);
     void emitInitializer(CodeBuilder* builder);
+    virtual void emitTableLookup(CodeBuilder* builder, cstring key, cstring value) {
+            builder->target->emitTableLookup(builder, dataMapName, key, value);
+            builder->endOfStatement(true);
+    };
 
  private:
     cstring getByteSwapMethod(unsigned int width) const;

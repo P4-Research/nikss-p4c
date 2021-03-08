@@ -15,9 +15,12 @@ void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
 
 // =====================EBPFTernaryTablePSA=============================
 void EBPFTernaryTablePSA::emitInstance(CodeBuilder *builder) {
-    builder->target->emitTableDecl(builder, name + "_prefixes", TableTernary,
-                                   cstring("struct ") + keyTypeName,
-                                   cstring("struct ") + valueTypeName, size);
+    builder->target->emitTableDecl(builder, name, TableTernary,
+                                   keyTypeName,
+                                   valueTypeName, size);
+    builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
+                                   program->arrayIndexType,
+                                   cstring("struct ") + valueTypeName, 1);
 //    builder->target->emitTableDecl(builder, name + "_tuples_map", TableHash,
 //                                   cstring("struct ") + keyTypeName,
 //                                   cstring("struct ") + valueTypeName, size);
@@ -33,6 +36,8 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
 
     unsigned int structAlignment = 4; // 4 by default
     unsigned int totalSizeOfKeys = 0;
+    unsigned int lengthOfTernaryFields = 0;
+    unsigned int lengthOfLPMFields = 0;
     if (keyGenerator != nullptr) {
         std::vector<std::pair<size_t, const IR::KeyElement*>> ordered;
         unsigned fieldNumber = 0;
@@ -48,6 +53,14 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
             unsigned width = ebpfType->to<IHasWidth>()->widthInBits();
             if (ebpfType->to<EBPFScalarType>()->alignment() > structAlignment) {
                 structAlignment = 8;
+            }
+
+            auto mtdecl = program->refMap->getDeclaration(c->matchType->path, true);
+            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
+            if (matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name) {
+                lengthOfTernaryFields += width;
+            } else if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
+                lengthOfLPMFields += width;
             }
 
             totalSizeOfKeys += ebpfType->to<EBPFScalarType>()->bytesRequired();
@@ -85,6 +98,14 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
 
     // generate mask key
     builder->emitIndent();
+    int max_masks = lengthOfLPMFields * pow(2, lengthOfTernaryFields);
+    // we set 8000 as maximum number of ternary masks due to BPF_COMPLEXITY_LIMIT_JMP_SEQ.
+    // TODO: find solution to workaround BPF_COMPLEXITY_LIMIT_JMP_SEQ.
+    builder->appendFormat("#define MAX_%s_MASKS %d", keyTypeName.toUpper(),
+                std::min(max_masks, 7000));
+    builder->newline();
+
+    builder->emitIndent();
     builder->appendFormat("struct %s_mask ", keyTypeName.c_str());
     builder->blockStart();
 
@@ -95,6 +116,102 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
     builder->blockEnd(false);
     builder->appendFormat(" __attribute__((aligned(%d)))", structAlignment);
     builder->endOfStatement(true);
+}
+
+void EBPFTernaryTablePSA::emitTableLookup(CodeBuilder *builder, cstring key, cstring value) {
+    builder->appendFormat("struct %s_mask head = {0};", keyTypeName);
+    builder->newline();
+    builder->emitIndent();
+    builder->appendFormat("struct %s_mask *", valueTypeName);
+    builder->target->emitTableLookup(builder, name + "_prefixes", "head", "val");
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->append("if (!val) ");
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder,
+            "Control: Head of mask list not found during ternary lookup. Bug?");
+    builder->emitIndent();
+    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
+    builder->newline();
+    builder->blockEnd(true);
+    builder->emitIndent();
+    builder->appendFormat("struct %s_mask next = val->next_tuple_mask;", keyTypeName);
+    builder->newline();
+    builder->emitIndent();
+    builder->appendLine("#pragma clang loop unroll(disable)");
+    builder->emitIndent();
+    builder->appendFormat("for (int i = 0; i < MAX_%s_MASKS; i++) ", keyTypeName.toUpper());
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendFormat("struct %s_mask *", valueTypeName);
+    builder->target->emitTableLookup(builder, name + "_prefixes", "next", "v");
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->append("if (!v) ");
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder,
+                                      "Control: No next element found!");
+    builder->emitIndent();
+    builder->appendLine("break;");
+    builder->blockEnd(true);
+    builder->emitIndent();
+    cstring new_key = "k";
+    builder->appendFormat("struct %s %s = {};", keyTypeName, new_key);
+    builder->newline();
+    builder->emitIndent();
+    builder->appendLine("#pragma clang loop unroll(disable)");
+    builder->emitIndent();
+    builder->appendFormat("for (int i = 0; i < sizeof(struct %s_mask) / 4; i++) ", keyTypeName);
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendFormat("__u32 *tmp = ((__u32 *) &%s);", new_key);
+    builder->newline();
+    builder->emitIndent();
+    builder->appendLine("__u32 *mask = ((__u32 *) &next);");
+    builder->emitIndent();
+    builder->appendFormat("*tmp = ((__u32 *) &%s)[i] & mask[i];", key);
+    builder->newline();
+    builder->emitIndent();
+    builder->appendLine("tmp++;");
+    builder->blockEnd(true);
+
+    builder->emitIndent();
+    builder->appendLine("__u32 tuple_id = v->tuple_id;");
+    builder->emitIndent();
+    builder->append("struct bpf_elf_map *");
+    builder->target->emitTableLookup(builder, name + "_tuples_map",
+            "tuple_id", "tuple");
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->append("if (!tuple) ");
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder,
+      Util::printf_format("Control: Tuples map %s not found during ternary lookup. Bug?",
+              name));
+    builder->emitIndent();
+    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
+    builder->newline();
+    builder->blockEnd(true);
+
+    builder->emitIndent();
+    builder->appendFormat("struct %s *tuple_entry = "
+                          "bpf_map_lookup_elem(%s, &%s)",
+                          valueTypeName, "tuple", new_key);
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->append("if (tuple_entry) ");
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendFormat("if (%s == NULL || tuple_entry->priority > %s->priority) ",
+            value, value);
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendFormat("%s = tuple_entry;", value);
+    builder->newline();
+    builder->blockEnd(true);
+    builder->blockEnd(true);
+
+    builder->blockEnd(true);
 }
 
 }  // namespace EBPF

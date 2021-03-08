@@ -321,7 +321,7 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
         return;
     }
 
-    if (isLPMTable()) {
+    if (isLPMTable() && !isTernaryTable()) {
         builder->emitIndent();
         builder->appendFormat("%s.%s = sizeof(%s)*8 - %d",
                               keyName.c_str(), prefixFieldName,

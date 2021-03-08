@@ -52,9 +52,9 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
     cstring registerTableWithFlags = "REGISTER_TABLE_FLAGS(%s, %s, sizeof(%s), "
                                         "sizeof(%s), %d, %s)";
     cstring registerOuterTable = "REGISTER_TABLE_OUTER(%s, %s_OF_MAPS, sizeof(%s), "
-                                 "sizeof(%s), %d, %d);";
-    cstring registerInnerTable = "REGISTER_TABLE_INNER(%s, $s, sizeof(%s), "
-                                 "sizeof(%s), %d, %d, %d);";
+                                 "sizeof(%s), %d, %s);";
+    cstring registerInnerTable = "REGISTER_TABLE_INNER(%s, %s, sizeof(%s), "
+                                 "sizeof(%s), %d, %s, %s);";
 
     if (tableKind == TableHash) {
         kind = "BPF_MAP_TYPE_HASH";
@@ -70,15 +70,25 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
     } else if (tableKind == TableTernary) {
         // ternary table is decomposed into 3 BPF maps
         cstring name = tblName.c_str() + cstring("_prefixes");
+        cstring maskKeyName = "struct " + keyType + "_mask";
+        cstring maskValueName = "struct " + valueType + "_mask";
         builder->appendFormat(registerTable, name,
-                              "BPF_MAP_TYPE_HASH", keyType.c_str(),
-                              valueType.c_str(), size);
+                              "BPF_MAP_TYPE_HASH", maskKeyName,
+                              maskValueName, size);
         builder->newline();
 
+        cstring max_index = "MAX_" + keyType.toUpper() + "_MASKS - 1";
+        cstring keyName = "struct " + keyType;
+        cstring valueName = "struct " + valueType;
+        builder->appendFormat(registerInnerTable, "tuple_8191",
+                              "BPF_MAP_TYPE_HASH", keyName, valueName,
+                              size, max_index, "1");
+
+        builder->newline();
         name = tblName.c_str() + cstring("_tuples_map");
         builder->appendFormat(registerOuterTable, name,
                               "BPF_MAP_TYPE_ARRAY", "__u32",
-                              "__u32", size);
+                              "__u32", size, max_index);
         builder->newline();
         return;
     } else {

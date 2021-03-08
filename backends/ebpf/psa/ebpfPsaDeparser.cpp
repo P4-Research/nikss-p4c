@@ -89,7 +89,9 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     builder->blockStart();
     builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjust failed");
     builder->emitIndent();
-    builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
+    // We immediately return instead of jumping to reject state.
+    // It avoids reaching BPF_COMPLEXITY_LIMIT_JMP_SEQ.
+    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
     builder->newline();
     builder->blockEnd(true);
     builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusted");
@@ -138,7 +140,9 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
     builder->blockStart();
     builder->target->emitTraceMessage(builder, "Deparser: invalid packet (packet too short)");
     builder->emitIndent();
-    builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
+    // We immediately return instead of jumping to reject state.
+    // It avoids reaching BPF_COMPLEXITY_LIMIT_JMP_SEQ.
+    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
     builder->newline();
     builder->blockEnd(true);
     builder->emitIndent();

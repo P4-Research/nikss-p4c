@@ -28,6 +28,7 @@ class EBPFTernaryTablePSA : public EBPFTablePSA {
 
     void emitInstance(CodeBuilder* builder) override;
     void emitKeyType(CodeBuilder* builder) override;
+    void emitTableLookup(CodeBuilder* builder, cstring key, cstring value) override;
 };
 
 }  // namespace EBPF

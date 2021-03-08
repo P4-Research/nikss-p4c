@@ -317,8 +317,7 @@ void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
         builder->appendLine("/* perform lookup */");
         builder->target->emitTraceMessage(builder, "Control: performing table lookup");
         builder->emitIndent();
-        builder->target->emitTableLookup(builder, table->dataMapName, keyname, valueName);
-        builder->endOfStatement(true);
+        table->emitTableLookup(builder, keyname, valueName);
     }
 
     builder->emitIndent();
