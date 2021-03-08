@@ -484,20 +484,17 @@ class DigestPSATest(P4EbpfTest):
         return my_functions.pop_value()
 
     def runTest(self):
-        pkt = testutils.simple_ip_packet(ip_src='1.2.3.4', ip_dst='10.10.11.11')
+        pkt = testutils.simple_ip_packet(eth_src="ff:ff:ff:ff:ff:ff")
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.send_packet(self, PORT0, str(pkt))
 
-        value = self.get_digest_value()
-        print(type(value.mac))
-        # TODO poniedzialek na stringa ten mac adress i sprawdzanie
-        print(type(value.port))
-        print(value.mac)
-        print(value.port)
+        for i in range(1, 3):
+            value = self.get_digest_value()
+            if hex(value.mac) != "0xffffffffffff" or value.port != 4:
+                self.fail("Digest map stored wrong values: mac->%s, port->%s" %
+                          (hex(value.mac), value.port))
 
-    #
-    # def tearDown(self):
-    #     self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm")
-    #     self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm_defaultAction")
-    #     super(SimpleLpmP4TwoKeysPSATest, self).tearDown()
+    def tearDown(self):
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/mac_learn_digest_0")
+        super(DigestPSATest, self).tearDown()
