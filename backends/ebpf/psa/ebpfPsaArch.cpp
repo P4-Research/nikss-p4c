@@ -512,7 +512,15 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
 
     if (ctrl->container->is<IR::P4Control>()) {
         auto p4Control = ctrl->container->to<IR::P4Control>();
+        findDigests(p4Control);
+        this->visit(p4Control->body);
+    }
 
+    return false;
+}
+void ConvertToEBPFDeparserPSA::findDigests(const IR::P4Control *p4Control) {
+    // Digests are only at ingress
+    if (type == INGRESS) {
         for (auto decl : p4Control->controlLocals) {
             auto name = decl->name.name;
             if (decl->is<IR::Declaration_Instance>()) {
@@ -523,18 +531,14 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
                     auto typeName = baseType->to<IR::Type_Name>();
                     auto digest = typeName->path->name.name;
                     if (digest == "Digest") {
-                        auto messageArg = typeSpec->arguments->front();// TODO add check only one argument
+                        auto messageArg = typeSpec->arguments->front();
                         auto messageType = typemap->getType(messageArg);
                         deparser->digests.emplace(di->name.name, messageType);
                     }
                 }
             }
         }
-
-        this->visit(p4Control->body);
     }
-
-    return false;
 }
 
 bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expression) {

@@ -15,6 +15,23 @@ void DeparserBodyTranslator::processFunction(const P4::ExternFunction *function)
     }
 }
 
+void DeparserBodyTranslator::processMethod(const P4::ExternMethod *method) {
+    if (method->method->name.name == "emit") {
+        // do not use visitor to generate emit() methods
+        return;
+    } else if (method->method->name.name == "pack") {
+        // Emit digest pack method
+        auto obj = method->object;
+        auto di = obj->to<IR::Declaration_Instance>();
+        auto arg = method->expr->arguments->front();
+        builder->appendFormat("bpf_map_push_elem(&%s, &", di->name.name);
+        this->visit(arg);
+        builder->appendFormat(", BPF_EXIST)");
+        return;
+    }
+    ControlBodyTranslator::processMethod(method);
+}
+
 void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     codeGen->setBuilder(builder);
 
@@ -273,11 +290,12 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
 }
 
 void EBPFDeparserPSA::emitDigestInstances(CodeBuilder* builder) const {
-    for (auto it = digests.begin(); it != digests.end(); it++) {
-        builder->appendFormat("REGISTER_TABLE(%s, %s, 0, sizeof( ", it->first, "BPF_MAP_TYPE_QUEUE");
-        auto type = EBPFTypeFactory::instance->create(it->second->to<IR::Type_Type>()->type);
+    for (auto digest : digests) {
+        builder->appendFormat("REGISTER_TABLE(%s, %s, 0, sizeof( ",
+                              digest.first, "BPF_MAP_TYPE_QUEUE");
+        auto type = EBPFTypeFactory::instance->create(digest.second->to<IR::Type_Type>()->type);
         type->declare(builder, "", false);
-        builder->appendFormat("), 100)");// TODO magic number of max size of queue
+        builder->appendFormat("), %d)", maxDigestQueueSize);
         builder->newline();
     }
 }

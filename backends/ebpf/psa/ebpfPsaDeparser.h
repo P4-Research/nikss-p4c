@@ -16,24 +16,13 @@ class DeparserBodyTranslator : public ControlBodyTranslator {
     explicit DeparserBodyTranslator(const EBPFDeparserPSA* deparser);
 
     void processFunction(const P4::ExternFunction* function) override;
-    void processMethod(const P4::ExternMethod* method) override {
-        if (method->method->name.name == "emit") {
-            // do not use visitor to generate emit() methods
-            return;
-        } else if (method->method->name.name == "pack") {
-            auto obj = method->object;
-            auto di = obj->to<IR::Declaration_Instance>();
-            auto arg = method->expr->arguments->front();
-            builder->appendFormat("bpf_map_push_elem(&%s, &", di->name.name);
-            this->visit(arg);
-            builder->appendFormat(", BPF_EXIST)");
-            return;
-        }
-        ControlBodyTranslator::processMethod(method);
-    };
+    void processMethod(const P4::ExternMethod* method) override;
 };
 
 class EBPFDeparserPSA : public EBPFControlPSA {
+ private:
+    int maxDigestQueueSize = 100;
+
  public:
     const IR::Parameter* packet_out;
     const IR::Parameter* istd;

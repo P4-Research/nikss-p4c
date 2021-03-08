@@ -489,7 +489,7 @@ class DigestPSATest(P4EbpfTest):
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.send_packet(self, PORT0, str(pkt))
 
-        for i in range(1, 3):
+        for i in range(0, 3):
             value = self.get_digest_value()
             if hex(value.mac) != "0xffffffffffff" or value.port != 4:
                 self.fail("Digest map stored wrong values: mac->%s, port->%s" %

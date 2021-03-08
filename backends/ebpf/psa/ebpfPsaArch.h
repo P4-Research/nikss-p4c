@@ -150,15 +150,8 @@ class ConvertToEBPFDeparserPSA : public Inspector {
 
     bool preorder(const IR::ControlBlock *) override;
     bool preorder(const IR::MethodCallExpression* expression) override;
-    bool preorder(const IR::Declaration_Instance* instance) {
-
-        return true;
-    }
-    bool preorder(const IR::Declaration_Variable* decl) {
-
-        return true;
-    }
     EBPF::EBPFDeparserPSA *getEBPFPsaDeparser() { return deparser; }
+    void findDigests(const IR::P4Control *p4Control);
 };
 
 }  // namespace EBPF
