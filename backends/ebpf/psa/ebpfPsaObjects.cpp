@@ -102,7 +102,7 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
     // we set 8000 as maximum number of ternary masks due to BPF_COMPLEXITY_LIMIT_JMP_SEQ.
     // TODO: find solution to workaround BPF_COMPLEXITY_LIMIT_JMP_SEQ.
     builder->appendFormat("#define MAX_%s_MASKS %d", keyTypeName.toUpper(),
-                std::min(max_masks, 7000));
+                std::min(max_masks, 256));
     builder->newline();
 
     builder->emitIndent();
@@ -126,14 +126,8 @@ void EBPFTernaryTablePSA::emitTableLookup(CodeBuilder *builder, cstring key, cst
     builder->target->emitTableLookup(builder, name + "_prefixes", "head", "val");
     builder->endOfStatement(true);
     builder->emitIndent();
-    builder->append("if (!val) ");
+    builder->append("if (val && val->has_next != 0) ");
     builder->blockStart();
-    builder->target->emitTraceMessage(builder,
-            "Control: Head of mask list not found during ternary lookup. Bug?");
-    builder->emitIndent();
-    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
-    builder->newline();
-    builder->blockEnd(true);
     builder->emitIndent();
     builder->appendFormat("struct %s_mask next = val->next_tuple_mask;", keyTypeName);
     builder->newline();
@@ -159,24 +153,30 @@ void EBPFTernaryTablePSA::emitTableLookup(CodeBuilder *builder, cstring key, cst
     builder->appendFormat("struct %s %s = {};", keyTypeName, new_key);
     builder->newline();
     builder->emitIndent();
-    builder->appendLine("#pragma clang loop unroll(disable)");
-    builder->emitIndent();
-    builder->appendFormat("for (int i = 0; i < sizeof(struct %s_mask) / 4; i++) ", keyTypeName);
-    builder->blockStart();
-    builder->emitIndent();
-    builder->appendFormat("__u32 *tmp = ((__u32 *) &%s);", new_key);
+    builder->appendFormat("__u32 *chunk = ((__u32 *) &%s);", new_key);
     builder->newline();
     builder->emitIndent();
     builder->appendLine("__u32 *mask = ((__u32 *) &next);");
     builder->emitIndent();
-    builder->appendFormat("*tmp = ((__u32 *) &%s)[i] & mask[i];", key);
-    builder->newline();
+    builder->appendLine("#pragma clang loop unroll(disable)");
     builder->emitIndent();
-    builder->appendLine("tmp++;");
+    builder->appendFormat("for (int i = 0; i < sizeof(struct %s_mask) / 4; i++) ", keyTypeName);
+    builder->blockStart();
+    cstring str = Util::printf_format("*(((__u32 *) &%s) + i)", key);
+    builder->target->emitTraceMessage(builder,
+                                      "Control: [Ternary] Masking next 4 bytes of %llx with mask %llx",
+                                      2, str, "mask[i]");
+
+    builder->emitIndent();
+    builder->appendFormat("chunk[i] = ((__u32 *) &%s)[i] & mask[i];", key);
+    builder->newline();
     builder->blockEnd(true);
 
     builder->emitIndent();
     builder->appendLine("__u32 tuple_id = v->tuple_id;");
+    builder->emitIndent();
+    builder->append("next = v->next_tuple_mask;");
+    builder->newline();
     builder->emitIndent();
     builder->append("struct bpf_elf_map *");
     builder->target->emitTableLookup(builder, name + "_tuples_map",
@@ -189,7 +189,7 @@ void EBPFTernaryTablePSA::emitTableLookup(CodeBuilder *builder, cstring key, cst
       Util::printf_format("Control: Tuples map %s not found during ternary lookup. Bug?",
               name));
     builder->emitIndent();
-    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
+    builder->append("break;");
     builder->newline();
     builder->blockEnd(true);
 
@@ -199,8 +199,21 @@ void EBPFTernaryTablePSA::emitTableLookup(CodeBuilder *builder, cstring key, cst
                           valueTypeName, "tuple", new_key);
     builder->endOfStatement(true);
     builder->emitIndent();
-    builder->append("if (tuple_entry) ");
+    builder->append("if (!tuple_entry) ");
     builder->blockStart();
+    builder->emitIndent();
+    builder->append("if (v->has_next == 0) ");
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendLine("break;");
+    builder->blockEnd(true);
+    builder->emitIndent();
+    builder->append("continue;");
+    builder->newline();
+    builder->blockEnd(true);
+    builder->target->emitTraceMessage(builder,
+            "Control: Ternary match found, priority=%d.", 1, "tuple_entry->priority");
+
     builder->emitIndent();
     builder->appendFormat("if (%s == NULL || tuple_entry->priority > %s->priority) ",
             value, value);
@@ -209,8 +222,14 @@ void EBPFTernaryTablePSA::emitTableLookup(CodeBuilder *builder, cstring key, cst
     builder->appendFormat("%s = tuple_entry;", value);
     builder->newline();
     builder->blockEnd(true);
-    builder->blockEnd(true);
 
+    builder->emitIndent();
+    builder->append("if (v->has_next == 0) ");
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendLine("break;");
+    builder->blockEnd(true);
+    builder->blockEnd(true);
     builder->blockEnd(true);
 }
 

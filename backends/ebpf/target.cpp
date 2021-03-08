@@ -80,7 +80,7 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
         cstring max_index = "MAX_" + keyType.toUpper() + "_MASKS - 1";
         cstring keyName = "struct " + keyType;
         cstring valueName = "struct " + valueType;
-        builder->appendFormat(registerInnerTable, "tuple_8191",
+        builder->appendFormat(registerInnerTable, cstring(tblName + "_tuple_8191"),
                               "BPF_MAP_TYPE_HASH", keyName, valueName,
                               size, max_index, "1");
 

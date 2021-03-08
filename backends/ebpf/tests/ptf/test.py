@@ -530,4 +530,23 @@ class PSATernaryTest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/psa-ternary.p4"
 
     def runTest(self):
-        pass
+        # flow rule: hdr.ipv4.protocol=0x11, hdr.ipv4.diffserv=0x00/0x00, hdr.ipv4.dstAddr=0xc0a80201/0xffff0000
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_prefixes "
+                         "key 00 00 00 00 00 00 00 00 value 01 00 00 00 00 00 0xff 0xff 0xff 00 00 00 01 00 00 00")
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_prefixes "
+                         "key 00 00 0xff 0xff 0xff 00 00 00 value 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
+        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuple_3 type "
+                         "hash key 8 value 8 entries 100 name ingress_tbl_ternary_2_tuple_3")
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuple_3 "
+                         "key 00 00 0xa8 0xc0 0x11 00 00 00 value 01 00 00 00 01 00 00 00")
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuples_map "
+                         "key 03 0 0 0 value pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuple_3 any")
+        pkt = testutils.simple_udp_packet(ip_src='1.2.3.4', ip_dst='192.168.2.1')
+        testutils.send_packet(self, PORT0, str(pkt))
+        pkt[IP].proto = 0x7
+        pkt[IP].chksum = 0xb3e7
+        testutils.verify_packet(self, str(pkt), PORT1)
+
+    def tearDown(self):
+        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuple_3")
+        super(PSATernaryTest, self).tearDown()

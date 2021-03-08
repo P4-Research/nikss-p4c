@@ -346,14 +346,14 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
         }
 
         auto tmpVar = "tmp_" + fieldName;
-        if (isLPMTable()) {
+        if (isLPMTable() && !isTernaryTable()) {
             declareTmpLpmKey(builder, c, tmpVar);
         }
 
         builder->emitIndent();
         if (memcpy) {
             builder->appendFormat("memcpy(&%s.%s, &", keyName.c_str(), fieldName.c_str());
-            if (isLPMTable()) {
+            if (isLPMTable() && !isTernaryTable()) {
                 emitLpmKeyField(builder, swap, tmpVar);
             } else {
                 codeGen->visit(c->expression);
@@ -361,7 +361,7 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
             builder->appendFormat(", %d)", scalar->bytesRequired());
         } else {
             builder->appendFormat("%s.%s = ", keyName.c_str(), fieldName.c_str());
-            if (isLPMTable()) {
+            if (isLPMTable() && !isTernaryTable()) {
                 emitLpmKeyField(builder, swap, tmpVar);
             } else {
                 codeGen->visit(c->expression);
