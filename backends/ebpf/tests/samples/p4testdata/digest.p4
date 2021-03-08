@@ -30,10 +30,6 @@ struct fwd_metadata_t {
 
 struct empty_t {}
 
-//struct metadata {
-//    fwd_metadata_t fwd_metadata;
-//}
-
 struct mac_learn_digest_t {
     EthernetAddress srcAddr;
     PortId_t        ingress_port;
