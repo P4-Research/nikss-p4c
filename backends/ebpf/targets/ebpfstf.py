@@ -65,7 +65,7 @@ def _generate_control_actions(cmds):
         if cmd.action[0] == "_NoAction":
             generated += ".action = 0,\n\t\t"
         else:
-            generated += ".action = %s,\n\t\t" % (cmd.action[0])
+            generated += ".action = %s,\n\t\t" % ("ACT_" + cmd.action[0].upper())
         generated += ".u = {.%s = {" % cmd.action[0]
         for val_num, val_field in enumerate(cmd.action[1]):
             generated += "%s," % val_field[1]

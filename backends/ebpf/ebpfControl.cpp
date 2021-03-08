@@ -289,8 +289,7 @@ void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
     if (!saveAction.empty()) {
         actionVariableName = saveAction.at(saveAction.size() - 1);
         if (!actionVariableName.isNullOrEmpty()) {
-            builder->appendFormat("%s %s;\n",
-                                  table->actionEnumName.c_str(), actionVariableName.c_str());
+            builder->appendFormat("unsigned int %s;\n", actionVariableName.c_str());
             builder->emitIndent();
         }
     }
@@ -448,7 +447,7 @@ bool ControlBodyTranslator::preorder(const IR::SwitchStatement* statement) {
             cstring name = EBPFObject::externalName(act);
             act->name.originalName == P4::P4CoreLibrary::instance.noAction.name ?
                 builder->append("0") :
-                builder->append(name);
+                builder->append(cstring("ACT_" + name.toUpper()));
         }
         builder->append(":");
         builder->newline();

@@ -167,10 +167,6 @@ void EBPFTable::emitActionArguments(CodeBuilder* builder,
 void EBPFTable::emitValueType(CodeBuilder* builder) {
     // create type definition for action
     builder->emitIndent();
-    builder->append("typedef __u8 ");
-    builder->append(actionEnumName);
-    builder->endOfStatement(true);
-    builder->emitIndent();
     unsigned int action_idx = 1; // 0 is reserved for NoAction
     for (auto a : actionList->actionList) {
         auto adecl = program->refMap->getDeclaration(a->getPath(), true);
@@ -181,10 +177,8 @@ void EBPFTable::emitValueType(CodeBuilder* builder) {
         }
         cstring name = EBPFObject::externalName(action);
         builder->emitIndent();
-        builder->append("static const ");
-        builder->append(actionEnumName);
-        builder->appendFormat(" %s = %d", name, action_idx);
-        builder->endOfStatement(true);
+        builder->appendFormat("#define ACT_%s %d", name.toUpper(), action_idx);
+        builder->newline();
         action_idx++;
     }
     builder->emitIndent();
@@ -195,7 +189,7 @@ void EBPFTable::emitValueType(CodeBuilder* builder) {
     builder->blockStart();
 
     builder->emitIndent();
-    builder->appendFormat("%s action;", actionEnumName.c_str());
+    builder->append("unsigned int action;");
     builder->newline();
 
     builder->emitIndent();
@@ -418,7 +412,8 @@ void EBPFTable::emitAction(CodeBuilder* builder, cstring valueName) {
         if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
             builder->append("case 0: ");
         } else {
-            builder->appendFormat("case %s: ", name.c_str());
+            cstring actionName = "ACT_" + name.toUpper();
+            builder->appendFormat("case %s: ", actionName);
         }
         builder->newline();
         builder->increaseIndent();
@@ -505,7 +500,8 @@ void EBPFTable::emitInitializer(CodeBuilder* builder) {
     if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
         builder->append(".action = 0,");
     } else {
-        builder->appendFormat(".action = %s,", name.c_str());
+        cstring actionName = "ACT_" + name.toUpper();
+        builder->appendFormat(".action = %s,", actionName);
     }
     builder->newline();
 
@@ -578,7 +574,8 @@ void EBPFTable::emitInitializer(CodeBuilder* builder) {
                               valueTypeName.c_str(), value.c_str());
         builder->blockStart();
         builder->emitIndent();
-        builder->appendFormat(".action = %s,", name.c_str());
+        cstring actionName = "ACT_" + name.toUpper();
+        builder->appendFormat(".action = %s,", actionName);
         builder->newline();
 
         CodeGenInspector cg(program->refMap, program->typeMap);
