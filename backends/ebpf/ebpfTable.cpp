@@ -167,7 +167,7 @@ void EBPFTable::emitActionArguments(CodeBuilder* builder,
 void EBPFTable::emitValueType(CodeBuilder* builder) {
     // create type definition for action
     builder->emitIndent();
-    unsigned int action_idx = 1; // 0 is reserved for NoAction
+    unsigned int action_idx = 1;  // 0 is reserved for NoAction
     for (auto a : actionList->actionList) {
         auto adecl = program->refMap->getDeclaration(a->getPath(), true);
         auto action = adecl->getNode()->to<IR::P4Action>();
