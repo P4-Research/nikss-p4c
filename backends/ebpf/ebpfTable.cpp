@@ -165,25 +165,23 @@ void EBPFTable::emitActionArguments(CodeBuilder* builder,
 }
 
 void EBPFTable::emitValueType(CodeBuilder* builder) {
-    // create an enum with tags for all actions
+    // create type definition for action
     builder->emitIndent();
-    builder->append("enum ");
-    builder->append(actionEnumName);
-    builder->spc();
-    builder->blockStart();
-
+    unsigned int action_idx = 1;  // 0 is reserved for NoAction
     for (auto a : actionList->actionList) {
         auto adecl = program->refMap->getDeclaration(a->getPath(), true);
         auto action = adecl->getNode()->to<IR::P4Action>();
+        // NoAction is from standard library
+        if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
+            continue;
+        }
         cstring name = EBPFObject::externalName(action);
         builder->emitIndent();
-        builder->append(name);
-        builder->append(",");
+        builder->appendFormat("#define ACT_%s %d", name.toUpper(), action_idx);
         builder->newline();
+        action_idx++;
     }
-
-    builder->blockEnd(false);
-    builder->endOfStatement(true);
+    builder->emitIndent();
 
     // a type-safe union: a struct with a tag and an union
     builder->emitIndent();
@@ -191,7 +189,7 @@ void EBPFTable::emitValueType(CodeBuilder* builder) {
     builder->blockStart();
 
     builder->emitIndent();
-    builder->appendFormat("enum %s action;", actionEnumName.c_str());
+    builder->append("unsigned int action;");
     builder->newline();
 
     builder->emitIndent();
@@ -411,7 +409,12 @@ void EBPFTable::emitAction(CodeBuilder* builder, cstring valueName) {
         auto action = adecl->getNode()->to<IR::P4Action>();
         cstring name = EBPFObject::externalName(action), msgStr, convStr;
         builder->emitIndent();
-        builder->appendFormat("case %s: ", name.c_str());
+        if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
+            builder->append("case 0: ");
+        } else {
+            cstring actionName = "ACT_" + name.toUpper();
+            builder->appendFormat("case %s: ", actionName);
+        }
         builder->newline();
         builder->increaseIndent();
 
@@ -494,7 +497,12 @@ void EBPFTable::emitInitializer(CodeBuilder* builder) {
     builder->appendFormat("struct %s %s = ", valueTypeName.c_str(), value.c_str());
     builder->blockStart();
     builder->emitIndent();
-    builder->appendFormat(".action = %s,", name.c_str());
+    if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
+        builder->append(".action = 0,");
+    } else {
+        cstring actionName = "ACT_" + name.toUpper();
+        builder->appendFormat(".action = %s,", actionName);
+    }
     builder->newline();
 
     CodeGenInspector cg(program->refMap, program->typeMap);
@@ -566,7 +574,8 @@ void EBPFTable::emitInitializer(CodeBuilder* builder) {
                               valueTypeName.c_str(), value.c_str());
         builder->blockStart();
         builder->emitIndent();
-        builder->appendFormat(".action = %s,", name.c_str());
+        cstring actionName = "ACT_" + name.toUpper();
+        builder->appendFormat(".action = %s,", actionName);
         builder->newline();
 
         CodeGenInspector cg(program->refMap, program->typeMap);

@@ -289,8 +289,7 @@ void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
     if (!saveAction.empty()) {
         actionVariableName = saveAction.at(saveAction.size() - 1);
         if (!actionVariableName.isNullOrEmpty()) {
-            builder->appendFormat("enum %s %s;\n",
-                                  table->actionEnumName.c_str(), actionVariableName.c_str());
+            builder->appendFormat("unsigned int %s;\n", actionVariableName.c_str());
             builder->emitIndent();
         }
     }
@@ -446,7 +445,9 @@ bool ControlBodyTranslator::preorder(const IR::SwitchStatement* statement) {
             BUG_CHECK(decl->is<IR::P4Action>(), "%1%: expected an action", pe);
             auto act = decl->to<IR::P4Action>();
             cstring name = EBPFObject::externalName(act);
-            builder->append(name);
+            act->name.originalName == P4::P4CoreLibrary::instance.noAction.name ?
+                builder->append("0") :
+                builder->append(cstring("ACT_" + name.toUpper()));
         }
         builder->append(":");
         builder->newline();
