@@ -20,6 +20,7 @@ limitations under the License.
 #include "ir/ir.h"
 #include "ebpfObject.h"
 #include "ebpfProgram.h"
+#include "frontends/p4/methodInstance.h"
 
 namespace EBPF {
 
@@ -27,6 +28,7 @@ class EBPFParser;
 class EBPFParserState;
 
 class StateTranslationVisitor : public CodeGenInspector {
+ protected:
     bool hasDefault;
     P4::P4CoreLibrary& p4lib;
     const EBPFParserState* state;
@@ -35,6 +37,8 @@ class StateTranslationVisitor : public CodeGenInspector {
                              unsigned alignment, EBPFType* type);
     void compileExtract(const IR::Expression* destination);
     void compileLookahead(const IR::Expression* destination);
+
+    virtual void processMethod(const P4::ExternMethod* method);
 
  public:
     explicit StateTranslationVisitor(P4::ReferenceMap* refMap, P4::TypeMap* typeMap) :
@@ -78,7 +82,7 @@ class EBPFParser : public EBPFObject {
 
     explicit EBPFParser(const EBPFProgram* program, const IR::P4Parser* block,
                         const P4::TypeMap* typeMap);
-    void emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl);
+    virtual void emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl);
     void emit(CodeBuilder* builder);
     virtual bool build();
 };

@@ -3,6 +3,24 @@
 
 namespace EBPF {
 
+void PsaStateTranslationVisitor::processMethod(const P4::ExternMethod* ext) {
+    auto externName = ext->originalExternType->name.name;
+
+    if (externName == "InternetChecksum" || externName == "Checksum") {
+        auto instance = ext->object->getName().name;
+        auto method = ext->method->getName().name;
+        parser->getChecksum(instance)->processMethod(builder, method, ext->expr);
+        return;
+    }
+
+    StateTranslationVisitor::processMethod(ext);
+}
+
+EBPFPsaParser::EBPFPsaParser(const EBPFProgram* program, const IR::P4Parser* block,
+                             const P4::TypeMap* typeMap) : EBPFParser(program, block, typeMap) {
+    visitor = new PsaStateTranslationVisitor(program->refMap, program->typeMap, this);
+}
+
 bool EBPFPsaParser::build() {
     auto pl = parserBlock->type->applyParams;
     if (pl->size() != 6) {
@@ -22,6 +40,32 @@ bool EBPFPsaParser::build() {
         return false;
     headerType = EBPFTypeFactory::instance->create(ht);
     return true;
+}
+
+void EBPFPsaParser::emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl) {
+    if (decl->is<IR::Declaration_Instance>()) {
+        auto di = decl->to<IR::Declaration_Instance>();
+        auto type = di->type->to<IR::Type_Name>();
+        auto typeSpec = di->type->to<IR::Type_Specialized>();
+        cstring name = di->name.name;
+
+        if (type != nullptr && type->path->name.name == "InternetChecksum") {
+            auto instance = new EBPFPsaInternetChecksum(program, decl, name, this->visitor);
+            checksum.emplace(name, instance);
+            instance->emitVariables(builder, decl);
+            return;
+        }
+
+        if (typeSpec != nullptr &&
+                typeSpec->baseType->to<IR::Type_Name>()->path->name.name == "Checksum") {
+            auto instance = new EBPFPsaChecksum(program, decl, name, this->visitor);
+            checksum.emplace(name, instance);
+            instance->emitVariables(builder, decl);
+            return;
+        }
+    }
+
+    EBPFParser::emitDeclaration(builder, decl);
 }
 
 }  // namespace EBPF
