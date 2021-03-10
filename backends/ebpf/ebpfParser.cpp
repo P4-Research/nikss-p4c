@@ -343,7 +343,7 @@ void StateTranslationVisitor::processMethod(const P4::ExternMethod* method) {
     }
 
     ::error(ErrorType::ERR_UNEXPECTED,
-            "Unexpected method call in parser %1%", expression);
+            "Unexpected extern method call in parser %1%", expression);
 }
 
 bool StateTranslationVisitor::preorder(const IR::MethodCallExpression* expression) {
@@ -367,8 +367,11 @@ bool StateTranslationVisitor::preorder(const IR::MethodCallExpression* expressio
     auto extMethod = mi->to<P4::ExternMethod>();
     if (extMethod != nullptr) {
         processMethod(extMethod);
+        return false;
     }
 
+    ::error(ErrorType::ERR_UNEXPECTED,
+            "Unexpected method call in parser %1%", expression);
     return false;
 }
 
