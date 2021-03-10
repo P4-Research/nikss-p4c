@@ -21,6 +21,7 @@ import ctypes as c
 import struct
 
 from scapy.layers.l2 import Ether
+from scapy.layers.inet import IP
 from ptf.packet import MPLS
 
 logger = logging.getLogger('eBPFTest')
@@ -498,3 +499,21 @@ class DigestPSATest(P4EbpfTest):
     def tearDown(self):
         self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/mac_learn_digest_0")
         super(DigestPSATest, self).tearDown()
+
+
+class InternetChecksumPSATest(P4EbpfTest):
+    p4_file_path = "samples/p4testdata/internet-checksum.p4"
+
+    def runTest(self):
+        # recompute the checksum
+        pkt = testutils.simple_ip_packet()
+        testutils.send_packet(self, PORT0, str(pkt))
+        pkt[IP].ttl = pkt[IP].ttl - 2
+        pkt[IP].chksum = None
+        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+
+        # drop invalid packet
+        pkt[IP].chksum = 0
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_no_other_packets(self)
+
