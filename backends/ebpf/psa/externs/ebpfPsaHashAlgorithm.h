@@ -32,6 +32,8 @@ class InternetChecksumAlgorithm : public EBPFPsaHashAlgorithm {
  protected:
     cstring stateVar;
 
+    void updateChecksum(CodeBuilder* builder, const IR::MethodCallExpression * expr, bool addData);
+
  public:
     InternetChecksumAlgorithm(const EBPFProgram* program, cstring name, Visitor * visitor)
         : EBPFPsaHashAlgorithm(program, name, visitor) {}

@@ -4,37 +4,9 @@ namespace EBPF {
 
 //===========================InternetChecksumAlgorithm===========================
 
-// TODO: call this method
-void InternetChecksumAlgorithm::emitGlobals(CodeBuilder* builder) {
-    builder->appendLine("inline u16 csum16_add(u16 csum, u16 addend) {\n"
-                        "    u16 res = csum;\n"
-                        "    res += addend;\n"
-                        "    return (res + (res < addend));\n"
-                        "}\n"
-                        "inline u16 csum16_sub(u16 csum, u16 addend) {\n"
-                        "    return csum16_add(csum, ~addend);\n"
-                        "}\n"
-                        "inline u16 csum_replace2(u16 csum, u16 old, u16 new) {\n"
-                        "    return (~csum16_add(csum16_sub(~csum, old), new));\n"
-                        "}");
-}
-
-void InternetChecksumAlgorithm::emitVariables(CodeBuilder* builder, const IR::Declaration* decl) {
-    (void) decl;
-    stateVar = program->refMap->newName(baseName + "_state");
-    builder->emitIndent();
-    builder->appendFormat("u16 %s = 0", stateVar.c_str());
-    builder->endOfStatement(true);
-}
-
-void InternetChecksumAlgorithm::emitClear(CodeBuilder* builder) {
-    builder->emitIndent();
-    builder->appendFormat("%s = 0", stateVar.c_str());
-    builder->endOfStatement(true);
-}
-
-void InternetChecksumAlgorithm::emitAddData(CodeBuilder* builder,
-                                            const IR::MethodCallExpression * expr) {
+void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder,
+                                               const IR::MethodCallExpression * expr,
+                                               bool addData) {
     if (expr->arguments->size() != 1) {
         ::error(ErrorType::ERR_UNEXPECTED, "Expected exactly 1 argument %1%", expr);
         return;
@@ -96,8 +68,13 @@ void InternetChecksumAlgorithm::emitAddData(CodeBuilder* builder,
                 builder->target->emitTraceMessage(builder, "InternetChecksum: word=0x%llx",
                                                   1, tmpVar.c_str());
                 builder->emitIndent();
-                builder->appendFormat("%s = csum_replace2(%s, 0, %s)", stateVar.c_str(),
-                                      stateVar.c_str(), tmpVar.c_str());
+                if (addData) {
+                    builder->appendFormat("%s = csum_replace2(%s, 0, %s)", stateVar.c_str(),
+                                          stateVar.c_str(), tmpVar.c_str());
+                } else {
+                    builder->appendFormat("%s = csum_replace2(%s, %s, 0)", stateVar.c_str(),
+                                          stateVar.c_str(), tmpVar.c_str());
+                }
                 builder->endOfStatement(true);
             }
         }
@@ -108,12 +85,46 @@ void InternetChecksumAlgorithm::emitAddData(CodeBuilder* builder,
     builder->blockEnd(true);
 }
 
+void InternetChecksumAlgorithm::emitGlobals(CodeBuilder* builder) {
+    builder->appendLine("inline u16 csum16_add(u16 csum, u16 addend) {\n"
+                        "    u16 res = csum;\n"
+                        "    res += addend;\n"
+                        "    return (res + (res < addend));\n"
+                        "}\n"
+                        "inline u16 csum16_sub(u16 csum, u16 addend) {\n"
+                        "    return csum16_add(csum, ~addend);\n"
+                        "}\n"
+                        "inline u16 csum_replace2(u16 csum, u16 old, u16 new) {\n"
+                        "    return (~csum16_add(csum16_sub(~csum, old), new));\n"
+                        "}");
+}
+
+void InternetChecksumAlgorithm::emitVariables(CodeBuilder* builder, const IR::Declaration* decl) {
+    (void) decl;
+    stateVar = program->refMap->newName(baseName + "_state");
+    builder->emitIndent();
+    builder->appendFormat("u16 %s = 0", stateVar.c_str());
+    builder->endOfStatement(true);
+}
+
+void InternetChecksumAlgorithm::emitClear(CodeBuilder* builder) {
+    builder->emitIndent();
+    builder->appendFormat("%s = 0", stateVar.c_str());
+    builder->endOfStatement(true);
+}
+
+void InternetChecksumAlgorithm::emitAddData(CodeBuilder* builder,
+                                            const IR::MethodCallExpression * expr) {
+    updateChecksum(builder, expr, true);
+}
+
 void InternetChecksumAlgorithm::emitGet(CodeBuilder* builder) {
     builder->append(stateVar);
 }
 
 void InternetChecksumAlgorithm::emitSubtractData(CodeBuilder* builder,
                                                  const IR::MethodCallExpression * expr) {
+    updateChecksum(builder, expr, false);
 }
 
 void InternetChecksumAlgorithm::emitGetInternalState(CodeBuilder* builder) {
