@@ -3,6 +3,7 @@
 
 #include "backends/ebpf/ebpfControl.h"
 #include "ebpfPsaControl.h"
+#include "backends/ebpf/psa/externs/ebpfPsaChecksum.h"
 
 namespace EBPF {
 

@@ -321,7 +321,7 @@ void EBPFDeparserPSA::emitDeclaration(CodeBuilder* builder, const IR::Declaratio
         }
 
         if (typeSpec != nullptr &&
-            typeSpec->baseType->to<IR::Type_Name>()->path->name.name == "Checksum") {
+                typeSpec->baseType->to<IR::Type_Name>()->path->name.name == "Checksum") {
             auto instance = new EBPFPsaChecksum(program, decl, name, this->codeGen);
             checksum.emplace(name, instance);
             instance->emitVariables(builder, decl);
