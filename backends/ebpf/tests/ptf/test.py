@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-import ctypes
 import os
 import logging
 import subprocess
 import copy
 import shlex
+import random
 
 import ptf
 # from ptf import config
@@ -43,7 +43,7 @@ class EbpfTest(BaseTest):
         command = "nsenter --net=/var/run/netns/" + self.switch_ns + " " + command
         return self.exec_cmd(command, do_fail)
 
-    def exec_cmd(self, command='echo me', do_fail=None):
+    def exec_cmd(self, command, do_fail=None):
         if isinstance(command, str):
             command = shlex.split(command)
         process = subprocess.Popen(command,
@@ -252,7 +252,6 @@ class PSACloneI2E(P4EbpfTest):
         pkt[Ether].src = "00:00:00:00:ca:fe"
         testutils.verify_packet(self, pkt, PORT1)
 
-
         pkt = testutils.simple_eth_packet(eth_dst='00:00:00:00:00:09')
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_packet(self, pkt, PORT1)
@@ -420,24 +419,24 @@ class CountersPSATest(P4EbpfTest):
 
     p4_file_path = "samples/p4testdata/counters.p4"
 
-    def get_counter_value(self, name, id):
+    def get_counter_value(self, name, cid):
         # convert number into hex stream and compose separate bytes as decimal values
-        id = ['{}{}'.format(a, b) for a, b in zip(*[iter('{:08x}'.format(id))]*2)]
-        id = [format(int(v, 16), 'd') for v in id]
-        id.reverse()
-        id = ' '.join(id)
-        cmd = "bpftool -j map lookup pinned /sys/fs/bpf/tc/globals/{} key {}".format(name, id)
+        cid = ['{}{}'.format(a, b) for a, b in zip(*[iter('{:08x}'.format(cid))]*2)]
+        cid = [format(int(v, 16), 'd') for v in cid]
+        cid.reverse()
+        cid = ' '.join(cid)
+        cmd = "bpftool -j map lookup pinned /sys/fs/bpf/tc/globals/{} key {}".format(name, cid)
         _, stdout, _ = self.exec_ns_cmd(cmd, "Failed to get counter")
         # create hex string from value
         value = [format(int(v, 0), '02x') for v in self.json.loads(stdout)['value']]
         value.reverse()
         return ''.join(value)
 
-    def verify_counter(self, name, id, expected_value):
-        value = self.get_counter_value(name, id)
+    def verify_counter(self, name, cid, expected_value):
+        value = self.get_counter_value(name, cid)
         if expected_value != value:
             self.fail("Counter {}.{} does not have correct value. Expected {}; got {}"
-                      .format(name, id, expected_value, value))
+                      .format(name, cid, expected_value, value))
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55',
@@ -504,16 +503,27 @@ class DigestPSATest(P4EbpfTest):
 class InternetChecksumPSATest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/internet-checksum.p4"
 
+    def random_ip(self):
+        return ".".join(str(random.randint(0, 255)) for _ in range(4))
+
     def runTest(self):
-        # recompute the checksum
-        pkt = testutils.simple_ip_packet()
-        testutils.send_packet(self, PORT0, str(pkt))
-        pkt[IP].ttl = pkt[IP].ttl - 2
-        pkt[IP].chksum = None
-        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+        for _ in range(10):
+            # test checksum computation
+            pkt = testutils.simple_ip_packet(pktlen=random.randint(100, 512),
+                                             ip_src=self.random_ip(),
+                                             ip_dst=self.random_ip(),
+                                             ip_ttl=random.randint(3, 255),
+                                             ip_id=random.randint(0, 0xFFFF),
+                                             ip_proto=17)
+            pkt[IP].flags = random.randint(0, 7)
+            pkt[IP].frag = random.randint(0, 0x1FFF)
+            testutils.send_packet(self, PORT0, str(pkt))
+            pkt[IP].ttl = pkt[IP].ttl - 2
+            pkt[IP].chksum = None
+            testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
 
-        # drop invalid packet
-        pkt[IP].chksum = 0
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_no_other_packets(self)
-
+            # test packet with invalid checksum
+            # Checksum will never contain value 0xFFFF, see RFC 1624 sec. 3.
+            pkt[IP].chksum = 0xFFFF
+            testutils.send_packet(self, PORT0, str(pkt))
+            testutils.verify_no_other_packets(self)
