@@ -48,7 +48,7 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
                                         cstring keyType, cstring valueType,
                                         unsigned size) const {
     cstring kind;
-    cstring registerTable = "REGISTER_TABLE(%s, %s, sizeof(%s), sizeof(%s), %s)";
+    cstring registerTable = "REGISTER_TABLE(%s, %s, sizeof(%s), sizeof(%s), %d)";
     cstring registerTableWithFlags = "REGISTER_TABLE_FLAGS(%s, %s, sizeof(%s), "
                                         "sizeof(%s), %d, %s)";
     if (tableKind == TableHash) {
@@ -67,7 +67,7 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
     }
     builder->appendFormat(registerTable, tblName.c_str(),
                           kind.c_str(), keyType.c_str(),
-                          valueType.c_str(), cstring::to_cstring(size));
+                          valueType.c_str(), size);
     builder->newline();
 }
 
@@ -77,7 +77,7 @@ KernelSamplesTarget::emitMapInMapDecl(Util::SourceCodeBuilder *builder, cstring 
                                       cstring innerValueType, unsigned int innerSize,
                                       cstring outerName, TableKind outerTableKind,
                                       cstring outerKeyType, unsigned int outerSize) const {
-    if (outerTableKind != TableArray) {
+    if (outerTableKind != TableArray || outerTableKind != TableHash) {
         BUG("Unsupported type of outer map for map-in-map");
     }
 

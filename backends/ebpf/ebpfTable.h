@@ -55,7 +55,6 @@ class EBPFTable : public EBPFTableBase {
     const IR::ActionList*     actionList;
     const IR::TableBlock*    table;
     cstring               defaultActionMapName;
-    cstring               actionEnumName;
     std::map<const IR::KeyElement*, cstring> keyFieldNames;
     std::map<const IR::KeyElement*, EBPFType*> keyTypes;
 
@@ -68,7 +67,7 @@ class EBPFTable : public EBPFTableBase {
     void emitKey(CodeBuilder* builder, cstring keyName);
     void emitAction(CodeBuilder* builder, cstring valueName);
     void emitInitializer(CodeBuilder* builder);
-    virtual void emitTableLookup(CodeBuilder* builder, cstring key, cstring value) {
+    virtual void emitLookup(CodeBuilder* builder, cstring key, cstring value) {
             builder->target->emitTableLookup(builder, dataMapName, key, value);
             builder->endOfStatement(true);
     }

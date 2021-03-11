@@ -117,7 +117,7 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
     builder->endOfStatement(true);
 }
 
-void EBPFTernaryTablePSA::emitTableLookup(CodeBuilder *builder, cstring key, cstring value) {
+void EBPFTernaryTablePSA::emitLookup(CodeBuilder *builder, cstring key, cstring value) {
     builder->appendFormat("struct %s_mask head = {0};", keyTypeName);
     builder->newline();
     builder->emitIndent();

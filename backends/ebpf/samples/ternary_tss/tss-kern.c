@@ -124,34 +124,34 @@ static __always_inline void * ternary_lookup(struct tuple_key *key, __u32 iterat
             return NULL;
         }
         struct tuple_key k = {};
-//        bpf_debug_printk("Key before clear: %llx %llx %llx", key->field1, key->field2, key->field3);
+        bpf_debug_printk("Key before clear: %llx %llx %llx", key->field1, key->field2, key->field3);
         #pragma clang loop unroll(disable)
         for (int i = 0; i < iterations; i++) {
             __u32 *tmp = ((__u32 *) &k);
             __u32 *mask = (__u32 *) &next_id;
-//            bpf_debug_printk("Using mask: %llx", mask);
-//            bpf_debug_printk("Masking: %llx", ((__u32 *) key)[i]);
+            bpf_debug_printk("Using mask: %llx", mask);
+            bpf_debug_printk("Masking: %llx", ((__u32 *) key)[i]);
             *tmp = ((__u32 *) key)[i] & mask[i];
             tmp++;
         }
 
-//        bpf_debug_printk("Key after clear: %llx %llx %llx", key->field1, key->field2, key->field3);
+        bpf_debug_printk("Key after clear: %llx %llx %llx", key->field1, key->field2, key->field3);
 
         __u32 tuple_id = elem->tuple_id;
-//        bpf_debug_printk("Looking up tuple %d", tuple_id);
+        bpf_debug_printk("Looking up tuple %d", tuple_id);
         struct bpf_elf_map *tuple = bpf_map_lookup_elem(&tuples_map, &tuple_id);
         if (!tuple) {
             return NULL;
         }
 
-//        bpf_debug_printk("Looking up key %llx %llx %llx", k.field3, k.field2, k.field1);
+        bpf_debug_printk("Looking up key %llx %llx %llx", k.field3, k.field2, k.field1);
         void *data = bpf_map_lookup_elem(tuple, &k);
         if (!data) {
             __u64 end = bpf_ktime_get_ns();
             bpf_debug_printk("Classified in %u", end - start);
             return NULL;
         }
-//        bpf_debug_printk("Found entry");
+        bpf_debug_printk("Found entry");
         struct tuple_value * tuple_entry = (struct tuple_value *) data;
         if (entry == NULL || tuple_entry->priority > entry->priority) {
             entry = tuple_entry;
@@ -231,11 +231,3 @@ int tc_egress(struct __sk_buff *ctx)
 }
 
 static char _license[] SEC("license") = "GPL";
-
-
-
-
-
-
-
-
