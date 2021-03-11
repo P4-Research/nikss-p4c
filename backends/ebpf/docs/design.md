@@ -155,7 +155,10 @@ struct tbl_ternary_key {
 };
 ```
 
-Note that key fields of equal width will not be shuffled.
+Note that key fields of equal width will not be shuffled. A control plane application must provide key 
+values in the descending order too. Moreover, due to the fact that current Parser implementation changes the byte order,
+the byte order of any key or mask value wider than 1 byte must also be changed. For instance, `0xffff0000` should become
+`0x0000ffff`.  
 
 **Note!** A huge number of prefixes causes a huge number of iterations to be made in an eBPF program. 
 Therefore, in case of ternary table we easily reach maximum number of instructions (1M) allowed. Due to this reason,
