@@ -1,4 +1,5 @@
 #include "ebpfPsaHashAlgorithm.h"
+#include "backends/ebpf/ebpfProgram.h"
 
 namespace EBPF {
 

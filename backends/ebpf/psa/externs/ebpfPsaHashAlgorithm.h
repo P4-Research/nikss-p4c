@@ -5,6 +5,8 @@
 
 namespace EBPF {
 
+class EBPFProgram;
+
 class EBPFPsaHashAlgorithm : public EBPFObject {
  protected:
     cstring baseName;
