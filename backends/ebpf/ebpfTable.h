@@ -55,6 +55,7 @@ class EBPFTable : public EBPFTableBase {
     const IR::ActionList*     actionList;
     const IR::TableBlock*    table;
     cstring               defaultActionMapName;
+    cstring               actionEnumName;
     std::map<const IR::KeyElement*, cstring> keyFieldNames;
     std::map<const IR::KeyElement*, EBPFType*> keyTypes;
 
