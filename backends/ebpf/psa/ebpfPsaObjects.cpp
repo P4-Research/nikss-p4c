@@ -5,7 +5,7 @@ namespace EBPF {
 
 // =====================EBPFTablePSA=============================
 void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
-    builder->target->emitTableDecl(builder, name, tableKind,
+    builder->target->emitTableDecl(builder, name, TableHash,
                                    cstring("struct ") + keyTypeName,
                                    cstring("struct ") + valueTypeName, size);
     builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
@@ -15,15 +15,16 @@ void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
 
 // =====================EBPFTernaryTablePSA=============================
 void EBPFTernaryTablePSA::emitInstance(CodeBuilder *builder) {
-    builder->target->emitTableDecl(builder, name, TableTernary,
-                                   keyTypeName,
-                                   valueTypeName, size);
+    builder->target->emitTableDecl(builder, name + "_prefixes", TableHash,
+                                   "struct " + keyTypeName + "_mask",
+                                   "struct " + valueTypeName + "_mask", size);
+    builder->target->emitMapInMapDecl(builder, name + "_tuple",
+                                      TableHash, "struct " + keyTypeName,
+                                      "struct " + valueTypeName, size,
+                                      name + "_tuples_map",TableArray, "__u32", size);
     builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
                                    program->arrayIndexType,
                                    cstring("struct ") + valueTypeName, 1);
-//    builder->target->emitTableDecl(builder, name + "_tuples_map", TableHash,
-//                                   cstring("struct ") + keyTypeName,
-//                                   cstring("struct ") + valueTypeName, size);
 }
 
 void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
@@ -98,11 +99,9 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
 
     // generate mask key
     builder->emitIndent();
-    int max_masks = lengthOfLPMFields * pow(2, lengthOfTernaryFields);
-    // we set 8000 as maximum number of ternary masks due to BPF_COMPLEXITY_LIMIT_JMP_SEQ.
-    // TODO: find solution to workaround BPF_COMPLEXITY_LIMIT_JMP_SEQ.
-    builder->appendFormat("#define MAX_%s_MASKS %d", keyTypeName.toUpper(),
-                std::min(max_masks, 256));
+    // we set 256 as maximum number of ternary masks due to BPF_COMPLEXITY_LIMIT_JMP_SEQ.
+    // TODO: find better solution to workaround BPF_COMPLEXITY_LIMIT_JMP_SEQ.
+    builder->appendFormat("#define MAX_%s_MASKS %d", keyTypeName.toUpper(), 256);
     builder->newline();
 
     builder->emitIndent();

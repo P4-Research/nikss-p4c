@@ -242,16 +242,14 @@ void PSAArch::emitInstances(CodeBuilder *builder) const {
     tcIngress->control->emitTableTypes(builder);
     tcEgress->control->emitTableTypes(builder);
     builder->appendLine("REGISTER_START()");
-    builder->appendLine("REGISTER_TABLE_INNER(clone_session_tbl_inner, BPF_MAP_TYPE_HASH, "
-                        "sizeof(elem_t), sizeof(struct element), "
-                        "CLONE_MAX_CLONES, 1, 1)");
-    builder->appendLine("REGISTER_TABLE_OUTER(clone_session_tbl, BPF_MAP_TYPE_ARRAY_OF_MAPS, "
-                        "sizeof(__u32), sizeof(__u32), CLONE_MAX_SESSIONS, 1)");
-    builder->appendLine("REGISTER_TABLE_INNER(multicast_grp_tbl_inner, BPF_MAP_TYPE_HASH, "
-                        "sizeof(elem_t), sizeof(struct element), "
-                        "CLONE_MAX_CLONES, 2, 1)");
-    builder->appendLine("REGISTER_TABLE_OUTER(multicast_grp_tbl, BPF_MAP_TYPE_ARRAY_OF_MAPS, "
-                        "sizeof(__u32), sizeof(__u32), CLONE_MAX_SESSIONS, 2)");
+    builder->target->emitMapInMapDecl(builder, "clone_session_tbl_inner",
+            TableHash, "elem_t",
+            "struct element", 64, "clone_session_tbl",
+            TableArray, "__u32", 1024);
+    builder->target->emitMapInMapDecl(builder, "multicast_grp_tbl_inner",
+                                      TableHash, "elem_t",
+                                      "struct element", 64, "multicast_grp_tbl",
+                                      TableArray, "__u32", 1024);
     tcIngress->control->emitTableInstances(builder);
     tcIngress->deparser->emitDigestInstances(builder);
     tcEgress->control->emitTableInstances(builder);
@@ -432,6 +430,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
     // use HASH_MAP as default type
     TableKind tableKind = TableHash;
 
+    bool isTernaryTable = false;
     // If any key field is LPM we will generate an LPM table
     auto keyGenerator = tblblk->container->getKey();
     if (keyGenerator != nullptr) {
@@ -450,13 +449,13 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
                             "%1%: only one LPM field allowed", it->matchType);
                     return false;
                 }
-                if (tableKind == TableTernary) {
+                if (isTernaryTable) {
                     // if at least one field is ternary, the whole table should be ternary
                     continue;
                 }
                 tableKind = TableLPMTrie;
             } else if (matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name) {
-                tableKind = TableTernary;
+                isTernaryTable = true;
             }
         }
     }
@@ -473,10 +472,10 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
     cstring name = EBPFObject::externalName(tblblk->container);
 
     EBPFTablePSA *table;
-    if (tableKind == TableTernary) {
+    if (isTernaryTable) {
         table = new EBPFTernaryTablePSA(program, tblblk, control->codeGen, name, size);
     } else {
-        table = new EBPFTablePSA(program, tblblk, control->codeGen, name, tableKind, size);
+        table = new EBPFTablePSA(program, tblblk, control->codeGen, name, size);
     }
 
     control->tables.emplace(tblblk->container->name, table);

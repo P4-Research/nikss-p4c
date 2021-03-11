@@ -124,8 +124,8 @@ control ingress(inout headers hdr,
     apply {
          send_to_port(ostd, (PortId_t) 5);
          tbl_ternary_0.apply();
-         tbl_ternary_1.apply();
          tbl_ternary_2.apply();
+         tbl_ternary_1.apply();
     }
 }
 

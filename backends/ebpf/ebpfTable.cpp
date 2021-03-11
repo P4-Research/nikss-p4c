@@ -102,7 +102,7 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
     commentGen.setBuilder(builder);
 
     if (keyGenerator != nullptr) {
-        if (isLPMTable() && !isTernaryTable()) {
+        if (isLPMTable()) {
             // For LPM kind key we need an additional 32 bit field - prefixlen
             auto prefixType = EBPFTypeFactory::instance->create(IR::Type_Bits::get(32));
             builder->emitIndent();
@@ -321,7 +321,7 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
         return;
     }
 
-    if (isLPMTable() && !isTernaryTable()) {
+    if (isLPMTable()) {
         builder->emitIndent();
         builder->appendFormat("%s.%s = sizeof(%s)*8 - %d",
                               keyName.c_str(), prefixFieldName,
@@ -346,14 +346,14 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
         }
 
         auto tmpVar = "tmp_" + fieldName;
-        if (isLPMTable() && !isTernaryTable()) {
+        if (isLPMTable()) {
             declareTmpLpmKey(builder, c, tmpVar);
         }
 
         builder->emitIndent();
         if (memcpy) {
             builder->appendFormat("memcpy(&%s.%s, &", keyName.c_str(), fieldName.c_str());
-            if (isLPMTable() && !isTernaryTable()) {
+            if (isLPMTable()) {
                 emitLpmKeyField(builder, swap, tmpVar);
             } else {
                 codeGen->visit(c->expression);
@@ -361,7 +361,7 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
             builder->appendFormat(", %d)", scalar->bytesRequired());
         } else {
             builder->appendFormat("%s.%s = ", keyName.c_str(), fieldName.c_str());
-            if (isLPMTable() && !isTernaryTable()) {
+            if (isLPMTable()) {
                 emitLpmKeyField(builder, swap, tmpVar);
             } else {
                 codeGen->visit(c->expression);
@@ -624,19 +624,25 @@ void EBPFTable::emitInitializer(CodeBuilder* builder) {
     builder->blockEnd(true);
 }
 
+// As ternary has precedence over lpm, this function checks if any
+// field is key field is lpm and none of key fields is of type ternary.
 bool EBPFTable::isLPMTable() {
+    bool isLPM = false;
     if (keyGenerator != nullptr) {
         // If any key field is LPM we will generate an LPM table
         for (auto it : keyGenerator->keyElements) {
             auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
-            if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
-                return true;
+            if (matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name) {
+                // if there is a ternary field, we are sure, it is not a LPM table.
+                return false;
+            } else if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
+                isLPM = true;
             }
         }
     }
 
-    return false;
+    return isLPM;
 }
 
 bool EBPFTable::isTernaryTable() {
