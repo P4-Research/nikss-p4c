@@ -108,6 +108,7 @@ class KernelSamplesTarget : public Target {
         }
         BUG("Unknown table kind");
     }
+
  protected:
     bool emitTraceMessages;
 

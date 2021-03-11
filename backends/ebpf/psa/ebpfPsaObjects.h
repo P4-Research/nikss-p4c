@@ -18,7 +18,6 @@ class EBPFTablePSA : public EBPFTable {
 };
 
 class EBPFTernaryTablePSA : public EBPFTablePSA {
-
  public:
     EBPFTernaryTablePSA(const EBPFProgram* program, const IR::TableBlock* table,
                  CodeGenInspector* codeGen, cstring name, size_t size) :

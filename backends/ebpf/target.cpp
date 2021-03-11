@@ -72,10 +72,11 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
 }
 
 void
-KernelSamplesTarget::emitMapInMapDecl(Util::SourceCodeBuilder *builder, cstring innerName, TableKind innerTableKind,
-                                      cstring innerKeyType, cstring innerValueType, unsigned int innerSize,
-                                      cstring outerName, TableKind outerTableKind, cstring outerKeyType,
-                                      unsigned int outerSize) const {
+KernelSamplesTarget::emitMapInMapDecl(Util::SourceCodeBuilder *builder, cstring innerName,
+                                      TableKind innerTableKind, cstring innerKeyType,
+                                      cstring innerValueType, unsigned int innerSize,
+                                      cstring outerName, TableKind outerTableKind,
+                                      cstring outerKeyType, unsigned int outerSize) const {
     if (outerTableKind != TableArray) {
         BUG("Unsupported type of outer map for map-in-map");
     }
@@ -98,7 +99,6 @@ KernelSamplesTarget::emitMapInMapDecl(Util::SourceCodeBuilder *builder, cstring 
                           kind, keyType,
                           "__u32", outerSize, innerMapIndex);
     builder->newline();
-
 }
 
 void KernelSamplesTarget::emitLicense(Util::SourceCodeBuilder* builder, cstring license) const {

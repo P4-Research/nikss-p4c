@@ -21,7 +21,7 @@ void EBPFTernaryTablePSA::emitInstance(CodeBuilder *builder) {
     builder->target->emitMapInMapDecl(builder, name + "_tuple",
                                       TableHash, "struct " + keyTypeName,
                                       "struct " + valueTypeName, size,
-                                      name + "_tuples_map",TableArray, "__u32", size);
+                                      name + "_tuples_map", TableArray, "__u32", size);
     builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
                                    program->arrayIndexType,
                                    cstring("struct ") + valueTypeName, 1);
@@ -35,7 +35,7 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
     CodeGenInspector commentGen(program->refMap, program->typeMap);
     commentGen.setBuilder(builder);
 
-    unsigned int structAlignment = 4; // 4 by default
+    unsigned int structAlignment = 4;  // 4 by default
     unsigned int totalSizeOfKeys = 0;
     unsigned int lengthOfTernaryFields = 0;
     unsigned int lengthOfLPMFields = 0;
@@ -163,8 +163,8 @@ void EBPFTernaryTablePSA::emitTableLookup(CodeBuilder *builder, cstring key, cst
     builder->blockStart();
     cstring str = Util::printf_format("*(((__u32 *) &%s) + i)", key);
     builder->target->emitTraceMessage(builder,
-                                      "Control: [Ternary] Masking next 4 bytes of %llx with mask %llx",
-                                      2, str, "mask[i]");
+                                  "Control: [Ternary] Masking next 4 bytes of %llx with mask %llx",
+                                  2, str, "mask[i]");
 
     builder->emitIndent();
     builder->appendFormat("chunk[i] = ((__u32 *) &%s)[i] & mask[i];", key);
