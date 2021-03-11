@@ -72,7 +72,7 @@ void PSAArch::emit(CodeBuilder *builder) const {
 }
 
 void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
-    EBPFPsaHashAlgorithmTypeFactory::emitAllGlobalHelpers(builder);
+    EBPFPsaHashAlgorithmTypeFactory::instance()->emitAllGlobalHelpers(builder);
 
     cstring forEachFunc ="static __always_inline\n"
                         "int do_for_each(SK_BUFF *skb, struct bpf_elf_map *map, "
@@ -525,7 +525,6 @@ void ConvertToEBPFDeparserPSA::findDigests(const IR::P4Control *p4Control) {
     // Digests are only at ingress
     if (type == INGRESS) {
         for (auto decl : p4Control->controlLocals) {
-            auto name = decl->name.name;
             if (decl->is<IR::Declaration_Instance>()) {
                 auto di = decl->to<IR::Declaration_Instance>();
                 if (di->type->is<IR::Type_Specialized>()) {

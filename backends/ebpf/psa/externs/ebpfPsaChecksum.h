@@ -1,5 +1,5 @@
-#ifndef BACKENDS_EBPF_PSA_EXTERNS_EBPFPSACHECKSUM_H
-#define BACKENDS_EBPF_PSA_EXTERNS_EBPFPSACHECKSUM_H
+#ifndef BACKENDS_EBPF_PSA_EXTERNS_EBPFPSACHECKSUM_H_
+#define BACKENDS_EBPF_PSA_EXTERNS_EBPFPSACHECKSUM_H_
 
 #include "backends/ebpf/ebpfObject.h"
 #include "ebpfPsaHashAlgorithm.h"
@@ -14,7 +14,6 @@ class EBPFPsaChecksum : public EBPFObject {
               cstring name, Visitor * visitor, int type);
 
  public:
-
     EBPFPsaChecksum(const EBPFProgram* program, const IR::Declaration* block,
                     cstring name, Visitor * visitor);
 
@@ -34,7 +33,7 @@ class EBPFPsaInternetChecksum : public EBPFPsaChecksum {
     EBPFPsaInternetChecksum(const EBPFProgram* program, const IR::Declaration* block,
                             cstring name, Visitor * visitor)
     : EBPFPsaChecksum(program, block, name, visitor,
-                      EBPFPsaHashAlgorithmTypeFactory::HashAlgorithm::ONES_COMPLEMENT16) {}
+                      EBPFPsaHashAlgorithm::HashAlgorithm::ONES_COMPLEMENT16) {}
 
     void processMethod(CodeBuilder* builder, cstring method,
                        const IR::MethodCallExpression * expr) override;
@@ -42,4 +41,4 @@ class EBPFPsaInternetChecksum : public EBPFPsaChecksum {
 
 }  // namespace EBPF
 
-#endif  /* BACKENDS_EBPF_PSA_EXTERNS_EBPFPSACHECKSUM_H */
+#endif  /* BACKENDS_EBPF_PSA_EXTERNS_EBPFPSACHECKSUM_H_ */

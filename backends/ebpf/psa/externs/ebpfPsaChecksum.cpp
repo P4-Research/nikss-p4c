@@ -6,7 +6,7 @@ namespace EBPF {
 void EBPFPsaChecksum::init(const EBPFProgram* program, const IR::Declaration* block,
           cstring name, Visitor * visitor, int type) {
     (void) block;
-    engine = EBPFPsaHashAlgorithmTypeFactory::create(type, program, name, visitor);
+    engine = EBPFPsaHashAlgorithmTypeFactory::instance()->create(type, program, name, visitor);
 }
 
 EBPFPsaChecksum::EBPFPsaChecksum(const EBPFProgram* program, const IR::Declaration* block,

@@ -1,5 +1,5 @@
-#ifndef BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAHASHALGORITHM_H
-#define BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAHASHALGORITHM_H
+#ifndef BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAHASHALGORITHM_H_
+#define BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAHASHALGORITHM_H_
 
 #include "backends/ebpf/ebpfObject.h"
 
@@ -12,6 +12,15 @@ class EBPFPsaHashAlgorithm : public EBPFObject {
     Visitor * visitor;
 
  public:
+    enum HashAlgorithm {
+        IDENTITY,
+        CRC32,
+        CRC32_CUSTOM,
+        CRC16,
+        CRC16_CUSTOM,
+        ONES_COMPLEMENT16  // aka InternetChecksum
+    };
+
     EBPFPsaHashAlgorithm(const EBPFProgram* program, cstring name, Visitor * visitor)
         : baseName(name), program(program), visitor(visitor) {}
 
@@ -55,28 +64,25 @@ class InternetChecksumAlgorithm : public EBPFPsaHashAlgorithm {
 
 class EBPFPsaHashAlgorithmTypeFactory {
  public:
-    enum HashAlgorithm {
-        IDENTITY,
-        CRC32,
-        CRC32_CUSTOM,
-        CRC16,
-        CRC16_CUSTOM,
-        ONES_COMPLEMENT16 // aka InternetChecksum
-    };
+    static EBPFPsaHashAlgorithmTypeFactory * instance() {
+        static EBPFPsaHashAlgorithmTypeFactory factory;
+        return &factory;
+    }
 
-    static EBPFPsaHashAlgorithm * create(int type, const EBPFProgram* program, cstring name,
+    EBPFPsaHashAlgorithm * create(int type, const EBPFProgram* program, cstring name,
                                          Visitor * visitor) {
-        if (type == 5 || type == 6) // Ones complement 16 or target default
+        // these hardcoded values refers to psa.p4 file, not the HashAlgorithm enum
+        if (type == 5 || type == 6)  // Ones complement 16 or target default
             return new InternetChecksumAlgorithm(program, name, visitor);
 
         BUG("Algorithm %1% not yet implemented", type);
     }
 
-    static void emitAllGlobalHelpers(CodeBuilder* builder) {
+    void emitAllGlobalHelpers(CodeBuilder* builder) {
         InternetChecksumAlgorithm::emitGlobals(builder);
     }
 };
 
 }  // namespace EBPF
 
-#endif  /* BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAHASHALGORITHM_H */
+#endif  /* BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAHASHALGORITHM_H_ */

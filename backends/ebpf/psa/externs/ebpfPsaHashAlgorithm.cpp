@@ -2,7 +2,7 @@
 
 namespace EBPF {
 
-//===========================InternetChecksumAlgorithm===========================
+// ===========================InternetChecksumAlgorithm===========================
 
 void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder,
                                                const IR::MethodCallExpression * expr,
@@ -35,17 +35,22 @@ void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder,
             ::error(ErrorType::ERR_UNSUPPORTED, "Only bits types are supported %1%", field);
             return;
         }
-        int width = fieldType->width_bits();
+        const int width = fieldType->width_bits();
         bitsToRead = width;
+
+        if (width > 64) {
+            BUG("Fields wider than 64 bits are not supported yet", field);
+        }
 
         while (bitsToRead > 0) {
             if (remainingBits == 16) {
                 builder->emitIndent();
                 builder->appendFormat("%s = ", tmpVar.c_str());
             } else {
-                builder->append(" + ");
+                builder->append(" | ");
             }
 
+            // TODO: add masks for fields, however they should not exceed declared width
             if (bitsToRead < remainingBits) {
                 remainingBits -= bitsToRead;
                 builder->appendFormat("(%s << %d)", fieldName.c_str(), remainingBits);
@@ -131,7 +136,7 @@ void InternetChecksumAlgorithm::emitGetInternalState(CodeBuilder* builder) {
     builder->append(stateVar);
 }
 
-// FIXME: works for constant value, but not for other cases
+// FIXME: works for constant value, but might not for other cases
 void InternetChecksumAlgorithm::emitSetInternalState(CodeBuilder* builder,
                                                      const IR::MethodCallExpression * expr) {
     if (expr->arguments->size() != 1) {
