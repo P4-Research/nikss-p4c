@@ -244,12 +244,12 @@ void PSAArch::emitInstances(CodeBuilder *builder) const {
     builder->appendLine("REGISTER_START()");
     builder->target->emitMapInMapDecl(builder, "clone_session_tbl_inner",
             TableHash, "elem_t",
-            "struct element", 64, "clone_session_tbl",
-            TableArray, "__u32", 1024);
+            "struct element", MaxClones, "clone_session_tbl",
+            TableArray, "__u32", MaxCloneSessions);
     builder->target->emitMapInMapDecl(builder, "multicast_grp_tbl_inner",
                                       TableHash, "elem_t",
-                                      "struct element", 64, "multicast_grp_tbl",
-                                      TableArray, "__u32", 1024);
+                                      "struct element", MaxClones, "multicast_grp_tbl",
+                                      TableArray, "__u32", MaxCloneSessions);
     tcIngress->control->emitTableInstances(builder);
     tcIngress->deparser->emitDigestInstances(builder);
     tcEgress->control->emitTableInstances(builder);

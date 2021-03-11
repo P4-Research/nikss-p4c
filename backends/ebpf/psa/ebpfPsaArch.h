@@ -19,6 +19,9 @@ enum pipeline_type {
 
 class PSAArch {
  public:
+    const unsigned MaxClones;
+    const unsigned MaxCloneSessions;
+
     std::vector<EBPFType*> ebpfTypes;
     XDPProgram*            xdp;
     EBPFPipeline*          tcIngress;
@@ -26,7 +29,11 @@ class PSAArch {
 
     PSAArch(std::vector<EBPFType*> ebpfTypes, XDPProgram* xdp, EBPFPipeline* tcIngress,
             EBPFPipeline* tcEgress) : ebpfTypes(ebpfTypes), xdp(xdp), tcIngress(tcIngress),
-            tcEgress(tcEgress) { }
+            tcEgress(tcEgress) {
+        MaxClones = 64;
+        MaxCloneSessions = 1024;
+
+    }
 
     void emit(CodeBuilder* builder) const;  // emits C file for eBPF program
     void emitPreamble(CodeBuilder *builder) const;
