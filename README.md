@@ -2,6 +2,8 @@
 
 This repository implements PSA (Portable Switch Architecture) for eBPF. All files are located under [backends/ebpf](./backends/ebpf).
 
+Refer to the [Cilium docs](https://docs.cilium.io/en/latest/bpf/) to learn more about eBPF.
+
 # Design
 
 Refer to the [design document](./backends/ebpf/docs/design.md) to find out more.
@@ -25,7 +27,7 @@ $ sudo apt install -y bison build-essential cmake \
                    libgmp-dev pkg-config python3-pip python3-setuptools \
                    tcpdump libpcap-dev libelf-dev zlib1g-dev llvm \
                    clang iptables net-tools cpp libgc1c2 libgmp10 \
-                   libgmpxx4ldbl python3
+                   libgmpxx4ldbl python3 binutils-dev
 
 $ pip3 install scapy==2.4.4 ply==3.8 ipaddr pyroute2
 
@@ -98,3 +100,6 @@ $ make -f backends/ebpf/runtime/kernel.mk BPFOBJ=out.o \
 P4FILE=backends/ebpf/tests/samples/p4testdata/simple-fwd.p4 P4C="p4c-ebpf --arch psa"
 ```
 
+# Running generated BPF program
+
+TBC
