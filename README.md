@@ -102,4 +102,12 @@ P4FILE=backends/ebpf/tests/samples/p4testdata/simple-fwd.p4 P4C="p4c-ebpf --arch
 
 # Running generated BPF program
 
-TBC
+Currently, we support loading BPF program only using `iproute2`. For each interface, 
+use the commands below (`out.o` is a BPF object file generated from p4c-ebpf):
+
+```bash
+$ ip link set dev "$intf" xdp obj out.o sec xdp-ingress
+$ tc qdisc add dev "$intf" clsact
+$ tc filter add dev "$intf" ingress bpf da obj out.o sec tc-ingress
+$ tc filter add dev "$intf" egress bpf da obj out.o sec tc-egress
+``` 
