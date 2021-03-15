@@ -21,8 +21,8 @@ class PsaStateTranslationVisitor : public StateTranslationVisitor {
 
 class EBPFPsaParser : public EBPFParser {
  public:
-    std::map<cstring, EBPFPsaChecksum*> checksums;
-    EBPFPsaChecksum* getChecksum(cstring name) const {
+    std::map<cstring, EBPFChecksumPSA*> checksums;
+    EBPFChecksumPSA* getChecksum(cstring name) const {
         auto result = ::get(checksums, name);
         BUG_CHECK(result != nullptr, "No checksum named %1%", name);
         return result; }

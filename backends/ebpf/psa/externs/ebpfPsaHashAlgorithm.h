@@ -7,7 +7,7 @@ namespace EBPF {
 
 class EBPFProgram;
 
-class EBPFPsaHashAlgorithm : public EBPFObject {
+class EBPFHashAlgorithmPSA : public EBPFObject {
  protected:
     cstring baseName;
     const EBPFProgram* program;
@@ -25,7 +25,7 @@ class EBPFPsaHashAlgorithm : public EBPFObject {
         TARGET_DEFAULT
     };
 
-    EBPFPsaHashAlgorithm(const EBPFProgram* program, cstring name, Visitor * visitor)
+    EBPFHashAlgorithmPSA(const EBPFProgram* program, cstring name, Visitor * visitor)
         : baseName(name), program(program), visitor(visitor) {}
 
     virtual void emitVariables(CodeBuilder* builder, const IR::Declaration* decl) = 0;
@@ -41,7 +41,7 @@ class EBPFPsaHashAlgorithm : public EBPFObject {
                                       const IR::MethodCallExpression * expr) = 0;
 };
 
-class InternetChecksumAlgorithm : public EBPFPsaHashAlgorithm {
+class InternetChecksumAlgorithm : public EBPFHashAlgorithmPSA {
  protected:
     cstring stateVar;
 
@@ -49,7 +49,7 @@ class InternetChecksumAlgorithm : public EBPFPsaHashAlgorithm {
 
  public:
     InternetChecksumAlgorithm(const EBPFProgram* program, cstring name, Visitor * visitor)
-        : EBPFPsaHashAlgorithm(program, name, visitor) {}
+        : EBPFHashAlgorithmPSA(program, name, visitor) {}
 
     static void emitGlobals(CodeBuilder* builder);
 
@@ -66,17 +66,17 @@ class InternetChecksumAlgorithm : public EBPFPsaHashAlgorithm {
                               const IR::MethodCallExpression * expr) override;
 };
 
-class EBPFPsaHashAlgorithmTypeFactory {
+class EBPFHashAlgorithmTypeFactoryPSA {
  public:
-    static EBPFPsaHashAlgorithmTypeFactory * instance() {
-        static EBPFPsaHashAlgorithmTypeFactory factory;
+    static EBPFHashAlgorithmTypeFactoryPSA * instance() {
+        static EBPFHashAlgorithmTypeFactoryPSA factory;
         return &factory;
     }
 
-    EBPFPsaHashAlgorithm * create(int type, const EBPFProgram* program, cstring name,
+    EBPFHashAlgorithmPSA * create(int type, const EBPFProgram* program, cstring name,
                                          Visitor * visitor) {
-        if (type == EBPFPsaHashAlgorithm::HashAlgorithm::ONES_COMPLEMENT16 ||
-                type == EBPFPsaHashAlgorithm::HashAlgorithm::TARGET_DEFAULT)
+        if (type == EBPFHashAlgorithmPSA::HashAlgorithm::ONES_COMPLEMENT16 ||
+                type == EBPFHashAlgorithmPSA::HashAlgorithm::TARGET_DEFAULT)
             return new InternetChecksumAlgorithm(program, name, visitor);
 
         BUG("Algorithm %1% not yet implemented", type);

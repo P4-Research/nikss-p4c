@@ -3,13 +3,13 @@
 
 namespace EBPF {
 
-void EBPFPsaChecksum::init(const EBPFProgram* program, const IR::Declaration* block,
+void EBPFChecksumPSA::init(const EBPFProgram* program, const IR::Declaration* block,
           cstring name, Visitor * visitor, int type) {
     (void) block;
-    engine = EBPFPsaHashAlgorithmTypeFactory::instance()->create(type, program, name, visitor);
+    engine = EBPFHashAlgorithmTypeFactoryPSA::instance()->create(type, program, name, visitor);
 }
 
-EBPFPsaChecksum::EBPFPsaChecksum(const EBPFProgram* program, const IR::Declaration* block,
+EBPFChecksumPSA::EBPFChecksumPSA(const EBPFProgram* program, const IR::Declaration* block,
                                  cstring name, Visitor * visitor) {
     engine = nullptr;
     auto di = block->to<IR::Declaration_Instance>();
@@ -21,12 +21,12 @@ EBPFPsaChecksum::EBPFPsaChecksum(const EBPFProgram* program, const IR::Declarati
     init(program, block, name, visitor, type);
 }
 
-EBPFPsaChecksum::EBPFPsaChecksum(const EBPFProgram* program, const IR::Declaration* block,
+EBPFChecksumPSA::EBPFChecksumPSA(const EBPFProgram* program, const IR::Declaration* block,
                 cstring name, Visitor * visitor, int type) {
     init(program, block, name, visitor, type);
 }
 
-void EBPFPsaChecksum::processMethod(CodeBuilder* builder, cstring method,
+void EBPFChecksumPSA::processMethod(CodeBuilder* builder, cstring method,
                                     const IR::MethodCallExpression * expr) {
     if (method == "clear") {
         engine->emitClear(builder);
@@ -39,7 +39,7 @@ void EBPFPsaChecksum::processMethod(CodeBuilder* builder, cstring method,
     }
 }
 
-void EBPFPsaInternetChecksum::processMethod(CodeBuilder* builder, cstring method,
+void EBPFInternetChecksumPSA::processMethod(CodeBuilder* builder, cstring method,
                                             const IR::MethodCallExpression * expr) {
     if (method == "add") {
         engine->emitAddData(builder, expr);
@@ -50,7 +50,7 @@ void EBPFPsaInternetChecksum::processMethod(CodeBuilder* builder, cstring method
     } else if (method == "set_state") {
         engine->emitSetInternalState(builder, expr);
     } else {
-        EBPFPsaChecksum::processMethod(builder, method, expr);
+        EBPFChecksumPSA::processMethod(builder, method, expr);
     }
 }
 
