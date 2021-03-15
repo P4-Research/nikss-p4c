@@ -22,14 +22,18 @@ void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder,
     builder->appendFormat("u16 %s = 0", tmpVar.c_str());
     builder->endOfStatement(true);
 
-    auto arguments = expr->arguments->at(0)->expression->to<IR::ListExpression>();
-    if (arguments == nullptr) {
-        ::error(ErrorType::ERR_UNEXPECTED, "Invalid argument list %1%", expr);
-        return;
+    std::vector<const IR::Expression *> arguments;
+
+    if (expr->arguments->at(0)->expression->is<IR::ListExpression>()) {
+        auto argList = expr->arguments->at(0)->expression->to<IR::ListExpression>();
+        for (auto field : argList->components)
+            arguments.push_back(field);
+    } else {
+        arguments.push_back(expr->arguments->at(0)->expression);
     }
 
     int remainingBits = 16, bitsToRead;
-    for (auto field : arguments->components) {
+    for (auto field : arguments) {
         cstring fieldName = field->toString();
         auto fieldType = field->type->to<IR::Type_Bits>();
         if (fieldType == nullptr) {

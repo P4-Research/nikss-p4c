@@ -24,6 +24,14 @@ header ipv4_t {
     bit<32> dstAddr;
 }
 
+header udp_t
+{
+    bit<16> srcPort;
+    bit<16> dstPort;
+    bit<16> length;
+    bit<16> checksum;
+};
+
 header clone_i2e_metadata_t {
 }
 
@@ -37,6 +45,7 @@ struct metadata {
 struct headers {
     ethernet_t ethernet;
     ipv4_t     ipv4;
+    udp_t      udp;
 }
 
 parser IngressParserImpl(
@@ -102,13 +111,7 @@ control IngressDeparserImpl(
     in metadata meta,
     in psa_ingress_output_metadata_t istd)
 {
-    InternetChecksum() ck;
-
     apply {
-        ck.set_state(parsed_hdr.ipv4.hdrChecksum);
-        ck.subtract({/* 16-bit word 4 */ parsed_hdr.ipv4.ttl, parsed_hdr.ipv4.protocol});
-        parsed_hdr.ipv4.hdrChecksum = ck.get();
-
         packet.emit(parsed_hdr.ethernet);
         packet.emit(parsed_hdr.ipv4);
     }
@@ -123,6 +126,8 @@ parser EgressParserImpl(
     in clone_i2e_metadata_t clone_i2e_meta,
     in empty_metadata_t clone_e2e_meta)
 {
+    InternetChecksum() ck;
+
     state start {
         transition parse_ethernet;
     }
@@ -132,6 +137,24 @@ parser EgressParserImpl(
     }
     state parse_ipv4 {
         buffer.extract(parsed_hdr.ipv4);
+
+        ck.set_state(parsed_hdr.ipv4.hdrChecksum);
+        ck.subtract({/* 16-bit word 4 */    parsed_hdr.ipv4.ttl, parsed_hdr.ipv4.protocol,
+                     /* 16-bit words 6-7 */ parsed_hdr.ipv4.srcAddr});
+        parsed_hdr.ipv4.hdrChecksum = ck.get();
+
+        transition select(parsed_hdr.ipv4.protocol) {
+            0x11: parse_udp;
+            default: accept;
+        }
+    }
+    state parse_udp {
+        buffer.extract(parsed_hdr.udp);
+        ck.clear();
+        ck.subtract(parsed_hdr.udp.checksum);
+        // remove fields from IP pseudo-header (protocol or packet length will not be changed)
+        ck.subtract({parsed_hdr.ipv4.srcAddr, parsed_hdr.ipv4.dstAddr});
+        parsed_hdr.udp.checksum = ck.get();
         transition accept;
     }
 }
@@ -144,6 +167,10 @@ control egress(inout headers hdr,
     apply {
         ostd.drop = false;
         hdr.ipv4.ttl = hdr.ipv4.ttl - 2;
+
+        if (hdr.udp.isValid()){
+            hdr.ipv4.srcAddr = 32w0x0a_00_00_01;
+        }
     }
 }
 
@@ -159,11 +186,18 @@ control EgressDeparserImpl(
     InternetChecksum() ck;
     apply {
         ck.set_state(parsed_hdr.ipv4.hdrChecksum);
-        ck.add({/* 16-bit word 4 */ parsed_hdr.ipv4.ttl, parsed_hdr.ipv4.protocol});
+        ck.add({/* 16-bit word 4 */    parsed_hdr.ipv4.ttl, parsed_hdr.ipv4.protocol,
+                /* 16-bit words 6-7 */ parsed_hdr.ipv4.srcAddr});
         parsed_hdr.ipv4.hdrChecksum = ck.get();
+
+        ck.clear();
+        ck.subtract(parsed_hdr.udp.checksum);
+        ck.add({parsed_hdr.ipv4.srcAddr, parsed_hdr.ipv4.dstAddr});
+        parsed_hdr.udp.checksum = ck.get();
 
         packet.emit(parsed_hdr.ethernet);
         packet.emit(parsed_hdr.ipv4);
+        packet.emit(parsed_hdr.udp);
     }
 }
 
