@@ -14,13 +14,15 @@ class EBPFPsaHashAlgorithm : public EBPFObject {
     Visitor * visitor;
 
  public:
+    // keep this enum in sync with psa.p4 file
     enum HashAlgorithm {
         IDENTITY,
         CRC32,
         CRC32_CUSTOM,
         CRC16,
         CRC16_CUSTOM,
-        ONES_COMPLEMENT16  // aka InternetChecksum
+        ONES_COMPLEMENT16,  // aka InternetChecksum
+        TARGET_DEFAULT
     };
 
     EBPFPsaHashAlgorithm(const EBPFProgram* program, cstring name, Visitor * visitor)
@@ -73,14 +75,14 @@ class EBPFPsaHashAlgorithmTypeFactory {
 
     EBPFPsaHashAlgorithm * create(int type, const EBPFProgram* program, cstring name,
                                          Visitor * visitor) {
-        // these hardcoded values refers to psa.p4 file, not the HashAlgorithm enum
-        if (type == 5 || type == 6)  // Ones complement 16 or target default
+        if (type == EBPFPsaHashAlgorithm::HashAlgorithm::ONES_COMPLEMENT16 ||
+                type == EBPFPsaHashAlgorithm::HashAlgorithm::TARGET_DEFAULT)
             return new InternetChecksumAlgorithm(program, name, visitor);
 
         BUG("Algorithm %1% not yet implemented", type);
     }
 
-    void emitAllGlobalHelpers(CodeBuilder* builder) {
+    void emitGlobals(CodeBuilder* builder) {
         InternetChecksumAlgorithm::emitGlobals(builder);
     }
 };

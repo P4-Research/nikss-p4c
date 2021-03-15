@@ -34,7 +34,7 @@ class EBPFDeparserPSA : public EBPFControlPSA {
     cstring outerHdrOffsetVar, outerHdrLengthVar;
     cstring returnCode;
     std::map<cstring, const IR::Type *> digests;
-    std::map<cstring, EBPFPsaChecksum*> checksum;
+    std::map<cstring, EBPFPsaChecksum*> checksums;
 
     EBPFDeparserPSA(const EBPFProgram* program, const IR::ControlBlock* control,
                     const IR::Parameter* parserHeaders, const IR::Parameter *istd) :
@@ -57,7 +57,7 @@ class EBPFDeparserPSA : public EBPFControlPSA {
     void emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl) override;
 
     EBPFPsaChecksum* getChecksum(cstring name) const {
-        auto result = ::get(checksum, name);
+        auto result = ::get(checksums, name);
         BUG_CHECK(result != nullptr, "No checksum named %1%", name);
         return result; }
 };

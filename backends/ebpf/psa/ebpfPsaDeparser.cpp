@@ -315,7 +315,7 @@ void EBPFDeparserPSA::emitDeclaration(CodeBuilder* builder, const IR::Declaratio
 
         if (type != nullptr && type->path->name.name == "InternetChecksum") {
             auto instance = new EBPFPsaInternetChecksum(program, decl, name, this->codeGen);
-            checksum.emplace(name, instance);
+            checksums.emplace(name, instance);
             instance->emitVariables(builder, decl);
             return;
         }
@@ -323,7 +323,7 @@ void EBPFDeparserPSA::emitDeclaration(CodeBuilder* builder, const IR::Declaratio
         if (typeSpec != nullptr &&
                 typeSpec->baseType->to<IR::Type_Name>()->path->name.name == "Checksum") {
             auto instance = new EBPFPsaChecksum(program, decl, name, this->codeGen);
-            checksum.emplace(name, instance);
+            checksums.emplace(name, instance);
             instance->emitVariables(builder, decl);
             return;
         }

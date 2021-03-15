@@ -72,7 +72,7 @@ void PSAArch::emit(CodeBuilder *builder) const {
 }
 
 void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
-    EBPFPsaHashAlgorithmTypeFactory::instance()->emitAllGlobalHelpers(builder);
+    EBPFPsaHashAlgorithmTypeFactory::instance()->emitGlobals(builder);
 
     cstring forEachFunc ="static __always_inline\n"
                         "int do_for_each(SK_BUFF *skb, struct bpf_elf_map *map, "
