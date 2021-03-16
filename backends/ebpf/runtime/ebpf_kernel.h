@@ -147,7 +147,6 @@ struct NAME {                            \
 	__uint(key_size, KEY_SIZE);          \
 	__uint(value_size, VALUE_SIZE);      \
 	__uint(max_entries, MAX_ENTRIES);    \
-	__uint(pinning, LIBBPF_PIN_BY_NAME); \
 } NAME SEC(".maps");
 #define REGISTER_TABLE_OUTER(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, INNER_ID, INNER_NAME) \
 struct {                                 \
