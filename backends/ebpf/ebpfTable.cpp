@@ -133,11 +133,10 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
 
             auto mtdecl = program->refMap->getDeclaration(c->matchType->path, true);
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
-            if (matchType->name.name != P4::P4CoreLibrary::instance.exactMatch.name &&
-                matchType->name.name != P4::P4CoreLibrary::instance.lpmMatch.name &&
-                matchType->name.name != P4::P4CoreLibrary::instance.ternaryMatch.name)
+            if (!isMatchTypeSupported(matchType)) {
                 ::error(ErrorType::ERR_UNSUPPORTED,
                         "Match of type %1% not supported", c->matchType);
+            }
         }
     }
 

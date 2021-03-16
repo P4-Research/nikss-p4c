@@ -26,6 +26,10 @@ class EBPFTernaryTablePSA : public EBPFTablePSA {
     void emitInstance(CodeBuilder* builder) override;
     void emitKeyType(CodeBuilder* builder) override;
     void emitLookup(CodeBuilder* builder, cstring key, cstring value) override;
+    bool isMatchTypeSupported(const IR::Declaration_ID* matchType) override {
+        return EBPFTablePSA::isMatchTypeSupported(matchType) ||
+               matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name;
+    }
 };
 
 }  // namespace EBPF

@@ -72,6 +72,10 @@ class EBPFTable : public EBPFTableBase {
             builder->target->emitTableLookup(builder, dataMapName, key, value);
             builder->endOfStatement(true);
     }
+    virtual bool isMatchTypeSupported(const IR::Declaration_ID* matchType) {
+        return matchType->name.name == P4::P4CoreLibrary::instance.exactMatch.name ||
+               matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name;
+    }
 
  private:
     cstring getByteSwapMethod(unsigned int width) const;
