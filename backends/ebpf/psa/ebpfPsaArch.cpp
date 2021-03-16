@@ -4,6 +4,7 @@
 #include "ebpfPsaControl.h"
 #include "xdpProgram.h"
 #include "externs/ebpfPsaCounter.h"
+#include "externs/ebpfPsaHashAlgorithm.h"
 
 namespace EBPF {
 
@@ -71,6 +72,8 @@ void PSAArch::emit(CodeBuilder *builder) const {
 }
 
 void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
+    EBPFHashAlgorithmTypeFactoryPSA::instance()->emitGlobals(builder);
+
     cstring forEachFunc ="static __always_inline\n"
                         "int do_for_each(SK_BUFF *skb, struct bpf_elf_map *map, "
                                         "unsigned int max_iter, "
@@ -375,7 +378,7 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
 // =====================EBPFParser=============================
 bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     auto pl = prsr->container->type->applyParams;
-    parser = new EBPFParser(program, prsr->container, typemap);
+    parser = new EBPFPsaParser(program, prsr->container, typemap);
 
     auto it = pl->parameters.begin();
     parser->packet = *it; ++it;
@@ -522,7 +525,6 @@ void ConvertToEBPFDeparserPSA::findDigests(const IR::P4Control *p4Control) {
     // Digests are only at ingress
     if (type == INGRESS) {
         for (auto decl : p4Control->controlLocals) {
-            auto name = decl->name.name;
             if (decl->is<IR::Declaration_Instance>()) {
                 auto di = decl->to<IR::Declaration_Instance>();
                 if (di->type->is<IR::Type_Specialized>()) {

@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-import ctypes
 import os
 import logging
 import subprocess
 import copy
 import shlex
+import random
 
 import ptf
 # from ptf import config
@@ -21,6 +21,7 @@ import ctypes as c
 import struct
 
 from scapy.layers.l2 import Ether
+from scapy.layers.inet import IP, UDP
 from ptf.packet import MPLS
 
 logger = logging.getLogger('eBPFTest')
@@ -42,7 +43,7 @@ class EbpfTest(BaseTest):
         command = "nsenter --net=/var/run/netns/" + self.switch_ns + " " + command
         return self.exec_cmd(command, do_fail)
 
-    def exec_cmd(self, command='echo me', do_fail=None):
+    def exec_cmd(self, command, do_fail=None):
         if isinstance(command, str):
             command = shlex.split(command)
         process = subprocess.Popen(command,
@@ -251,7 +252,6 @@ class PSACloneI2E(P4EbpfTest):
         pkt[Ether].src = "00:00:00:00:ca:fe"
         testutils.verify_packet(self, pkt, PORT1)
 
-
         pkt = testutils.simple_eth_packet(eth_dst='00:00:00:00:00:09')
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_packet(self, pkt, PORT1)
@@ -365,7 +365,7 @@ class SimpleLpmP4PSATest(P4EbpfTest):
         pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='10.10.11.11')
         # This command adds LPM entry 10.10.0.0/16 with action forwarding on port 6 (PORT2 in ptf)
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm "
-                         "key hex 10 00 00 00 0a 0a 00 00 value hex 00 00 00 00 06 00 00 00")
+                         "key hex 10 00 00 00 0a 0a 00 00 value hex 01 00 00 00 06 00 00 00")
         # This command adds 10.10.10.10/8 entry with not existing port number (0)
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm "
                          "key hex 08 00 00 00 0a 0a 0a 0a value hex 01 00 00 00 00 00 00 00")
@@ -419,24 +419,24 @@ class CountersPSATest(P4EbpfTest):
 
     p4_file_path = "samples/p4testdata/counters.p4"
 
-    def get_counter_value(self, name, id):
+    def get_counter_value(self, name, cid):
         # convert number into hex stream and compose separate bytes as decimal values
-        id = ['{}{}'.format(a, b) for a, b in zip(*[iter('{:08x}'.format(id))]*2)]
-        id = [format(int(v, 16), 'd') for v in id]
-        id.reverse()
-        id = ' '.join(id)
-        cmd = "bpftool -j map lookup pinned /sys/fs/bpf/tc/globals/{} key {}".format(name, id)
+        cid = ['{}{}'.format(a, b) for a, b in zip(*[iter('{:08x}'.format(cid))]*2)]
+        cid = [format(int(v, 16), 'd') for v in cid]
+        cid.reverse()
+        cid = ' '.join(cid)
+        cmd = "bpftool -j map lookup pinned /sys/fs/bpf/tc/globals/{} key {}".format(name, cid)
         _, stdout, _ = self.exec_ns_cmd(cmd, "Failed to get counter")
         # create hex string from value
         value = [format(int(v, 0), '02x') for v in self.json.loads(stdout)['value']]
         value.reverse()
         return ''.join(value)
 
-    def verify_counter(self, name, id, expected_value):
-        value = self.get_counter_value(name, id)
+    def verify_counter(self, name, cid, expected_value):
+        value = self.get_counter_value(name, cid)
         if expected_value != value:
             self.fail("Counter {}.{} does not have correct value. Expected {}; got {}"
-                      .format(name, id, expected_value, value))
+                      .format(name, cid, expected_value, value))
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55',
@@ -498,3 +498,44 @@ class DigestPSATest(P4EbpfTest):
     def tearDown(self):
         self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/mac_learn_digest_0")
         super(DigestPSATest, self).tearDown()
+
+
+class InternetChecksumPSATest(P4EbpfTest):
+    """
+    Test if checksum in IP header (or any other using Ones Complement algorithm)
+    is computed correctly.
+    1. Generate IP packet with random values in header.
+    2. Verify that packet is forwarded. Data plane will decrement TTL twice and change
+     source IP address.
+    3. Send the same packet with bad checksum.
+    4. Verify that packet is dropped.
+    5. Repeat 1-4 a few times with a different packet.
+    """
+
+    p4_file_path = "samples/p4testdata/internet-checksum.p4"
+
+    def random_ip(self):
+        return ".".join(str(random.randint(0, 255)) for _ in range(4))
+
+    def runTest(self):
+        for _ in range(10):
+            # test checksum computation
+            pkt = testutils.simple_udp_packet(pktlen=random.randint(100, 512),
+                                              ip_src=self.random_ip(),
+                                              ip_dst=self.random_ip(),
+                                              ip_ttl=random.randint(3, 255),
+                                              ip_id=random.randint(0, 0xFFFF))
+            pkt[IP].flags = random.randint(0, 7)
+            pkt[IP].frag = random.randint(0, 0x1FFF)
+            testutils.send_packet(self, PORT0, str(pkt))
+            pkt[IP].ttl = pkt[IP].ttl - 2
+            pkt[IP].src = '10.0.0.1'
+            pkt[IP].chksum = None
+            pkt[UDP].chksum = None
+            testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+
+            # test packet with invalid checksum
+            # Checksum will never contain value 0xFFFF, see RFC 1624 sec. 3.
+            pkt[IP].chksum = 0xFFFF
+            testutils.send_packet(self, PORT0, str(pkt))
+            testutils.verify_no_other_packets(self)

@@ -61,8 +61,6 @@ bool StateTranslationVisitor::preorder(const IR::AssignmentStatement* statement)
                 return false;
             }
         }
-        ::error(ErrorType::ERR_UNEXPECTED,
-                "Unexpected method call in parser %1%", statement->right);
     }
 
     return CodeGenInspector::preorder(statement);
@@ -324,6 +322,28 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
     builder->newline();
 }
 
+void StateTranslationVisitor::processMethod(const P4::ExternMethod* method) {
+    auto expression = method->expr;
+
+    auto decl = method->object;
+    if (decl == state->parser->packet) {
+        if (method->method->name.name == p4lib.packetIn.extract.name) {
+            if (expression->arguments->size() != 1) {
+                ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                        "Variable-sized header fields not yet supported %1%", expression);
+                return;
+            }
+            compileExtract(expression->arguments->at(0)->expression);
+            return;
+        }
+        BUG("Unhandled packet method %1%", expression->method);
+        return;
+    }
+
+    ::error(ErrorType::ERR_UNEXPECTED,
+            "Unexpected extern method call in parser %1%", expression);
+}
+
 bool StateTranslationVisitor::preorder(const IR::MethodCallExpression* expression) {
     builder->append("/* ");
     visit(expression->method);
@@ -344,20 +364,8 @@ bool StateTranslationVisitor::preorder(const IR::MethodCallExpression* expressio
                                           state->parser->program->typeMap);
     auto extMethod = mi->to<P4::ExternMethod>();
     if (extMethod != nullptr) {
-        auto decl = extMethod->object;
-        if (decl == state->parser->packet) {
-            if (extMethod->method->name.name == p4lib.packetIn.extract.name) {
-                if (expression->arguments->size() != 1) {
-                    ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
-                            "Variable-sized header fields not yet supported %1%", expression);
-                    return false;
-                }
-                compileExtract(expression->arguments->at(0)->expression);
-                return false;
-            }
-            BUG("Unhandled packet method %1%", expression->method);
-            return false;
-        }
+        processMethod(extMethod);
+        return false;
     }
 
     ::error(ErrorType::ERR_UNEXPECTED,
