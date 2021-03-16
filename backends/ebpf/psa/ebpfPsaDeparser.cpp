@@ -16,7 +16,13 @@ void DeparserBodyTranslator::processFunction(const P4::ExternFunction *function)
 }
 
 void DeparserBodyTranslator::processMethod(const P4::ExternMethod *method) {
-    if (method->method->name.name == "emit") {
+    auto externName = method->originalExternType->name.name;
+    if (externName == "InternetChecksum" || externName == "Checksum") {
+        auto instance = method->object->getName().name;
+        auto methodName = method->method->getName().name;
+        deparser->getChecksum(instance)->processMethod(builder, methodName, method->expr);
+        return;
+    } else if (method->method->name.name == "emit") {
         // do not use visitor to generate emit() methods
         return;
     } else if (method->method->name.name == "pack") {
@@ -302,6 +308,32 @@ void EBPFDeparserPSA::emitDigestInstances(CodeBuilder* builder) const {
         builder->appendFormat("), %d)", maxDigestQueueSize);
         builder->newline();
     }
+}
+
+void EBPFDeparserPSA::emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl) {
+    if (decl->is<IR::Declaration_Instance>()) {
+        auto di = decl->to<IR::Declaration_Instance>();
+        auto type = di->type->to<IR::Type_Name>();
+        auto typeSpec = di->type->to<IR::Type_Specialized>();
+        cstring name = di->name.name;
+
+        if (type != nullptr && type->path->name.name == "InternetChecksum") {
+            auto instance = new EBPFInternetChecksumPSA(program, decl, name, this->codeGen);
+            checksums.emplace(name, instance);
+            instance->emitVariables(builder, decl);
+            return;
+        }
+
+        if (typeSpec != nullptr &&
+                typeSpec->baseType->to<IR::Type_Name>()->path->name.name == "Checksum") {
+            auto instance = new EBPFChecksumPSA(program, decl, name, this->codeGen);
+            checksums.emplace(name, instance);
+            instance->emitVariables(builder, decl);
+            return;
+        }
+    }
+
+    EBPFControlPSA::emitDeclaration(builder, decl);
 }
 
 // =====================EBPFIngressDeparserPSA=============================

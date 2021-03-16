@@ -3,6 +3,7 @@
 
 #include "backends/ebpf/ebpfControl.h"
 #include "ebpfPsaControl.h"
+#include "backends/ebpf/psa/externs/ebpfPsaChecksum.h"
 
 namespace EBPF {
 
@@ -33,6 +34,7 @@ class EBPFDeparserPSA : public EBPFControlPSA {
     cstring outerHdrOffsetVar, outerHdrLengthVar;
     cstring returnCode;
     std::map<cstring, const IR::Type *> digests;
+    std::map<cstring, EBPFChecksumPSA*> checksums;
 
     EBPFDeparserPSA(const EBPFProgram* program, const IR::ControlBlock* control,
                     const IR::Parameter* parserHeaders, const IR::Parameter *istd) :
@@ -52,6 +54,12 @@ class EBPFDeparserPSA : public EBPFControlPSA {
     void emitField(CodeBuilder* builder, cstring headerExpression,
                    cstring field, unsigned alignment, EBPF::EBPFType* type) const;
     void emitDigestInstances(CodeBuilder* builder) const;
+    void emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl) override;
+
+    EBPFChecksumPSA* getChecksum(cstring name) const {
+        auto result = ::get(checksums, name);
+        BUG_CHECK(result != nullptr, "No checksum named %1%", name);
+        return result; }
 };
 
 class EBPFIngressDeparserPSA : public EBPFDeparserPSA {

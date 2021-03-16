@@ -6,7 +6,7 @@
 #include "backends/ebpf/codeGen.h"
 #include "backends/ebpf/ebpfObject.h"
 #include "backends/ebpf/ebpfOptions.h"
-#include "backends/ebpf/ebpfParser.h"
+#include "ebpfPsaParser.h"
 #include "xdpProgram.h"
 #include "ebpfPipeline.h"
 
@@ -89,7 +89,7 @@ class ConvertToEBPFParserPSA : public Inspector {
     EBPF::EBPFProgram *program;
     P4::TypeMap *typemap;
     P4::ReferenceMap *refmap;
-    EBPF::EBPFParser* parser;
+    EBPF::EBPFPsaParser* parser;
 
  public:
     ConvertToEBPFParserPSA(EBPF::EBPFProgram* program, P4::ReferenceMap* refmap,
