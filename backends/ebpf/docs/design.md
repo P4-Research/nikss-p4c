@@ -149,9 +149,9 @@ The above P4 table's key will be translated to:
 
 ```c
 struct tbl_ternary_key {
-    __u32 field3;
-    __u8  field1;
-    __u8  field2;
+    __u32 field3; /* hdr.ipv4.dstAddr */
+    __u8  field1; /* hdr.ipv4.protocol */
+    __u8  field2; /* hdr.ipv4.diffserv */
 };
 ```
 
