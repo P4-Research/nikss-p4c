@@ -28,6 +28,8 @@ BPFOBJ=
 # Get the source name of the object to match targets
 BPFNAME=$(basename $(BPFOBJ))
 
+CFILE=
+
 all: verify_target_bpf $(BPFOBJ)
 
 # Verify LLVM compiler tools are available and bpf target is supported by llc
@@ -69,6 +71,11 @@ $(BPFNAME).bc: %.bc : %.c
 # Invoke the llvm on the generated .bc code and produce bpf byte code
 $(BPFNAME).o: %.o : %.bc
 	$(LLC) -march=bpf -mcpu=probe -filetype=obj $< -o $@
+
+.PHONY: ebpf
+ebpf:
+	$(CLANG) $(ARGS) $(CFLAGS) $(INCLUDES) -emit-llvm -c -o  $(BPFNAME).bc $(CFILE)
+	$(LLC) -march=bpf -mcpu=probe -filetype=obj -o $(BPFNAME).o $(BPFNAME).bc
 
 clean:
 	rm -f *.o *.bc $(BPFNAME).c $(BPFNAME).h
