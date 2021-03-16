@@ -133,10 +133,10 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
 
             auto mtdecl = program->refMap->getDeclaration(c->matchType->path, true);
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
-            if (matchType->name.name != P4::P4CoreLibrary::instance.exactMatch.name &&
-                matchType->name.name != P4::P4CoreLibrary::instance.lpmMatch.name)
+            if (!isMatchTypeSupported(matchType)) {
                 ::error(ErrorType::ERR_UNSUPPORTED,
                         "Match of type %1% not supported", c->matchType);
+            }
         }
     }
 
@@ -192,6 +192,12 @@ void EBPFTable::emitValueType(CodeBuilder* builder) {
     builder->append("unsigned int action;");
     builder->newline();
 
+    if (isTernaryTable()) {
+        builder->emitIndent();
+        builder->append("__u32 priority;");
+        builder->newline();
+    }
+
     builder->emitIndent();
     builder->append("union ");
     builder->blockStart();
@@ -208,6 +214,23 @@ void EBPFTable::emitValueType(CodeBuilder* builder) {
     builder->appendLine("u;");
     builder->blockEnd(false);
     builder->endOfStatement(true);
+
+    if (isTernaryTable()) {
+        // emit ternary mask value
+        builder->emitIndent();
+        builder->appendFormat("struct %s_mask ", valueTypeName.c_str());
+        builder->blockStart();
+
+        builder->emitIndent();
+        builder->appendLine("__u32 tuple_id;");
+        builder->emitIndent();
+        builder->appendFormat("struct %s_mask next_tuple_mask;", keyTypeName.c_str());
+        builder->newline();
+        builder->emitIndent();
+        builder->appendLine("__u8 has_next;");
+        builder->blockEnd(false);
+        builder->endOfStatement(true);
+    }
 }
 
 void EBPFTable::emitTypes(CodeBuilder* builder) {
@@ -608,13 +631,34 @@ void EBPFTable::emitInitializer(CodeBuilder* builder) {
     builder->blockEnd(true);
 }
 
+// As ternary has precedence over lpm, this function checks if any
+// field is key field is lpm and none of key fields is of type ternary.
 bool EBPFTable::isLPMTable() {
+    bool isLPM = false;
     if (keyGenerator != nullptr) {
         // If any key field is LPM we will generate an LPM table
         for (auto it : keyGenerator->keyElements) {
             auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
-            if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
+            if (matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name) {
+                // if there is a ternary field, we are sure, it is not a LPM table.
+                return false;
+            } else if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
+                isLPM = true;
+            }
+        }
+    }
+
+    return isLPM;
+}
+
+bool EBPFTable::isTernaryTable() {
+    if (keyGenerator != nullptr) {
+        // If any key field is LPM we will generate an LPM table
+        for (auto it : keyGenerator->keyElements) {
+            auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
+            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
+            if (matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name) {
                 return true;
             }
         }

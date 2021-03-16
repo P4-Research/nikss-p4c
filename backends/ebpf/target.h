@@ -53,6 +53,24 @@ class Target {
     virtual void emitTableDecl(Util::SourceCodeBuilder* builder,
                                cstring tblName, TableKind tableKind,
                                cstring keyType, cstring valueType, unsigned size) const = 0;
+    // map-in-map requires declaration of both inner and outer map,
+    // thus we define them together in a single method.
+    virtual void emitMapInMapDecl(Util::SourceCodeBuilder* builder,
+                          cstring innerName, TableKind innerTableKind,
+                          cstring innerKeyType, cstring innerValueType, unsigned innerSize,
+                          cstring outerName, TableKind outerTableKind,
+                          cstring outerKeyType, unsigned outerSize) const {
+        (void) builder;
+        (void) innerName;
+        (void) innerTableKind;
+        (void) innerKeyType;
+        (void) innerValueType;
+        (void) innerSize;
+        (void) outerName;
+        (void) outerTableKind;
+        (void) outerKeyType;
+        (void) outerSize;
+    }
     virtual void emitMain(Util::SourceCodeBuilder* builder,
                           cstring functionName,
                           cstring argName) const = 0;
@@ -77,6 +95,20 @@ class Target {
 // Represents a target that is compiled within the kernel
 // source tree samples folder and which attaches to a socket
 class KernelSamplesTarget : public Target {
+ private:
+    mutable unsigned int innerMapIndex;
+
+    cstring getBPFMapType(TableKind kind) const {
+        if (kind == TableHash) {
+            return "BPF_MAP_TYPE_HASH";
+        } else if (kind == TableArray) {
+            return "BPF_MAP_TYPE_ARRAY";
+        } else if (kind == TableLPMTrie) {
+            return "BPF_MAP_TYPE_LPM_TRIE";
+        }
+        BUG("Unknown table kind");
+    }
+
  protected:
     bool emitTraceMessages;
 
@@ -84,6 +116,7 @@ class KernelSamplesTarget : public Target {
     explicit KernelSamplesTarget(bool emitTrace = false, cstring name = "Linux kernel")
         : Target(name) {
         emitTraceMessages = emitTrace;
+        innerMapIndex = 0;
     }
     void emitLicense(Util::SourceCodeBuilder* builder, cstring license) const override;
     void emitCodeSection(Util::SourceCodeBuilder* builder, cstring sectionName) const override;
@@ -97,6 +130,11 @@ class KernelSamplesTarget : public Target {
     void emitTableDecl(Util::SourceCodeBuilder* builder,
                        cstring tblName, TableKind tableKind,
                        cstring keyType, cstring valueType, unsigned size) const override;
+    void emitMapInMapDecl(Util::SourceCodeBuilder* builder,
+                          cstring innerName, TableKind innerTableKind,
+                          cstring innerKeyType, cstring innerValueType, unsigned innerSize,
+                          cstring outerName, TableKind outerTableKind,
+                          cstring outerKeyType, unsigned outerSize) const override;
     void emitMain(Util::SourceCodeBuilder* builder,
                   cstring functionName,
                   cstring argName) const override;

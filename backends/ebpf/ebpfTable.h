@@ -48,6 +48,7 @@ class EBPFTable : public EBPFTableBase {
     const cstring prefixFieldName = "prefixlen";
     const int prefixLenFieldWidth = 32;
     bool isLPMTable();
+    bool isTernaryTable();
 
  public:
     const IR::Key*            keyGenerator;
@@ -62,11 +63,19 @@ class EBPFTable : public EBPFTableBase {
     virtual void emitTypes(CodeBuilder* builder);
     virtual void emitInstance(CodeBuilder* builder);
     void emitActionArguments(CodeBuilder* builder, const IR::P4Action* action, cstring name);
-    void emitKeyType(CodeBuilder* builder);
+    virtual void emitKeyType(CodeBuilder* builder);
     void emitValueType(CodeBuilder* builder);
     void emitKey(CodeBuilder* builder, cstring keyName);
     void emitAction(CodeBuilder* builder, cstring valueName);
     void emitInitializer(CodeBuilder* builder);
+    virtual void emitLookup(CodeBuilder* builder, cstring key, cstring value) {
+            builder->target->emitTableLookup(builder, dataMapName, key, value);
+            builder->endOfStatement(true);
+    }
+    virtual bool isMatchTypeSupported(const IR::Declaration_ID* matchType) {
+        return matchType->name.name == P4::P4CoreLibrary::instance.exactMatch.name ||
+               matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name;
+    }
 
  private:
     cstring getByteSwapMethod(unsigned int width) const;

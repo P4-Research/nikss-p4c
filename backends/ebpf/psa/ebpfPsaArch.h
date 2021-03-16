@@ -19,6 +19,9 @@ enum pipeline_type {
 
 class PSAArch {
  public:
+    static const unsigned MaxClones = 64;
+    static const unsigned MaxCloneSessions = 1024;
+
     std::vector<EBPFType*> ebpfTypes;
     XDPProgram*            xdp;
     EBPFPipeline*          tcIngress;

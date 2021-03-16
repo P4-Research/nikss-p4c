@@ -122,3 +122,48 @@ invoking `bpf_redirect()` to the `PSA_PORT_RECIRCULATE` port with `BPF_F_INGRESS
 There are some global metadata defined for the PSA architecture. For example, `packet_path` must be shared among different pipelines.
 To share a global metadata between pipelines we will use `skb->cb` (control buffer), which gives us 20B that are free to use.
 
+# Match-Action tables
+
+## Ternary
+
+If one of the key fields has type ternary, the whole table becomes ternary table. As there is no built-in 
+ternary lookup algorithm, the p4c-ebpf-psa compiler use a combination of hash and array maps to implement
+Tuple Space Search (TSS) algorithm. 
+
+When inserting a new table entry to a ternary table a control plane must construct map key similarily to how 
+p4c-ebpf-psa does it. Basically, p4c-ebpf-psa sorts key in descending order of key width to avoid gaps. 
+See the example below:
+
+```
+bit<8>  hdr.ipv4.protocol;
+bit<8>  hdr.ipv4.diffserv;
+bit<32> hdr.ipv4.dstAddr;
+key = {
+    hdr.ipv4.protocol : exact;
+    hdr.ipv4.diffserv : ternary;
+    hdr.ipv4.dstAddr :  lpm;
+}
+```
+
+The above P4 table's key will be translated to:
+
+```c
+struct tbl_ternary_key {
+    __u32 field3; /* hdr.ipv4.dstAddr */
+    __u8  field1; /* hdr.ipv4.protocol */
+    __u8  field2; /* hdr.ipv4.diffserv */
+};
+```
+
+Note that key fields of equal width will not be shuffled. A control plane application must provide key 
+values in the descending order too. Moreover, due to the fact that current Parser implementation changes the byte order,
+the byte order of any key or mask value wider than 1 byte must also be changed. For instance, `0xffff0000` should become
+`0x0000ffff`.  
+
+**Note!** A huge number of prefixes causes a huge number of iterations to be made in an eBPF program. 
+Therefore, in case of ternary table we easily reach maximum number of instructions (1M) allowed. Due to this reason,
+we decided to set maximum number of prefixes to `MAX_MASKS = 256`. If this limit will be reached, a control plane
+will not be allowed to insert new rules. However, we expect it will be rather rare situation as so huge number of 
+prefixes/masks is not frequently observed, even in production deployments.
+
+

@@ -71,6 +71,36 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
     builder->newline();
 }
 
+void
+KernelSamplesTarget::emitMapInMapDecl(Util::SourceCodeBuilder *builder, cstring innerName,
+                                      TableKind innerTableKind, cstring innerKeyType,
+                                      cstring innerValueType, unsigned int innerSize,
+                                      cstring outerName, TableKind outerTableKind,
+                                      cstring outerKeyType, unsigned int outerSize) const {
+    if (outerTableKind != TableArray && outerTableKind != TableHash) {
+        BUG("Unsupported type of outer map for map-in-map");
+    }
+
+    cstring registerOuterTable = "REGISTER_TABLE_OUTER(%s, %s_OF_MAPS, sizeof(%s), "
+                                 "sizeof(%s), %d, %d)";
+    cstring registerInnerTable = "REGISTER_TABLE_INNER(%s, %s, sizeof(%s), "
+                                 "sizeof(%s), %d, %d, %d)";
+
+    innerMapIndex++;
+
+    cstring kind = getBPFMapType(innerTableKind);
+    builder->appendFormat(registerInnerTable, innerName,
+                          kind, innerKeyType, innerValueType,
+                          innerSize, innerMapIndex, innerMapIndex);
+    builder->newline();
+    kind = getBPFMapType(outerTableKind);
+    cstring keyType = outerTableKind == TableArray ? "__u32" : outerKeyType;
+    builder->appendFormat(registerOuterTable, outerName,
+                          kind, keyType,
+                          "__u32", outerSize, innerMapIndex);
+    builder->newline();
+}
+
 void KernelSamplesTarget::emitLicense(Util::SourceCodeBuilder* builder, cstring license) const {
     builder->emitIndent();
     builder->appendFormat("char _license[] SEC(\"license\") = \"%s\";", license.c_str());
