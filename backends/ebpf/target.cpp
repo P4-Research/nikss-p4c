@@ -77,7 +77,7 @@ KernelSamplesTarget::emitMapInMapDecl(Util::SourceCodeBuilder *builder, cstring 
                                       cstring innerValueType, unsigned int innerSize,
                                       cstring outerName, TableKind outerTableKind,
                                       cstring outerKeyType, unsigned int outerSize) const {
-    if (outerTableKind != TableArray || outerTableKind != TableHash) {
+    if (outerTableKind != TableArray && outerTableKind != TableHash) {
         BUG("Unsupported type of outer map for map-in-map");
     }
 

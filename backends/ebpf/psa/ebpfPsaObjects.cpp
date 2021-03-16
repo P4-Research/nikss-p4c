@@ -1,4 +1,4 @@
-
+#include "backends/ebpf/ebpfType.h"
 #include "ebpfPsaObjects.h"
 
 namespace EBPF {
