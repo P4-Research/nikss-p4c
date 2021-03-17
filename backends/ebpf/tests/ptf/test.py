@@ -63,15 +63,32 @@ class EbpfTest(BaseTest):
                 self.fail("Command failed (see above for details): {}".format(str(do_fail)))
         return process.returncode, stdout_data, stderr_data
 
-    def add_port(self, dev, image):
-        self.exec_ns_cmd("ip link set dev {} xdp obj {} sec xdp-ingress".format(dev, image))
+    def add_port(self, dev):
+        self.exec_ns_cmd("bpftool net attach xdp pinned /sys/fs/bpf/prog/xdp_xdp-ingress dev {} overwrite".format(dev))
         self.exec_ns_cmd("tc qdisc add dev {} clsact".format(dev))
-        self.exec_ns_cmd("tc filter add dev {} ingress bpf da obj {} sec tc-ingress".format(dev, image))
-        self.exec_ns_cmd("tc filter add dev {} egress bpf da obj {} sec tc-egress".format(dev, image))
+        self.exec_ns_cmd("tc filter add dev {} ingress bpf da fd /sys/fs/bpf/prog/classifier_tc-ingress".format(dev))
+        self.exec_ns_cmd("tc filter add dev {} egress bpf da fd /sys/fs/bpf/prog/classifier_tc-egress".format(dev))
 
     def del_port(self, dev):
         self.exec_ns_cmd("ip link set dev {} xdp off".format(dev))
         self.exec_ns_cmd("tc qdisc del dev {} clsact".format(dev))
+
+    def remove_map(self, name):
+        self.exec_ns_cmd("rm /sys/fs/bpf/{}".format(name))
+
+    def remove_maps(self, maps):
+        for map in maps:
+            self.remove_map(map)
+
+    def create_map(self, name, type, key_size, value_size, max_entries):
+        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/{} type "
+                         "{} key {} value {} entries {} name {}".format(
+                         name, type, key_size, value_size, max_entries, name))
+
+    def update_map(self, name, key, value, map_in_map=False):
+        if map_in_map:
+            value = "pinned /sys/fs/bpf/{} any".format(value)
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/{} key {} value {}".format(name, key, value))
 
     def setUp(self):
         super(EbpfTest, self).setUp()
@@ -84,8 +101,10 @@ class EbpfTest(BaseTest):
         self.interfaces = testutils.test_param_get("interfaces").split(",")
         logger.info("Using interfaces: %s", str(self.interfaces))
 
+        self.exec_ns_cmd("bpftool prog loadall {} /sys/fs/bpf/prog".format(self.test_prog_image))
+
         for intf in self.interfaces:
-            self.add_port(dev=intf, image=self.test_prog_image)
+            self.add_port(dev=intf)
 
         if self.ctool_file_path:
             head, tail = os.path.split(self.ctool_file_path)
@@ -98,7 +117,7 @@ class EbpfTest(BaseTest):
     def tearDown(self):
         for intf in self.interfaces:
             self.del_port(intf)
-
+        self.exec_ns_cmd("rm -rf /sys/fs/bpf/prog")
         super(EbpfTest, self).tearDown()
 
 
@@ -123,73 +142,16 @@ class P4EbpfTest(EbpfTest):
         self.exec_cmd(cmd, "P4 compilation error")
         output_file_path = os.path.join("ptf_out", filename + ".o")
 
-        cmd = ["clang", "-O2", "-target", "bpf", "-Werror", "-DPSA_PORT_RECIRCULATE=2", "-g", "-c", c_file_path, "-o", output_file_path, "-I../runtime", "-I../runtime/contrib/libbpf/include/uapi/", "-I../runtime/contrib/libbpf/src/" ]
+        cmd = ["clang", "-O2", "-target", "bpf", "-Werror", "-DBTF", "-DPSA_PORT_RECIRCULATE=2", "-g", "-c", c_file_path, "-o", output_file_path, "-I../runtime", "-I../runtime/contrib/libbpf/include/uapi/", "-I../runtime/contrib/libbpf/src/" ]
         self.exec_cmd(cmd, "Clang compilation error")
         self.test_prog_image = output_file_path
 
         super(P4EbpfTest, self).setUp()
 
     def tearDown(self):
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/clone_session_tbl")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/clone_session_tbl_inner")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/multicast_grp_tbl")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/multicast_grp_tbl_inner")
+        self.remove_map("clone_session_tbl")
+        self.remove_map("multicast_grp_tbl")
         super(P4EbpfTest, self).tearDown()
-
-
-class ResubmitTest(EbpfTest):
-    """
-    Test resubmit packet path. eBPF program should do following operation:
-    1. In NORMAL path: In all packet set source MAC to starts with '00:44'.
-        Test if destination MAC address ends with 'FF:F0' - in this case resubmit.
-    2. In RESUBMIT path destination MAC set to zero.
-    Open question: how to verify here that the eBPF program did above operations?
-    """
-    test_prog_image = 'samples/resubmit_test.o'
-
-    def runTest(self):
-        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55', eth_src='55:44:33:22:11:00')
-        testutils.send_packet(self, PORT0, str(pkt))
-        pkt[Ether].src = '00:44:33:22:11:00'
-        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
-
-        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:FF:F0', eth_src='55:44:33:22:11:00')
-        testutils.send_packet(self, PORT0, str(pkt))
-        pkt[Ether].dst = '00:00:00:00:00:00'
-        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
-
-
-class MetadataXdpTcTest(EbpfTest):
-    """
-    Test global and user metadata consists of three phases:
-    1. In XDP memory allocation for dummy, user, and global metadata.
-    2. In TC ingress check if global metadata are okey. If yes then filling up user metadata.
-    3. Checking in PTF a packet with user metadata which comes from TC egress.
-    """
-    test_prog_image = 'samples/meta_xdp2tc.o'
-
-    class UserMetadata(Packet):
-        name = "UserMetadata"
-        fields_desc = [IntField("field1", 0),
-                       ByteField("field2", 0),
-                       ByteField("field3", 0),
-                       ByteField("field4", 0),
-                       ByteField("global_metadata_ok", 0)]
-
-    class DummyMetadata(Packet):
-        name = "DummyMetadata"
-        fields_desc = [IntField("field1", 0),
-                       IntField("field2", 0),
-                       IntField("field3", 0),
-                       ShortField("ether_type", 0)]
-
-    def runTest(self):
-        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55', eth_src='55:44:33:22:11:00')
-        testutils.send_packet(self, PORT0, str(pkt))
-        pkt_with_metadata = MetadataXdpTcTest.DummyMetadata(ether_type=0x0800) / MetadataXdpTcTest.UserMetadata(
-            field1=11, field2=2, field3=3, field4=4,
-            global_metadata_ok=255) / pkt
-        testutils.verify_packet_any_port(self, str(pkt_with_metadata), ALL_PORTS)
 
 
 class SimpleForwardingPSATest(P4EbpfTest):
@@ -200,8 +162,7 @@ class SimpleForwardingPSATest(P4EbpfTest):
         pkt = testutils.simple_ip_packet()
         # initialize default action
         # TODO: we need to come up with a better solution to initialize default action.
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_defaultAction "
-                         "key 00 00 00 00 value 01 00 00 00 05 00 00 00")
+        self.update_map(name="ingress_tbl_fwd_defaultAction", key="00 00 00 00", value="01 00 00 00 05 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT1)
 
@@ -331,16 +292,14 @@ class MulticastPSATest(P4EbpfTest):
 
     def runTest(self):
         # TODO: replace bpftool with prectl
-        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/tc/globals/mcast_grp_8 type "
-                         "hash key 8 value 20 entries 64 name mcast_grp_8")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/mcast_grp_8 "
-                         "key 02 00 00 00 01 00 00 00 value 06 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00 00 00 00 00")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/mcast_grp_8 "
-                         "key 01 00 00 00 01 00 00 00 value 05 00 00 00 00 00 05 00 00 00 00 00 02 00 00 00 01 00 00 00")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/mcast_grp_8 "
-                         "key 00 00 00 00 00 00 00 00 value 00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00 01 00 00 00")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/multicast_grp_tbl "
-                         "key 8 0 0 0 value pinned /sys/fs/bpf/tc/globals/mcast_grp_8 any")
+        self.create_map(name="mcast_grp_8", type="hash", key_size=8, value_size=20, max_entries=64)
+        self.update_map(name="mcast_grp_8", key="02 00 00 00 01 00 00 00",
+                        value="06 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00 00 00 00 00")
+        self.update_map(name="mcast_grp_8", key="01 00 00 00 01 00 00 00",
+                        value="05 00 00 00 00 00 05 00 00 00 00 00 02 00 00 00 01 00 00 00")
+        self.update_map(name="mcast_grp_8", key="00 00 00 00 00 00 00 00",
+                        value="00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00 01 00 00 00")
+        self.update_map(name="multicast_grp_tbl", key="8 0 0 0", value="mcast_grp_8", map_in_map=True)
 
         pkt = testutils.simple_eth_packet(eth_dst='00:00:00:00:00:05')
         testutils.send_packet(self, PORT0, pkt)
@@ -353,7 +312,7 @@ class MulticastPSATest(P4EbpfTest):
         testutils.verify_no_other_packets(self)
 
     def tearDown(self):
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/mcast_grp_8")
+        self.remove_map("mcast_grp_8")
         super(MulticastPSATest, self).tearDown()
 
 
@@ -364,24 +323,25 @@ class SimpleLpmP4PSATest(P4EbpfTest):
     def runTest(self):
         pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='10.10.11.11')
         # This command adds LPM entry 10.10.0.0/16 with action forwarding on port 6 (PORT2 in ptf)
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm "
-                         "key hex 10 00 00 00 0a 0a 00 00 value hex 01 00 00 00 06 00 00 00")
+        self.update_map(name="ingress_tbl_fwd_lpm", key="hex 10 00 00 00 0a 0a 00 00",
+                        value="hex 01 00 00 00 06 00 00 00")
         # This command adds 10.10.10.10/8 entry with not existing port number (0)
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm "
-                         "key hex 08 00 00 00 0a 0a 0a 0a value hex 01 00 00 00 00 00 00 00")
+        self.update_map(name="ingress_tbl_fwd_lpm", key="hex 08 00 00 00 0a 0a 0a 0a",
+                        value="hex 01 00 00 00 00 00 00 00")
+
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT2)
 
         pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='192.168.2.1')
         # This command adds LPM entry 192.168.2.1/24 with action forwarding on port 5 (PORT1 in ptf)
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm "
-                         "key hex 18 00 00 00 c0 a8 02 00 value hex 01 00 00 00 05 00 00 00")
+        self.update_map(name="ingress_tbl_fwd_lpm", key="hex 18 00 00 00 c0 a8 02 00",
+                        value="hex 01 00 00 00 05 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT1)
 
     def tearDown(self):
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_lpm_defaultAction")
+        self.remove_map("ingress_tbl_fwd_lpm")
+        self.remove_map("ingress_tbl_fwd_lpm_defaultAction")
         super(SimpleLpmP4PSATest, self).tearDown()
 
 
@@ -393,24 +353,22 @@ class SimpleLpmP4TwoKeysPSATest(P4EbpfTest):
         pkt = testutils.simple_ip_packet(ip_src='1.2.3.4', ip_dst='10.10.11.11')
         # This command adds LPM entry 10.10.11.0/24 with action forwarding on port 6 (PORT2 in ptf)
         # Note that prefix value has to be a sum of exact fields size and lpm prefix
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm "
-                         "key hex 38 00 00 00 01 02 03 04 0a 0a 0b 00 "
-                         "value hex 01 00 00 00 06 00 00 00")
+        self.update_map(name="ingress_tbl_fwd_exact_lpm", key="hex 38 00 00 00 01 02 03 04 0a 0a 0b 00",
+                        value="hex 01 00 00 00 06 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT2)
 
         pkt = testutils.simple_ip_packet(ip_src='1.2.3.4', ip_dst='192.168.2.1')
         # This command adds LPM entry 192.168.2.1/24 with action forwarding on port 5 (PORT1 in ptf)
         # Note that prefix value has to be a sum of exact fields size and lpm prefix
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm "
-                         "key hex 38 00 00 00 01 02 03 04 c0 a8 02 00 "
-                         "value hex 01 00 00 00 05 00 00 00")
+        self.update_map(name="ingress_tbl_fwd_exact_lpm", key="hex 38 00 00 00 01 02 03 04 c0 a8 02 00",
+                        value="hex 01 00 00 00 05 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT1)
 
     def tearDown(self):
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_fwd_exact_lpm_defaultAction")
+        self.remove_map("ingress_tbl_fwd_exact_lpm")
+        self.remove_map("ingress_tbl_fwd_exact_lpm_defaultAction")
         super(SimpleLpmP4TwoKeysPSATest, self).tearDown()
 
 
@@ -425,7 +383,7 @@ class CountersPSATest(P4EbpfTest):
         cid = [format(int(v, 16), 'd') for v in cid]
         cid.reverse()
         cid = ' '.join(cid)
-        cmd = "bpftool -j map lookup pinned /sys/fs/bpf/tc/globals/{} key {}".format(name, cid)
+        cmd = "bpftool -j map lookup pinned /sys/fs/bpf/{} key {}".format(name, cid)
         _, stdout, _ = self.exec_ns_cmd(cmd, "Failed to get counter")
         # create hex string from value
         value = [format(int(v, 0), '02x') for v in self.json.loads(stdout)['value']]
@@ -460,9 +418,9 @@ class CountersPSATest(P4EbpfTest):
         self.verify_counter("ingress_test3_cnt", 510, "00000001000000c7")
 
     def tearDown(self):
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_test1_cnt")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_test2_cnt")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_test3_cnt")
+        self.remove_map("ingress_test1_cnt")
+        self.remove_map("ingress_test2_cnt")
+        self.remove_map("ingress_test3_cnt")
         super(CountersPSATest, self).tearDown()
 
 
@@ -496,7 +454,7 @@ class DigestPSATest(P4EbpfTest):
                           (hex(value.mac), value.port))
 
     def tearDown(self):
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/mac_learn_digest_0")
+        self.remove_map("mac_learn_digest_0")
         super(DigestPSATest, self).tearDown()
 
 
@@ -508,68 +466,68 @@ class PSATernaryTest(P4EbpfTest):
         # flow rules for 'tbl_ternary_0'
         # 1. hdr.ipv4.srcAddr=0x01020304/0xffffff00 => action 0 priority 1
         # 2. hdr.ipv4.srcAddr=0x01020304/0xffff00ff => action 1 priority 10
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_prefixes "
-                         "key 00 00 00 00 value 01 00 00 00 00 0xff 0xff 0xff 01 00 00 00")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_prefixes "
-                         "key 00 0xff 0xff 0xff value 01 00 00 00 0xff 00 0xff 0xff 01 00 00 00")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_prefixes "
-                         "key 0xff 00 0xff 0xff value 02 00 00 00 00 00 00 00 00 00 00 00")
-        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_tuple_1 type "
-                         "hash key 4 value 8 entries 100 name ingress_tbl_ternary_0_tuple_1")
-        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_tuple_2 type "
-                         "hash key 4 value 8 entries 100 name ingress_tbl_ternary_0_tuple_2")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_tuple_1 "
-                         "key 00 0x03 0x02 0x01 value 00 00 00 00 01 00 00 00")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_tuple_2 "
-                         "key 0x04 00 0x02 0x01 value 01 00 00 00 10 00 00 00")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_tuples_map "
-                         "key 01 0 0 0 value pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_tuple_1 any")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_tuples_map "
-                         "key 02 0 0 0 value pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_tuple_2 any")
+        self.update_map(name="ingress_tbl_ternary_0_prefixes", key="00 00 00 00",
+                        value="01 00 00 00 00 0xff 0xff 0xff 01 00 00 00")
+        self.update_map(name="ingress_tbl_ternary_0_prefixes", key="00 0xff 0xff 0xff",
+                        value="01 00 00 00 0xff 00 0xff 0xff 01 00 00 00")
+        self.update_map(name="ingress_tbl_ternary_0_prefixes", key="0xff 00 0xff 0xff",
+                        value="02 00 00 00 00 00 00 00 00 00 00 00")
+        self.create_map(name="ingress_tbl_ternary_0_tuple_1", type="hash", key_size=4, value_size=8,
+                        max_entries=100)
+        self.create_map(name="ingress_tbl_ternary_0_tuple_2", type="hash", key_size=4, value_size=8,
+                        max_entries=100)
+        self.update_map(name="ingress_tbl_ternary_0_tuple_1", key="00 0x03 0x02 0x01",
+                        value="00 00 00 00 01 00 00 00")
+        self.update_map(name="ingress_tbl_ternary_0_tuple_2", key="0x04 00 0x02 0x01",
+                        value="01 00 00 00 10 00 00 00")
+        self.update_map(name="ingress_tbl_ternary_0_tuples_map", key="01 0 0 0",
+                        value="ingress_tbl_ternary_0_tuple_1", map_in_map=True)
+        self.update_map(name="ingress_tbl_ternary_0_tuples_map", key="02 0 0 0",
+                        value="ingress_tbl_ternary_0_tuple_2", map_in_map=True)
 
         # flow rules for 'tbl_ternary_1'
         # 1. hdr.ipv4.diffserv=0x00/0x00, hdr.ipv4.dstAddr=0xc0a80201/0xffffff00 => action 0 priority 1
         # 2. hdr.ipv4.diffserv=0x00/0xff, hdr.ipv4.dstAddr=0xc0a80201/0xffffff00 => action 1 priority 10
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_prefixes "
-                         "key 00 00 00 00 00 00 00 00 value 01 00 00 00 00 0xff 0xff 0xff 0xff 00 00 00 01 00 00 00")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_prefixes "
-                         "key 00 0xff 0xff 0xff 0xff 00 00 00 value 06 00 00 00 00 0xff 0xff 0xff 00 00 00 00 01 00 00 00")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_prefixes "
-                         "key 00 0xff 0xff 0xff 00 00 00 00 value 07 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
-        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_tuple_6 type "
-                         "hash key 8 value 8 entries 100 name ingress_tbl_ternary_1_tuple_6")
-        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_tuple_7 type "
-                         "hash key 8 value 8 entries 100 name ingress_tbl_ternary_1_tuple_7")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_tuple_7 "
-                         "key 00 0x02 0xa8 0xc0 00 00 00 00 value 00 00 00 00 01 00 00 00")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_tuple_6 "
-                         "key 00 0x02 0xa8 0xc0 00 00 00 00 value 01 00 00 00 10 00 00 00")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_tuples_map "
-                         "key 06 00 00 00 value pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_tuple_6 any")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_tuples_map "
-                         "key 07 00 00 00 value pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_tuple_7 any")
+        self.update_map(name="ingress_tbl_ternary_1_prefixes", key="00 00 00 00 00 00 00 00",
+                        value="01 00 00 00 00 0xff 0xff 0xff 0xff 00 00 00 01 00 00 00")
+        self.update_map(name="ingress_tbl_ternary_1_prefixes", key="00 0xff 0xff 0xff 0xff 00 00 00",
+                        value="06 00 00 00 00 0xff 0xff 0xff 00 00 00 00 01 00 00 00")
+        self.update_map(name="ingress_tbl_ternary_1_prefixes", key="00 0xff 0xff 0xff 00 00 00 00",
+                        value="07 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
+        self.create_map(name="ingress_tbl_ternary_1_tuple_6", type="hash", key_size=8, value_size=8,
+                        max_entries=100)
+        self.create_map(name="ingress_tbl_ternary_1_tuple_7", type="hash", key_size=8, value_size=8,
+                        max_entries=100)
+        self.update_map(name="ingress_tbl_ternary_1_tuple_7", key="00 0x02 0xa8 0xc0 00 00 00 00",
+                        value="00 00 00 00 01 00 00 00")
+        self.update_map(name="ingress_tbl_ternary_1_tuple_6", key="00 0x02 0xa8 0xc0 00 00 00 00",
+                        value="01 00 00 00 10 00 00 00")
+        self.update_map(name="ingress_tbl_ternary_1_tuples_map", key="06 00 00 00",
+                        value="ingress_tbl_ternary_1_tuple_6", map_in_map=True)
+        self.update_map(name="ingress_tbl_ternary_1_tuples_map", key="07 00 00 00",
+                        value="ingress_tbl_ternary_1_tuple_7", map_in_map=True)
 
         # flow rules 'tbl_ternary_2':
         # 1. hdr.ipv4.protocol=0x11, hdr.ipv4.diffserv=0x00/0x00, hdr.ipv4.dstAddr=0xc0a80201/0xffff0000 => action 0 priority 1
         # 2. hdr.ipv4.protocol=0x11, hdr.ipv4.diffserv=0x00/0xff, hdr.ipv4.dstAddr=0xc0a80201/0xffff0000 => action 1 priority 10
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_prefixes "
-                         "key 00 00 00 00 00 00 00 00 value 01 00 00 00 00 00 0xff 0xff 0xff 00 00 00 01 00 00 00")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_prefixes "
-                         "key 00 00 0xff 0xff 0xff 00 00 00 value 03 00 00 00 00 00 0xff 0xff 00 00 00 00 01 00 00 00")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_prefixes "
-                         "key 00 00 0xff 0xff 00 00 00 00 value 05 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
-        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuple_3 type "
-                         "hash key 8 value 8 entries 100 name ingress_tbl_ternary_2_tuple_3")
-        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuple_5 type "
-                         "hash key 8 value 8 entries 100 name ingress_tbl_ternary_2_tuple_5")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuple_3 "
-                         "key 00 00 0xa8 0xc0 0x11 00 00 00 value 00 00 00 00 01 00 00 00")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuple_5 "
-                         "key 00 00 0xa8 0xc0 00 00 00 00 value 01 00 00 00 10 00 00 00")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuples_map "
-                         "key 03 00 00 00 value pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuple_3 any")
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuples_map "
-                         "key 05 00 00 00 value pinned /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuple_5 any")
+        self.update_map(name="ingress_tbl_ternary_2_prefixes", key="00 00 00 00 00 00 00 00",
+                        value="01 00 00 00 00 00 0xff 0xff 0xff 00 00 00 01 00 00 00")
+        self.update_map(name="ingress_tbl_ternary_2_prefixes", key="00 00 0xff 0xff 0xff 00 00 00",
+                        value="03 00 00 00 00 00 0xff 0xff 00 00 00 00 01 00 00 00")
+        self.update_map(name="ingress_tbl_ternary_2_prefixes", key="00 00 0xff 0xff 00 00 00 00",
+                        value="05 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
+        self.create_map(name="ingress_tbl_ternary_2_tuple_3", type="hash", key_size=8, value_size=8,
+                        max_entries=100)
+        self.create_map(name="ingress_tbl_ternary_2_tuple_5", type="hash", key_size=8, value_size=8,
+                        max_entries=100)
+        self.update_map(name="ingress_tbl_ternary_2_tuple_3", key="00 00 0xa8 0xc0 0x11 00 00 00",
+                        value="00 00 00 00 01 00 00 00")
+        self.update_map(name="ingress_tbl_ternary_2_tuple_5", key="00 00 0xa8 0xc0 00 00 00 00",
+                        value="01 00 00 00 10 00 00 00")
+        self.update_map(name="ingress_tbl_ternary_2_tuples_map", key="03 00 00 00",
+                        value="ingress_tbl_ternary_2_tuple_3", map_in_map=True)
+        self.update_map(name="ingress_tbl_ternary_2_tuples_map", key="05 00 00 00",
+                        value="ingress_tbl_ternary_2_tuple_5", map_in_map=True)
 
 
         pkt = testutils.simple_udp_packet(ip_src='1.2.3.4', ip_dst='192.168.2.1')
@@ -582,26 +540,24 @@ class PSATernaryTest(P4EbpfTest):
         testutils.verify_packet(self, str(pkt), PORT1)
 
     def tearDown(self):
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_prefixes")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_tuples_map")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_tuple_1")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_tuple_2")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_tuple")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_0_defaultAction")
+        self.remove_maps(
+            ["ingress_tbl_ternary_0_prefixes",
+             "ingress_tbl_ternary_0_tuples_map",
+             "ingress_tbl_ternary_0_tuple_1",
+             "ingress_tbl_ternary_0_tuple_2",
+             "ingress_tbl_ternary_0_defaultAction",
+             "ingress_tbl_ternary_1_prefixes",
+             "ingress_tbl_ternary_1_tuples_map",
+             "ingress_tbl_ternary_1_tuple_6",
+             "ingress_tbl_ternary_1_tuple_7",
+             "ingress_tbl_ternary_1_defaultAction",
+             "ingress_tbl_ternary_2_prefixes",
+             "ingress_tbl_ternary_2_tuples_map",
+             "ingress_tbl_ternary_2_tuple_3",
+             "ingress_tbl_ternary_2_tuple_5",
+             "ingress_tbl_ternary_2_defaultAction"]
+        )
 
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_prefixes")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_tuples_map")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_tuple_6")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_tuple_7")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_tuple")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_1_defaultAction")
-
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_prefixes")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuples_map")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuple_3")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuple_5")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_tuple")
-        self.exec_ns_cmd("rm /sys/fs/bpf/tc/globals/ingress_tbl_ternary_2_defaultAction")
         super(PSATernaryTest, self).tearDown()
         
     

@@ -6,7 +6,7 @@
 #include "inttypes.h"
 
 int queue_map;
-static const char *TC_GLOBAL_NS = "/sys/fs/bpf/tc/globals";
+static const char *TC_GLOBAL_NS = "/sys/fs/bpf";
 static const char *BPF_MAP_NAME = "mac_learn_digest_0";
 
 struct digest pop_value() {

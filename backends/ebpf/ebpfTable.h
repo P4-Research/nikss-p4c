@@ -47,6 +47,7 @@ class EBPFTableBase : public EBPFObject {
 class EBPFTable : public EBPFTableBase {
     const cstring prefixFieldName = "prefixlen";
     const int prefixLenFieldWidth = 32;
+ protected:
     bool isLPMTable();
     bool isTernaryTable();
 

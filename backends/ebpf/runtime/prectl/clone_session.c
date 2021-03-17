@@ -15,7 +15,7 @@
 /**
  * When PIN_GLOBAL_NS is used, this is deafult global namespace that is loaded.
  */
-static const char *TC_GLOBAL_NS = "/sys/fs/bpf/tc/globals";
+static const char *BPF_FS = "/sys/fs/bpf";
 
 /**
  * The name of the BPF MAP variable in packet-cloning.c
@@ -63,7 +63,7 @@ int clone_session_create(__u32 clone_session_id)
     }
 
     char path[256];
-    snprintf(path, sizeof(path), "%s/clone_session_%d", TC_GLOBAL_NS, clone_session_id);
+    snprintf(path, sizeof(path), "%s/clone_session_%d", BPF_FS, clone_session_id);
     error = bpf_obj_pin(inner_map_fd, path);
     if (error < 0) {
         printf("failed to pin new clone session to a file [%s]\n", strerror(errno));
@@ -84,7 +84,7 @@ int clone_session_create(__u32 clone_session_id)
     }
 
     char pinned_file[256];
-    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", TC_GLOBAL_NS,
+    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", BPF_FS,
              CLONE_SESSION_TABLE);
 
     long outer_map_fd = bpf_obj_get(pinned_file);
@@ -125,11 +125,11 @@ int clone_session_delete(__u32 clone_session_id)
     start_time = get_current_time();
     int error = 0;
     char session_map_path[256];
-    snprintf(session_map_path, sizeof(session_map_path), "%s/clone_session_%d", TC_GLOBAL_NS,
+    snprintf(session_map_path, sizeof(session_map_path), "%s/clone_session_%d", BPF_FS,
              clone_session_id);
 
     char pinned_file[256];
-    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", TC_GLOBAL_NS,
+    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", BPF_FS,
              CLONE_SESSION_TABLE);
     long outer_map_fd = bpf_obj_get(pinned_file);
     if (outer_map_fd < 0) {
@@ -171,7 +171,7 @@ int clone_session_add_member(__u32 clone_session_id, struct clone_session_entry 
     int error = 0;
 
     char pinned_file[256];
-    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", TC_GLOBAL_NS,
+    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", BPF_FS,
              CLONE_SESSION_TABLE);
 
     long outer_map_fd = bpf_obj_get(pinned_file);
@@ -367,7 +367,7 @@ int clone_session_del_member(__u32 clone_session_id, __u32 egress_port, __u16 in
     int error = 0;
 
     char pinned_file[256];
-    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", TC_GLOBAL_NS,
+    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", BPF_FS,
              CLONE_SESSION_TABLE);
 
     long outer_map_fd = bpf_obj_get(pinned_file);

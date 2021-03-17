@@ -124,6 +124,11 @@ To share a global metadata between pipelines we will use `skb->cb` (control buff
 
 # Match-Action tables
 
+In general, P4 tables are translated from P4 represetnation to the BPF map definitions. However, the type and organization of
+BPF maps depends on a specific match kind of a P4 table's key. The details of each kind's implementation are described below.
+
+**Note!** Contrary to `p4c-ebpf` for `ebpf_model.p4`, `p4c-ebpf-psa` supports only BTF-like map definitions. 
+
 ## Ternary
 
 If one of the key fields has type ternary, the whole table becomes ternary table. As there is no built-in 

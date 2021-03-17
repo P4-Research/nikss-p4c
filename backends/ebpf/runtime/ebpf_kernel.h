@@ -104,7 +104,7 @@ struct bpf_elf_map SEC("maps") NAME = {          \
     .id          = ID,               \
     .inner_idx   = INNER_IDX,        \
 };
-#define REGISTER_TABLE_OUTER(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, INNER_ID) \
+#define REGISTER_TABLE_OUTER(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, INNER_ID, INNER_NAME) \
 struct bpf_elf_map SEC("maps") NAME = {          \
     .type        = TYPE,             \
     .size_key    = KEY_SIZE,         \
