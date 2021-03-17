@@ -56,10 +56,12 @@ declare -a RECIRC_PORT_ID=$(ip -o link | awk '$2 == "psa_recirc:" {print $1}' | 
 
 echo "Compiling data plane program.."
 declare -a P4PROGRAM=$(find "$2" -type f -name "*.p4")
+declare -a ARGS="-DPSA_PORT_RECIRCULATE=$RECIRC_PORT_ID -DBTF"
+
 if [ -n "$P4PROGRAM" ]; then
   echo "Found P4 program: $P4PROGRAM"
   make -f ../runtime/kernel.mk BPFOBJ=out.o \
-  P4FILE=$P4PROGRAM ARGS=-DPSA_PORT_RECIRCULATE=$RECIRC_PORT_ID P4C="p4c-ebpf --arch psa"
+  P4FILE=$P4PROGRAM ARGS="$ARGS" P4C="p4c-ebpf --arch psa"
   exit_on_error
 else
   declare -a CFILE=$(find "$2" -type f -name "*.c")
@@ -68,7 +70,7 @@ else
     exit 1
   fi
   echo "Found C file: $CFILE"
-  make -f ../runtime/kernel.mk BPFOBJ=out.o ARGS=-DPSA_PORT_RECIRCULATE=$RECIRC_PORT_ID ebpf CFILE=$CFILE
+  make -f ../runtime/kernel.mk BPFOBJ=out.o ARGS="$ARGS" ebpf CFILE=$CFILE
 fi
 
 bpftool prog loadall out.o /sys/fs/bpf/prog

@@ -5,16 +5,29 @@
 #include <linux/pkt_cls.h>
 
 struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__type(key, int);
-	__type(value, int);
-	__uint(max_entries, 2);
+	__uint(type, BPF_MAP_TYPE_DEVMAP);
+	__uint(key_size, sizeof(int));
+	__uint(value_size, sizeof(int));
+	__uint(max_entries, 100);
+       __uint(pinning, LIBBPF_PIN_BY_NAME);
 } tx_port SEC(".maps");
 
 SEC("xdp/xdp-ingress")
 int xdp_func(struct xdp_md *ctx)
 {
-    return XDP_PASS;
+    void *data_end = (void *)(long)ctx->data_end;
+    void *data = (void *)(long)ctx->data;
+    struct ethhdr *eth = data;
+ 
+    __u64 nh_off;
+
+    nh_off = sizeof(*eth);
+    if (data + nh_off > data_end)
+        return XDP_DROP;
+
+    int port = ctx->ingress_ifindex;
+
+    return bpf_redirect_map(&tx_port, port, 0);
 }
 
 SEC("classifier/tc-ingress")
