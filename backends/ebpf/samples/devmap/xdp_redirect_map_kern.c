@@ -126,6 +126,7 @@ static __always_inline int xdp_redirect_map(struct xdp_md *ctx, void *redirect_m
     bpf_debug("XDP ingress (stage=1)\n");
     update_status(ctx, 1);
 
+    // loader writes only one entry at key 0
     dst_port = 0;
     ret = bpf_redirect_map(redirect_map, dst_port, 0);
 
