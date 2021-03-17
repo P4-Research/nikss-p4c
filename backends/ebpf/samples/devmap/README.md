@@ -48,7 +48,7 @@ These results means that:
 * `ifindex` in egress program is not changed to index of egress interface.
 
 Kernel program can be little modified (uncomment lines 136-142) to show behaviour of multiple
-calls to `bpf_redirect_map`. Second call is t Below is sample result:
+calls to `bpf_redirect_map`. Second call is to non-existent entry. Below is sample result:
 ```
      kworker/1:1-14714   [001] ..s1 24433.385967: 0:   stage=4: pkt_data=53
             ping-15301   [000] ..s1 24433.609546: 0: XDP ingress (stage=1)
