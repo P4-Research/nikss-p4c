@@ -89,6 +89,9 @@ for intf in ${INTERFACES//,/ } ; do
   tc qdisc add dev "$intf" clsact
   tc filter add dev "$intf" ingress bpf da fd /sys/fs/bpf/prog/classifier_tc-ingress
   tc filter add dev "$intf" egress bpf da fd /sys/fs/bpf/prog/classifier_tc-egress
+
+  # by default, pin IRQ to 3rd CPU core
+  bash scripts/set_irq_affinity.sh 2 "$intf"
 done
 
 echo "Installing table entries.. Looking for $2/commands.txt"

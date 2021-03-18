@@ -146,11 +146,13 @@ control ingress(inout headers_t headers, inout local_metadata_t local_metadata1,
             ostd.egress_port = (PortId_t)port_out;
         }
 
-    action vxlan_decap() {
+    action vxlan_decap(PortId_t port_out) {
         headers.outer_ethernet.setInvalid();
         headers.outer_ipv4.setInvalid();
         headers.outer_udp.setInvalid();
         headers.vxlan.setInvalid();
+        ostd.drop = false;
+        ostd.egress_port = (PortId_t)port_out;
     }
 
     table vxlan {
@@ -165,6 +167,9 @@ control ingress(inout headers_t headers, inout local_metadata_t local_metadata1,
     }
 
     apply {
+        if (headers.vxlan.isValid()) {
+            headers.ethernet.dst_addr = headers.outer_ethernet.dst_addr;
+        }
         vxlan.apply();
     }
 }
