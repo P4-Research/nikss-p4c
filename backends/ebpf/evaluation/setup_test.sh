@@ -55,7 +55,7 @@ declare -a RECIRC_PORT_ID=$(ip -o link | awk '$2 == "psa_recirc:" {print $1}' | 
 #set -x
 
 echo "Compiling data plane program.."
-declare -a P4PROGRAM=$(find "$2" -type f -name "*.p4")
+declare -a P4PROGRAM=$(find "$2" -maxdepth 1 -type f -name "*.p4")
 declare -a ARGS="-DPSA_PORT_RECIRCULATE=$RECIRC_PORT_ID -DBTF"
 
 if [ -n "$P4PROGRAM" ]; then
@@ -64,7 +64,7 @@ if [ -n "$P4PROGRAM" ]; then
   P4FILE=$P4PROGRAM ARGS="$ARGS" P4C="p4c-ebpf --arch psa"
   exit_on_error
 else
-  declare -a CFILE=$(find "$2" -type f -name "*.c")
+  declare -a CFILE=$(find "$2" -maxdepth 1 -type f -name "*.c")
   if [ -z "$CFILE" ]; then
     echo "Neither P4 nor C file found under path $2"
     exit 1
@@ -108,3 +108,27 @@ done
 
 echo -e "Dumping BPF setup:"
 bpftool net show 
+
+XDP_PROG_ID="$(bpftool prog show -f | grep xdp_func | awk '{print $1}' | tr -d : | tail -n1)"
+TC_EGRESS_PROG_ID="$(bpftool prog show -f | grep tc_egress_func | awk '{print $1}' | tr -d : | tail -n1)"
+TC_INGRESS_PROG_ID="$(bpftool prog show -f | grep tc_ingress_func | awk '{print $1}' | tr -d : | tail -n1)"
+
+XLATED_XDP="$(bpftool prog dump xlated id "$XDP_PROG_ID" | grep -v ";" | wc -l)"
+JITED_XDP="$(bpftool prog dump jited id "$XDP_PROG_ID" | grep -v ";" | wc -l)"
+
+XLATED_TC_INGRESS="$(bpftool prog dump xlated id "$TC_INGRESS_PROG_ID" | grep -v ";" | wc -l)"
+JITED_TC_INGRESS="$(bpftool prog dump jited id "$TC_INGRESS_PROG_ID" | grep -v ";" | wc -l)"
+
+XLATED_TC_EGRESS="$(bpftool prog dump xlated id "$TC_EGRESS_PROG_ID" | grep -v ";" | wc -l)"
+JITED_TC_EGRESS="$(bpftool prog dump jited id "$TC_EGRESS_PROG_ID" | grep -v ";" | wc -l)"
+
+XLATED=$(( $XLATED_XDP + $XLATED_TC_INGRESS + $XLATED_TC_EGRESS ))
+JITED=$(( $JITED_XDP + $JITED_TC_INGRESS + $JITED_TC_EGRESS  ))
+
+STACK_SIZE="$(llvm-objdump -S -no-show-raw-insn out.o | grep "r10 -" | awk '{print $7}' | sort -n | tail -n1 | tr -d ")")"
+
+echo -e "Summary of eBPF programs:"
+echo -e "BPF stack size = "$STACK_SIZE""
+echo -e "# of BPF insns"
+echo -e "\txlated: "$XLATED""
+echo -e "\tjited: "$JITED""
