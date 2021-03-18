@@ -61,6 +61,34 @@ parser packet_parser(packet_in packet, out headers_t headers, inout local_metada
     }
     state parser_ipv4 {
         packet.extract(headers.ipv4);
+        transition select(headers.ipv4.protocol) {
+           17: parse_udp;
+           default: accept;
+        }
+    }
+    state parse_udp {
+        packet.extract(headers.outer_udp);
+        transition select(headers.outer_udp.dst_port) {
+            4789: parse_vxlan;
+            default: accept;
+         }
+    }
+    state parse_vxlan {
+        packet.extract(headers.vxlan);
+        transition parse_inner_ethernet;
+    }
+    state parse_inner_ethernet {
+        headers.outer_ethernet = headers.ethernet;
+        packet.extract(headers.ethernet);
+        transition select(headers.ethernet.ether_type) {
+            0x0800: parse_inner_ipv4;
+            default: accept;
+        }
+    }
+
+    state parse_inner_ipv4 {
+        headers.outer_ipv4 = headers.ipv4;
+        packet.extract(headers.ipv4);
         transition accept;
     }
 }
@@ -118,12 +146,20 @@ control ingress(inout headers_t headers, inout local_metadata_t local_metadata1,
             ostd.egress_port = (PortId_t)port_out;
         }
 
+    action vxlan_decap() {
+        headers.outer_ethernet.setInvalid();
+        headers.outer_ipv4.setInvalid();
+        headers.outer_udp.setInvalid();
+        headers.vxlan.setInvalid();
+    }
+
     table vxlan {
         key = {
             headers.ethernet.dst_addr: exact;
         }
         actions = {
             vxlan_encap;
+            vxlan_decap;
         }
         size =  1024 * 1024;
     }
