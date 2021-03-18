@@ -3,21 +3,13 @@
  */
 #include <linux/bpf.h>
 #include <linux/if_link.h>
-#include <assert.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
 #include <net/if.h>
 #include <unistd.h>
 #include <libgen.h>
-#include <sys/resource.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
@@ -30,7 +22,6 @@ static __u32 prog_id;
 static __u32 dummy_prog_id;
 
 static __u32 xdp_flags = XDP_FLAGS_UPDATE_IF_NOEXIST;
-static int rxcnt_map_fd;
 
 static void int_exit(int sig)
 {
@@ -72,32 +63,6 @@ static void poll_stats()
     }
 }
 
-static int get_mac_addr(unsigned int ifindex_out, void *mac_addr)
-{
-    char ifname[IF_NAMESIZE];
-    struct ifreq ifr;
-    int fd, ret = -1;
-
-    fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (fd < 0)
-        return ret;
-
-    if (!if_indextoname(ifindex_out, ifname))
-        goto err_out;
-
-    strcpy(ifr.ifr_name, ifname);
-
-    if (ioctl(fd, SIOCGIFHWADDR, &ifr) != 0)
-        goto err_out;
-
-    memcpy(mac_addr, ifr.ifr_hwaddr.sa_data, 6 * sizeof(char));
-    ret = 0;
-
-    err_out:
-    close(fd);
-    return ret;
-}
-
 static void usage(const char *prog)
 {
     fprintf(stderr,
@@ -117,7 +82,7 @@ int main(int argc, char **argv)
     };
     struct bpf_program *prog, *dummy_prog, *devmap_prog;
     int prog_fd, dummy_prog_fd, devmap_prog_fd = 0;
-    int tx_port_map_fd, tx_mac_map_fd;
+    int tx_port_map_fd;
     struct bpf_devmap_val devmap_val;
     struct bpf_prog_info info = {};
     __u32 info_len = sizeof(info);
@@ -193,13 +158,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    tx_mac_map_fd = bpf_object__find_map_fd_by_name(obj, "tx_mac");
-    rxcnt_map_fd = bpf_object__find_map_fd_by_name(obj, "rxcnt");
-    if (tx_mac_map_fd < 0 || rxcnt_map_fd < 0) {
-        printf("bpf_object__find_map_fd_by_name failed\n");
-        return 1;
-    }
-
     if (bpf_set_link_xdp_fd(ifindex_in, prog_fd, xdp_flags) < 0) {
         printf("ERROR: link set xdp fd failed on %d\n", ifindex_in);
         return 1;
@@ -229,8 +187,6 @@ int main(int argc, char **argv)
 
     /* Load 2nd xdp prog on egress. */
     if (xdp_devmap_attached) {
-        unsigned char mac_addr[6];
-
         devmap_prog = bpf_object__find_program_by_name(obj, "xdp_redirect_map_egress");
         if (!devmap_prog) {
             printf("finding devmap_prog in obj file failed\n");
@@ -239,17 +195,6 @@ int main(int argc, char **argv)
         devmap_prog_fd = bpf_program__fd(devmap_prog);
         if (devmap_prog_fd < 0) {
             printf("finding devmap_prog fd failed\n");
-            goto out;
-        }
-
-        if (get_mac_addr(ifindex_out, mac_addr) < 0) {
-            printf("get interface %d mac failed\n", ifindex_out);
-            goto out;
-        }
-
-        ret = bpf_map_update_elem(tx_mac_map_fd, &key, mac_addr, 0);
-        if (ret) {
-            perror("bpf_update_elem tx_mac_map_fd");
             goto out;
         }
     }

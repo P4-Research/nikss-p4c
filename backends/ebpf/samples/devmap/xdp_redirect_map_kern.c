@@ -52,24 +52,6 @@ struct {
     __uint(max_entries, 100);
 } tx_port_native SEC(".maps");
 
-/* Count RX packets, as XDP bpf_prog doesn't get direct TX-success
- * feedback.  Redirect TX errors can be caught via a tracepoint.
- */
-struct {
-    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-    __type(key, u32);
-    __type(value, long);
-    __uint(max_entries, 1);
-} rxcnt SEC(".maps");
-
-/* map to store egress interface mac address */
-struct {
-    __uint(type, BPF_MAP_TYPE_ARRAY);
-    __type(key, u32);
-    __type(value, __be64);
-    __uint(max_entries, 1);
-} tx_mac SEC(".maps");
-
 struct metadata_t {
     u32 step_id;
 };

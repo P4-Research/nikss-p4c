@@ -21,13 +21,4 @@ sleep 1
 ping -c 5 -I veth0 10.1.0.2
 nsenter --net=/var/run/netns/test0 killall xdp_redirect_map
 
-#nsenter --net=/var/run/netns/test0 bpftool prog loadall poc1.o /sys/fs/bpf/xdp1 type xdp
-#nsenter --net=/var/run/netns/test0 bpftool net attach xdp id 280 dev eth0
-#nsenter --net=/var/run/netns/test0 bpftool map update name egress_map key 3 0 0 0 value 3 0 0 0 0 0 0 0
-
-#nsenter --net=/var/run/netns/test0 bash
-
-#nsenter --net=/var/run/netns/test0 bpftool net detach xdp dev eth0
-#nsenter --net=/var/run/netns/test0 rm -rf /sys/fs/bpf/xdp1
-
 ip netns delete test0

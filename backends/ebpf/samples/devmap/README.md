@@ -73,3 +73,5 @@ These results means that:
 Note: return codes from `bpf_redirect_map`:
 * `0` == `XDP_ABORTED`.
 * `4` == `XDP_REDIRECT`.
+
+Also note that eBPF program at egress can't be attached to `DEVMAP` in SKB mode. 
