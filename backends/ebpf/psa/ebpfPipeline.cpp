@@ -205,7 +205,8 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("ret = %s(skb, ", processFunctionName);
 
-    builder->appendFormat("(%s %s *) &%s, &ostd, &%s);", parser->headerType->to<EBPFStructType>()->kind,
+    builder->appendFormat("(%s %s *) &%s, &ostd, &%s);",
+            parser->headerType->to<EBPFStructType>()->kind,
             parser->headerType->to<EBPFStructType>()->name,
             parser->headers->name.name,
             deparser->to<EBPFIngressDeparserPSA>()->resubmit_meta->name.name);
