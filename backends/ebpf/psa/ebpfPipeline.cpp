@@ -95,12 +95,14 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     // firstly emit process() in-lined function and then the actual BPF section.
     builder->append("static __always_inline");
     builder->spc();
+
+    cstring ptrToHeadersVar = parser->headers->name.name + "_ptr";
     builder->appendFormat(
-            "int %s(SK_BUFF *%s, %s %s *p%s, struct psa_ingress_output_metadata_t *%s, ",
+            "int %s(SK_BUFF *%s, %s %s *%s, struct psa_ingress_output_metadata_t *%s, ",
             processFunctionName, model.CPacketName.str(),
             parser->headerType->to<EBPFStructType>()->kind,
             parser->headerType->to<EBPFStructType>()->name,
-            parser->headers->name.name,
+            ptrToHeadersVar,
             control->outputStandardMetadata->name.name);
     auto type = EBPFTypeFactory::instance->create(
             deparser->to<EBPFIngressDeparserPSA>()->resubmit_meta->type);
@@ -135,7 +137,7 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
 
     builder->emitIndent();
     parser->headerType->declare(builder, parser->headers->name.name, false);
-    builder->appendFormat(" = *p%s;", parser->headers->name.name);
+    builder->appendFormat(" = *%s;", ptrToHeadersVar);
 
     builder->emitIndent();
     auto user_md_type = typeMap->getType(control->user_metadata);
