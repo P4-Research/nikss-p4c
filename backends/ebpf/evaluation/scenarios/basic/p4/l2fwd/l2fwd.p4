@@ -49,12 +49,7 @@ parser IngressParserImpl(packet_in buffer,
     state start {
         buffer.extract(parsed_hdr.ethernet); 
         transition accept;
-        //transition select(parsed_hdr.ethernet.etherType) {
-        //    0x0800: parse_ipv4;
-        //    default: accept;
-        //}
     }
-
 }
 
 parser EgressParserImpl(packet_in buffer,
@@ -86,7 +81,6 @@ control ingress(inout headers hdr,
             istd.ingress_port : exact;
         }
         actions = { do_forward; NoAction; }
-        default_action = do_forward((PortId_t) 5);
         size = 100;
     }
 
