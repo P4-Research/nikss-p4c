@@ -27,7 +27,7 @@ function cleanup() {
 }
 
 cleanup
-trap cleanup EXIT
+#trap cleanup EXIT
 
 # Trace all command from this point
 set -x
@@ -79,6 +79,7 @@ TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
 
 # Start tests
 ptf \
+  test.ConstDefaultActionPSATest \
   --test-dir ptf/ \
   --test-params=$TEST_PARAMS \
   --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 $@

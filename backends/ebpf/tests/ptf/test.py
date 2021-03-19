@@ -572,8 +572,8 @@ class PSATernaryTest(P4EbpfTest):
         )
 
         super(PSATernaryTest, self).tearDown()
-        
-    
+
+
 class InternetChecksumPSATest(P4EbpfTest):
     """
     Test if checksum in IP header (or any other using Ones Complement algorithm)
@@ -647,9 +647,13 @@ class ParserValueSetPSATest(P4EbpfTest):
         super(ParserValueSetPSATest, self).tearDown()
 
 
-class ConstDefaultActionPSATest(P4EbpfTest):
+class ConstDefaultActionPSATest(EbpfTest):
 
-    p4_file_path = "samples/p4testdata/action-const-default.p4"
+    test_prog_image = "samples/const-action.o"
+
+    def initialize(self):
+
+        pass
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
