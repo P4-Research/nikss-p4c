@@ -5,7 +5,8 @@ namespace EBPF {
 
 // =====================EBPFTablePSA=============================
 void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
-    builder->target->emitTableDecl(builder, name, TableHash,
+    TableKind kind = isLPMTable() ? TableLPMTrie : TableHash;
+    builder->target->emitTableDecl(builder, name, kind,
                                    cstring("struct ") + keyTypeName,
                                    cstring("struct ") + valueTypeName, size);
     builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,

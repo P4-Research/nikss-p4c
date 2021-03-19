@@ -1,0 +1,2 @@
+bpftool map update id 216 key 11 00 00 00 value 8 00 00 00
+bpftool map update id 216 key 8 00 00 00 value 11 00 00 00

@@ -75,7 +75,7 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
     EBPFHashAlgorithmTypeFactoryPSA::instance()->emitGlobals(builder);
 
     cstring forEachFunc ="static __always_inline\n"
-                        "int do_for_each(SK_BUFF *skb, struct bpf_elf_map *map, "
+                        "int do_for_each(SK_BUFF *skb, void *map, "
                                         "unsigned int max_iter, "
                                         "void (*a)(SK_BUFF *, void *))\n"
                         "{\n"
@@ -132,12 +132,12 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
 
     cstring pktClonesFunc =
             "static __always_inline\n"
-            "int do_packet_clones(SK_BUFF * skb, struct bpf_elf_map * map, __u32 session_id, "
+            "int do_packet_clones(SK_BUFF * skb, void * map, __u32 session_id, "
                 "PSA_PacketPath_t new_pkt_path, __u8 caller_id)\n"
             "{\n"
                 "%trace_msg_clone_requested%"
             "    struct psa_global_metadata * meta = (struct psa_global_metadata *) skb->cb;\n"
-            "    struct bpf_elf_map * inner_map;\n"
+            "    void * inner_map;\n"
             "    inner_map = bpf_map_lookup_elem(map, &session_id);\n"
             "    if (inner_map != NULL) {\n"
             "        PSA_PacketPath_t original_pkt_path = meta->packet_path;\n"

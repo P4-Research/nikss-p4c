@@ -14,7 +14,7 @@ class XDPProgram : public EBPFProgram {
     cstring sectionName;
     explicit XDPProgram(const EbpfOptions& options) :
         EBPFProgram(options, nullptr, nullptr, nullptr, nullptr) {
-        sectionName = "xdp-ingress";
+        sectionName = "xdp/xdp-ingress";
         functionName = "xdp_func";
     }
 

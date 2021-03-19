@@ -25,7 +25,7 @@ class EBPFPipeline : public EBPFProgram {
                  P4::TypeMap* typeMap) :
                  EBPFProgram(options, nullptr, refMap, typeMap, nullptr),
                              name(name) {
-        sectionName = name;
+        sectionName = "classifier/" + name;
         functionName = name.replace("-", "_") + "_func";
         errorType = "ParserError_t";
         packetStartVar = cstring("pkt");

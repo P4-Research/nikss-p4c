@@ -82,6 +82,7 @@ struct bpf_elf_map {
 #define SK_BUFF struct __sk_buff
 
 #define REGISTER_START()
+#ifndef BTF
 /* Note: pinning exports the table name globally, do not remove */
 #define REGISTER_TABLE(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES) \
 struct bpf_elf_map SEC("maps") NAME = {          \
@@ -103,7 +104,7 @@ struct bpf_elf_map SEC("maps") NAME = {          \
     .id          = ID,               \
     .inner_idx   = INNER_IDX,        \
 };
-#define REGISTER_TABLE_OUTER(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, INNER_ID) \
+#define REGISTER_TABLE_OUTER(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, INNER_ID, INNER_NAME) \
 struct bpf_elf_map SEC("maps") NAME = {          \
     .type        = TYPE,             \
     .size_key    = KEY_SIZE,         \
@@ -122,6 +123,41 @@ struct bpf_elf_map SEC("maps") NAME = {          \
     .pinning     = 2,                \
     .flags       = FLAGS,            \
 };
+#else
+#define REGISTER_TABLE(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES) \
+struct {                                 \
+	__uint(type, TYPE);                  \
+	__uint(key_size, KEY_SIZE);          \
+	__uint(value_size, VALUE_SIZE);      \
+	__uint(max_entries, MAX_ENTRIES);    \
+	__uint(pinning, LIBBPF_PIN_BY_NAME); \
+} NAME SEC(".maps");
+#define REGISTER_TABLE_FLAGS(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, FLAGS) \
+struct {                                 \
+	__uint(type, TYPE);                  \
+	__uint(key_size, KEY_SIZE);          \
+	__uint(value_size, VALUE_SIZE);      \
+	__uint(max_entries, MAX_ENTRIES);    \
+	__uint(pinning, LIBBPF_PIN_BY_NAME); \
+	__uint(map_flags, FLAGS);            \
+} NAME SEC(".maps");
+#define REGISTER_TABLE_INNER(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, ID, INNER_IDX) \
+struct NAME {                            \
+	__uint(type, TYPE);                  \
+	__uint(key_size, KEY_SIZE);          \
+	__uint(value_size, VALUE_SIZE);      \
+	__uint(max_entries, MAX_ENTRIES);    \
+} NAME SEC(".maps");
+#define REGISTER_TABLE_OUTER(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, INNER_ID, INNER_NAME) \
+struct {                                 \
+	__uint(type, TYPE);                  \
+	__uint(key_size, KEY_SIZE);          \
+	__uint(value_size, VALUE_SIZE);      \
+	__uint(max_entries, MAX_ENTRIES);    \
+	__uint(pinning, LIBBPF_PIN_BY_NAME); \
+	__array(values, struct INNER_NAME);     \
+} NAME SEC(".maps");
+#endif
 #define REGISTER_END()
 
 #define BPF_MAP_LOOKUP_ELEM(table, key) \

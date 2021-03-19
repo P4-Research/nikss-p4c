@@ -75,8 +75,10 @@ silent_echo_conf() {
 } 2> /dev/null
 silent_echo_conf
 
+TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
+
 # Start tests
 ptf \
   --test-dir ptf/ \
-  --test-params='interfaces="'"$interface_list"'";namespace="switch"' \
+  --test-params=$TEST_PARAMS \
   --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2

@@ -82,7 +82,7 @@ KernelSamplesTarget::emitMapInMapDecl(Util::SourceCodeBuilder *builder, cstring 
     }
 
     cstring registerOuterTable = "REGISTER_TABLE_OUTER(%s, %s_OF_MAPS, sizeof(%s), "
-                                 "sizeof(%s), %d, %d)";
+                                 "sizeof(%s), %d, %d, %s)";
     cstring registerInnerTable = "REGISTER_TABLE_INNER(%s, %s, sizeof(%s), "
                                  "sizeof(%s), %d, %d, %d)";
 
@@ -97,7 +97,8 @@ KernelSamplesTarget::emitMapInMapDecl(Util::SourceCodeBuilder *builder, cstring 
     cstring keyType = outerTableKind == TableArray ? "__u32" : outerKeyType;
     builder->appendFormat(registerOuterTable, outerName,
                           kind, keyType,
-                          "__u32", outerSize, innerMapIndex);
+                          "__u32", outerSize, innerMapIndex,
+                          innerName);
     builder->newline();
 }
 
