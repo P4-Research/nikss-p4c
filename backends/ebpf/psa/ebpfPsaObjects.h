@@ -45,7 +45,8 @@ class EBPFValueSetPSA : public EBPFTableBase {
 
     void emitTypes(CodeBuilder* builder);
     void emitInstance(CodeBuilder* builder);
-    void emitKeyInitializer(CodeBuilder* builder, const IR::SelectExpression* expression, cstring varName);
+    void emitKeyInitializer(CodeBuilder* builder, const IR::SelectExpression* expression,
+                            cstring varName);
     void emitLookup(CodeBuilder* builder);
 };
 

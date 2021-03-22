@@ -86,8 +86,8 @@ class EBPFParser : public EBPFObject {
     void emit(CodeBuilder* builder);
     virtual bool build();
 
-    virtual void emitTypes(CodeBuilder* builder) { (void) builder; };
-    virtual void emitValueSetInstances(CodeBuilder* builder) { (void) builder; };
+    virtual void emitTypes(CodeBuilder* builder) { (void) builder; }
+    virtual void emitValueSetInstances(CodeBuilder* builder) { (void) builder; }
 };
 
 }  // namespace EBPF

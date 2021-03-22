@@ -9,6 +9,29 @@ header ethernet_t {
     bit<16>         etherType;
 }
 
+header ipv4_t {
+    bit<4>  version;
+    bit<4>  ihl;
+    bit<8>  diffserv;
+    bit<16> totalLen;
+    bit<16> identification;
+    bit<3>  flags;
+    bit<13> fragOffset;
+    bit<8>  ttl;
+    bit<8>  protocol;
+    bit<16> hdrChecksum;
+    bit<32> srcAddr;
+    bit<32> dstAddr;
+}
+
+header udp_t
+{
+    bit<16> srcPort;
+    bit<16> dstPort;
+    bit<16> length;
+    bit<16> checksum;
+};
+
 header clone_i2e_metadata_t {
 }
 
@@ -19,7 +42,9 @@ struct metadata {
 }
 
 struct headers {
-    ethernet_t       ethernet;
+    ethernet_t ethernet;
+    ipv4_t     ipv4;
+    udp_t      udp;
 }
 
 parser IngressParserImpl(
@@ -30,8 +55,26 @@ parser IngressParserImpl(
     in empty_metadata_t resubmit_meta,
     in empty_metadata_t recirculate_meta)
 {
+    value_set<bit<32>>(4) pvs;
+
     state start {
         buffer.extract(parsed_hdr.ethernet);
+        transition select(parsed_hdr.ethernet.etherType) {
+            0x0800: parse_ipv4;
+            default: accept;
+        }
+    }
+
+    state parse_ipv4 {
+        buffer.extract(parsed_hdr.ipv4);
+        transition select(parsed_hdr.ipv4.dstAddr) {
+            pvs: parse_udp;
+            default: accept;
+        }
+    }
+
+    state parse_udp {
+        buffer.extract(parsed_hdr.udp);
         transition accept;
     }
 }
@@ -42,17 +85,15 @@ control ingress(inout headers hdr,
                 in  psa_ingress_input_metadata_t  istd,
                 inout psa_ingress_output_metadata_t ostd)
 {
-    Counter<bit<64>, bit<32>>(1024, PSA_CounterType_t.BYTES) test1_cnt;
-    Counter<bit<32>, bit<32>>(1024, PSA_CounterType_t.PACKETS) test2_cnt;
-    Counter<bit<32>, bit<32>>(1024, PSA_CounterType_t.PACKETS_AND_BYTES) test3_cnt;
-
     apply {
-        ostd.drop = false;
-        ostd.egress_port = (PortId_t) 5;
+        ostd.drop = true;
 
-        test1_cnt.count(hdr.ethernet.srcAddr[31:0]);
-        test2_cnt.count(hdr.ethernet.srcAddr[31:0]);
-        test3_cnt.count(hdr.ethernet.srcAddr[31:0]);
+        if (hdr.udp.isValid()) {
+            if (hdr.udp.dstPort == 80) {
+                ostd.drop = false;
+                ostd.egress_port = (PortId_t) 5;
+            }
+        }
     }
 }
 
@@ -92,6 +133,8 @@ control IngressDeparserImpl(
 {
     apply {
         packet.emit(hdr.ethernet);
+        packet.emit(hdr.ipv4);
+        packet.emit(hdr.udp);
     }
 }
 
