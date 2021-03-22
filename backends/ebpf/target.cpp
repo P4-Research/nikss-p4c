@@ -27,8 +27,10 @@ void KernelSamplesTarget::emitIncludes(Util::SourceCodeBuilder* builder) const {
 
 void KernelSamplesTarget::emitTableLookup(Util::SourceCodeBuilder* builder, cstring tblName,
                                           cstring key, cstring value) const {
-    builder->appendFormat("%s = BPF_MAP_LOOKUP_ELEM(%s, &%s)",
-                          value.c_str(), tblName.c_str(), key.c_str());
+    if (!value.isNullOrEmpty())
+        builder->appendFormat("%s = ", value.c_str());
+    builder->appendFormat("BPF_MAP_LOOKUP_ELEM(%s, &%s)",
+                          tblName.c_str(), key.c_str());
 }
 
 void KernelSamplesTarget::emitTableUpdate(Util::SourceCodeBuilder* builder, cstring tblName,
@@ -183,7 +185,9 @@ void TestTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
 
 void BccTarget::emitTableLookup(Util::SourceCodeBuilder* builder, cstring tblName,
                                 cstring key, cstring value) const {
-    builder->appendFormat("%s = %s.lookup(&%s)",
+    if (!value.isNullOrEmpty())
+        builder->appendFormat("%s = ", value.c_str());
+    builder->appendFormat("%s.lookup(&%s)",
                           value.c_str(), tblName.c_str(), key.c_str());
 }
 
