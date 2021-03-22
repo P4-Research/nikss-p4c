@@ -188,7 +188,7 @@ void BccTarget::emitTableLookup(Util::SourceCodeBuilder* builder, cstring tblNam
     if (!value.isNullOrEmpty())
         builder->appendFormat("%s = ", value.c_str());
     builder->appendFormat("%s.lookup(&%s)",
-                          value.c_str(), tblName.c_str(), key.c_str());
+                          tblName.c_str(), key.c_str());
 }
 
 void BccTarget::emitTableUpdate(Util::SourceCodeBuilder* builder, cstring tblName,
