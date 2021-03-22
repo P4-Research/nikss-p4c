@@ -76,13 +76,14 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
                           this->outerHdrLengthVar.c_str(),
                           pipelineProgram->offsetVar.c_str());
     builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->appendFormat("if (%s != 0) ", this->outerHdrOffsetVar.c_str());
+    builder->blockStart();
     builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusting by %d B",
                                       1, this->outerHdrOffsetVar.c_str());
-
     builder->emitIndent();
     builder->appendFormat("int %s = 0", this->returnCode.c_str());
     builder->endOfStatement(true);
-
     builder->emitIndent();
     builder->appendFormat("%s = bpf_skb_adjust_room(%s, %s, 1, 0)",
                           this->returnCode.c_str(),
@@ -101,7 +102,7 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     builder->newline();
     builder->blockEnd(true);
     builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusted");
-
+    builder->blockEnd(true);
     builder->emitIndent();
     builder->appendFormat("%s = %s;",
                           program->packetStartVar,

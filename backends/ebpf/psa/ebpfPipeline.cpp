@@ -75,6 +75,8 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
 
 void EBPFPipeline::emitHeaderInstances(CodeBuilder* builder) {
     builder->emitIndent();
+    // declaring header instance as volatile optimizes stack size and improves throughput
+    builder->append("volatile ");
     parser->headerType->declare(builder, parser->headers->name.name, false);
     builder->append(" = ");
     parser->headerType->emitInitializer(builder);
@@ -93,9 +95,14 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     // firstly emit process() in-lined function and then the actual BPF section.
     builder->append("static __always_inline");
     builder->spc();
+
+    cstring ptrToHeadersVar = parser->headers->name.name + "_ptr";
     builder->appendFormat(
-            "int %s(SK_BUFF *%s, struct psa_ingress_output_metadata_t *%s, ",
+            "int %s(SK_BUFF *%s, %s %s *%s, struct psa_ingress_output_metadata_t *%s, ",
             processFunctionName, model.CPacketName.str(),
+            parser->headerType->to<EBPFStructType>()->kind,
+            parser->headerType->to<EBPFStructType>()->name,
+            ptrToHeadersVar,
             control->outputStandardMetadata->name.name);
     auto type = EBPFTypeFactory::instance->create(
             deparser->to<EBPFIngressDeparserPSA>()->resubmit_meta->type);
@@ -128,7 +135,9 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
                         "    *ether_type = md->pkt_ether_type;\n");
     builder->blockEnd(true);
 
-    emitHeaderInstances(builder);
+    builder->emitIndent();
+    parser->headerType->declare(builder, parser->headers->name.name, false);
+    builder->appendFormat(" = *%s;", ptrToHeadersVar);
 
     builder->emitIndent();
     auto user_md_type = typeMap->getType(control->user_metadata);
@@ -183,18 +192,37 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->emitIndent();
     deparser->to<EBPFIngressDeparserPSA>()->emitSharedMetadataInitializer(builder);
 
-    builder->appendFormat("int i = 0;\n"
-                        "    int ret = TC_ACT_UNSPEC;\n"
-                        "    #pragma clang loop unroll(disable)\n"
-                        "    for (i = 0; i < %d; i++) {\n"
-                        "        ostd.resubmit = 0;\n"
-                        "        ret = %s(skb, &ostd, &%s);\n"
-                        "        if (ostd.drop == 1 || ostd.resubmit == 0) {\n"
-                        "            break;\n"
-                        "        }\n"
-                        "    }", maxResubmitDepth, processFunctionName,
-                        deparser->to<EBPFIngressDeparserPSA>()->resubmit_meta->name.name);
+
+    emitHeaderInstances(builder);
+
+    builder->emitIndent();
+    builder->appendLine("int ret = TC_ACT_UNSPEC;");
+    builder->emitIndent();
+    builder->appendLine("#pragma clang loop unroll(disable)");
+    builder->emitIndent();
+    builder->appendFormat("for (int i = 0; i < %d; i++) ", maxResubmitDepth);
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendLine("ostd.resubmit = 0;");
+    builder->emitIndent();
+    builder->appendFormat("ret = %s(skb, ", processFunctionName);
+
+    builder->appendFormat("(%s %s *) &%s, &ostd, &%s);",
+            parser->headerType->to<EBPFStructType>()->kind,
+            parser->headerType->to<EBPFStructType>()->name,
+            parser->headers->name.name,
+            deparser->to<EBPFIngressDeparserPSA>()->resubmit_meta->name.name);
     builder->newline();
+    builder->append("        if (ostd.drop == 1 || ostd.resubmit == 0) {\n"
+                    "            break;\n"
+                    "        }\n");
+    builder->emitIndent();
+    builder->appendFormat("__builtin_memset((void *) &%s, 0, sizeof(%s %s));",
+                          parser->headers->name.name,
+                          parser->headerType->to<EBPFStructType>()->kind,
+                          parser->headerType->to<EBPFStructType>()->name);
+    builder->newline();
+    builder->blockEnd(true);
 
     builder->emitIndent();
     builder->appendLine("if (ret != TC_ACT_UNSPEC) {\n"
