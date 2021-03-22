@@ -600,3 +600,35 @@ class InternetChecksumPSATest(P4EbpfTest):
             pkt[IP].chksum = 0xFFFF
             testutils.send_packet(self, PORT0, str(pkt))
             testutils.verify_no_other_packets(self)
+
+
+class ParserValueSetPSATest(P4EbpfTest):
+    """
+    Test value_set implementation. P4 application will pass packet, which IP destination
+    address contains value_set and destination port 80.
+    1. Send UDP packet. Should be dropped.
+    2. Configure value_set with other IP address.
+    3. Send UDP packet. Should be dropped.
+    4. Change IP destination address to the same as in value_set.
+    5. Send UDP packet. Should be passed.
+    """
+    p4_file_path = "samples/p4testdata/pvs.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_udp_packet(ip_dst='8.8.8.8', udp_dport=80)
+
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_no_other_packets(self)
+
+        self.update_map("IngressParserImpl_pvs", '1 0 0 10', '0 0 0 0')
+
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_no_other_packets(self)
+
+        pkt[IP].dst = '10.0.0.1'
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+
+    def tearDown(self):
+        self.remove_map("IngressParserImpl_pvs")
+        super(ParserValueSetPSATest, self).tearDown()

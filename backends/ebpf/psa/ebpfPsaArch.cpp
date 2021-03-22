@@ -242,7 +242,9 @@ void PSAArch::emitPreamble(CodeBuilder *builder) const {
 
 void PSAArch::emitInstances(CodeBuilder *builder) const {
     builder->newline();
+    tcIngress->parser->emitTypes(builder);
     tcIngress->control->emitTableTypes(builder);
+    tcEgress->parser->emitTypes(builder);
     tcEgress->control->emitTableTypes(builder);
     builder->appendLine("REGISTER_START()");
     builder->target->emitMapInMapDecl(builder, "clone_session_tbl_inner",
@@ -253,9 +255,14 @@ void PSAArch::emitInstances(CodeBuilder *builder) const {
                                       TableHash, "elem_t",
                                       "struct element", MaxClones, "multicast_grp_tbl",
                                       TableArray, "__u32", MaxCloneSessions);
+
+    tcIngress->parser->emitValueSetInstances(builder);
     tcIngress->control->emitTableInstances(builder);
     tcIngress->deparser->emitDigestInstances(builder);
+
+    tcEgress->parser->emitValueSetInstances(builder);
     tcEgress->control->emitTableInstances(builder);
+
     builder->appendLine("REGISTER_END()");
     builder->newline();
 }
@@ -395,6 +402,8 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
 
     parser->visitor->asPointerVariables.insert(resubmit_meta->name.name);
 
+    findValueSets(prsr);
+
     return true;
 }
 
@@ -402,6 +411,16 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserState *s) {
     return false;
 }
 
+void ConvertToEBPFParserPSA::findValueSets(const IR::ParserBlock *prsr) {
+    for (auto decl : prsr->container->parserLocals) {
+        if (decl->is<IR::P4ValueSet>()) {
+            cstring extName = EBPFObject::externalName(decl);
+            auto pvs = new EBPFValueSetPSA(program, decl->to<IR::P4ValueSet>(),
+                                           extName, parser->visitor);
+            parser->valueSets.emplace(decl->name.name, pvs);
+        }
+    }
+}
 // =====================EBPFControl=============================
 bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     control = new EBPFControlPSA(program,
