@@ -24,13 +24,6 @@ struct {
 SEC("xdp/xdp-ingress")
 int xdp_func(struct xdp_md *ctx)
 {
-    return XDP_PASS;
-}
-
-
-SEC("classifier/tc-ingress")
-int tc_ingress_func(struct __sk_buff *ctx)
-{
     void *data_end = (void *)(long)ctx->data_end;
     void *data = (void *)(long)ctx->data;
     struct ethhdr *eth = data;
@@ -58,7 +51,7 @@ int tc_ingress_func(struct __sk_buff *ctx)
     ip = data + sizeof(*eth);
     if (ip + 1 > data_end)
         return TC_ACT_SHOT;
- 
+
 
     if (ip->protocol == 0x11) {
         udp = data + sizeof(*eth) + sizeof(*ip);
@@ -75,7 +68,6 @@ int tc_ingress_func(struct __sk_buff *ctx)
             inner_ip = inner_eth + 1;
         }
     }
-
     if (vxlan == NULL) {
         should_encap = true;
     }
@@ -92,10 +84,8 @@ int tc_ingress_func(struct __sk_buff *ctx)
 
         __u32 new_hdrsz = sizeof(struct ethhdr) + sizeof(struct iphdr) +
                           sizeof(struct udphdr) + sizeof(struct vxlanhdr);
-        ret = bpf_skb_adjust_room(ctx, new_hdrsz, BPF_ADJ_ROOM_MAC,
-                                  BPF_F_ADJ_ROOM_ENCAP_L4_UDP |
-                                  BPF_F_ADJ_ROOM_ENCAP_L3_IPV4 |
-                                  BPF_F_ADJ_ROOM_ENCAP_L2(sizeof(struct ethhdr)));
+
+        ret = bpf_xdp_adjust_head(ctx, -new_hdrsz);
         if (ret) {
             return TC_ACT_SHOT;
         }
@@ -105,6 +95,7 @@ int tc_ingress_func(struct __sk_buff *ctx)
 
         eth = data;
         if (eth + 1 > data_end) {
+            bpf_printk("drop");
             return TC_ACT_SHOT;
         }
 
@@ -114,11 +105,12 @@ int tc_ingress_func(struct __sk_buff *ctx)
         __u8 src_mac[6] = {0x11, 0x11, 0x11, 0x11, 0x11, 0x11};
         __builtin_memcpy(eth->h_source, src_mac, 6);
 
+        eth->h_proto = bpf_htons(0x0800);
+
         ip = data + sizeof(*eth);
         if (ip + 1 > data_end) {
             return TC_ACT_SHOT;
         }
-
 
         ip->ihl = 5;
         ip->version = 4;
@@ -132,7 +124,7 @@ int tc_ingress_func(struct __sk_buff *ctx)
         if (udp + 1 > data_end) {
             return TC_ACT_SHOT;
         }
-        
+
         udp->source = 5555;
         udp->dest = bpf_htons(4789);
         udp->len = bpf_htons(bpf_ntohs(ip->tot_len) - sizeof(struct iphdr));
@@ -159,19 +151,26 @@ int tc_ingress_func(struct __sk_buff *ctx)
     } else {
         __u32 extra_hdrsz = sizeof(struct ethhdr) + sizeof(struct iphdr) +
                             sizeof(struct udphdr) + sizeof(struct vxlanhdr);
-        ret = bpf_skb_adjust_room(ctx, -extra_hdrsz, BPF_ADJ_ROOM_MAC, 0);
+        ret = bpf_xdp_adjust_head(ctx, extra_hdrsz);
         if (ret) {
             return TC_ACT_SHOT;
         }
     }
 
 
-    int port = ctx->ifindex;
+    int port = ctx->ingress_ifindex;
     ifindex = bpf_map_lookup_elem(&tx_port, &port);
     if (!ifindex)
         return TC_ACT_SHOT;
 
     return bpf_redirect(*ifindex, 0);
+}
+
+
+SEC("classifier/tc-ingress")
+int tc_ingress_func(struct __sk_buff *ctx)
+{
+    return TC_ACT_OK;
 }
 
 SEC("classifier/tc-egress")
