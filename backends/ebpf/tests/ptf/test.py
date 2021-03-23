@@ -108,7 +108,7 @@ class EbpfTest(BaseTest):
         self.interfaces = testutils.test_param_get("interfaces").split(",")
         logger.info("Using interfaces: %s", str(self.interfaces))
 
-        self.exec_ns_cmd("bpftool prog loadall {} /sys/fs/bpf/prog".format(self.test_prog_image))
+        self.exec_ns_cmd("load-prog {}".format(self.test_prog_image))
 
         for intf in self.interfaces:
             self.add_port(dev=intf)
@@ -651,11 +651,17 @@ class ConstDefaultActionPSATest(EbpfTest):
 
     test_prog_image = "samples/const-action.o"
 
-    def initialize(self):
-
-        pass
-
     def runTest(self):
         pkt = testutils.simple_ip_packet()
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT1)
+
+    def tearDown(self):
+        self.remove_maps(
+            ["multicast_grp_tbl",
+             "clone_session_tbl",
+             "ingress_tbl_const_action",
+             "ingress_tbl_const_action_defaultAction"]
+        )
+
+        super(EbpfTest, self).tearDown()

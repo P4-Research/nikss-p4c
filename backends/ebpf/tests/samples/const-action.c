@@ -99,15 +99,15 @@ REGISTER_TABLE(ingress_tbl_const_action, BPF_MAP_TYPE_HASH, sizeof(struct ingres
 REGISTER_TABLE(ingress_tbl_const_action_defaultAction, BPF_MAP_TYPE_ARRAY, sizeof(u32), sizeof(struct ingress_tbl_const_action_value), 1)
 REGISTER_END()
 
-//SEC("map-initializer")
-//int map_initialize() {
-//    u32 ebpf_zero = 0;
-//    struct ingress_tbl_const_action_value val = {};
-//    val.action = ACT_INGRESS_DO_FORWARD;
-//    val.u.ingress_do_forward.egress_port = 5;
-//
-//    int ret = BPF_MAP_UPDATE_ELEM(ingress_tbl_const_action_defaultAction, &ebpf_zero, &val, 0);
-//}
+SEC("classifier/map-initializer")
+int map_initialize() {
+    u32 ebpf_zero = 0;
+    struct ingress_tbl_const_action_value val = {};
+    val.action = ACT_INGRESS_DO_FORWARD;
+    val.u.ingress_do_forward.egress_port = 5;
+
+    BPF_MAP_UPDATE_ELEM(ingress_tbl_const_action_defaultAction, &ebpf_zero, &val, 0);
+}
 
 SEC("xdp/xdp-ingress")
 int xdp_func(struct xdp_md *skb) {
