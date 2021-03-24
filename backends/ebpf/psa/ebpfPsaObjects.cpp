@@ -40,6 +40,9 @@ EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* tab
 
 void EBPFTablePSA::initDirectCounters() {
     auto counterProperty = table->container->properties->getProperty("psa_direct_counter");
+    if (counterProperty == nullptr)
+        return;
+
     auto counterAdder = [this](const IR::PathExpression * pe){
         CHECK_NULL(pe);
         auto decl = program->refMap->getDeclaration(pe->path, true);
