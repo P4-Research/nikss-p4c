@@ -3,7 +3,72 @@
 
 namespace EBPF {
 
+// =====================ActionTranslationVisitorPSA=============================
+bool ActionTranslationVisitorPSA::preorder(const IR::MethodCallExpression* expression) {
+    auto mi = P4::MethodInstance::resolve(expression,
+                                          program->refMap,
+                                          program->typeMap);
+    auto ext = mi->to<P4::ExternMethod>();
+    if (ext != nullptr) {
+        processMethod(ext);
+        return false;
+    }
+
+    return CodeGenInspector::preorder(expression);
+}
+
+void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) {
+    auto declType = method->originalExternType;
+    auto name = method->object->getName();
+
+    if (declType->name.name == "Counter") {
+        program->control->getCounter(name)->emitMethodInvocation(builder, method);
+    } else if (declType->name.name == "DirectCounter") {
+        table->getCounter(name)->emitDirectMethodInvocation(builder, method, valueName);
+    } else {
+        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                "%1%: Unexpected method call in action", method->expr);
+    }
+}
+
 // =====================EBPFTablePSA=============================
+EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* table,
+                           CodeGenInspector* codeGen, cstring name, size_t size) :
+                           EBPFTable(program, table, codeGen), name(name), size(size) {
+    initDirectCounters();
+}
+
+void EBPFTablePSA::initDirectCounters() {
+    auto counterProperty = table->container->properties->getProperty("psa_direct_counter");
+    auto counterAdder = [this](const IR::PathExpression * pe){
+        CHECK_NULL(pe);
+        auto decl = program->refMap->getDeclaration(pe->path, true);
+        auto di = decl->to<IR::Declaration_Instance>();
+        CHECK_NULL(di);
+        auto ctr = new EBPFCounterPSA(program, di, EBPFObject::externalName(di), codeGen);
+        this->counters.emplace_back(std::make_pair(pe->path->name.name, ctr));
+    };
+
+    if (counterProperty->value->is<IR::ExpressionValue>()) {
+        auto ev = counterProperty->value->to<IR::ExpressionValue>();
+
+        if (ev->expression->is<IR::PathExpression>()) {
+            counterAdder(ev->expression->to<IR::PathExpression>());
+        } else if (ev->expression->is<IR::ListExpression>()) {
+            auto le = ev->expression->to<IR::ListExpression>();
+            for (auto c : le->components) {
+                counterAdder(c->to<IR::PathExpression>());
+            }
+        } else {
+            ::error(ErrorType::ERR_UNSUPPORTED,
+                    "Unsupported list type: %1%", counterProperty->value);
+        }
+    } else {
+        ::error(ErrorType::ERR_UNKNOWN,
+                "Unknown property expression type: %1%", counterProperty->value);
+    }
+}
+
 void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
     TableKind kind = isLPMTable() ? TableLPMTrie : TableHash;
     builder->target->emitTableDecl(builder, name, kind,
@@ -12,6 +77,12 @@ void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
     builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
                                    program->arrayIndexType,
                                    cstring("struct ") + valueTypeName, 1);
+}
+
+void EBPFTablePSA::emitDirectTypes(CodeBuilder* builder) {
+    for (auto ctr : counters) {
+        ctr.second->emitValueType(builder);
+    }
 }
 
 // =====================EBPFTernaryTablePSA=============================
