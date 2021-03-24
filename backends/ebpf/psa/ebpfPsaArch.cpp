@@ -424,6 +424,9 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     parser->headerType = EBPFTypeFactory::instance->create(ht);
 
     parser->visitor->asPointerVariables.insert(resubmit_meta->name.name);
+    if (this->type == INGRESS) {
+        parser->visitor->asPointerVariables.insert(parser->headers->name.name);
+    }
 
     findValueSets(prsr);
 
@@ -460,6 +463,9 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     auto codegen = new ControlBodyTranslatorPSA(control);
     codegen->substitute(control->headers, parserHeaders);
     codegen->asPointerVariables.insert(control->outputStandardMetadata->name.name);
+    if (this->type == INGRESS) {
+        codegen->asPointerVariables.insert(control->headers->name.name);
+    }
     control->codeGen = codegen;
 
     for (auto a : ctrl->constantValue) {
@@ -570,6 +576,10 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
             deparser = new EBPFEgressDeparserPSA(program, ctrl, parserHeaders, istd);
 
     auto codegen = new DeparserBodyTranslator(deparser);
+    if (this->type == INGRESS) {
+        codegen->asPointerVariables.insert(parserHeaders->name.name);
+    }
+
     deparser->codeGen = codegen;
     if (!deparser->build()) {
         BUG("failed to build deparser");
@@ -626,7 +636,8 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expressi
                 auto exprMemb = expr->to<IR::Member>();
                 auto headerName = exprMemb->member.name;
                 auto headersStructName = deparser->parserHeaders->name.name;
-                deparser->headersExpressions.push_back(headersStructName + "." + headerName);
+                cstring op = this->type == INGRESS ? "->" : ".";
+                deparser->headersExpressions.push_back(headersStructName + op + headerName);
                 return false;
             }
         }
