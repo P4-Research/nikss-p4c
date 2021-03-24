@@ -24,7 +24,13 @@ void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) 
     if (declType->name.name == "Counter") {
         program->control->getCounter(name)->emitMethodInvocation(builder, method);
     } else if (declType->name.name == "DirectCounter") {
-        table->getCounter(name)->emitDirectMethodInvocation(builder, method, valueName);
+        auto ctr = table->getCounter(name);
+        if (ctr != nullptr)
+            ctr->emitDirectMethodInvocation(builder, method, valueName);
+        else
+            ::error(ErrorType::ERR_NOT_FOUND,
+                    "%1%: Table %2% do not own DirectCounter named %3%",
+                    method->expr, table->name, name);
     } else {
         ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
                 "%1%: Unexpected method call in action", method->expr);

@@ -48,8 +48,11 @@ class EBPFTablePSA : public EBPFTable {
             [name](std::pair<cstring, EBPFCounterPSA *> elem)->bool {
                 return name == elem.first;
             });
-        BUG_CHECK(result != counters.end(), "No direct counter named %1%", name);
-        return result->second; }
+        if (result != counters.end())
+            return result->second;
+        return nullptr;
+    }
+
 };
 
 class EBPFTernaryTablePSA : public EBPFTablePSA {
