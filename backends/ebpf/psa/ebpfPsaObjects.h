@@ -52,7 +52,6 @@ class EBPFTablePSA : public EBPFTable {
             return result->second;
         return nullptr;
     }
-
 };
 
 class EBPFTernaryTablePSA : public EBPFTablePSA {

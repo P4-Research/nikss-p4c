@@ -1,5 +1,6 @@
 #include "backends/ebpf/ebpfType.h"
 #include "ebpfPsaObjects.h"
+#include "ebpfPipeline.h"
 
 namespace EBPF {
 
