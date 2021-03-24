@@ -78,7 +78,7 @@ EBPFCounterPSA::EBPFCounterPSA(const EBPFProgram* program, const IR::Declaration
         }
         size = declaredSize->asUnsigned();
     } else {
-        indexWidthType= nullptr;
+        indexWidthType = nullptr;
     }
 
     // TODO: add more advance logic to decide whether used map will be HASH_MAP or ARRAY_MAP
@@ -154,8 +154,9 @@ void EBPFCounterPSA::emitMethodInvocation(CodeBuilder* builder, const P4::Extern
     builder->blockEnd(false);
 }
 
-void EBPFCounterPSA::emitDirectMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method,
-                                cstring valuePtr) {
+void EBPFCounterPSA::emitDirectMethodInvocation(CodeBuilder* builder,
+                                                const P4::ExternMethod* method,
+                                                cstring valuePtr) {
     if (method->method->name.name != "count") {
         ::error(ErrorType::ERR_UNSUPPORTED, "Unexpected method %1%", method->expr);
         return;

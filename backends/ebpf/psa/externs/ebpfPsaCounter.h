@@ -29,7 +29,8 @@ class EBPFCounterPSA : public EBPFCounterTable {
     virtual void emitValueType(CodeBuilder* builder);
 
     void emitMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method) override;
-    void emitDirectMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method, cstring valuePtr);
+    void emitDirectMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method,
+                                    cstring valuePtr);
     virtual void emitCount(CodeBuilder* builder, const IR::MethodCallExpression *expression);
     virtual void emitCounterUpdate(CodeBuilder* builder, cstring target, bool targetIsPtr,
                                    cstring contextVar, cstring keyName);
