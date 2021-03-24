@@ -45,7 +45,7 @@ bool PsaStateTranslationVisitor::preorder(const IR::SelectExpression* expression
     selectHasValueSet = false;
     selectFirstIfStatement = true;
     selectHasDefault = false;
-    currentSelectExpression = const_cast<IR::SelectExpression*>(expression);
+    currentSelectExpression = expression;
 
     for (auto e : expression->selectCases) {
         if (e->keyset->is<IR::PathExpression>()) {
