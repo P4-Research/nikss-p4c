@@ -54,4 +54,10 @@ void EBPFControlPSA::emitTableInstances(CodeBuilder* builder) {
     for (auto it : counters)
         it.second->emitInstance(builder);
 }
+
+void EBPFControlPSA::emitTableInitializers(CodeBuilder* builder) {
+    for (auto it : tables) {
+        it.second->emitInitializer(builder);
+    }
+}
 }  // namespace EBPF

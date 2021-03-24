@@ -95,6 +95,72 @@ void EBPFTablePSA::emitDirectTypes(CodeBuilder* builder) {
     }
 }
 
+void EBPFTablePSA::emitInitializer(CodeBuilder *builder) {
+    const IR::P4Table* t = table->container;
+    const IR::Expression* defaultAction = t->getDefaultAction();
+    BUG_CHECK(defaultAction->is<IR::MethodCallExpression>(),
+              "%1%: expected an action call", defaultAction);
+    auto mce = defaultAction->to<IR::MethodCallExpression>();
+    auto mi = P4::MethodInstance::resolve(mce, program->refMap, program->typeMap);
+
+    auto ac = mi->to<P4::ActionCall>();
+    BUG_CHECK(ac != nullptr, "%1%: expected an action call", mce);
+    auto action = ac->action;
+
+    cstring actionName = EBPFObject::externalName(action);
+    auto value = this->program->refMap->newName("value");
+
+    builder->emitIndent();
+    builder->appendFormat("struct %s %s = ", valueTypeName.c_str(), value.c_str());
+    builder->blockStart();
+    builder->emitIndent();
+    if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
+        builder->append(".action = 0,");
+    } else {
+        cstring fullActionName = "ACT_" + actionName.toUpper();
+        builder->appendFormat(".action = %s,", fullActionName);
+    }
+    builder->newline();
+
+    CodeGenInspector cg(program->refMap, program->typeMap);
+    cg.setBuilder(builder);
+
+    builder->emitIndent();
+    builder->appendFormat(".u = {.%s = {", actionName.c_str());
+    for (auto p : *mi->substitution.getParametersInArgumentOrder()) {
+        auto arg = mi->substitution.lookup(p);
+        arg->apply(cg);
+        builder->append(",");
+    }
+    builder->append("}},\n");
+    builder->blockEnd(false);
+    builder->endOfStatement(true);
+
+    auto ret = this->program->refMap->newName("ret");
+    builder->emitIndent();
+    builder->appendFormat("int %s = ", ret.c_str());
+    builder->target->emitTableUpdate(builder, defaultActionMapName,
+                                     this->program->zeroKey.c_str(), value.c_str());
+    builder->newline();
+    builder->emitIndent();
+    builder->appendFormat("if (%s) ", ret.c_str());
+    builder->blockStart();
+    cstring msgStr = Util::printf_format("Map initializer: Error while map (%s) update, code: %s",
+                                         defaultActionMapName, "%d");
+    builder->target->emitTraceMessage(builder,
+                                      msgStr, 1, ret.c_str());
+
+    builder->blockEnd(false);
+    builder->append(" else ");
+
+    builder->blockStart();
+    msgStr = Util::printf_format("Map initializer: Map (%s) update succeed",
+                                         defaultActionMapName, ret.c_str());
+    builder->target->emitTraceMessage(builder,
+                                      msgStr);
+    builder->blockEnd(true);
+}
+
 // =====================EBPFTernaryTablePSA=============================
 void EBPFTernaryTablePSA::emitInstance(CodeBuilder *builder) {
     builder->target->emitTableDecl(builder, name + "_prefixes", TableHash,

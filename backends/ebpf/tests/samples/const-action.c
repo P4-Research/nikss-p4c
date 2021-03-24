@@ -99,14 +99,31 @@ REGISTER_TABLE(ingress_tbl_const_action, BPF_MAP_TYPE_HASH, sizeof(struct ingres
 REGISTER_TABLE(ingress_tbl_const_action_defaultAction, BPF_MAP_TYPE_ARRAY, sizeof(u32), sizeof(struct ingress_tbl_const_action_value), 1)
 REGISTER_END()
 
+#define MAP_PATH "/sys/fs/bpf"
+
 SEC("classifier/map-initializer")
 int map_initialize() {
     u32 ebpf_zero = 0;
-    struct ingress_tbl_const_action_value val = {};
-    val.action = ACT_INGRESS_DO_FORWARD;
-    val.u.ingress_do_forward.egress_port = 5;
+//    struct ingress_tbl_const_action_value val = {};
+//    val.action = ACT_INGRESS_DO_FORWARD;
+//    val.u.ingress_do_forward.egress_port = 5;
+
+    struct ingress_tbl_const_action_value val = {
+            .action = ACT_INGRESS_DO_FORWARD,
+            .u = {.ingress_do_forward = {5,}},
+    };
 
     BPF_MAP_UPDATE_ELEM(ingress_tbl_const_action_defaultAction, &ebpf_zero, &val, 0);
+
+
+//    int tableFileDescriptor = BPF_OBJ_GET(MAP_PATH "/ingress_tbl_const_action_defaultAction");
+//    if (tableFileDescriptor < 0) { fprintf(stderr, "map ingress_tbl_const_action_defaultAction not loaded\n"); exit(1); }
+//    struct ingress_tbl_const_action_value value = {
+//            .action = ACT_INGRESS_DO_FORWARD,
+//            .u = {.ingress_do_forward = {5,}},
+//    };
+//    int ok = BPF_USER_MAP_UPDATE_ELEM(tableFileDescriptor, &ebpf_zero, &value, BPF_ANY);
+//    if (ok != 0) { perror("Could not write in ingress_tbl_const_action_defaultAction"); exit(1); }
 }
 
 SEC("xdp/xdp-ingress")

@@ -31,6 +31,7 @@ class EBPFControlPSA : public EBPFControl {
     bool build() override;
     void emit(CodeBuilder* builder) override;
     void emitTableInstances(CodeBuilder* builder) override;
+    void emitTableInitializers(CodeBuilder* builder) override;
 };
 
 }  // namespace EBPF

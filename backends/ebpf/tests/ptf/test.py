@@ -665,3 +665,43 @@ class ConstDefaultActionPSATest(EbpfTest):
         )
 
         super(EbpfTest, self).tearDown()
+
+
+class ConstDefaultActionPSAP4Test(P4EbpfTest):
+
+    p4_file_path = "samples/p4testdata/action-const-default.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT1)
+
+    def tearDown(self):
+        self.remove_maps(
+            ["multicast_grp_tbl",
+             "clone_session_tbl",
+             "ingress_tbl_const_action",
+             "ingress_tbl_const_action_defaultAction"]
+        )
+
+        super(EbpfTest, self).tearDown()
+
+
+class ConstEntryPSAP4Test(P4EbpfTest):
+
+    p4_file_path = "samples/p4testdata/const-entry.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT1)
+
+    def tearDown(self):
+        self.remove_maps(
+            ["multicast_grp_tbl",
+             "clone_session_tbl",
+             "ingress_tbl_const_action",
+             "ingress_tbl_const_action_defaultAction"]
+        )
+
+        super(EbpfTest, self).tearDown()

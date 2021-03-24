@@ -91,7 +91,7 @@ class EBPFTable : public EBPFTableBase {
     void emitValueType(CodeBuilder* builder);
     void emitKey(CodeBuilder* builder, cstring keyName);
     void emitAction(CodeBuilder* builder, cstring valueName);
-    void emitInitializer(CodeBuilder* builder);
+    virtual void emitInitializer(CodeBuilder* builder);
     virtual void emitLookup(CodeBuilder* builder, cstring key, cstring value) {
             builder->target->emitTableLookup(builder, dataMapName, key, value);
             builder->endOfStatement(true);

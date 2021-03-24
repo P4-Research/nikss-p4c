@@ -48,6 +48,9 @@ void PSAArch::emit(CodeBuilder *builder) const {
      */
     emitInstances(builder);
 
+    //Tutaj emit
+    emitInitializer(builder);
+
     /*
      * 6. XDP helper program.
      */
@@ -265,6 +268,23 @@ void PSAArch::emitInstances(CodeBuilder *builder) const {
 
     builder->appendLine("REGISTER_END()");
     builder->newline();
+}
+
+void PSAArch::emitInitializer(CodeBuilder *builder) const {
+    builder->newline();
+    builder->appendLine("SEC(\"classifier/map-initializer\")");
+    builder->appendFormat("int %s()",
+                          "map_initialize");
+    builder->spc();
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendFormat("u32 %s = 0;", this->tcIngress->zeroKey.c_str());
+    builder->newline();
+    tcIngress->control->emitTableInitializers(builder);
+    builder->newline();
+    builder->emitIndent();
+    builder->appendLine("return 0;");
+    builder->blockEnd(true);
 }
 
 const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {

@@ -40,7 +40,7 @@ class EBPFTablePSA : public EBPFTable {
                  CodeGenInspector* codeGen, cstring name, size_t size);
 
     void emitInstance(CodeBuilder* builder) override;
-
+    void emitInitializer(CodeBuilder* builder) override;
     void emitDirectTypes(CodeBuilder* builder) override;
 
     EBPFCounterPSA* getCounter(cstring name) const {
