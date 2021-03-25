@@ -71,7 +71,7 @@ void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder,
                 remainingBits = 0;
                 builder->append("(");
                 visitor->visit(field);
-                builder->appendFormat(" << %d)", bitsToRead);
+                builder->appendFormat(" >> %d)", bitsToRead);
             }
 
             if (remainingBits == 0) {
