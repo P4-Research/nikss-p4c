@@ -110,6 +110,9 @@ void EBPFTablePSA::emitInitializer(CodeBuilder *builder) {
     cstring actionName = EBPFObject::externalName(action);
     auto value = this->program->refMap->newName("value");
 
+    CodeGenInspector cg(program->refMap, program->typeMap);
+    cg.setBuilder(builder);
+
     builder->emitIndent();
     builder->appendFormat("struct %s %s = ", valueTypeName.c_str(), value.c_str());
     builder->blockStart();
@@ -121,9 +124,6 @@ void EBPFTablePSA::emitInitializer(CodeBuilder *builder) {
         builder->appendFormat(".action = %s,", fullActionName);
     }
     builder->newline();
-
-    CodeGenInspector cg(program->refMap, program->typeMap);
-    cg.setBuilder(builder);
 
     builder->emitIndent();
     builder->appendFormat(".u = {.%s = {", actionName.c_str());
@@ -159,6 +159,85 @@ void EBPFTablePSA::emitInitializer(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder,
                                       msgStr);
     builder->blockEnd(true);
+
+    auto keyName = this->program->refMap->newName("key");
+    auto valueName = this->program->refMap->newName("value");
+    const IR::EntriesList* entries = t->getEntries();
+    for (auto entry: entries->entries) {
+        // construct key
+        builder->emitIndent();
+        builder->appendFormat("struct %s %s = {}", this->keyTypeName.c_str(), keyName.c_str());
+        builder->endOfStatement(true);
+
+        for (size_t index = 0; index < keyGenerator->keyElements.size(); index++) {
+            auto keyElement = keyGenerator->keyElements[index];
+            cstring fieldName = ::get(keyFieldNames, keyElement);
+            CHECK_NULL(fieldName);
+
+            builder->emitIndent();
+            builder->appendFormat("%s.%s = ", keyName.c_str(), fieldName.c_str());
+            entry->keys->components[index]->apply(cg);
+            builder->endOfStatement(true);
+        }
+
+        // construct value
+        builder->emitIndent();
+        builder->appendFormat("struct %s %s = {}", this->valueTypeName.c_str(), valueName.c_str());
+        builder->endOfStatement(true);
+
+        mce = entry->action->to<IR::MethodCallExpression>();
+        mi = P4::MethodInstance::resolve(mce, program->refMap, program->typeMap);
+
+        ac = mi->to<P4::ActionCall>();
+        action = ac->action;
+
+        this->emitTableValue(builder, mce, valueName.c_str());
+
+        builder->emitIndent();
+        builder->target->emitTableUpdate(builder, this->name,
+                                         keyName.c_str(), valueName.c_str());
+        builder->newline();
+    }
+}
+void EBPFTablePSA::emitTableValue(CodeBuilder* builder, const IR::MethodCallExpression* actionMce, cstring valueName) {
+//    const IR::P4Table* t = table->container;
+//    const IR::Expression* defaultAction = t->getDefaultAction();
+//    BUG_CHECK(defaultAction->is<IR::MethodCallExpression>(),
+//              "%1%: expected an action call", defaultAction);
+//    auto mce = action->to<IR::MethodCallExpression>();
+    auto mi = P4::MethodInstance::resolve(actionMce, program->refMap, program->typeMap);
+//
+    auto ac = mi->to<P4::ActionCall>();
+    BUG_CHECK(ac != nullptr, "%1%: expected an action call", mi);
+    auto action = ac->action;
+
+    cstring actionName = EBPFObject::externalName(action);
+
+    CodeGenInspector cg(program->refMap, program->typeMap);
+    cg.setBuilder(builder);
+
+    builder->emitIndent();
+    builder->appendFormat("struct %s %s = ", valueTypeName.c_str(), valueName.c_str());
+    builder->blockStart();
+    builder->emitIndent();
+    if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
+        builder->append(".action = 0,");
+    } else {
+        cstring fullActionName = "ACT_" + actionName.toUpper();
+        builder->appendFormat(".action = %s,", fullActionName);
+    }
+    builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat(".u = {.%s = {", actionName.c_str());
+    for (auto p : *mi->substitution.getParametersInArgumentOrder()) {
+        auto arg = mi->substitution.lookup(p);
+        arg->apply(cg);
+        builder->append(",");
+    }
+    builder->append("}},\n");
+    builder->blockEnd(false);
+    builder->endOfStatement(true);
 }
 
 // =====================EBPFTernaryTablePSA=============================

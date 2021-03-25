@@ -41,6 +41,7 @@ class EBPFTablePSA : public EBPFTable {
 
     void emitInstance(CodeBuilder* builder) override;
     void emitInitializer(CodeBuilder* builder) override;
+    void emitTableValue(CodeBuilder* builder, const IR::MethodCallExpression* actionMce, cstring valueName);
     void emitDirectTypes(CodeBuilder* builder) override;
 
     EBPFCounterPSA* getCounter(cstring name) const {
