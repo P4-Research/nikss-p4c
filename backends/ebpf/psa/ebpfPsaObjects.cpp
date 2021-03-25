@@ -96,84 +96,25 @@ void EBPFTablePSA::emitDirectTypes(CodeBuilder* builder) {
 }
 
 void EBPFTablePSA::emitInitializer(CodeBuilder *builder) {
-    const IR::P4Table* t = table->container;
-    const IR::Expression* defaultAction = t->getDefaultAction();
-    BUG_CHECK(defaultAction->is<IR::MethodCallExpression>(),
-              "%1%: expected an action call", defaultAction);
-    auto mce = defaultAction->to<IR::MethodCallExpression>();
-    auto mi = P4::MethodInstance::resolve(mce, program->refMap, program->typeMap);
+    this->emitDefaultActionInitializer(builder);
+    this->emitConstEntriesInitializer(builder);
+}
 
-    auto ac = mi->to<P4::ActionCall>();
-    BUG_CHECK(ac != nullptr, "%1%: expected an action call", mce);
-    auto action = ac->action;
-
-    cstring actionName = EBPFObject::externalName(action);
-    auto value = this->program->refMap->newName("value");
-
+void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
     CodeGenInspector cg(program->refMap, program->typeMap);
     cg.setBuilder(builder);
-
-    builder->emitIndent();
-    builder->appendFormat("struct %s %s = ", valueTypeName.c_str(), value.c_str());
-    builder->blockStart();
-    builder->emitIndent();
-    if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
-        builder->append(".action = 0,");
-    } else {
-        cstring fullActionName = "ACT_" + actionName.toUpper();
-        builder->appendFormat(".action = %s,", fullActionName);
-    }
-    builder->newline();
-
-    builder->emitIndent();
-    builder->appendFormat(".u = {.%s = {", actionName.c_str());
-    for (auto p : *mi->substitution.getParametersInArgumentOrder()) {
-        auto arg = mi->substitution.lookup(p);
-        arg->apply(cg);
-        builder->append(",");
-    }
-    builder->append("}},\n");
-    builder->blockEnd(false);
-    builder->endOfStatement(true);
-
-    auto ret = this->program->refMap->newName("ret");
-    builder->emitIndent();
-    builder->appendFormat("int %s = ", ret.c_str());
-    builder->target->emitTableUpdate(builder, defaultActionMapName,
-                                     this->program->zeroKey.c_str(), value.c_str());
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat("if (%s) ", ret.c_str());
-    builder->blockStart();
-    cstring msgStr = Util::printf_format("Map initializer: Error while map (%s) update, code: %s",
-                                         defaultActionMapName, "%d");
-    builder->target->emitTraceMessage(builder,
-                                      msgStr, 1, ret.c_str());
-
-    builder->blockEnd(false);
-    builder->append(" else ");
-
-    builder->blockStart();
-    msgStr = Util::printf_format("Map initializer: Map (%s) update succeed",
-                                         defaultActionMapName, ret.c_str());
-    builder->target->emitTraceMessage(builder,
-                                      msgStr);
-    builder->blockEnd(true);
-
-    auto keyName = this->program->refMap->newName("key");
-    auto valueName = this->program->refMap->newName("value");
-    const IR::EntriesList* entries = t->getEntries();
+    auto keyName = program->refMap->newName("key");
+    auto valueName = program->refMap->newName("value");
+    const IR::EntriesList* entries = table->container->getEntries();
     for (auto entry: entries->entries) {
         // construct key
         builder->emitIndent();
-        builder->appendFormat("struct %s %s = {}", this->keyTypeName.c_str(), keyName.c_str());
+        builder->appendFormat("struct %s %s = {}", keyTypeName.c_str(), keyName.c_str());
         builder->endOfStatement(true);
-
         for (size_t index = 0; index < keyGenerator->keyElements.size(); index++) {
             auto keyElement = keyGenerator->keyElements[index];
-            cstring fieldName = ::get(keyFieldNames, keyElement);
+            cstring fieldName = get(keyFieldNames, keyElement);
             CHECK_NULL(fieldName);
-
             builder->emitIndent();
             builder->appendFormat("%s.%s = ", keyName.c_str(), fieldName.c_str());
             entry->keys->components[index]->apply(cg);
@@ -182,31 +123,66 @@ void EBPFTablePSA::emitInitializer(CodeBuilder *builder) {
 
         // construct value
         builder->emitIndent();
-        builder->appendFormat("struct %s %s = {}", this->valueTypeName.c_str(), valueName.c_str());
+        builder->appendFormat("struct %s %s = {}", valueTypeName.c_str(), valueName.c_str());
         builder->endOfStatement(true);
+        auto *mce = entry->action->to<IR::MethodCallExpression>();
+        emitTableValue(builder, mce, valueName.c_str());
 
-        mce = entry->action->to<IR::MethodCallExpression>();
-        mi = P4::MethodInstance::resolve(mce, program->refMap, program->typeMap);
-
-        ac = mi->to<P4::ActionCall>();
-        action = ac->action;
-
-        this->emitTableValue(builder, mce, valueName.c_str());
-
+        //emit update
+        auto ret = program->refMap->newName("ret");
         builder->emitIndent();
-        builder->target->emitTableUpdate(builder, this->name,
+        builder->appendFormat("int %s = ", ret.c_str());
+        builder->target->emitTableUpdate(builder, name,
                                          keyName.c_str(), valueName.c_str());
         builder->newline();
+
+        emitMapUpdateTraceMsg(builder, name, ret);
     }
 }
+
+void EBPFTablePSA::emitDefaultActionInitializer(CodeBuilder *builder) {
+    const IR::P4Table* t = table->container;
+    const IR::Expression* defaultAction = t->getDefaultAction();
+    BUG_CHECK(defaultAction->is<IR::MethodCallExpression>(),
+              "%1%: expected an action call", defaultAction);
+    auto mce = defaultAction->to<IR::MethodCallExpression>();
+
+    auto value = program->refMap->newName("value");
+    emitTableValue(builder, mce, value.c_str());
+
+    auto ret = program->refMap->newName("ret");
+    builder->emitIndent();
+    builder->appendFormat("int %s = ", ret.c_str());
+    builder->target->emitTableUpdate(builder, defaultActionMapName,
+                                     program->zeroKey.c_str(), value.c_str());
+    builder->newline();
+
+    emitMapUpdateTraceMsg(builder, defaultActionMapName, ret);
+
+}
+
+void EBPFTablePSA::emitMapUpdateTraceMsg(CodeBuilder *builder, cstring mapName, cstring returnCode) const {
+    builder->emitIndent();
+    builder->appendFormat("if (%s) ", returnCode.c_str());
+    builder->blockStart();
+    cstring msgStr = Util::printf_format("Map initializer: Error while map (%s) update, code: %s",
+                                         mapName, "%d");
+    builder->target->emitTraceMessage(builder,
+                                      msgStr, 1, returnCode.c_str());
+
+    builder->blockEnd(false);
+    builder->append(" else ");
+
+    builder->blockStart();
+    msgStr = Util::printf_format("Map initializer: Map (%s) update succeed",
+                                 mapName, returnCode.c_str());
+    builder->target->emitTraceMessage(builder,
+                                      msgStr);
+    builder->blockEnd(true);
+}
+
 void EBPFTablePSA::emitTableValue(CodeBuilder* builder, const IR::MethodCallExpression* actionMce, cstring valueName) {
-//    const IR::P4Table* t = table->container;
-//    const IR::Expression* defaultAction = t->getDefaultAction();
-//    BUG_CHECK(defaultAction->is<IR::MethodCallExpression>(),
-//              "%1%: expected an action call", defaultAction);
-//    auto mce = action->to<IR::MethodCallExpression>();
     auto mi = P4::MethodInstance::resolve(actionMce, program->refMap, program->typeMap);
-//
     auto ac = mi->to<P4::ActionCall>();
     BUG_CHECK(ac != nullptr, "%1%: expected an action call", mi);
     auto action = ac->action;
