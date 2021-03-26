@@ -12,25 +12,37 @@
 #include "ebpf_kernel.h"
 #include "psa.h"
 
+//#define _DEBUG
+
+#ifdef _DEBUG
 #define bpf_trace_message(fmt, ...)                                \
     do {                                                           \
         char ____fmt[] = fmt;                                      \
         bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
     } while(0)
+#else
+#define bpf_trace_message(fmt, ...)
+#endif
 
 struct vxlanhdr {
     __u8 flags;
     unsigned int rsvd : 24;
     unsigned int vni : 24;
     __u8 rsvd2;
-};
+} __attribute__((packed));
+
+struct ethhdr_t {
+    unsigned long h_dest : 48;
+    unsigned long h_source : 48;
+    __u16 h_proto;
+} __attribute__((packed));
 
 struct hdr_t {
-    struct ethhdr eth;
+    struct ethhdr_t eth;
     struct iphdr ip;
     struct udphdr udp;
     struct vxlanhdr vxlan;
-    struct ethhdr outer_eth;
+    struct ethhdr_t outer_eth;
     struct iphdr outer_ip;
     bool eth_valid, ip_valid, udp_valid, vxlan_valid, outer_eth_valid, outer_ip_valid;
 };
@@ -74,7 +86,7 @@ int tc_ingress_func(struct __sk_buff *ctx)
     struct psa_ingress_output_metadata_t ostd = {
             .drop = true,
     };
-    struct hdr_t hdr = {
+    volatile struct hdr_t hdr = {
             .eth_valid = false,
             .ip_valid = false,
             .udp_valid = false,
@@ -90,13 +102,13 @@ int tc_ingress_func(struct __sk_buff *ctx)
     // **************************************************************
 start:
     {
-        if (data_end < current_data + sizeof(struct ethhdr)) {
+        if (data_end < current_data + sizeof(struct ethhdr_t)) {
             goto reject;
         }
         bpf_trace_message("Parser: extracting header hdr.eth\n");
-        __builtin_memcpy(&(hdr.eth), current_data, sizeof(struct ethhdr));
+        __builtin_memcpy((void *) &(hdr.eth), current_data, sizeof(struct ethhdr_t));
         hdr.eth_valid = true;
-        current_data += sizeof(struct ethhdr);
+        current_data += sizeof(struct ethhdr_t);
 
         switch (hdr.eth.h_proto) {
             case 0x0008: goto parse_ipv4; break;
@@ -110,7 +122,7 @@ parse_ipv4:
             goto reject;
         }
         bpf_trace_message("Parser: extracting header hdr.ip\n");
-        __builtin_memcpy(&(hdr.ip), current_data, sizeof(struct iphdr));
+        __builtin_memcpy((void *) &(hdr.ip), current_data, sizeof(struct iphdr));
         hdr.ip_valid = true;
         current_data += sizeof(struct iphdr);
 
@@ -128,7 +140,7 @@ parse_udp:
             goto reject;
         }
         bpf_trace_message("Parser: extracting header hdr.udp\n");
-        __builtin_memcpy(&(hdr.udp), current_data, sizeof(struct udphdr));
+        __builtin_memcpy((void *) &(hdr.udp), current_data, sizeof(struct udphdr));
         hdr.udp_valid = true;
         current_data += sizeof(struct udphdr);
 
@@ -146,7 +158,7 @@ parse_vxlan:
             goto reject;
         }
         bpf_trace_message("Parser: extracting header hdr.vxlan\n");
-        __builtin_memcpy(&(hdr.vxlan), current_data, sizeof(struct vxlanhdr));
+        __builtin_memcpy((void *) &(hdr.vxlan), current_data, sizeof(struct vxlanhdr));
         hdr.vxlan_valid = true;
         current_data += sizeof(struct vxlanhdr);
 
@@ -155,17 +167,17 @@ parse_vxlan:
 
 parse_inner_eth:
     {
-        if (data_end < current_data + sizeof(struct ethhdr)) {
+        if (data_end < current_data + sizeof(struct ethhdr_t)) {
             goto reject;
         }
 
-        __builtin_memcpy(&(hdr.outer_eth), &(hdr.eth), sizeof(struct ethhdr));
+        __builtin_memcpy((void *) &(hdr.outer_eth), (void *) &(hdr.eth), sizeof(struct ethhdr_t));
         hdr.outer_eth_valid = hdr.eth_valid;
 
         bpf_trace_message("Parser: extracting header hdr.eth\n");
-        __builtin_memcpy(&(hdr.eth), current_data, sizeof(struct ethhdr));
+        __builtin_memcpy((void *) &(hdr.eth), current_data, sizeof(struct ethhdr_t));
         hdr.eth_valid = true;
-        current_data += sizeof(struct ethhdr);
+        current_data += sizeof(struct ethhdr_t);
 
         switch (hdr.eth.h_proto) {
             case 0x0008: goto parse_inner_ip; break;
@@ -179,11 +191,11 @@ parse_inner_ip:
             goto reject;
         }
 
-        __builtin_memcpy(&(hdr.outer_ip), &(hdr.ip), sizeof(struct iphdr));
+        __builtin_memcpy((void *) &(hdr.outer_ip), (void *) &(hdr.ip), sizeof(struct iphdr));
         hdr.outer_ip_valid = hdr.ip_valid;
 
         bpf_trace_message("Parser: extracting header hdr.ip\n");
-        __builtin_memcpy(&(hdr.ip), current_data, sizeof(struct iphdr));
+        __builtin_memcpy((void *) &(hdr.ip), current_data, sizeof(struct iphdr));
         hdr.eth_valid = true;
         current_data += sizeof(struct iphdr);
 
@@ -207,14 +219,14 @@ accept:
     u32 ebpf_zero = 0;
     {
         if (hdr.vxlan_valid) {
-            __builtin_memcpy(&(hdr.eth.h_dest), &(hdr.outer_eth.h_dest), 6);
+            hdr.eth.h_dest = hdr.outer_eth.h_dest;
         }
 
         bpf_trace_message("Control: applying vxlan_0\n");
         {
             /* construct key */
             struct vxlan_key key = {};
-            __builtin_memcpy(&(key.field0), &(hdr.eth.h_dest), 6);
+            key.field0 = bpf_be64_to_cpu(hdr.eth.h_dest) >> 16;
             bpf_trace_message("Control: key hdr.ethernet.dst_addr=0x%llx\n", (unsigned long long) key.field0);
             /* value */
             struct vxlan_value *value = NULL;
@@ -242,9 +254,9 @@ accept:
                         bpf_trace_message("Control: param port_out=0x%llx (32 bits)\n", (unsigned long long) (value->u.vxlan_encap.port_out));
                         {
                             hdr.outer_eth_valid = true;
-                            __builtin_memcpy(&(hdr.outer_eth.h_source), &(value->u.vxlan_encap.ethernet_src_addr), 6);
-                            __builtin_memcpy(&(hdr.outer_eth.h_dest), &(value->u.vxlan_encap.ethernet_dst_addr), 6);
-                            hdr.outer_eth.h_proto = 0x0008;
+                            hdr.outer_eth.h_source = bpf_cpu_to_be64(value->u.vxlan_encap.ethernet_src_addr) >> 16;
+                            hdr.outer_eth.h_dest = bpf_cpu_to_be64(value->u.vxlan_encap.ethernet_dst_addr) >> 16;
+                            hdr.outer_eth.h_proto = bpf_htons(0x0800);
                             
                             hdr.outer_ip_valid = true;
                             hdr.outer_ip.ihl = 5;
@@ -255,8 +267,8 @@ accept:
                             hdr.outer_ip.frag_off = 0;
                             hdr.outer_ip.ttl = 64;
                             hdr.outer_ip.protocol = 17;
-                            hdr.outer_ip.saddr = value->u.vxlan_encap.ipv4_src_addr;
-                            hdr.outer_ip.daddr = value->u.vxlan_encap.ipv4_dst_addr;
+                            hdr.outer_ip.saddr = bpf_htonl(value->u.vxlan_encap.ipv4_src_addr);
+                            hdr.outer_ip.daddr = bpf_htonl(value->u.vxlan_encap.ipv4_dst_addr);
                             
                             hdr.udp_valid = true;
                             hdr.udp.source = bpf_htons(15221);
@@ -266,7 +278,7 @@ accept:
                             hdr.vxlan_valid = true;
                             hdr.vxlan.flags = 0;
                             hdr.vxlan.rsvd = 0;
-                            hdr.vxlan.vni = value->u.vxlan_encap.vxlan_vni;
+                            hdr.vxlan.vni = bpf_htonl(value->u.vxlan_encap.vxlan_vni) >> 8;
                             hdr.vxlan.rsvd2 = 0;
                             
                             ostd.drop = false;
@@ -314,7 +326,7 @@ accept:
     int ebpf_packetOffsetInBytes = current_data - data;
     int outHeaderLength = 0;
     if (hdr.eth_valid) {
-        outHeaderLength += sizeof(struct ethhdr);
+        outHeaderLength += sizeof(struct ethhdr_t);
     }
     if (hdr.ip_valid) {
         outHeaderLength += sizeof(struct iphdr);
@@ -326,7 +338,7 @@ accept:
         outHeaderLength += sizeof(struct vxlanhdr);
     }
     if (hdr.outer_eth_valid) {
-        outHeaderLength += sizeof(struct ethhdr);
+        outHeaderLength += sizeof(struct ethhdr_t);
     }
     if (hdr.outer_ip_valid) {
         outHeaderLength += sizeof(struct iphdr);
@@ -349,12 +361,12 @@ accept:
 
     if (hdr.outer_eth_valid) {
         bpf_trace_message("Deparser: emitting header hdr.outer_eth\n");
-        if (data_end < current_data + sizeof(struct ethhdr)) {
+        if (data_end < current_data + sizeof(struct ethhdr_t)) {
             bpf_trace_message("Deparser: invalid packet (packet too short)\n");
             return TC_ACT_SHOT;
         }
-        __builtin_memcpy(current_data, &(hdr.outer_eth), sizeof(struct ethhdr));
-        current_data += sizeof(struct ethhdr);
+        __builtin_memcpy(current_data, (void *) &(hdr.outer_eth), sizeof(struct ethhdr_t));
+        current_data += sizeof(struct ethhdr_t);
     }
 
     if (hdr.outer_ip_valid) {
@@ -366,7 +378,7 @@ accept:
 
         hdr.outer_ip.tot_len = bpf_htons(hdr.outer_ip.tot_len);
 
-        __builtin_memcpy(current_data, &(hdr.outer_ip), sizeof(struct iphdr));
+        __builtin_memcpy(current_data, (void *) &(hdr.outer_ip), sizeof(struct iphdr));
         current_data += sizeof(struct iphdr);
     }
 
@@ -379,7 +391,7 @@ accept:
 
         hdr.udp.len = htons(hdr.udp.len);
 
-        __builtin_memcpy(current_data, &(hdr.udp), sizeof(struct udphdr));
+        __builtin_memcpy(current_data, (void *) &(hdr.udp), sizeof(struct udphdr));
         current_data += sizeof(struct udphdr);
     }
 
@@ -389,18 +401,18 @@ accept:
             bpf_trace_message("Deparser: invalid packet (packet too short)\n");
             return TC_ACT_SHOT;
         }
-        __builtin_memcpy(current_data, &(hdr.vxlan), sizeof(struct vxlanhdr));
+        __builtin_memcpy(current_data, (void *) &(hdr.vxlan), sizeof(struct vxlanhdr));
         current_data += sizeof(struct vxlanhdr);
     }
 
     if (hdr.eth_valid) {
         bpf_trace_message("Deparser: emitting header hdr.eth\n");
-        if (data_end < current_data + sizeof(struct ethhdr)) {
+        if (data_end < current_data + sizeof(struct ethhdr_t)) {
             bpf_trace_message("Deparser: invalid packet (packet too short)\n");
             return TC_ACT_SHOT;
         }
-        __builtin_memcpy(current_data, &(hdr.eth), sizeof(struct ethhdr));
-        current_data += sizeof(struct ethhdr);
+        __builtin_memcpy(current_data, (void *) &(hdr.eth), sizeof(struct ethhdr_t));
+        current_data += sizeof(struct ethhdr_t);
     }
 
     if (hdr.ip_valid) {
@@ -412,7 +424,7 @@ accept:
 
         hdr.ip.tot_len = bpf_htons(hdr.ip.tot_len);
 
-        __builtin_memcpy(current_data, &(hdr.ip), sizeof(struct iphdr));
+        __builtin_memcpy(current_data, (void *) &(hdr.ip), sizeof(struct iphdr));
         current_data += sizeof(struct iphdr);
     }
 

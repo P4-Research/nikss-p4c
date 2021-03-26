@@ -1,10 +1,9 @@
 
-
 bpftool map update pinned /sys/fs/bpf/vxlan key hex f1 f2 f3 f4 f5 f6 00 00 value hex 01 00 00 00 0 0 0 0  e1 e2 e3 e4 e5 e6 0 0  11 12 13 14 15 16 0 0  01 02 03 04  05 06 07 08  10 0 0 0  02 0 0 0
 bpftool map update pinned /sys/fs/bpf/vxlan key hex 01 00 00 01 12 00 00 00 value hex 02 00 00 00 0 0 0 0  02 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 
 
 # from scapy.all import *
-# pkt = Ether(dst='f1:f2:f3:f4:f5:f6')/IP()/TCP()/raw("some data")
-# pkt = Ether(dst='01:00:00:01:12:00')/IP()/UDP()/VXLAN()/Ether()/IP()/TCP()/raw("some data")
+# pkt = Ether(dst='f6:f5:f4:f3:f2:f1')/IP()/TCP()/raw("some data")
+# pkt = Ether(dst='00:12:01:00:00:01')/IP()/UDP()/VXLAN()/Ether()/IP()/TCP()/raw("some data")
 # sendp(pkt, iface='veth0')
