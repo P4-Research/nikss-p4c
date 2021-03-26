@@ -38,6 +38,7 @@ class PSAArch {
     void emitInstances(CodeBuilder *builder) const;
     void emitPSAIncludes(CodeBuilder *builder) const;
     void emitHelperFunctions(CodeBuilder *builder) const;
+    void emitInitializer(CodeBuilder *p_builder) const;
 };
 
 class ConvertToEbpfPSA : public Transform {

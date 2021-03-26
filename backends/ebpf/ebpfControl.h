@@ -74,7 +74,7 @@ class EBPFControl : public EBPFObject {
     virtual void emit(CodeBuilder* builder);
     virtual void emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl);
     void emitTableTypes(CodeBuilder* builder);
-    void emitTableInitializers(CodeBuilder* builder);
+    virtual void emitTableInitializers(CodeBuilder* builder);
     virtual void emitTableInstances(CodeBuilder* builder);
     virtual bool build();
     EBPFTable* getTable(cstring name) const {

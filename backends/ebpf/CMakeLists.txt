@@ -138,6 +138,7 @@ file(RELATIVE_PATH
 # binary to be in the top level directory. This should go away when we
 # remove automake and fix the scripts.
 add_custom_target(linkp4cebpf
+  COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/load-prog ${P4C_BINARY_DIR}/load-prog
   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/prectl ${P4C_BINARY_DIR}/prectl
   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/p4c-ebpf ${P4C_BINARY_DIR}/p4c-ebpf
   COMMAND ${CMAKE_COMMAND} -E make_directory ${P4C_BINARY_DIR}/p4include &&
@@ -234,6 +235,13 @@ if (LIBBPF)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/runtime/usr/include)
   target_link_libraries (prectl z elf ${LIBBPF})
   install (TARGETS prectl
+          RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
+
+  set (LOAD_PROG_SRCS
+          runtime/load-prog/load_prog.c)
+  add_executable(load-prog ${LOAD_PROG_SRCS})
+  target_link_libraries (load-prog z elf ${LIBBPF})
+  install (TARGETS load-prog
           RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
 endif()
 
