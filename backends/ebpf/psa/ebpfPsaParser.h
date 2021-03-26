@@ -16,7 +16,7 @@ class PsaStateTranslationVisitor : public StateTranslationVisitor {
     bool selectHasValueSet = false;
     bool selectFirstIfStatement = true;
     bool selectHasDefault = false;
-    IR::SelectExpression* currentSelectExpression = nullptr;
+    const IR::SelectExpression* currentSelectExpression = nullptr;
 
     explicit PsaStateTranslationVisitor(P4::ReferenceMap* refMap, P4::TypeMap* typeMap,
                                         EBPFPsaParser * prsr) :

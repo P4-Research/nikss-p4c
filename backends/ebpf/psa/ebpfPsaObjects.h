@@ -1,20 +1,57 @@
 #ifndef BACKENDS_EBPF_PSA_EBPFPSAOBJECTS_H_
 #define BACKENDS_EBPF_PSA_EBPFPSAOBJECTS_H_
 
+#include "frontends/p4/methodInstance.h"
 #include "backends/ebpf/ebpfTable.h"
+#include "backends/ebpf/psa/externs/ebpfPsaCounter.h"
 
 namespace EBPF {
 
+class EBPFTablePSA;
+
+class ActionTranslationVisitorPSA : public ActionTranslationVisitor {
+ protected:
+    const EBPFTablePSA* table;
+
+ public:
+    ActionTranslationVisitorPSA(cstring valueName, const EBPFProgram* program,
+                                const EBPFTablePSA* table):
+            ActionTranslationVisitor(valueName, program), table(table) { }
+
+    bool preorder(const IR::MethodCallExpression* expression) override;
+
+    void processMethod(const P4::ExternMethod* method);
+};  // ActionTranslationVisitor
+
 class EBPFTablePSA : public EBPFTable {
+ protected:
+    ActionTranslationVisitor*
+        createActionTranslationVisitor(cstring valueName, const EBPFProgram* program) override {
+        return new ActionTranslationVisitorPSA(valueName, program, this);
+    }
+    void initDirectCounters();
+
  public:
     cstring name;
     size_t size;
+    std::vector<std::pair<cstring, EBPFCounterPSA *>> counters;
 
     EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* table,
-                 CodeGenInspector* codeGen, cstring name, size_t size) :
-                 EBPFTable(program, table, codeGen), name(name), size(size) { }
+                 CodeGenInspector* codeGen, cstring name, size_t size);
 
     void emitInstance(CodeBuilder* builder) override;
+
+    void emitDirectTypes(CodeBuilder* builder) override;
+
+    EBPFCounterPSA* getCounter(cstring name) const {
+        auto result = std::find_if(counters.begin(), counters.end(),
+            [name](std::pair<cstring, EBPFCounterPSA *> elem)->bool {
+                return name == elem.first;
+            });
+        if (result != counters.end())
+            return result->second;
+        return nullptr;
+    }
 };
 
 class EBPFTernaryTablePSA : public EBPFTablePSA {

@@ -22,6 +22,24 @@ limitations under the License.
 #include "frontends/p4/methodInstance.h"
 
 namespace EBPF {
+
+class ActionTranslationVisitor : public CodeGenInspector {
+ protected:
+    const EBPFProgram*  program;
+    const IR::P4Action* action;
+    cstring             valueName;
+
+ public:
+    ActionTranslationVisitor(cstring valueName, const EBPFProgram* program):
+            CodeGenInspector(program->refMap, program->typeMap), program(program),
+            action(nullptr), valueName(valueName)
+    { CHECK_NULL(program); }
+
+    bool preorder(const IR::PathExpression* expression);
+
+    bool preorder(const IR::P4Action* act);
+};  // ActionTranslationVisitor
+
 // Also used to represent counters
 class EBPFTableBase : public EBPFObject {
  public:
@@ -51,6 +69,10 @@ class EBPFTable : public EBPFTableBase {
  protected:
     bool isLPMTable();
     bool isTernaryTable();
+    virtual ActionTranslationVisitor*
+        createActionTranslationVisitor(cstring valueName, const EBPFProgram* program) {
+        return new ActionTranslationVisitor(valueName, program);
+    }
 
  public:
     const IR::Key*            keyGenerator;
@@ -78,6 +100,7 @@ class EBPFTable : public EBPFTableBase {
         return matchType->name.name == P4::P4CoreLibrary::instance.exactMatch.name ||
                matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name;
     }
+    virtual void emitDirectTypes(CodeBuilder* builder) { (void) builder; }
 
  private:
     cstring getByteSwapMethod(unsigned int width) const;
@@ -95,7 +118,7 @@ class EBPFCounterTable : public EBPFTableBase {
 
  public:
     EBPFCounterTable(const EBPFProgram* program, const IR::ExternBlock* block,
-                     cstring name, CodeGenInspector* codeGen, bool initialize = true);
+                     cstring name, CodeGenInspector* codeGen);
     EBPFCounterTable(const EBPFProgram* program, cstring name, CodeGenInspector* codeGen,
                      size_t size, bool isHash) :
             EBPFTableBase(program, name, codeGen), size(size), isHash(isHash) { }

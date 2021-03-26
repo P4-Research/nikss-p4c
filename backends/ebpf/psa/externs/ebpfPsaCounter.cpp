@@ -3,24 +3,36 @@
 
 namespace EBPF {
 
-EBPFCounterPSA::EBPFCounterPSA(const EBPFProgram* program, const IR::ExternBlock* block,
-               cstring name, CodeGenInspector* codeGen) :
-               EBPFCounterTable(program, block, name, codeGen, false) {
-    if (!block->node->is<IR::Declaration_Instance>()) {
-        ::error(ErrorType::ERR_EXPRESSION, "Not a declaration instance: %1%", block);
+EBPFCounterPSA::EBPFCounterPSA(const EBPFProgram* program, const IR::Declaration_Instance* di,
+                               cstring name, CodeGenInspector* codeGen) :
+                               EBPFCounterTable(program, name, codeGen, 1, false) {
+    CHECK_NULL(di);
+    if (!di->type->is<IR::Type_Specialized>()) {
+        ::error(ErrorType::ERR_MODEL, "Missing specialization: %1%", di);
         return;
     }
-    if (!block->instanceType->is<IR::Type_SpecializedCanonical>()) {
-        ::error(ErrorType::ERR_MODEL, "Missing specialization: %1%", block);
+    auto ts = di->type->to<IR::Type_Specialized>();
+    if (ts->baseType->toString() == "Counter") {
+        isDirect = false;
+    } else if (ts->baseType->toString() == "DirectCounter") {
+        isDirect = true;
+    } else {
+        ::error(ErrorType::ERR_UNKNOWN, "Unknown counter type extern: %1%", di);
         return;
     }
 
-    auto di = block->node->to<IR::Declaration_Instance>();
-    auto ts = block->instanceType->to<IR::Type_SpecializedCanonical>();
+    if (isDirect && di->arguments->size() != 1) {
+        ::error(ErrorType::ERR_MODEL, "Expected 1 argument: %1%", di);
+        return;
+    } else if (!isDirect && di->arguments->size() != 2) {
+        ::error(ErrorType::ERR_MODEL, "Expected 2 arguments: %1%", di);
+        return;
+    }
 
-    // Direct counter has one specializtion argument, dataplane width,
-    // which also is at first position
-    if (ts->arguments->size() != 2) {
+    if (isDirect && ts->arguments->size() != 1) {
+        ::error(ErrorType::ERR_MODEL, "Expected 1 specialization type: %1%", ts);
+        return;
+    } else if (!isDirect && ts->arguments->size() != 2) {
         ::error(ErrorType::ERR_MODEL, "Expected 2 specialization types: %1%", ts);
         return;
     }
@@ -44,30 +56,36 @@ EBPFCounterPSA::EBPFCounterPSA(const EBPFProgram* program, const IR::ExternBlock
     }
 
     // check index type
-    auto istype = ts->arguments->at(1);
-    if (!dpwtype->is<IR::Type_Bits>()) {
-        ::error(ErrorType::ERR_UNSUPPORTED, "Must be bit or int type: %1%", ts);
-        return;
-    }
-    unsigned indexWidth = istype->width_bits();
-    if (indexWidth != 32) {
-        // ARRAY_MAP can have only 32 bits key, so assume this and warn user
-        ::warning(ErrorType::WARN_UNSUPPORTED,
-                  "Only 32-bits keys are supported, changed to 32 bits: %1%", ts);
-        indexWidth = 32;
-    }
-    indexWidthType = EBPFTypeFactory::instance->create(istype);
+    if (!isDirect) {
+        auto istype = ts->arguments->at(1);
+        if (!dpwtype->is<IR::Type_Bits>()) {
+            ::error(ErrorType::ERR_UNSUPPORTED, "Must be bit or int type: %1%", ts);
+            return;
+        }
+        unsigned indexWidth = istype->width_bits();
+        if (indexWidth != 32) {
+            // ARRAY_MAP can have only 32 bits key, so assume this and warn user
+            ::warning(ErrorType::WARN_UNSUPPORTED,
+                      "Only 32-bits keys are supported, changed to 32 bits: %1%", ts);
+            indexWidth = 32;
+        }
+        indexWidthType = EBPFTypeFactory::instance->create(istype);
 
-    auto declaredSize = (*di->arguments)[0]->expression->to<IR::Constant>();
-    if (!declaredSize->fitsInt()) {
-        ::error(ErrorType::ERR_OVERLIMIT, "%1%: size too large", declaredSize);
-        return;
+        auto declaredSize = di->arguments->at(0)->expression->to<IR::Constant>();
+        if (!declaredSize->fitsInt()) {
+            ::error(ErrorType::ERR_OVERLIMIT, "%1%: size too large", declaredSize);
+            return;
+        }
+        size = declaredSize->asUnsigned();
+    } else {
+        indexWidthType = nullptr;
     }
-    size = declaredSize->asUnsigned();
 
     // TODO: add more advance logic to decide whether used map will be HASH_MAP or ARRAY_MAP
     isHash = false;
-    type = toCounterType((*di->arguments)[1]->expression->to<IR::Constant>()->asInt());
+
+    auto typeArg = di->arguments->at(di->arguments->size() - 1)->expression->to<IR::Constant>();
+    type = toCounterType(typeArg->asInt());
 }
 
 EBPFCounterPSA::CounterType EBPFCounterPSA::toCounterType(const int type) {
@@ -97,7 +115,9 @@ void EBPFCounterPSA::emitKeyType(CodeBuilder* builder) {
 
 void EBPFCounterPSA::emitValueType(CodeBuilder* builder) {
     builder->emitIndent();
-    builder->appendLine("typedef struct ");
+    if (!isDirect)
+        builder->append("typedef ");
+    builder->append("struct ");
     builder->blockStart();
     if (type == CounterType::BYTES || type == CounterType::PACKETS_AND_BYTES) {
         builder->emitIndent();
@@ -113,7 +133,10 @@ void EBPFCounterPSA::emitValueType(CodeBuilder* builder) {
     }
 
     builder->blockEnd(false);
-    builder->appendFormat(" %s", valueTypeName.c_str());
+    if (isDirect)
+        builder->appendFormat(" %s", instanceName.c_str());
+    else
+        builder->appendFormat(" %s", valueTypeName.c_str());
     builder->endOfStatement(true);
 }
 
@@ -122,12 +145,42 @@ void EBPFCounterPSA::emitMethodInvocation(CodeBuilder* builder, const P4::Extern
         ::error(ErrorType::ERR_UNSUPPORTED, "Unexpected method %1%", method->expr);
         return;
     }
+    BUG_CHECK(!isDirect, "DirectCounter used outside of table");
     BUG_CHECK(method->expr->arguments->size() == 1,
               "Expected just 1 argument for %1%", method->expr);
 
     builder->blockStart();
     this->emitCount(builder, method->expr);
     builder->blockEnd(false);
+}
+
+void EBPFCounterPSA::emitDirectMethodInvocation(CodeBuilder* builder,
+                                                const P4::ExternMethod* method,
+                                                cstring valuePtr) {
+    if (method->method->name.name != "count") {
+        ::error(ErrorType::ERR_UNSUPPORTED, "Unexpected method %1%", method->expr);
+        return;
+    }
+    BUG_CHECK(isDirect, "Bad Counter invocation");
+    BUG_CHECK(method->expr->arguments->size() == 0,
+              "Expected no arguments for %1%", method->expr);
+
+    cstring target = valuePtr + "->" + instanceName;
+    auto pipeline = dynamic_cast<const EBPFPipeline *>(program);
+    if (pipeline == nullptr) {
+        ::error(ErrorType::ERR_UNSUPPORTED,
+                "DirectCounter used outside of pipeline %1%", method->expr);
+        return;
+    }
+    cstring msgStr = Util::printf_format("Counter: updating %s, packets=1, bytes=%%u",
+                                         instanceName.c_str());
+    cstring varStr = Util::printf_format("%s->len", pipeline->contextVar.c_str());
+    builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, varStr.c_str());
+
+    emitCounterUpdate(builder, target, false, pipeline->contextVar, "");
+
+    msgStr = Util::printf_format("Counter: %s updated", instanceName.c_str());
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
 }
 
 void EBPFCounterPSA::emitCount(CodeBuilder* builder,

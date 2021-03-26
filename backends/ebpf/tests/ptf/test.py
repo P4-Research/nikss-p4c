@@ -5,20 +5,15 @@ import subprocess
 import copy
 import shlex
 import random
+import json
+import ctypes as c
+import struct
 
 import ptf
 # from ptf import config
 # from ptf.mask import Mask
 import ptf.testutils as testutils
-from scapy.packet import Packet
-from scapy.fields import (
-    ByteField,
-    IntField,
-    ShortField,
-)
 from ptf.base_tests import BaseTest
-import ctypes as c
-import struct
 
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import IP, UDP
@@ -89,6 +84,18 @@ class EbpfTest(BaseTest):
         if map_in_map:
             value = "pinned /sys/fs/bpf/{} any".format(value)
         self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/{} key {} value {}".format(name, key, value))
+
+    def read_map(self, name, key):
+        cmd = "bpftool -j map lookup pinned /sys/fs/bpf/{} key {}".format(name, key)
+        _, stdout, _ = self.exec_ns_cmd(cmd, "Failed to read map {}".format(name))
+        value = [format(int(v, 0), '02x') for v in json.loads(stdout)['value']]
+        return ' '.join(value)
+
+    def verify_map_entry(self, name, key, expected_value):
+        value = self.read_map(name, key)
+        if expected_value != value:
+            self.fail("Map {} key {} does not have correct value. Expected {}; got {}"
+                      .format(name, key, expected_value, value))
 
     def setUp(self):
         super(EbpfTest, self).setUp()
@@ -165,6 +172,10 @@ class SimpleForwardingPSATest(P4EbpfTest):
         self.update_map(name="ingress_tbl_fwd_defaultAction", key="00 00 00 00", value="01 00 00 00 05 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT1)
+
+    def tearDown(self):
+        self.remove_maps(["ingress_tbl_fwd", "ingress_tbl_fwd_defaultAction"])
+        super(SimpleForwardingPSATest, self).tearDown()
 
 
 class PSAResubmitTest(P4EbpfTest):
@@ -373,28 +384,7 @@ class SimpleLpmP4TwoKeysPSATest(P4EbpfTest):
 
 
 class CountersPSATest(P4EbpfTest):
-    import json
-
     p4_file_path = "samples/p4testdata/counters.p4"
-
-    def get_counter_value(self, name, cid):
-        # convert number into hex stream and compose separate bytes as decimal values
-        cid = ['{}{}'.format(a, b) for a, b in zip(*[iter('{:08x}'.format(cid))]*2)]
-        cid = [format(int(v, 16), 'd') for v in cid]
-        cid.reverse()
-        cid = ' '.join(cid)
-        cmd = "bpftool -j map lookup pinned /sys/fs/bpf/{} key {}".format(name, cid)
-        _, stdout, _ = self.exec_ns_cmd(cmd, "Failed to get counter")
-        # create hex string from value
-        value = [format(int(v, 0), '02x') for v in self.json.loads(stdout)['value']]
-        value.reverse()
-        return ''.join(value)
-
-    def verify_counter(self, name, cid, expected_value):
-        value = self.get_counter_value(name, cid)
-        if expected_value != value:
-            self.fail("Counter {}.{} does not have correct value. Expected {}; got {}"
-                      .format(name, cid, expected_value, value))
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55',
@@ -403,9 +393,9 @@ class CountersPSATest(P4EbpfTest):
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
 
-        self.verify_counter("ingress_test1_cnt", 1, "0000000000000064")
-        self.verify_counter("ingress_test2_cnt", 1, "00000001")
-        self.verify_counter("ingress_test3_cnt", 1, "0000000100000064")
+        self.verify_map_entry("ingress_test1_cnt", "1 0 0 0", "64 00 00 00 00 00 00 00")
+        self.verify_map_entry("ingress_test2_cnt", "1 0 0 0", "01 00 00 00")
+        self.verify_map_entry("ingress_test3_cnt", "1 0 0 0", "64 00 00 00 01 00 00 00")
 
         pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55',
                                          eth_src='00:AA:00:00:01:FE',
@@ -413,15 +403,38 @@ class CountersPSATest(P4EbpfTest):
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
 
-        self.verify_counter("ingress_test1_cnt", 510, "00000000000000c7")
-        self.verify_counter("ingress_test2_cnt", 510, "00000001")
-        self.verify_counter("ingress_test3_cnt", 510, "00000001000000c7")
+        self.verify_map_entry("ingress_test1_cnt", "hex fe 01 00 00", "c7 00 00 00 00 00 00 00")
+        self.verify_map_entry("ingress_test2_cnt", "hex fe 01 00 00", "01 00 00 00")
+        self.verify_map_entry("ingress_test3_cnt", "hex fe 01 00 00", "c7 00 00 00 01 00 00 00")
 
     def tearDown(self):
         self.remove_map("ingress_test1_cnt")
         self.remove_map("ingress_test2_cnt")
         self.remove_map("ingress_test3_cnt")
         super(CountersPSATest, self).tearDown()
+
+
+class DirectCountersPSATest(P4EbpfTest):
+    p4_file_path = "samples/p4testdata/direct-counters.p4"
+
+    def runTest(self):
+        self.update_map("ingress_tbl1", "0 0 0 10", "1 0 0 0  0 0 0 0  0 0 0 0")
+        self.update_map("ingress_tbl2", "1 0 0 10", "2 0 0 0  0 0 0 0  0 0 0 0  0 0 0 0")
+        self.update_map("ingress_tbl2", "2 0 0 10", "3 0 0 0  0 0 0 0  0 0 0 0  0 0 0 0")
+
+        for i in range(3):
+            pkt = testutils.simple_ip_packet(pktlen=100, ip_src='10.0.0.{}'.format(i))
+            testutils.send_packet(self, PORT0, str(pkt))
+            testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+
+        self.verify_map_entry("ingress_tbl1", "0 0 0 10", "01 00 00 00 64 00 00 00 01 00 00 00")
+        self.verify_map_entry("ingress_tbl2", "1 0 0 10", "02 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00")
+        self.verify_map_entry("ingress_tbl2", "2 0 0 10", "03 00 00 00 64 00 00 00 01 00 00 00 01 00 00 00")
+
+    def tearDown(self):
+        self.remove_maps(["ingress_tbl1", "ingress_tbl1_defaultAction",
+                          "ingress_tbl2", "ingress_tbl2_defaultAction"])
+        super(DirectCountersPSATest, self).tearDown()
 
 
 class DigestPSATest(P4EbpfTest):

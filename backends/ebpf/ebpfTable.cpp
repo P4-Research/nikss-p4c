@@ -22,45 +22,30 @@ limitations under the License.
 
 namespace EBPF {
 
-namespace {
-class ActionTranslationVisitor : public CodeGenInspector {
- protected:
-    const EBPFProgram*  program;
-    const IR::P4Action* action;
-    cstring             valueName;
-
- public:
-    ActionTranslationVisitor(cstring valueName, const EBPFProgram* program):
-            CodeGenInspector(program->refMap, program->typeMap), program(program),
-            action(nullptr), valueName(valueName)
-    { CHECK_NULL(program); }
-
-    bool preorder(const IR::PathExpression* expression) {
-        auto decl = program->refMap->getDeclaration(expression->path, true);
-        if (decl->is<IR::Parameter>()) {
-            auto param = decl->to<IR::Parameter>();
-            bool isParam = action->parameters->getParameter(param->name) == param;
-            if (isParam) {
-                builder->append(valueName);
-                builder->append("->u.");
-                cstring name = EBPFObject::externalName(action);
-                builder->append(name);
-                builder->append(".");
-                builder->append(expression->path->toString());  // original name
-                return false;
-            }
+bool ActionTranslationVisitor::preorder(const IR::PathExpression* expression) {
+    auto decl = program->refMap->getDeclaration(expression->path, true);
+    if (decl->is<IR::Parameter>()) {
+        auto param = decl->to<IR::Parameter>();
+        bool isParam = action->parameters->getParameter(param->name) == param;
+        if (isParam) {
+            builder->append(valueName);
+            builder->append("->u.");
+            cstring name = EBPFObject::externalName(action);
+            builder->append(name);
+            builder->append(".");
+            builder->append(expression->path->toString());  // original name
+            return false;
         }
-        visit(expression->path);
-        return false;
     }
+    visit(expression->path);
+    return false;
+}
 
-    bool preorder(const IR::P4Action* act) {
-        action = act;
-        visit(action->body);
-        return false;
-    }
-};  // ActionTranslationVisitor
-}  // namespace
+bool ActionTranslationVisitor::preorder(const IR::P4Action* act) {
+    action = act;
+    visit(action->body);
+    return false;
+}
 
 ////////////////////////////////////////////////////////////////
 
@@ -212,6 +197,9 @@ void EBPFTable::emitValueType(CodeBuilder* builder) {
     builder->blockEnd(false);
     builder->spc();
     builder->appendLine("u;");
+
+    emitDirectTypes(builder);
+
     builder->blockEnd(false);
     builder->endOfStatement(true);
 
@@ -462,12 +450,12 @@ void EBPFTable::emitAction(CodeBuilder* builder, cstring valueName) {
 
         builder->emitIndent();
 
-        ActionTranslationVisitor visitor(valueName, program);
-        visitor.setBuilder(builder);
-        visitor.copySubstitutions(codeGen);
-        visitor.copyPointerVariables(codeGen);
+        auto visitor = createActionTranslationVisitor(valueName, program);
+        visitor->setBuilder(builder);
+        visitor->copySubstitutions(codeGen);
+        visitor->copyPointerVariables(codeGen);
 
-        action->apply(visitor);
+        action->apply(*visitor);
         builder->newline();
         builder->emitIndent();
         builder->appendLine("break;");
@@ -670,11 +658,8 @@ bool EBPFTable::isTernaryTable() {
 ////////////////////////////////////////////////////////////////
 
 EBPFCounterTable::EBPFCounterTable(const EBPFProgram* program, const IR::ExternBlock* block,
-                                   cstring name, CodeGenInspector* codeGen, bool initialize) :
+                                   cstring name, CodeGenInspector* codeGen) :
         EBPFTableBase(program, name, codeGen) {
-    if (!initialize)
-        return;
-
     auto sz = block->getParameterValue(program->model.counterArray.max_index.name);
     if (sz == nullptr || !sz->is<IR::Constant>()) {
         ::error(ErrorType::ERR_INVALID,
