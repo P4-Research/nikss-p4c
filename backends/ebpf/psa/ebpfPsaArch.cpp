@@ -16,10 +16,11 @@ void PSAArch::emit(CodeBuilder *builder) const {
      * 3. Macro definitions (it's called "preamble")
      * 4. Headers, structs, types, PSA-specific data types.
      * 5. BPF map definitions.
-     * 6. XDP helper program.
-     * 7. Helper functions
-     * 8. TC Ingress program.
-     * 9. TC Egress program.
+     * 6. BPF map initialization
+     * 7. XDP helper program.
+     * 8. Helper functions
+     * 9. TC Ingress program.
+     * 10. TC Egress program.
      */
 
     // 1. Automatically generated comment.
@@ -48,26 +49,28 @@ void PSAArch::emit(CodeBuilder *builder) const {
      */
     emitInstances(builder);
 
-    //Tutaj emit
+    /*
+     * 6. BPF map initialization
+     */
     emitInitializer(builder);
 
     /*
-     * 6. XDP helper program.
+     * 7. XDP helper program.
      */
     xdp->emit(builder);
 
     /*
-     * 7. Helper functions for ingress and egress program.
+     * 8. Helper functions for ingress and egress program.
      */
     emitHelperFunctions(builder);
 
     /*
-     * 8. TC Ingress program.
+     * 9. TC Ingress program.
      */
     tcIngress->emit(builder);
 
     /*
-     * 9. TC Egress program.
+     * 10. TC Egress program.
      */
     tcEgress->emit(builder);
 
@@ -271,7 +274,6 @@ void PSAArch::emitInstances(CodeBuilder *builder) const {
 }
 
 void PSAArch::emitInitializer(CodeBuilder *builder) const {
-    builder->newline();
     builder->appendLine("SEC(\"classifier/map-initializer\")");
     builder->appendFormat("int %s()",
                           "map_initialize");
@@ -281,6 +283,7 @@ void PSAArch::emitInitializer(CodeBuilder *builder) const {
     builder->appendFormat("u32 %s = 0;", this->tcIngress->zeroKey.c_str());
     builder->newline();
     tcIngress->control->emitTableInitializers(builder);
+    tcEgress->control->emitTableInitializers(builder);
     builder->newline();
     builder->emitIndent();
     builder->appendLine("return 0;");

@@ -647,27 +647,7 @@ class ParserValueSetPSATest(P4EbpfTest):
         super(ParserValueSetPSATest, self).tearDown()
 
 
-class ConstDefaultActionPSATest(EbpfTest):
-
-    test_prog_image = "samples/const-action.o"
-
-    def runTest(self):
-        pkt = testutils.simple_ip_packet()
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT1)
-
-    def tearDown(self):
-        self.remove_maps(
-            ["multicast_grp_tbl",
-             "clone_session_tbl",
-             "ingress_tbl_const_action",
-             "ingress_tbl_const_action_defaultAction"]
-        )
-
-        super(EbpfTest, self).tearDown()
-
-
-class ConstDefaultActionPSAP4Test(P4EbpfTest):
+class ConstDefaultActionPSATest(P4EbpfTest):
 
     p4_file_path = "samples/p4testdata/action-const-default.p4"
 
@@ -678,16 +658,14 @@ class ConstDefaultActionPSAP4Test(P4EbpfTest):
 
     def tearDown(self):
         self.remove_maps(
-            ["multicast_grp_tbl",
-             "clone_session_tbl",
-             "ingress_tbl_const_action",
+            ["ingress_tbl_const_action",
              "ingress_tbl_const_action_defaultAction"]
         )
 
-        super(EbpfTest, self).tearDown()
+        super(P4EbpfTest, self).tearDown()
 
 
-class ConstEntryPSAP4Test(P4EbpfTest):
+class ConstEntryPSATest(P4EbpfTest):
 
     p4_file_path = "samples/p4testdata/const-entry.p4"
 
@@ -698,10 +676,31 @@ class ConstEntryPSAP4Test(P4EbpfTest):
 
     def tearDown(self):
         self.remove_maps(
-            ["multicast_grp_tbl",
-             "clone_session_tbl",
-             "ingress_tbl_const_action",
-             "ingress_tbl_const_action_defaultAction"]
+            ["ingress_tbl_const_entry",
+             "ingress_tbl_const_entry_defaultAction"]
         )
 
-        super(EbpfTest, self).tearDown()
+        super(P4EbpfTest, self).tearDown()
+
+
+class ConstEntryAndActionPSATest(P4EbpfTest):
+
+    p4_file_path = "samples/p4testdata/const-entry-and-action.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+        # via default action
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT1)
+
+        # via const entry
+        testutils.send_packet(self, PORT2, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT0)
+
+    def tearDown(self):
+        self.remove_maps(
+            ["ingress_tbl_entry_action",
+             "ingress_tbl_entry_action_defaultAction"]
+        )
+
+        super(P4EbpfTest, self).tearDown()

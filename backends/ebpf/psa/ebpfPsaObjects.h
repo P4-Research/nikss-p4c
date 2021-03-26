@@ -32,10 +32,12 @@ class EBPFTablePSA : public EBPFTable {
     void initDirectCounters();
 
  private:
-    void emitTableValue(CodeBuilder* builder, const IR::MethodCallExpression* actionMce, cstring valueName);
+    void emitTableValue(CodeBuilder* builder, const IR::MethodCallExpression* actionMce,
+                        cstring valueName);
     void emitDefaultActionInitializer(CodeBuilder *builder);
     void emitConstEntriesInitializer(CodeBuilder *builder);
-    void emitMapUpdateTraceMsg(CodeBuilder *builder, cstring mapName, cstring returnCode) const;
+    void emitMapUpdateTraceMsg(CodeBuilder *builder, cstring mapName,
+                               cstring returnCode) const;
 
  public:
     cstring name;

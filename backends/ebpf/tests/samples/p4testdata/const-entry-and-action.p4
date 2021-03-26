@@ -92,19 +92,20 @@ control ingress(inout headers hdr,
         send_to_port(ostd, egress_port);
     }
 
-    table tbl_const_entry {
+    table tbl_entry_action {
         key = {
             istd.ingress_port : exact;
         }
         actions = { do_forward; NoAction; }
+        const default_action = do_forward((PortId_t) 5);
         const entries = {
-            (PortId_t)4 : do_forward((PortId_t) 5);
+            (PortId_t)6 : do_forward((PortId_t) 4);
         }
         size = 100;
     }
 
     apply {
-         tbl_const_entry.apply();
+         tbl_entry_action.apply();
     }
 }
 
