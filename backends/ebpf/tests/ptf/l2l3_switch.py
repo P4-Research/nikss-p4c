@@ -55,7 +55,7 @@ class L2L3SwitchTest(P4EbpfTest):
         self.configure_port(port_id=6, vlan_id=1)
         self.configure_port(port_id=8, vlan_id=1)
         self.configure_port(port_id=7, vlan_id=2)
-        
+
         # Create multicast group and add members
         # TODO: replace bpftool with prectl
         # Multicast group for VLAN 1
@@ -189,7 +189,6 @@ class RoutingTest(L2L3SwitchTest):
         exp_pkt[Ether].dst = "00:00:00:00:02:02"
         exp_pkt[Dot1Q].vlan = 2
         exp_pkt[IP].ttl = 63
-        exp_pkt[IP].chksum = 0x5C94
         testutils.verify_packet(self, str(pkt), PORT3)
 
         # enable routing from VLAN 2 to VLAN 1
@@ -212,7 +211,6 @@ class RoutingTest(L2L3SwitchTest):
         exp_pkt[Ether].dst = "00:00:00:00:00:01"
         exp_pkt[Dot1Q].vlan = 1
         exp_pkt[IP].ttl = 63
-        exp_pkt[IP].chksum = 0x5C94
         testutils.verify_packet(self, str(pkt), PORT1)
 
 

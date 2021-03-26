@@ -86,7 +86,7 @@ struct local_metadata_t {
 }
 
 parser packet_parser(packet_in packet, out headers_t headers, inout local_metadata_t local_metadata, in psa_ingress_parser_input_metadata_t standard_metadata, in empty_metadata_t resub_meta, in empty_metadata_t recirc_meta) {
-
+    InternetChecksum() ck;
     state start {
         transition parse_ethernet;
     }
@@ -110,6 +110,11 @@ parser packet_parser(packet_in packet, out headers_t headers, inout local_metada
 
     state parse_ipv4 {
         packet.extract(headers.ipv4);
+
+        ck.set_state(headers.ipv4.hdr_checksum);
+        ck.subtract({/* 16-bit word */ headers.ipv4.ttl, headers.ipv4.protocol });
+        headers.ipv4.hdr_checksum = ck.get();
+
         transition select(headers.ipv4.protocol) {
             PROTO_TCP: parse_tcp;
             PROTO_UDP: parse_udp;
@@ -134,10 +139,15 @@ parser packet_parser(packet_in packet, out headers_t headers, inout local_metada
 
 control packet_deparser(packet_out packet, out empty_metadata_t clone_i2e_meta, out empty_metadata_t resubmit_meta, out empty_metadata_t normal_meta, inout headers_t headers, in local_metadata_t local_metadata, in psa_ingress_output_metadata_t istd) {
     Digest<mac_learn_digest_t>() mac_learn_digest;
+    InternetChecksum() ck;
     apply {
         if (local_metadata.send_mac_learn_msg) {
             mac_learn_digest.pack(local_metadata.mac_learn_msg);
         }
+
+        ck.set_state(headers.ipv4.hdr_checksum);
+        ck.add({/* 16-bit word */ headers.ipv4.ttl, headers.ipv4.protocol });
+        headers.ipv4.hdr_checksum = ck.get();
 
         packet.emit(headers.bridged_meta);
         packet.emit(headers.ethernet);
