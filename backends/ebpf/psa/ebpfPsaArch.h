@@ -122,6 +122,7 @@ class ConvertToEBPFControlPSA : public Inspector {
     P4::ReferenceMap *refmap;
 
     EBPF::EBPFControlPSA *control;
+
  public:
     ConvertToEBPFControlPSA(EBPF::EBPFProgram *program, const IR::Parameter* parserHeaders,
                             P4::ReferenceMap *refmap,

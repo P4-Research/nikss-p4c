@@ -240,7 +240,7 @@ StateTranslationVisitor::compileExtractField(
     // printed only when its fits into register
     if (widthToExtract <= 64) {
         cstring exprStr = expr->toString();
-        if (expr->to<IR::Member>()->expr->is<IR::PathExpression>() &&
+        if (expr->is<IR::Member>() && expr->to<IR::Member>()->expr->is<IR::PathExpression>() &&
             asPointerVariables.count(
                     expr->to<IR::Member>()->expr->to<IR::PathExpression>()->path->name.name) > 0) {
             exprStr = exprStr.replace(".", "->");

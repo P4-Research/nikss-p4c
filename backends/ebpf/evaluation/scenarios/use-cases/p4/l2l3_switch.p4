@@ -111,7 +111,7 @@ parser packet_parser(packet_in packet, out headers_t headers, inout local_metada
     state parse_ipv4 {
         packet.extract(headers.ipv4);
 
-        ck.set_state(headers.ipv4.hdr_checksum);
+        ck.subtract(headers.ipv4.hdr_checksum);
         ck.subtract({/* 16-bit word */ headers.ipv4.ttl, headers.ipv4.protocol });
         headers.ipv4.hdr_checksum = ck.get();
 
@@ -145,7 +145,7 @@ control packet_deparser(packet_out packet, out empty_metadata_t clone_i2e_meta, 
             mac_learn_digest.pack(local_metadata.mac_learn_msg);
         }
 
-        ck.set_state(headers.ipv4.hdr_checksum);
+        ck.subtract(headers.ipv4.hdr_checksum);
         ck.add({/* 16-bit word */ headers.ipv4.ttl, headers.ipv4.protocol });
         headers.ipv4.hdr_checksum = ck.get();
 
