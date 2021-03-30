@@ -26,6 +26,10 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     builder->append(":");
     builder->newline();
     builder->emitIndent();
+    builder->appendFormat("%s.parser_error = %s",
+                          control->inputStandardMetadata->name.name.c_str(), errorVar.c_str());
+    builder->endOfStatement(true);
+    builder->emitIndent();
     builder->blockStart();
     // TODO: add more info: packet length, ingress port
     msgStr = Util::printf_format("%s control: packet processing started", sectionName);

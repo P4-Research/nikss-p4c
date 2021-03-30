@@ -163,6 +163,18 @@ class EBPFEnumType : public EBPFType, public EBPF::IHasWidth {
     const IR::Type_Enum* getType() const { return type->to<IR::Type_Enum>(); }
 };
 
+// represents an error type for PSA
+class EBPFErrorTypePSA : public EBPFType {
+ public:
+    explicit EBPFErrorTypePSA(const IR::Type_Error * type) : EBPFType(type) {}
+
+    void emit(CodeBuilder* builder) override;
+    void declare(CodeBuilder* builder, cstring id, bool asPointer) override;
+    void emitInitializer(CodeBuilder* builder) override;
+
+    const IR::Type_Error* getType() const { return type->to<IR::Type_Error>(); }
+};
+
 }  // namespace EBPF
 
 #endif /* _BACKENDS_EBPF_EBPFTYPE_H_ */

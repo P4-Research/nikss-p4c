@@ -38,6 +38,7 @@ class StateTranslationVisitor : public CodeGenInspector {
     void compileExtract(const IR::Expression* destination);
     void compileLookahead(const IR::Expression* destination);
 
+    virtual void processFunction(const P4::ExternFunction* function);
     virtual void processMethod(const P4::ExternMethod* method);
 
  public:
@@ -88,6 +89,7 @@ class EBPFParser : public EBPFObject {
 
     virtual void emitTypes(CodeBuilder* builder) { (void) builder; }
     virtual void emitValueSetInstances(CodeBuilder* builder) { (void) builder; }
+    virtual void emitRejectState(CodeBuilder* builder);
 };
 
 }  // namespace EBPF

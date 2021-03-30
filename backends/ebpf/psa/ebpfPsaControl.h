@@ -11,6 +11,8 @@ class ControlBodyTranslatorPSA : public ControlBodyTranslator {
     explicit ControlBodyTranslatorPSA(const EBPFControl* control) :
             ControlBodyTranslator(control) {}
 
+    bool preorder(const IR::Member* expression) override;
+
     void processMethod(const P4::ExternMethod* method) override;
 };
 
