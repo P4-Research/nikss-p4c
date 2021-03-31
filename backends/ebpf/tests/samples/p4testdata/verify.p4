@@ -50,8 +50,7 @@ control ingress(inout headers hdr,
                 inout psa_ingress_output_metadata_t ostd)
 {
     apply {
-        if (istd.parser_error != error.NoError)
-        {
+        if (istd.parser_error != error.NoError) {
             ostd.drop = true;
             return;
         }
@@ -83,8 +82,7 @@ control egress(inout headers hdr,
                inout psa_egress_output_metadata_t ostd)
 {
     apply {
-        if (istd.parser_error != error.NoError)
-        {
+        if (istd.parser_error != error.NoError) {
             ostd.drop = true;
             return;
         }
