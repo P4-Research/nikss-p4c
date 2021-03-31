@@ -10,12 +10,147 @@ import struct
 
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import IP, UDP
+from scapy.layers.vxlan import VXLAN
 from ptf.packet import MPLS
 
 PORT0 = 0
 PORT1 = 1
 PORT2 = 2
 ALL_PORTS = [PORT0, PORT1, PORT2]
+
+
+class EbpfTest(BaseTest):
+    switch_ns = 'test'
+    test_prog_image = 'generic.o'  # default, if test case not specify program
+    ctool_file_path = ""
+
+    def exec_ns_cmd(self, command='echo me', do_fail=None):
+        command = "nsenter --net=/var/run/netns/" + self.switch_ns + " " + command
+        return self.exec_cmd(command, do_fail)
+
+    def exec_cmd(self, command, do_fail=None):
+        if isinstance(command, str):
+            command = shlex.split(command)
+        process = subprocess.Popen(command,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+        stdout_data, stderr_data = process.communicate()
+        if stderr_data is None:
+            stderr_data = ""
+        if stdout_data is None:
+            stdout_data = ""
+        if process.returncode != 0:
+            logger.info("Command failed: %s", command)
+            logger.info("Return code: %d", process.returncode)
+            logger.info("STDOUT: %s", stdout_data)
+            logger.info("STDERR: %s", stderr_data)
+            if do_fail:
+                self.fail("Command failed (see above for details): {}".format(str(do_fail)))
+        return process.returncode, stdout_data, stderr_data
+
+    def add_port(self, dev):
+        self.exec_ns_cmd("bpftool net attach xdp pinned /sys/fs/bpf/prog/xdp_xdp-ingress dev {} overwrite".format(dev))
+        self.exec_ns_cmd("tc qdisc add dev {} clsact".format(dev))
+        self.exec_ns_cmd("tc filter add dev {} ingress bpf da fd /sys/fs/bpf/prog/classifier_tc-ingress".format(dev))
+        self.exec_ns_cmd("tc filter add dev {} egress bpf da fd /sys/fs/bpf/prog/classifier_tc-egress".format(dev))
+
+    def del_port(self, dev):
+        self.exec_ns_cmd("ip link set dev {} xdp off".format(dev))
+        self.exec_ns_cmd("tc qdisc del dev {} clsact".format(dev))
+
+    def remove_map(self, name):
+        self.exec_ns_cmd("rm /sys/fs/bpf/{}".format(name))
+
+    def remove_maps(self, maps):
+        for map in maps:
+            self.remove_map(map)
+
+    def create_map(self, name, type, key_size, value_size, max_entries):
+        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/{} type "
+                         "{} key {} value {} entries {} name {}".format(
+                         name, type, key_size, value_size, max_entries, name))
+
+    def update_map(self, name, key, value, map_in_map=False):
+        if map_in_map:
+            value = "pinned /sys/fs/bpf/{} any".format(value)
+        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/{} key {} value {}".format(name, key, value))
+
+    def read_map(self, name, key):
+        cmd = "bpftool -j map lookup pinned /sys/fs/bpf/{} key {}".format(name, key)
+        _, stdout, _ = self.exec_ns_cmd(cmd, "Failed to read map {}".format(name))
+        value = [format(int(v, 0), '02x') for v in json.loads(stdout)['value']]
+        return ' '.join(value)
+
+    def verify_map_entry(self, name, key, expected_value):
+        value = self.read_map(name, key)
+        if expected_value != value:
+            self.fail("Map {} key {} does not have correct value. Expected {}; got {}"
+                      .format(name, key, expected_value, value))
+
+    def setUp(self):
+        super(EbpfTest, self).setUp()
+        self.dataplane = ptf.dataplane_instance
+        self.dataplane.flush()
+
+        if "namespace" in testutils.test_params_get():
+            self.switch_ns = testutils.test_param_get("namespace")
+        logger.info("Using namespace: %s", self.switch_ns)
+        self.interfaces = testutils.test_param_get("interfaces").split(",")
+        logger.info("Using interfaces: %s", str(self.interfaces))
+
+        self.exec_ns_cmd("load-prog {}".format(self.test_prog_image))
+
+        for intf in self.interfaces:
+            self.add_port(dev=intf)
+
+        if self.ctool_file_path:
+            head, tail = os.path.split(self.ctool_file_path)
+            filename = tail.split(".")[0]
+            so_file_path = head + "/" + filename + ".so"
+            cmd = ["clang", "-fPIC", "-l", "bpf", "-shared", "-o", so_file_path, self.ctool_file_path]
+            self.exec_cmd(cmd, "Ctool compilation error")
+            self.so_file_path = so_file_path
+
+    def tearDown(self):
+        for intf in self.interfaces:
+            self.del_port(intf)
+        self.exec_ns_cmd("rm -rf /sys/fs/bpf/prog")
+        self.exec_cmd("rm -rf /sys/fs/bpf/prog")
+        super(EbpfTest, self).tearDown()
+
+
+class P4EbpfTest(EbpfTest):
+    """
+    Similar to EbpfTest, but generates BPF bytecode from a P4 program.
+    """
+
+    p4_file_path = ""
+
+    def setUp(self):
+        if not os.path.exists(self.p4_file_path):
+            self.fail("P4 program not found, no such file.")
+
+        if not os.path.exists("ptf_out"):
+            os.makedirs("ptf_out")
+
+        head, tail = os.path.split(self.p4_file_path)
+        filename = tail.split(".")[0]
+        c_file_path = os.path.join("ptf_out", filename + ".c")
+        cmd = ["p4c-ebpf", "--trace", "--arch", "psa", "-o", c_file_path, self.p4_file_path]
+        self.exec_cmd(cmd, "P4 compilation error")
+        output_file_path = os.path.join("ptf_out", filename + ".o")
+
+        cmd = ["clang", "-O2", "-target", "bpf", "-Werror", "-DBTF", "-DPSA_PORT_RECIRCULATE=2", "-g", "-c", c_file_path, "-o", output_file_path, "-I../runtime", "-I../runtime/contrib/libbpf/include/uapi/", "-I../runtime/contrib/libbpf/src/" ]
+        self.exec_cmd(cmd, "Clang compilation error")
+        self.test_prog_image = output_file_path
+
+        super(P4EbpfTest, self).setUp()
+
+    def tearDown(self):
+        self.remove_map("clone_session_tbl")
+        self.remove_map("multicast_grp_tbl")
+        super(P4EbpfTest, self).tearDown()
+
 
 class SimpleForwardingPSATest(P4EbpfTest):
 
@@ -592,3 +727,37 @@ class VerifyPSATest(P4EbpfTest):
         pkt[Ether].type = 0xFF00
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_no_other_packets(self)
+
+
+
+class CheckNewParserSpecialization(EbpfTest):
+
+    test_prog_image = "samples/test.o"
+
+    def runTest(self):
+        # pkt = testutils.simple_ip_packet()
+        # zrob ten pakiet porzadnie
+
+        pkt = Ether(dst="00:00:00:00:00:01", src="00:00:00:00:00:02")
+        pkt = pkt / IP(src="10.10.10.10", dst="11.11.11.11")
+
+        self.update_map(name="ingress_vxlan", key="hex 01 00 00 00 00 00 00 00", value="hex 01 00 00 00 0 0 0 0 ff ff ff ff ff ff 0 0  11 11 11 11 11 11 0 0  01 02 03 04 05 06 07 08 10 0 0 0 05 0 0 0")
+        testutils.send_packet(self, PORT0, str(pkt))
+
+        vxlan_pkt = Ether(dst="ff:ff:ff:ff:ff:ff", src="11:11:11:11:11:11")
+        vxlan_pkt = vxlan_pkt / IP(src="4.3.2.1", dst="8.7.6.5", id=0x1513, ttl=64, frag=0, tos=0, ihl=0x45, chksum=0)
+        vxlan_pkt = vxlan_pkt / UDP(sport=15221, dport=4789, chksum=0)
+        vxlan_pkt = vxlan_pkt / VXLAN(flags=0, reserved0=0, reserved1=0, reserved2=0, vni=0x000010)
+        vxlan_pkt = vxlan_pkt / Ether(dst="00:00:00:00:00:01", src="00:00:00:00:00:02")
+        vxlan_pkt = vxlan_pkt / IP(src="10.10.10.10", dst="11.11.11.11")
+        testutils.verify_packet(self, str(vxlan_pkt), PORT1)
+
+    def tearDown(self):
+        self.remove_map("clone_session_tbl")
+        self.remove_map("multicast_grp_tbl")
+        # self.remove_maps(
+        #     ["ingress_vxlan",
+        #      "ingress_vxlan_defaultAction"]
+        # )
+
+        super(EbpfTest, self).tearDown()

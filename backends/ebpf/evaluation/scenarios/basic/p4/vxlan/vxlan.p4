@@ -135,7 +135,7 @@ control ingress(inout headers_t headers, inout local_metadata_t local_metadata1,
             headers.outer_udp.setValid();
             headers.outer_udp.src_port = 15221; // random port
             headers.outer_udp.dst_port = 4789;
-            headers.outer_udp.length = headers.ipv4.total_len + (8 + 8 + 14);
+            headers.outer_udp.length = headers.ipv4.total_len + (14 + 8 + 8); // UDP(8) + VXLAN(8) + Ethernet(14) + IP (20)
 
             headers.vxlan.setValid();
             headers.vxlan.flags = 0;
