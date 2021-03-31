@@ -34,7 +34,6 @@ void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder,
 
     int remainingBits = 16, bitsToRead;
     for (auto field : arguments) {
-        cstring fieldName = field->toString();
         auto fieldType = field->type->to<IR::Type_Bits>();
         if (fieldType == nullptr) {
             ::error(ErrorType::ERR_UNSUPPORTED, "Only bits types are supported %1%", field);
@@ -83,10 +82,10 @@ void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder,
                                                   1, tmpVar.c_str());
                 builder->emitIndent();
                 if (addData) {
-                    builder->appendFormat("%s = csum_replace2(%s, 0, %s)", stateVar.c_str(),
+                    builder->appendFormat("%s = csum16_add(%s, %s)", stateVar.c_str(),
                                           stateVar.c_str(), tmpVar.c_str());
                 } else {
-                    builder->appendFormat("%s = csum_replace2(%s, %s, 0)", stateVar.c_str(),
+                    builder->appendFormat("%s = csum16_sub(%s, %s)", stateVar.c_str(),
                                           stateVar.c_str(), tmpVar.c_str());
                 }
                 builder->endOfStatement(true);
@@ -94,7 +93,7 @@ void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder,
         }
     }
 
-    builder->target->emitTraceMessage(builder, "InternetChecksum: new checksum=0x%llx",
+    builder->target->emitTraceMessage(builder, "InternetChecksum: new state=0x%llx",
                                       1, stateVar.c_str());
     builder->blockEnd(true);
 }
@@ -107,9 +106,6 @@ void InternetChecksumAlgorithm::emitGlobals(CodeBuilder* builder) {
                         "}\n"
                         "inline u16 csum16_sub(u16 csum, u16 addend) {\n"
                         "    return csum16_add(csum, ~addend);\n"
-                        "}\n"
-                        "inline u16 csum_replace2(u16 csum, u16 old, u16 new) {\n"
-                        "    return (~csum16_add(csum16_sub(~csum, old), new));\n"
                         "}");
 }
 
@@ -133,7 +129,7 @@ void InternetChecksumAlgorithm::emitAddData(CodeBuilder* builder,
 }
 
 void InternetChecksumAlgorithm::emitGet(CodeBuilder* builder) {
-    builder->append(stateVar);
+    builder->appendFormat("((u16) (~%s))", stateVar.c_str());
 }
 
 void InternetChecksumAlgorithm::emitSubtractData(CodeBuilder* builder,
