@@ -356,7 +356,9 @@ void StateTranslationVisitor::processMethod(const P4::ExternMethod* method) {
 }
 
 bool StateTranslationVisitor::preorder(const IR::MethodCallExpression* expression) {
-    builder->append("/* ");
+    if (commentDescriptionDepth == 0)
+        builder->append("/* ");
+    commentDescriptionDepth++;
     visit(expression->method);
     builder->append("(");
     bool first = true;
@@ -367,8 +369,15 @@ bool StateTranslationVisitor::preorder(const IR::MethodCallExpression* expressio
         visit(a);
     }
     builder->append(")");
-    builder->append("*/");
-    builder->newline();
+    if (commentDescriptionDepth == 1) {
+        builder->append("*/");
+        builder->newline();
+    }
+    commentDescriptionDepth--;
+
+    // do not process extern when comment is generated
+    if (commentDescriptionDepth != 0)
+        return false;
 
     auto mi = P4::MethodInstance::resolve(expression,
                                           state->parser->program->refMap,

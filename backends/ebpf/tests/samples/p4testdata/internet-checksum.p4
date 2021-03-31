@@ -39,13 +39,16 @@ struct empty_metadata_t {
 }
 
 struct metadata {
-    bit<16> checksum;
 }
 
 struct headers {
     ethernet_t ethernet;
     ipv4_t     ipv4;
     udp_t      udp;
+}
+
+error {
+    BadIPv4HeaderChecksum
 }
 
 parser IngressParserImpl(
@@ -81,7 +84,8 @@ parser IngressParserImpl(
             /* 16-bit words 6-7 */  parsed_hdr.ipv4.srcAddr,
             /* 16-bit words 8-9 */  parsed_hdr.ipv4.dstAddr
             });
-        user_meta.checksum = ck.get();
+        verify(parsed_hdr.ipv4.hdrChecksum == ck.get(), error.BadIPv4HeaderChecksum);
+        parsed_hdr.ipv4.hdrChecksum = ck.get_state();
         transition accept;
     }
 }
@@ -93,11 +97,13 @@ control ingress(inout headers hdr,
                 inout psa_ingress_output_metadata_t ostd)
 {
     apply {
+        if (istd.parser_error != error.NoError) {
+            return;
+        }
+
         if (hdr.ipv4.isValid()){
-            if (user_meta.checksum == hdr.ipv4.hdrChecksum) {
-                ostd.drop = false;
-                ostd.egress_port = (PortId_t) 5;
-            }
+            ostd.drop = false;
+            ostd.egress_port = (PortId_t) 5;
         }
     }
 }
@@ -141,7 +147,7 @@ parser EgressParserImpl(
         ck.set_state(parsed_hdr.ipv4.hdrChecksum);
         ck.subtract({/* 16-bit word 4 */    parsed_hdr.ipv4.ttl, parsed_hdr.ipv4.protocol,
                      /* 16-bit words 6-7 */ parsed_hdr.ipv4.srcAddr});
-        parsed_hdr.ipv4.hdrChecksum = ck.get();
+        parsed_hdr.ipv4.hdrChecksum = ck.get_state();
 
         transition select(parsed_hdr.ipv4.protocol) {
             0x11: parse_udp;
@@ -154,7 +160,7 @@ parser EgressParserImpl(
         ck.subtract(parsed_hdr.udp.checksum);
         // remove fields from IP pseudo-header (protocol or packet length will not be changed)
         ck.subtract({parsed_hdr.ipv4.srcAddr, parsed_hdr.ipv4.dstAddr});
-        parsed_hdr.udp.checksum = ck.get();
+        parsed_hdr.udp.checksum = ck.get_state();
         transition accept;
     }
 }
@@ -191,7 +197,7 @@ control EgressDeparserImpl(
         parsed_hdr.ipv4.hdrChecksum = ck.get();
 
         ck.clear();
-        ck.subtract(parsed_hdr.udp.checksum);
+        ck.set_state(parsed_hdr.udp.checksum);
         ck.add({parsed_hdr.ipv4.srcAddr, parsed_hdr.ipv4.dstAddr});
         parsed_hdr.udp.checksum = ck.get();
 
