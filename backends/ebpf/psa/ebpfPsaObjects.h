@@ -26,7 +26,8 @@ class ActionTranslationVisitorPSA : public ActionTranslationVisitor {
 class EBPFTablePSA : public EBPFTable {
  protected:
     ActionTranslationVisitor*
-        createActionTranslationVisitor(cstring valueName, const EBPFProgram* program) override {
+        createActionTranslationVisitor(cstring valueName,
+                                       const EBPFProgram* program) const override {
         return new ActionTranslationVisitorPSA(valueName, program, this);
     }
     void initDirectCounters();

@@ -160,9 +160,8 @@ void EBPFTable::emitValueType(CodeBuilder* builder) {
         if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
             continue;
         }
-        cstring name = EBPFObject::externalName(action);
         builder->emitIndent();
-        builder->appendFormat("#define ACT_%s %d", name.toUpper(), action_idx);
+        builder->appendFormat("#define %s %d", actionToActionIDName(action), action_idx);
         builder->newline();
         action_idx++;
     }
@@ -423,7 +422,7 @@ void EBPFTable::emitAction(CodeBuilder* builder, cstring valueName) {
         if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
             builder->append("case 0: ");
         } else {
-            cstring actionName = "ACT_" + name.toUpper();
+            cstring actionName = actionToActionIDName(action);
             builder->appendFormat("case %s: ", actionName);
         }
         builder->newline();
@@ -511,7 +510,7 @@ void EBPFTable::emitInitializer(CodeBuilder* builder) {
     if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
         builder->append(".action = 0,");
     } else {
-        cstring actionName = "ACT_" + name.toUpper();
+        cstring actionName = actionToActionIDName(action);
         builder->appendFormat(".action = %s,", actionName);
     }
     builder->newline();
@@ -585,7 +584,7 @@ void EBPFTable::emitInitializer(CodeBuilder* builder) {
                               valueTypeName.c_str(), value.c_str());
         builder->blockStart();
         builder->emitIndent();
-        cstring actionName = "ACT_" + name.toUpper();
+        cstring actionName = actionToActionIDName(action);
         builder->appendFormat(".action = %s,", actionName);
         builder->newline();
 
@@ -617,6 +616,12 @@ void EBPFTable::emitInitializer(CodeBuilder* builder) {
         builder->blockEnd(true);
     }
     builder->blockEnd(true);
+}
+
+cstring EBPFTable::actionToActionIDName(const IR::P4Action * action) const {
+    cstring actionName = EBPFObject::externalName(action);
+    cstring tableInstance = dataMapName;
+    return Util::printf_format("%s_ACT_%s", tableInstance.toUpper(), actionName.toUpper());
 }
 
 // As ternary has precedence over lpm, this function checks if any
