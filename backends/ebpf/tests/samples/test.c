@@ -98,22 +98,6 @@ struct headers_t {
 struct tmp_headers_t {
     int a[23];
 };
-//struct headers_valid_t {
-//    u8 ethernet_valid;
-//    u8 ipv4_valid;
-//    u8 vxlan_valid;
-//    u8 outer_ethernet_valid;
-//    u8 outer_ipv4_valid;
-//    u8 outer_udp_valid;
-//};
-//struct headers_offsets_t {
-//    u8 ethernet;
-//    u8 ipv4;
-//    u8 vxlan;
-//    u8 outer_ethernet;
-//    u8 outer_ipv4;
-//    u8 outer_udp;
-//};
 struct local_metadata_t {
 };
 
@@ -151,18 +135,6 @@ REGISTER_END()
 
 SEC("classifier/map-initializer")
 int map_initialize() {
-    u32 ebpf_zero = 0;
-//    struct ingress_vxlan_value value_0 = {
-//            .action = ACT_INGRESS_VXLAN_ENCAP,
-//            .u = {.ingress_vxlan_encap = { 5, 5, 5, 5, 5, 5 }},
-//    };
-////    struct ingress_vxlan_key key_0 = {
-////            .field0 = 0x,
-////    };
-//    int ret = BPF_MAP_UPDATE_ELEM(ingress_vxlan_defaultAction, &ebpf_zero, &value_0, BPF_ANY);
-//    if (ret) {
-//    } else {
-//    }
 
     return 0;
 }
@@ -271,16 +243,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     struct headers_t headers = *headers_ptr;
     struct local_metadata_t local_metadata1 = {
     };
-    struct tmp_headers_t tmp_header;
-//    struct headers_valid_t hdr_valid = {0};
-//    struct headers_offsets_t hdr_offset = {0};
-
-    //bpf_trace_message("Sizeof (): %d\n", sizeof(headers));
-    //bpf_trace_message("Sizeof (): %d\n", sizeof(headers.ethernet));
-    //bpf_trace_message("Sizeof (): %d\n", sizeof(headers.ipv4));
-    //bpf_trace_message("Sizeof (): %d\n", sizeof(tmp_header));
-//    bpf_trace_message("Sizeof (): %d\n", sizeof(hdr_valid));
-//    bpf_trace_message("Sizeof (): %d\n", sizeof(hdr_offset));
+    volatile struct tmp_headers_t tmp_header;
 
     unsigned ebpf_packetOffsetInBits = 0;unsigned ebpf_packetOffsetInBits_save = 0;
     ParserError_t ebpf_errorCode = NoError;
@@ -295,21 +258,14 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
         goto reject;
     }
 
-//    hdr_offset.ethernet = 0;
     headers.ethernet.offset = 0;
-
     headers.ethernet.dst_addr = (u64)((load_dword(pkt, BYTES(ebpf_packetOffsetInBits)) >> 16) & EBPF_MASK(u64, 48));
     ebpf_packetOffsetInBits += 48;
-
-//    headers.ethernet.src_addr = (u64)((load_dword(pkt, BYTES(ebpf_packetOffsetInBits)) >> 16) & EBPF_MASK(u64, 48));
     ebpf_packetOffsetInBits += 48;
-
     headers.ethernet.ether_type = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
 
     headers.ethernet.ebpf_valid = 1;
-//    hdr_valid.ethernet_valid = 1;
-
 
 /* extract(headers.ipv4)*/
     if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
@@ -317,41 +273,21 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
         goto reject;
     }
 
-//    hdr_offset.ipv4 = BYTES(ebpf_packetOffsetInBits);
     headers.ipv4.offset = BYTES(ebpf_packetOffsetInBits);
 
-//    headers.ipv4.ver_ihl = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
-
-//    headers.ipv4.diffserv = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
-
     headers.ipv4.total_len = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
-
-//    headers.ipv4.identification = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
-
-//    headers.ipv4.flags_offset = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
-
-//    headers.ipv4.ttl = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
-
     headers.ipv4.protocol = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
-
-//    headers.ipv4.hdr_checksum = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
-
-//    headers.ipv4.src_addr = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 32;
-
-//    headers.ipv4.dst_addr = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 32;
-
     headers.ipv4.ebpf_valid = 1;
-//    hdr_valid.ipv4_valid = 1;
 
     switch (headers.ipv4.protocol) {
         case 17: goto parse_udp;
@@ -365,23 +301,13 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
         goto reject;
     }
 
-//    hdr_offset.outer_udp = BYTES(ebpf_packetOffsetInBits);
     headers.outer_udp.offset = BYTES(ebpf_packetOffsetInBits);
-
-//    headers.outer_udp.src_port = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
-
     headers.outer_udp.dst_port = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
-
-//    headers.outer_udp.length = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
-
-//    headers.outer_udp.checksum = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
-
     headers.outer_udp.ebpf_valid = 1;
-//    hdr_valid.outer_udp_valid = 1;
 
     switch (headers.outer_udp.dst_port) {
         case 4789: goto parse_vxlan;
@@ -394,48 +320,30 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
         ebpf_errorCode = PacketTooShort;
         goto reject;
     }
-//    hdr_offset.vxlan = BYTES(ebpf_packetOffsetInBits);
+
     headers.vxlan.offset = BYTES(ebpf_packetOffsetInBits);
-
-//    headers.vxlan.flags = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
-
-//    headers.vxlan.reserved = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits)) >> 8) & EBPF_MASK(u32, 24));
     ebpf_packetOffsetInBits += 24;
-
-//    headers.vxlan.vni = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits)) >> 8) & EBPF_MASK(u32, 24));
     ebpf_packetOffsetInBits += 24;
-
-//    headers.vxlan.reserved2 = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
-
     headers.vxlan.ebpf_valid = 1;
-//    hdr_valid.vxlan_valid = 1;
 
-    headers.outer_ethernet = headers.ethernet;/* extract(headers.ethernet)*/
-//    hdr_offset.outer_ethernet = hdr_offset.ethernet;
-    headers.outer_ethernet.offset = headers.ethernet.offset;
-    headers.outer_ethernet.ebpf_valid = headers.ethernet.ebpf_valid;
+    headers.outer_ethernet = headers.ethernet;
 
     if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
         ebpf_errorCode = PacketTooShort;
         goto reject;
     }
 
-//    hdr_offset.ethernet = BYTES(ebpf_packetOffsetInBits);
     headers.ethernet.offset = BYTES(ebpf_packetOffsetInBits);
 
     headers.ethernet.dst_addr = (u64)((load_dword(pkt, BYTES(ebpf_packetOffsetInBits)) >> 16) & EBPF_MASK(u64, 48));
     ebpf_packetOffsetInBits += 48;
-
-//    headers.ethernet.src_addr = (u64)((load_dword(pkt, BYTES(ebpf_packetOffsetInBits)) >> 16) & EBPF_MASK(u64, 48));
     ebpf_packetOffsetInBits += 48;
-
     headers.ethernet.ether_type = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
 
     headers.ethernet.ebpf_valid = 1;
-//    hdr_valid.ethernet_valid = 1;
 
     switch (headers.ethernet.ether_type) {
         case 2048: goto parse_inner_ipv4;
@@ -443,47 +351,25 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     }
 }
     parse_inner_ipv4: {
-    headers.outer_ipv4 = headers.ipv4;/* extract(headers.ipv4)*/
-//    hdr_offset.outer_ipv4 = hdr_offset.ipv4;
-    headers.outer_ipv4.offset = headers.ipv4.offset;
-    headers.outer_ipv4.ebpf_valid = headers.ipv4.ebpf_valid;
+    headers.outer_ipv4 = headers.ipv4;
 
     if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
         ebpf_errorCode = PacketTooShort;
         goto reject;
     }
 
-//    hdr_offset.ipv4 = BYTES(ebpf_packetOffsetInBits);
     headers.ipv4.offset = BYTES(ebpf_packetOffsetInBits);
-
-//    headers.ipv4.ver_ihl = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
-
-//    headers.ipv4.diffserv = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
-
     headers.ipv4.total_len = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
-
-//    headers.ipv4.identification = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
-
-//    headers.ipv4.flags_offset = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
-
-//    headers.ipv4.ttl = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
-
-    headers.ipv4.protocol = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
+//    headers.ipv4.protocol = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
-
-//    headers.ipv4.hdr_checksum = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
-
-//    headers.ipv4.src_addr = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 32;
-
-//    headers.ipv4.dst_addr = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 32;
 
     headers.ipv4.ebpf_valid = 1;
@@ -536,15 +422,12 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
                     switch (value->action) {
                         case ACT_INGRESS_VXLAN_ENCAP:
                         {
-                            //bpf_trace_message("Encap \n");
-                            // tutaj chyba trzeba offsetow uzywac
-//                            hdr_valid.outer_ethernet_valid = true;
+
                             headers.outer_ethernet.ebpf_valid = true;
                             headers.outer_ethernet.src_addr = value->u.ingress_vxlan_encap.ethernet_src_addr;
                             headers.outer_ethernet.dst_addr = value->u.ingress_vxlan_encap.ethernet_dst_addr;
                             headers.outer_ethernet.ether_type = 2048;
 
-//                            hdr_valid.outer_ipv4_valid = true;
                             headers.outer_ipv4.ebpf_valid = true;
                             headers.outer_ipv4.ver_ihl = 69;
                             headers.outer_ipv4.diffserv = 0;
@@ -556,13 +439,11 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
                             headers.outer_ipv4.src_addr = value->u.ingress_vxlan_encap.ipv4_src_addr;
                             headers.outer_ipv4.dst_addr = value->u.ingress_vxlan_encap.ipv4_dst_addr;
 
-//                            hdr_valid.outer_udp_valid = true;
                             headers.outer_udp.ebpf_valid = true;
                             headers.outer_udp.src_port = 15221;
                             headers.outer_udp.dst_port = 4789;
                             headers.outer_udp.length = headers.ipv4.total_len + 30;
 
-//                            hdr_valid.vxlan_valid = true;
                             headers.vxlan.ebpf_valid = true;
                             headers.vxlan.flags = 0;
                             headers.vxlan.reserved = 0;
@@ -576,11 +457,6 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
                             break;
                         case ACT_INGRESS_VXLAN_DECAP:
                         {
-                            //bpf_trace_message("Decap \n");
-//                            hdr_valid.outer_ethernet_valid = false;
-//                            hdr_valid.outer_ipv4_valid = false;
-//                            hdr_valid.outer_udp_valid = false;
-//                            hdr_valid.vxlan_valid = false;
                             headers.outer_ethernet.ebpf_valid = false;
                             headers.outer_ipv4.ebpf_valid = false;
                             headers.outer_udp.ebpf_valid = false;
