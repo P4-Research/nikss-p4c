@@ -284,6 +284,10 @@ control ingress(inout headers_t headers, inout local_metadata_t local_metadata, 
         if (tbl_routable.apply().hit) {
             switch (tbl_routing.apply().action_run) {
                 set_nexthop: {
+                    if (headers.ipv4.ttl == 0) {
+                        drop();
+                        exit;
+                    }
                     tbl_out_arp.apply();
                 }
             }
@@ -299,25 +303,6 @@ control ingress(inout headers_t headers, inout local_metadata_t local_metadata, 
 }
 
 control egress(inout headers_t headers, inout local_metadata_t local_metadata, in psa_egress_input_metadata_t istd, inout psa_egress_output_metadata_t ostd) {
-
-    action drop() {
-        egress_drop(ostd);
-    }
-
-    table tbl_mcast_src_pruning {
-        key = {
-            istd.packet_path : exact;
-        }
-
-        actions = {
-            NoAction;
-            drop;
-        }
-
-        const default_action = NoAction();
-
-        size = 1;
-    }
 
     action strip_vlan() {
         headers.ethernet.ether_type = headers.vlan_tag.eth_type;

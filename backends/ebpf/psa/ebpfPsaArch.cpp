@@ -542,7 +542,8 @@ bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Instance* instance)
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Variable* decl) {
-    if (decl->type->to<IR::Type_Name>()->path->name.name == "psa_ingress_output_metadata_t") {
+    if (decl->type->is<IR::Type_Name>() &&
+            decl->type->to<IR::Type_Name>()->path->name.name == "psa_ingress_output_metadata_t") {
         control->codeGen->asPointerVariables.insert(decl->name.name);
     }
 
