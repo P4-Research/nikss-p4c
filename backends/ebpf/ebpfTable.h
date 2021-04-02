@@ -70,7 +70,7 @@ class EBPFTable : public EBPFTableBase {
     bool isLPMTable();
     bool isTernaryTable();
     virtual ActionTranslationVisitor*
-        createActionTranslationVisitor(cstring valueName, const EBPFProgram* program) {
+        createActionTranslationVisitor(cstring valueName, const EBPFProgram* program) const {
         return new ActionTranslationVisitor(valueName, program);
     }
 
@@ -101,6 +101,7 @@ class EBPFTable : public EBPFTableBase {
                matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name;
     }
     virtual void emitDirectTypes(CodeBuilder* builder) { (void) builder; }
+    cstring actionToActionIDName(const IR::P4Action * action) const;
 
  private:
     cstring getByteSwapMethod(unsigned int width) const;

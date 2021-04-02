@@ -199,7 +199,7 @@ void EBPFTablePSA::emitTableValue(CodeBuilder* builder, const IR::MethodCallExpr
     if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
         builder->append(".action = 0,");
     } else {
-        cstring fullActionName = "ACT_" + actionName.toUpper();
+        cstring fullActionName = actionToActionIDName(action);
         builder->appendFormat(".action = %s,", fullActionName);
     }
     builder->newline();
