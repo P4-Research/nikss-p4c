@@ -4,6 +4,16 @@ This repository implements PSA (Portable Switch Architecture) for eBPF. All file
 
 Refer to the [Cilium docs](https://docs.cilium.io/en/latest/bpf/) to learn more about eBPF.
 
+# Project
+
+The project is a joint cooperation between WUT (Warsaw University of Technology) and Orange Labs Poland. 
+
+We share project-related files (design docs, presentations, perf results, etc.) via Google Drive: https://drive.google.com/drive/folders/1Mvfj_L4OSsdzK2XFnysxIm1vAPCvCa8F?usp=sharing.
+Please, use this location to share your contributions.
+
+We use [the PSA-eBPF Google document](https://docs.google.com/document/d/1zMKN9jKDZeAV3GK-Y7fymGwZA-HWRzG5S-HHtbR6nmE/edit?usp=sharing)
+to take notes from the meetings.
+
 # Design
 
 Refer to the [design document](./backends/ebpf/docs/design.md) to find out more.
