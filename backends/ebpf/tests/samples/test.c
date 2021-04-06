@@ -384,7 +384,9 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     accept:
     {
 
-        __builtin_memcpy((void *) &(tmp_header), pkt, BYTES(ebpf_packetOffsetInBits));
+        void * ptr = (void *) &(tmp_header);
+//        __builtin_memcpy(ptr, pkt, skb->len);
+        __builtin_memcpy(ptr, pkt, BYTES(ebpf_packetOffsetInBits));
 
         struct psa_ingress_input_metadata_t standard_metadata = {
                 .ingress_port = skb->ifindex,
@@ -394,10 +396,9 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
         };
         u8 hit_1;
         {
-            if (            headers.vxlan.ebpf_valid) {
-                headers.ethernet.dst_addr = headers.outer_ethernet.dst_addr;            }
-
-            //
+            if (headers.vxlan.ebpf_valid) {
+                headers.ethernet.dst_addr = headers.outer_ethernet.dst_addr;
+            }
 
             {
                 /* construct key */
@@ -533,7 +534,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
             }
             //bpf_trace_message("Outer ethernet emit \n");
 
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.outer_ethernet.offset), 14);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.outer_ethernet.offset), 14);
 
             headers.outer_ethernet.dst_addr = htonll(headers.outer_ethernet.dst_addr << 16);
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ethernet.dst_addr), 6);
@@ -555,7 +556,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
             }
             //bpf_trace_message("Outer ipv4 emit \n");
 
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.outer_ipv4.offset), 20);//20
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.outer_ipv4.offset), 20);//20
 
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ipv4.ver_ihl), 1);
             ebpf_packetOffsetInBits += 8;
@@ -629,7 +630,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
 
             //bpf_trace_message("Vxlan emit \n");
 
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.vxlan.offset), 8);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.vxlan.offset), 8);
 
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.vxlan.flags), 1);
             ebpf_packetOffsetInBits += 8;
@@ -784,24 +785,24 @@ int tc_egress_func(SK_BUFF *skb) {
     //bpf_trace_message("TC egress\n");
     struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->cb;
     volatile struct headers_t headers = {
-//            .ethernet = {
-//                    .ebpf_valid = 0
-//            },
-//            .ipv4 = {
-//                    .ebpf_valid = 0
-//            },
-//            .vxlan = {
-//                    .ebpf_valid = 0
-//            },
-//            .outer_ethernet = {
-//                    .ebpf_valid = 0
-//            },
-//            .outer_ipv4 = {
-//                    .ebpf_valid = 0
-//            },
-//            .outer_udp = {
-//                    .ebpf_valid = 0
-//            },
+            .ethernet = {
+                    .ebpf_valid = 0
+            },
+            .ipv4 = {
+                    .ebpf_valid = 0
+            },
+            .vxlan = {
+                    .ebpf_valid = 0
+            },
+            .outer_ethernet = {
+                    .ebpf_valid = 0
+            },
+            .outer_ipv4 = {
+                    .ebpf_valid = 0
+            },
+            .outer_udp = {
+                    .ebpf_valid = 0
+            },
     };
     unsigned ebpf_packetOffsetInBits = 0;unsigned ebpf_packetOffsetInBits_save = 0;
     ParserError_t ebpf_errorCode = NoError;
