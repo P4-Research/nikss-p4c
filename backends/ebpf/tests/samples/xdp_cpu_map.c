@@ -358,12 +358,13 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr_ptr,
         }
         *ether_type = md->pkt_ether_type;
     }
-    struct headers parsed_hdr = *parsed_hdr_ptr;
+//    struct headers parsed_hdr = *parsed_hdr_ptr;
     struct metadata user_meta = {
             .fwd_metadata = {
             },
     };
-    unsigned ebpf_packetOffsetInBits = 0;unsigned ebpf_packetOffsetInBits_save = 0;
+    unsigned ebpf_packetOffsetInBits = 272;
+    unsigned ebpf_packetOffsetInBits_save = 0;
     ParserError_t ebpf_errorCode = NoError;
     void* pkt = ((void*)(long)skb->data);
     void* ebpf_packetEnd = ((void*)(long)skb->data_end);
@@ -371,17 +372,14 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr_ptr,
     unsigned char ebpf_byte;
 
     //odczytanie z mapy do parsed_hdr
-
     bpf_trace_message("Control start\n");
-
-    struct headers *hdr_ptr;
+    struct headers *hdr_ptr = NULL;
     hdr_ptr = BPF_MAP_LOOKUP_ELEM(per_cpu_map, &ebpf_zero);
     bpf_trace_message("Po lookup\n");
     if (hdr_ptr == NULL) {
         bpf_trace_message("classifier/tc-ingress control: brak pakietu w cpu mapie!\n");
         return TC_ACT_SHOT;
     } else {
-        parsed_hdr = *hdr_ptr;
         bpf_trace_message("Nagłówki w mapie\n");
         goto accept;
     }
@@ -471,10 +469,10 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr_ptr,
             return TC_ACT_UNSPEC;
         }
         int outHeaderLength = 0;
-        if (parsed_hdr.ethernet.ebpf_valid) {
+        if (hdr_ptr->ethernet.ebpf_valid) {
             outHeaderLength += 112;
         }
-        if (parsed_hdr.ipv4.ebpf_valid) {
+        if (hdr_ptr->ipv4.ebpf_valid) {
             outHeaderLength += 160;
         }
 
@@ -492,165 +490,165 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr_ptr,
         pkt = ((void*)(long)skb->data);
         ebpf_packetEnd = ((void*)(long)skb->data_end);
         ebpf_packetOffsetInBits = 0;
-        if (parsed_hdr.ethernet.ebpf_valid) {
-            bpf_trace_message("Deparser: emitting header parsed_hdr.ethernet\n");
+        if (hdr_ptr->ethernet.ebpf_valid) {
+            bpf_trace_message("Deparser: emitting header hdr_ptr->ethernet\n");
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
                 bpf_trace_message("Deparser: invalid packet (packet too short)\n");
                 return TC_ACT_SHOT;
             }
 
-            bpf_trace_message("Deparser: emitting field dstAddr=0x%llx (48 bits)\n", (unsigned long long) parsed_hdr.ethernet.dstAddr);
-            parsed_hdr.ethernet.dstAddr = htonll(parsed_hdr.ethernet.dstAddr << 16);
-            ebpf_byte = ((char*)(&parsed_hdr.ethernet.dstAddr))[0];
+            bpf_trace_message("Deparser: emitting field dstAddr=0x%llx (48 bits)\n", (unsigned long long) hdr_ptr->ethernet.dstAddr);
+            hdr_ptr->ethernet.dstAddr = htonll(hdr_ptr->ethernet.dstAddr << 16);
+            ebpf_byte = ((char*)(&hdr_ptr->ethernet.dstAddr))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ethernet.dstAddr))[1];
+            ebpf_byte = ((char*)(&hdr_ptr->ethernet.dstAddr))[1];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ethernet.dstAddr))[2];
+            ebpf_byte = ((char*)(&hdr_ptr->ethernet.dstAddr))[2];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 2, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ethernet.dstAddr))[3];
+            ebpf_byte = ((char*)(&hdr_ptr->ethernet.dstAddr))[3];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 3, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ethernet.dstAddr))[4];
+            ebpf_byte = ((char*)(&hdr_ptr->ethernet.dstAddr))[4];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 4, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ethernet.dstAddr))[5];
+            ebpf_byte = ((char*)(&hdr_ptr->ethernet.dstAddr))[5];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 5, (ebpf_byte));
             ebpf_packetOffsetInBits += 48;
             bpf_trace_message("Deparser: emitted dstAddr\n");
 
-            bpf_trace_message("Deparser: emitting field srcAddr=0x%llx (48 bits)\n", (unsigned long long) parsed_hdr.ethernet.srcAddr);
-            parsed_hdr.ethernet.srcAddr = htonll(parsed_hdr.ethernet.srcAddr << 16);
-            ebpf_byte = ((char*)(&parsed_hdr.ethernet.srcAddr))[0];
+            bpf_trace_message("Deparser: emitting field srcAddr=0x%llx (48 bits)\n", (unsigned long long) hdr_ptr->ethernet.srcAddr);
+            hdr_ptr->ethernet.srcAddr = htonll(hdr_ptr->ethernet.srcAddr << 16);
+            ebpf_byte = ((char*)(&hdr_ptr->ethernet.srcAddr))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ethernet.srcAddr))[1];
+            ebpf_byte = ((char*)(&hdr_ptr->ethernet.srcAddr))[1];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ethernet.srcAddr))[2];
+            ebpf_byte = ((char*)(&hdr_ptr->ethernet.srcAddr))[2];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 2, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ethernet.srcAddr))[3];
+            ebpf_byte = ((char*)(&hdr_ptr->ethernet.srcAddr))[3];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 3, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ethernet.srcAddr))[4];
+            ebpf_byte = ((char*)(&hdr_ptr->ethernet.srcAddr))[4];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 4, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ethernet.srcAddr))[5];
+            ebpf_byte = ((char*)(&hdr_ptr->ethernet.srcAddr))[5];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 5, (ebpf_byte));
             ebpf_packetOffsetInBits += 48;
             bpf_trace_message("Deparser: emitted srcAddr\n");
 
-            bpf_trace_message("Deparser: emitting field etherType=0x%llx (16 bits)\n", (unsigned long long) parsed_hdr.ethernet.etherType);
-            parsed_hdr.ethernet.etherType = bpf_htons(parsed_hdr.ethernet.etherType);
-            ebpf_byte = ((char*)(&parsed_hdr.ethernet.etherType))[0];
+            bpf_trace_message("Deparser: emitting field etherType=0x%llx (16 bits)\n", (unsigned long long) hdr_ptr->ethernet.etherType);
+            hdr_ptr->ethernet.etherType = bpf_htons(hdr_ptr->ethernet.etherType);
+            ebpf_byte = ((char*)(&hdr_ptr->ethernet.etherType))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ethernet.etherType))[1];
+            ebpf_byte = ((char*)(&hdr_ptr->ethernet.etherType))[1];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
             ebpf_packetOffsetInBits += 16;
             bpf_trace_message("Deparser: emitted etherType\n");
 
-            bpf_trace_message("Deparser: emitted parsed_hdr.ethernet\n");
+            bpf_trace_message("Deparser: emitted hdr_ptr->ethernet\n");
         }
-        if (parsed_hdr.ipv4.ebpf_valid) {
-            bpf_trace_message("Deparser: emitting header parsed_hdr.ipv4\n");
+        if (hdr_ptr->ipv4.ebpf_valid) {
+            bpf_trace_message("Deparser: emitting header hdr_ptr->ipv4\n");
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
                 bpf_trace_message("Deparser: invalid packet (packet too short)\n");
                 return TC_ACT_SHOT;
             }
 
-            bpf_trace_message("Deparser: emitting field version=0x%llx (4 bits)\n", (unsigned long long) parsed_hdr.ipv4.version);
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.version))[0];
+            bpf_trace_message("Deparser: emitting field version=0x%llx (4 bits)\n", (unsigned long long) hdr_ptr->ipv4.version);
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.version))[0];
             write_partial(pkt + BYTES(ebpf_packetOffsetInBits) + 0, 4, 4, (ebpf_byte >> 0));
             ebpf_packetOffsetInBits += 4;
             bpf_trace_message("Deparser: emitted version\n");
 
-            bpf_trace_message("Deparser: emitting field ihl=0x%llx (4 bits)\n", (unsigned long long) parsed_hdr.ipv4.ihl);
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.ihl))[0];
+            bpf_trace_message("Deparser: emitting field ihl=0x%llx (4 bits)\n", (unsigned long long) hdr_ptr->ipv4.ihl);
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.ihl))[0];
             write_partial(pkt + BYTES(ebpf_packetOffsetInBits) + 0, 4, 0, (ebpf_byte >> 0));
             ebpf_packetOffsetInBits += 4;
             bpf_trace_message("Deparser: emitted ihl\n");
 
-            bpf_trace_message("Deparser: emitting field diffserv=0x%llx (8 bits)\n", (unsigned long long) parsed_hdr.ipv4.diffserv);
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.diffserv))[0];
+            bpf_trace_message("Deparser: emitting field diffserv=0x%llx (8 bits)\n", (unsigned long long) hdr_ptr->ipv4.diffserv);
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.diffserv))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
             ebpf_packetOffsetInBits += 8;
             bpf_trace_message("Deparser: emitted diffserv\n");
 
-            bpf_trace_message("Deparser: emitting field totalLen=0x%llx (16 bits)\n", (unsigned long long) parsed_hdr.ipv4.totalLen);
-            parsed_hdr.ipv4.totalLen = bpf_htons(parsed_hdr.ipv4.totalLen);
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.totalLen))[0];
+            bpf_trace_message("Deparser: emitting field totalLen=0x%llx (16 bits)\n", (unsigned long long) hdr_ptr->ipv4.totalLen);
+            hdr_ptr->ipv4.totalLen = bpf_htons(hdr_ptr->ipv4.totalLen);
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.totalLen))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.totalLen))[1];
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.totalLen))[1];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
             ebpf_packetOffsetInBits += 16;
             bpf_trace_message("Deparser: emitted totalLen\n");
 
-            bpf_trace_message("Deparser: emitting field identification=0x%llx (16 bits)\n", (unsigned long long) parsed_hdr.ipv4.identification);
-            parsed_hdr.ipv4.identification = bpf_htons(parsed_hdr.ipv4.identification);
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.identification))[0];
+            bpf_trace_message("Deparser: emitting field identification=0x%llx (16 bits)\n", (unsigned long long) hdr_ptr->ipv4.identification);
+            hdr_ptr->ipv4.identification = bpf_htons(hdr_ptr->ipv4.identification);
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.identification))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.identification))[1];
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.identification))[1];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
             ebpf_packetOffsetInBits += 16;
             bpf_trace_message("Deparser: emitted identification\n");
 
-            bpf_trace_message("Deparser: emitting field flags=0x%llx (3 bits)\n", (unsigned long long) parsed_hdr.ipv4.flags);
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.flags))[0];
+            bpf_trace_message("Deparser: emitting field flags=0x%llx (3 bits)\n", (unsigned long long) hdr_ptr->ipv4.flags);
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.flags))[0];
             write_partial(pkt + BYTES(ebpf_packetOffsetInBits) + 0, 3, 5, (ebpf_byte >> 0));
             ebpf_packetOffsetInBits += 3;
             bpf_trace_message("Deparser: emitted flags\n");
 
-            bpf_trace_message("Deparser: emitting field fragOffset=0x%llx (13 bits)\n", (unsigned long long) parsed_hdr.ipv4.fragOffset);
-            parsed_hdr.ipv4.fragOffset = bpf_htons(parsed_hdr.ipv4.fragOffset << 3);
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.fragOffset))[0];
+            bpf_trace_message("Deparser: emitting field fragOffset=0x%llx (13 bits)\n", (unsigned long long) hdr_ptr->ipv4.fragOffset);
+            hdr_ptr->ipv4.fragOffset = bpf_htons(hdr_ptr->ipv4.fragOffset << 3);
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.fragOffset))[0];
             write_partial(pkt + BYTES(ebpf_packetOffsetInBits) + 0, 5, 0, (ebpf_byte >> 3));
             write_partial(pkt + BYTES(ebpf_packetOffsetInBits) + 0 + 1, 3, 5, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.fragOffset))[1];
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.fragOffset))[1];
             write_partial(pkt + BYTES(ebpf_packetOffsetInBits) + 1, 5, 0, (ebpf_byte >> 3));
             ebpf_packetOffsetInBits += 13;
             bpf_trace_message("Deparser: emitted fragOffset\n");
 
-            bpf_trace_message("Deparser: emitting field ttl=0x%llx (8 bits)\n", (unsigned long long) parsed_hdr.ipv4.ttl);
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.ttl))[0];
+            bpf_trace_message("Deparser: emitting field ttl=0x%llx (8 bits)\n", (unsigned long long) hdr_ptr->ipv4.ttl);
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.ttl))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
             ebpf_packetOffsetInBits += 8;
             bpf_trace_message("Deparser: emitted ttl\n");
 
-            bpf_trace_message("Deparser: emitting field protocol=0x%llx (8 bits)\n", (unsigned long long) parsed_hdr.ipv4.protocol);
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.protocol))[0];
+            bpf_trace_message("Deparser: emitting field protocol=0x%llx (8 bits)\n", (unsigned long long) hdr_ptr->ipv4.protocol);
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.protocol))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
             ebpf_packetOffsetInBits += 8;
             bpf_trace_message("Deparser: emitted protocol\n");
 
-            bpf_trace_message("Deparser: emitting field hdrChecksum=0x%llx (16 bits)\n", (unsigned long long) parsed_hdr.ipv4.hdrChecksum);
-            parsed_hdr.ipv4.hdrChecksum = bpf_htons(parsed_hdr.ipv4.hdrChecksum);
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.hdrChecksum))[0];
+            bpf_trace_message("Deparser: emitting field hdrChecksum=0x%llx (16 bits)\n", (unsigned long long) hdr_ptr->ipv4.hdrChecksum);
+            hdr_ptr->ipv4.hdrChecksum = bpf_htons(hdr_ptr->ipv4.hdrChecksum);
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.hdrChecksum))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.hdrChecksum))[1];
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.hdrChecksum))[1];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
             ebpf_packetOffsetInBits += 16;
             bpf_trace_message("Deparser: emitted hdrChecksum\n");
 
-            bpf_trace_message("Deparser: emitting field srcAddr=0x%llx (32 bits)\n", (unsigned long long) parsed_hdr.ipv4.srcAddr);
-            parsed_hdr.ipv4.srcAddr = htonl(parsed_hdr.ipv4.srcAddr);
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.srcAddr))[0];
+            bpf_trace_message("Deparser: emitting field srcAddr=0x%llx (32 bits)\n", (unsigned long long) hdr_ptr->ipv4.srcAddr);
+            hdr_ptr->ipv4.srcAddr = htonl(hdr_ptr->ipv4.srcAddr);
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.srcAddr))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.srcAddr))[1];
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.srcAddr))[1];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.srcAddr))[2];
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.srcAddr))[2];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 2, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.srcAddr))[3];
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.srcAddr))[3];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 3, (ebpf_byte));
             ebpf_packetOffsetInBits += 32;
             bpf_trace_message("Deparser: emitted srcAddr\n");
 
-            bpf_trace_message("Deparser: emitting field dstAddr=0x%llx (32 bits)\n", (unsigned long long) parsed_hdr.ipv4.dstAddr);
-            parsed_hdr.ipv4.dstAddr = htonl(parsed_hdr.ipv4.dstAddr);
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.dstAddr))[0];
+            bpf_trace_message("Deparser: emitting field dstAddr=0x%llx (32 bits)\n", (unsigned long long) hdr_ptr->ipv4.dstAddr);
+            hdr_ptr->ipv4.dstAddr = htonl(hdr_ptr->ipv4.dstAddr);
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.dstAddr))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.dstAddr))[1];
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.dstAddr))[1];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.dstAddr))[2];
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.dstAddr))[2];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 2, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.ipv4.dstAddr))[3];
+            ebpf_byte = ((char*)(&hdr_ptr->ipv4.dstAddr))[3];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 3, (ebpf_byte));
             ebpf_packetOffsetInBits += 32;
             bpf_trace_message("Deparser: emitted dstAddr\n");
 
-            bpf_trace_message("Deparser: emitted parsed_hdr.ipv4\n");
+            bpf_trace_message("Deparser: emitted hdr_ptr->ipv4\n");
         }
 
     }
