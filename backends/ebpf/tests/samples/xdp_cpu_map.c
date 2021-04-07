@@ -140,6 +140,7 @@ int xdp_func(struct xdp_md *skb) {
     eth->h_proto = bpf_htons(0x0800);
 
     struct headers parsed_hdr;
+    __builtin_memset(&parsed_hdr, 0, sizeof(parsed_hdr));
     unsigned ebpf_packetOffsetInBits = 0;
     unsigned ebpf_packetOffsetInBits_save = 0;
     ParserError_t ebpf_errorCode = NoError;
@@ -371,8 +372,11 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr_ptr,
 
     //odczytanie z mapy do parsed_hdr
 
+    bpf_trace_message("Control start\n");
+
     struct headers *hdr_ptr;
     hdr_ptr = BPF_MAP_LOOKUP_ELEM(per_cpu_map, &ebpf_zero);
+    bpf_trace_message("Po lookup\n");
     if (hdr_ptr == NULL) {
         bpf_trace_message("classifier/tc-ingress control: brak pakietu w cpu mapie!\n");
         return TC_ACT_SHOT;
