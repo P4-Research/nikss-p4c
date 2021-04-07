@@ -88,13 +88,23 @@ class ConvertToEbpfPipeline : public Inspector {
 
 class ConvertToEBPFParserPSA : public Inspector {
     EBPF::EBPFProgram *program;
+    pipeline_type type;
+
     P4::TypeMap *typemap;
     P4::ReferenceMap *refmap;
     EBPF::EBPFPsaParser* parser;
 
  public:
     ConvertToEBPFParserPSA(EBPF::EBPFProgram* program, P4::ReferenceMap* refmap,
-            P4::TypeMap* typemap) : program(program), typemap(typemap), refmap(refmap) { }
+            P4::TypeMap* typemap) : program(program), typemap(typemap), refmap(refmap) {
+        if (program->is<EBPFIngressPipeline>()) {
+            type = INGRESS;
+        } else if (program->is<EBPFEgressPipeline>()) {
+            type = EGRESS;
+        } else {
+            BUG("undefined pipeline type, cannot build parser");
+        }
+    }
 
     bool preorder(const IR::ParserBlock *prsr) override;
     bool preorder(const IR::ParserState *s) override;
@@ -105,16 +115,27 @@ class ConvertToEBPFParserPSA : public Inspector {
 
 class ConvertToEBPFControlPSA : public Inspector {
     EBPF::EBPFProgram *program;
+    pipeline_type type;
+
     const IR::Parameter* parserHeaders;
     P4::TypeMap *typemap;
     P4::ReferenceMap *refmap;
 
     EBPF::EBPFControlPSA *control;
+
  public:
     ConvertToEBPFControlPSA(EBPF::EBPFProgram *program, const IR::Parameter* parserHeaders,
                             P4::ReferenceMap *refmap,
                             P4::TypeMap *typemap) : program(program), parserHeaders(parserHeaders),
-                            typemap(typemap), refmap(refmap) { }
+                            typemap(typemap), refmap(refmap) {
+        if (program->is<EBPFIngressPipeline>()) {
+            type = INGRESS;
+        } else if (program->is<EBPFEgressPipeline>()) {
+            type = EGRESS;
+        } else {
+            BUG("undefined pipeline type, cannot build control block");
+        }
+    }
 
     bool preorder(const IR::P4Action *) override;
     bool preorder(const IR::TableBlock *) override;

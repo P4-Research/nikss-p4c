@@ -36,7 +36,7 @@ set -x
 make -C samples
 exit_on_error $?
 
-declare -a INTERFACES=("eth0" "eth1" "eth2")
+declare -a INTERFACES=("eth0" "eth1" "eth2" "eth3" "eth4" "eth5")
 # For PTF tests parameter
 interface_list=$( IFS=$','; echo "${INTERFACES[*]}" )
 interface_list="psa_recirc,""$interface_list"
@@ -81,4 +81,5 @@ TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
 ptf \
   --test-dir ptf/ \
   --test-params=$TEST_PARAMS \
-  --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 $@
+  --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
+  --interface 4@s1-eth4 --interface 5@s1-eth5 $@

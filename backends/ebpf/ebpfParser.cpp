@@ -239,7 +239,13 @@ StateTranslationVisitor::compileExtractField(
     // eBPF can pass 64 bits of data as one argument, so value of the field is
     // printed only when its fits into register
     if (widthToExtract <= 64) {
-        cstring tmp = Util::printf_format("(unsigned long long) %s.%s", expr->toString(), field);
+        cstring exprStr = expr->toString();
+        if (expr->is<IR::Member>() && expr->to<IR::Member>()->expr->is<IR::PathExpression>() &&
+            asPointerVariables.count(
+                    expr->to<IR::Member>()->expr->to<IR::PathExpression>()->path->name.name) > 0) {
+            exprStr = exprStr.replace(".", "->");
+        }
+        cstring tmp = Util::printf_format("(unsigned long long) %s.%s", exprStr, field);
         msgStr = Util::printf_format("Parser: extracted %s=0x%%llx (%u bits)",
                                      field, widthToExtract);
         builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, tmp.c_str());

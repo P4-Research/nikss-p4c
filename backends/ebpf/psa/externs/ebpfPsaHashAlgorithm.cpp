@@ -58,16 +58,20 @@ void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder,
             // TODO: add masks for fields, however they should not exceed declared width
             if (bitsToRead < remainingBits) {
                 remainingBits -= bitsToRead;
-                builder->appendFormat("(%s << %d)", fieldName.c_str(), remainingBits);
+                builder->append("(");
+                visitor->visit(field);
+                builder->appendFormat(" << %d)", remainingBits);
                 bitsToRead = 0;
             } else if (bitsToRead == remainingBits) {
                 remainingBits = 0;
-                builder->append(fieldName);
+                visitor->visit(field);
                 bitsToRead = 0;
             } else if (bitsToRead > remainingBits) {
                 bitsToRead -= remainingBits;
                 remainingBits = 0;
-                builder->appendFormat("(%s >> %d)", fieldName.c_str(), bitsToRead);
+                builder->append("(");
+                visitor->visit(field);
+                builder->appendFormat(" >> %d)", bitsToRead);
             }
 
             if (remainingBits == 0) {
