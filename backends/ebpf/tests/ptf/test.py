@@ -592,3 +592,19 @@ class VerifyPSATest(P4EbpfTest):
         pkt[Ether].type = 0xFF00
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_no_other_packets(self)
+
+
+class PerCPUMap(EbpfTest):
+    test_prog_image = "samples/xdp_cpu_map.o"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT1)
+
+    def tearDown(self):
+        self.remove_maps(
+            ["ingress_tbl_const_action",
+             "ingress_tbl_const_action_defaultAction"]
+        )
+        super(EbpfTest, self).tearDown()
