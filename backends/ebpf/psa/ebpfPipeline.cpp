@@ -79,6 +79,8 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
 
 void EBPFPipeline::emitHeaderInstances(CodeBuilder* builder) {
     builder->emitIndent();
+    // declaring header instance as volatile optimizes stack size and improves throughput
+    builder->append("volatile ");
     parser->headerType->declare(builder, parser->headers->name.name, false);
     builder->append(" = ");
     parser->headerType->emitInitializer(builder);
