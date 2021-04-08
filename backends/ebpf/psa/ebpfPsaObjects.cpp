@@ -304,7 +304,7 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
     builder->emitIndent();
     // we set 256 as maximum number of ternary masks due to BPF_COMPLEXITY_LIMIT_JMP_SEQ.
     // TODO: find better solution to workaround BPF_COMPLEXITY_LIMIT_JMP_SEQ.
-    builder->appendFormat("#define MAX_%s_MASKS %d", keyTypeName.toUpper(), 196);
+    builder->appendFormat("#define MAX_%s_MASKS %d", keyTypeName.toUpper(), 256);
     builder->newline();
 
     builder->emitIndent();

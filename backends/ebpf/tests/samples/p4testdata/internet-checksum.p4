@@ -102,8 +102,7 @@ control ingress(inout headers hdr,
         }
 
         if (hdr.ipv4.isValid()){
-            ostd.drop = false;
-            ostd.egress_port = (PortId_t) 5;
+            send_to_port(ostd, (PortId_t) 5);
         }
     }
 }
