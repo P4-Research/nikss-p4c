@@ -2,6 +2,18 @@
 
 namespace EBPF {
 
+bool ControlBodyTranslatorPSA::preorder(const IR::Member* expression) {
+    if (expression->expr->is<IR::TypeNameExpression>()) {
+        auto tne = expression->expr->to<IR::TypeNameExpression>();
+        if (tne->typeName->path->name.name == "error") {
+            builder->append(expression->member);
+            return false;
+        }
+    }
+
+    return CodeGenInspector::preorder(expression);
+}
+
 void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
     auto decl = method->object;
     auto declType = method->originalExternType;

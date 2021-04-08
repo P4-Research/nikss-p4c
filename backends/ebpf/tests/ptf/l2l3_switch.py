@@ -5,6 +5,7 @@ import ctypes as c
 import struct
 
 from scapy.layers.l2 import Ether, Dot1Q
+from scapy.layers.inet import IP
 
 PORT0 = 0
 PORT1 = 1
@@ -14,10 +15,12 @@ PORT4 = 4
 PORT5 = 5
 ALL_PORTS = [PORT0, PORT1, PORT2, PORT3]
 
+
 def pkt_add_vlan(pkt, vlan_vid=10, vlan_pcp=0, dl_vlan_cfi=0):
     return Ether(src=pkt[Ether].src, dst=pkt[Ether].dst) / \
            Dot1Q(prio=vlan_pcp, id=dl_vlan_cfi, vlan=vlan_vid) / \
            pkt[Ether].payload
+
 
 class L2L3SwitchTest(P4EbpfTest):
 
@@ -88,12 +91,17 @@ class L2L3SwitchTest(P4EbpfTest):
 
     def tearDown(self):
         self.remove_maps(["mcast_grp_1", "mcast_grp_2", "mcast_grp_3",
-                          "ingress_tbl_switching",
-                          "ingress_tbl_switching_defaultAction",
-                          "ingress_tbl_routable",
-                          "ingress_tbl_routing",
-                          "ingress_tbl_routing_defaultAction"])
+                          "ingress_tbl_ingress_vlan", "ingress_tbl_ingress_vlan_defaultAction",
+                          "ingress_tbl_mac_learning", "ingress_tbl_mac_learning_defaultAction",
+                          "ingress_tbl_acl", "ingress_tbl_acl_defaultAction",
+                          "ingress_tbl_out_arp", "ingress_tbl_out_arp_defaultAction",
+                          "ingress_tbl_switching", "ingress_tbl_switching_defaultAction",
+                          "ingress_tbl_routable", "ingress_tbl_routable_defaultAction",
+                          "ingress_tbl_routing", "ingress_tbl_routing_defaultAction",
+                          "egress_tbl_vlan_egress", "egress_tbl_vlan_egress_defaultAction",
+                          "mac_learn_digest_0"])
         super(L2L3SwitchTest, self).tearDown()
+
 
 class SwitchingTest(L2L3SwitchTest):
 
@@ -156,6 +164,7 @@ class SwitchingTest(L2L3SwitchTest):
         pkt = pkt_add_vlan(pkt, vlan_vid=1)
         testutils.send_packet(self, PORT1, str(pkt))
         testutils.verify_no_packet(self, str(pkt), PORT0)
+
 
 class RoutingTest(L2L3SwitchTest):
 

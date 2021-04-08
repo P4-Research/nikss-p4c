@@ -22,10 +22,14 @@ class PsaStateTranslationVisitor : public StateTranslationVisitor {
                                         EBPFPsaParser * prsr) :
         StateTranslationVisitor(refMap, typeMap), parser(prsr) {}
 
+    bool preorder(const IR::Expression* expression) override;
     bool preorder(const IR::SelectCase* selectCase) override;
     bool preorder(const IR::SelectExpression* expression) override;
 
+    void processFunction(const P4::ExternFunction* function) override;
     void processMethod(const P4::ExternMethod* ext) override;
+
+    void compileVerify(const IR::MethodCallExpression * expression);
 };
 
 class EBPFPsaParser : public EBPFParser {
@@ -51,6 +55,7 @@ class EBPFPsaParser : public EBPFParser {
 
     void emitTypes(CodeBuilder* builder) override;
     void emitValueSetInstances(CodeBuilder* builder) override;
+    void emitRejectState(CodeBuilder* builder) override;
 };
 
 }  // namespace EBPF

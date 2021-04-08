@@ -328,6 +328,11 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
     builder->newline();
 }
 
+void StateTranslationVisitor::processFunction(const P4::ExternFunction* function) {
+    ::error(ErrorType::ERR_UNEXPECTED,
+            "Unexpected extern function call in parser %1%", function->expr);
+}
+
 void StateTranslationVisitor::processMethod(const P4::ExternMethod* method) {
     auto expression = method->expr;
 
@@ -351,7 +356,9 @@ void StateTranslationVisitor::processMethod(const P4::ExternMethod* method) {
 }
 
 bool StateTranslationVisitor::preorder(const IR::MethodCallExpression* expression) {
-    builder->append("/* ");
+    if (commentDescriptionDepth == 0)
+        builder->append("/* ");
+    commentDescriptionDepth++;
     visit(expression->method);
     builder->append("(");
     bool first = true;
@@ -362,12 +369,26 @@ bool StateTranslationVisitor::preorder(const IR::MethodCallExpression* expressio
         visit(a);
     }
     builder->append(")");
-    builder->append("*/");
-    builder->newline();
+    if (commentDescriptionDepth == 1) {
+        builder->append("*/");
+        builder->newline();
+    }
+    commentDescriptionDepth--;
+
+    // do not process extern when comment is generated
+    if (commentDescriptionDepth != 0)
+        return false;
 
     auto mi = P4::MethodInstance::resolve(expression,
                                           state->parser->program->refMap,
                                           state->parser->program->typeMap);
+
+    auto ef = mi->to<P4::ExternFunction>();
+    if (ef != nullptr) {
+        processFunction(ef);
+        return false;
+    }
+
     auto extMethod = mi->to<P4::ExternMethod>();
     if (extMethod != nullptr) {
         processMethod(extMethod);
@@ -437,9 +458,7 @@ void EBPFParser::emit(CodeBuilder* builder) {
     // This state may be called from deparser, so do not explicitly tell source of this event.
     builder->target->emitTraceMessage(builder, "Packet rejected");
 
-    builder->emitIndent();
-    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
-    builder->newline();
+    emitRejectState(builder);
 
     builder->blockEnd(true);
     builder->newline();
@@ -466,6 +485,12 @@ bool EBPFParser::build() {
         return false;
     headerType = EBPFTypeFactory::instance->create(ht);
     return true;
+}
+
+void EBPFParser::emitRejectState(CodeBuilder* builder) {
+    builder->emitIndent();
+    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
+    builder->newline();
 }
 
 }  // namespace EBPF
