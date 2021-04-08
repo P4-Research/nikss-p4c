@@ -228,6 +228,16 @@ void EBPFPsaParser::emitValueSetInstances(CodeBuilder* builder) {
 
 void EBPFPsaParser::emitRejectState(CodeBuilder* builder) {
     builder->emitIndent();
+    builder->appendFormat("if (%s == 0) ", program->errorVar.c_str());
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder,
+        "Parser: Explicit transition to reject state, dropping packet..");
+    builder->emitIndent();
+    builder->appendFormat("return %s", builder->target->abortReturnCode().c_str());
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
+
+    builder->emitIndent();
     builder->appendFormat("goto %s", IR::ParserState::accept.c_str());
     builder->endOfStatement(true);
 }

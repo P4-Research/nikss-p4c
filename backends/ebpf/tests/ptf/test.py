@@ -579,3 +579,8 @@ class VerifyPSATest(P4EbpfTest):
         pkt[Ether].type = 0x1111
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_no_other_packets(self)
+
+        # explicit transition to reject state
+        pkt[Ether].type = 0xFF00
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_no_other_packets(self)

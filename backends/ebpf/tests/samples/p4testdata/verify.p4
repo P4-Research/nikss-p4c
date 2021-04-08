@@ -38,6 +38,12 @@ parser IngressParserImpl(
 {
     state start {
         buffer.extract(parsed_hdr.ethernet);
+        transition select(parsed_hdr.ethernet.etherType) {
+            0xFF00: reject;
+            default: verify_eth;
+        }
+    }
+    state verify_eth {
         verify(parsed_hdr.ethernet.etherType == 0x0800, error.InvalidEtherType);
         transition accept;
     }
