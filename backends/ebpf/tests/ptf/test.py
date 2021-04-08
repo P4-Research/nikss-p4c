@@ -749,9 +749,11 @@ class CheckNewParserSpecialization(EbpfTest):
         vxlan_pkt = vxlan_pkt / IP(src="10.10.10.10", dst="11.11.11.11")
         testutils.verify_packet(self, str(vxlan_pkt), PORT1)
 
-        # self.update_map(name="ingress_vxlan", key="hex ff ff ff ff ff ff 00 00", value="hex 02 00 00 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 05 00 00 00")
-        # testutils.send_packet(self, PORT0, str(vxlan_pkt))
-        # testutils.verify_packet(self, str(pkt), PORT1)
+        self.update_map(name="ingress_vxlan", key="hex ff ff ff ff ff ff 00 00", value="hex 02 00 00 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 05 00 00 00")
+        testutils.send_packet(self, PORT0, str(vxlan_pkt))
+        decap_pkt = Ether(dst="ff:ff:ff:ff:ff:ff", src="00:00:00:00:00:02")
+        decap_pkt = decap_pkt / IP(src="10.10.10.10", dst="11.11.11.11")
+        testutils.verify_packet(self, str(decap_pkt), PORT1)
 
     def tearDown(self):
         self.remove_map("clone_session_tbl")

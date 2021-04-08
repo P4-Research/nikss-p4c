@@ -25,12 +25,12 @@
 #endif
 #define P4C_PSA_PORT_RECIRCULATE 0xfffffffa
 
-//#define bpf_trace_message(fmt, ...)                                \
-//    do {                                                           \
-//        char ____fmt[] = fmt;                                      \
-//        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
-//    } while(0)
-#define bpf_trace_message(fmt, ...)
+#define bpf_trace_message(fmt, ...)                                \
+    do {                                                           \
+        char ____fmt[] = fmt;                                      \
+        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
+    } while(0)
+//#define bpf_trace_message(fmt, ...)
 
 
 struct internal_metadata {
@@ -135,12 +135,11 @@ REGISTER_END()
 
 SEC("classifier/map-initializer")
 int map_initialize() {
-
     return 0;
 }
 SEC("xdp/xdp-ingress")
 int xdp_func(struct xdp_md *skb) {
-    //bpf_trace_message("XDP ingress\n");
+//    bpf_trace_message("XDP ingress\n");
     void *data = (void *)(long)skb->data;
     void *data_end = (void *)(long)skb->data_end;
 
@@ -228,6 +227,7 @@ int do_packet_clones(SK_BUFF * skb, void * map, __u32 session_id, PSA_PacketPath
 
 static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, struct psa_ingress_output_metadata_t *ostd, struct empty_metadata_t *resubmit_meta)
 {
+
     struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->cb;
     if (meta->packet_path == NORMAL) {
         struct internal_metadata *md = (struct internal_metadata *)(unsigned long)skb->data_meta;
@@ -266,6 +266,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     ebpf_packetOffsetInBits += 16;
 
     headers.ethernet.ebpf_valid = 1;
+//    bpf_trace_message("Parser: ethernet valid\n");
 
 /* extract(headers.ipv4)*/
     if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
@@ -288,6 +289,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     ebpf_packetOffsetInBits += 32;
     ebpf_packetOffsetInBits += 32;
     headers.ipv4.ebpf_valid = 1;
+//    bpf_trace_message("Parser: IPv4 valid\n");
 
     switch (headers.ipv4.protocol) {
         case 17: goto parse_udp;
@@ -308,6 +310,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     ebpf_packetOffsetInBits += 16;
     ebpf_packetOffsetInBits += 16;
     headers.outer_udp.ebpf_valid = 1;
+//    bpf_trace_message("Parser: UDP valid\n");
 
     switch (headers.outer_udp.dst_port) {
         case 4789: goto parse_vxlan;
@@ -327,6 +330,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     ebpf_packetOffsetInBits += 24;
     ebpf_packetOffsetInBits += 8;
     headers.vxlan.ebpf_valid = 1;
+//    bpf_trace_message("Parser: vxlan valid\n");
 
     headers.outer_ethernet = headers.ethernet;
 
@@ -344,6 +348,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     ebpf_packetOffsetInBits += 16;
 
     headers.ethernet.ebpf_valid = 1;
+//    bpf_trace_message("Parser: ethernet valid\n");
 
     switch (headers.ethernet.ether_type) {
         case 2048: goto parse_inner_ipv4;
@@ -373,6 +378,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     ebpf_packetOffsetInBits += 32;
 
     headers.ipv4.ebpf_valid = 1;
+//    bpf_trace_message("Parser: ipv4 valid\n");
 
     goto accept;
 }
@@ -386,7 +392,9 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
 
         void * ptr = (void *) &(tmp_header);
 //        __builtin_memcpy(ptr, pkt, skb->len);
-        __builtin_memcpy(ptr, pkt, BYTES(ebpf_packetOffsetInBits));
+//        __builtin_memcpy(ptr, pkt, BYTES(ebpf_packetOffsetInBits));
+
+        bpf_skb_load_bytes(skb, 0, ptr, BYTES(ebpf_packetOffsetInBits));
 
         struct psa_ingress_input_metadata_t standard_metadata = {
                 .ingress_port = skb->ifindex,
@@ -397,6 +405,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
         u8 hit_1;
         {
             if (headers.vxlan.ebpf_valid) {
+                bpf_trace_message("Tc ingress: vxlan valid: %d\n", headers.outer_ethernet.dst_addr);
                 headers.ethernet.dst_addr = headers.outer_ethernet.dst_addr;
             }
 
@@ -653,8 +662,8 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
                 return TC_ACT_SHOT;
             }
 
-            //bpf_trace_message("Ethernet emit \n");
-            //bpf_trace_message("Ethernet offset: %d \n", headers.ethernet.offset);
+            bpf_trace_message("Ethernet emit \n");
+            bpf_trace_message("Ethernet offset: %d \n", headers.ethernet.offset);
 
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.ethernet.offset), 14);
 
@@ -673,8 +682,8 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
 //            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ethernet.src_addr), 6);
             ebpf_packetOffsetInBits += 48;
 
-            headers.ethernet.ether_type = bpf_htons(headers.ethernet.ether_type);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ethernet.ether_type), 2);
+//            headers.ethernet.ether_type = bpf_htons(headers.ethernet.ether_type);
+//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ethernet.ether_type), 2);
             ebpf_packetOffsetInBits += 16;
 
             //bpf_trace_message("Bytes emitted: %d \n", BYTES(ebpf_packetOffsetInBits));
