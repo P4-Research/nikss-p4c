@@ -78,6 +78,10 @@ struct action_param {
     const size_t len;
 };
 
+// TODO: how should we pass action name/ID? On the CP side we have either name (string) or P4Info ID.
+// Name is not useful in case of actions as PSA-eBPF identifies actions by index
+// P4Info is not useful at all.
+// It seems that the only option is to force CP to iterate over table's actions and find the action index.
 int psabpf_table_add(const char *tbl_name, struct match_key *mkeys, size_t num_keys, )
 
 
@@ -88,5 +92,13 @@ int psabpf_table_add(const char *tbl_name, struct match_key *mkeys, size_t num_k
 /*
  * P4 Registers
  */
+
+////// P4 Digests
+/* Used to read a next Digest message. */
+int psabpf_digest_get_next(const char *name, void **data);
+
+////// MISC
+/* Use to retrieve report about packet processing from the data plane. */
+int psabpf_report_get_next();
 
 #endif //__PSABPF_H
