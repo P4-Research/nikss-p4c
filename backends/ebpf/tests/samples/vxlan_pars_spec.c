@@ -25,12 +25,12 @@
 #endif
 #define P4C_PSA_PORT_RECIRCULATE 0xfffffffa
 
-#define bpf_trace_message(fmt, ...)                                \
-    do {                                                           \
-        char ____fmt[] = fmt;                                      \
-        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
-    } while(0)
-//#define bpf_trace_message(fmt, ...)
+//#define bpf_trace_message(fmt, ...)                                \
+//    do {                                                           \
+//        char ____fmt[] = fmt;                                      \
+//        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
+//    } while(0)
+#define bpf_trace_message(fmt, ...)
 
 
 struct internal_metadata {
@@ -139,7 +139,6 @@ int map_initialize() {
 }
 SEC("xdp/xdp-ingress")
 int xdp_func(struct xdp_md *skb) {
-//    bpf_trace_message("XDP ingress\n");
     void *data = (void *)(long)skb->data;
     void *data_end = (void *)(long)skb->data_end;
 
@@ -266,7 +265,6 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     ebpf_packetOffsetInBits += 16;
 
     headers.ethernet.ebpf_valid = 1;
-//    bpf_trace_message("Parser: ethernet valid\n");
 
 /* extract(headers.ipv4)*/
     if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
@@ -289,7 +287,6 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     ebpf_packetOffsetInBits += 32;
     ebpf_packetOffsetInBits += 32;
     headers.ipv4.ebpf_valid = 1;
-//    bpf_trace_message("Parser: IPv4 valid\n");
 
     switch (headers.ipv4.protocol) {
         case 17: goto parse_udp;
@@ -310,7 +307,6 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     ebpf_packetOffsetInBits += 16;
     ebpf_packetOffsetInBits += 16;
     headers.outer_udp.ebpf_valid = 1;
-//    bpf_trace_message("Parser: UDP valid\n");
 
     switch (headers.outer_udp.dst_port) {
         case 4789: goto parse_vxlan;
@@ -330,7 +326,6 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     ebpf_packetOffsetInBits += 24;
     ebpf_packetOffsetInBits += 8;
     headers.vxlan.ebpf_valid = 1;
-//    bpf_trace_message("Parser: vxlan valid\n");
 
     headers.outer_ethernet = headers.ethernet;
 
@@ -348,7 +343,6 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     ebpf_packetOffsetInBits += 16;
 
     headers.ethernet.ebpf_valid = 1;
-//    bpf_trace_message("Parser: ethernet valid\n");
 
     switch (headers.ethernet.ether_type) {
         case 2048: goto parse_inner_ipv4;
@@ -378,7 +372,6 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     ebpf_packetOffsetInBits += 32;
 
     headers.ipv4.ebpf_valid = 1;
-//    bpf_trace_message("Parser: ipv4 valid\n");
 
     goto accept;
 }
@@ -391,9 +384,6 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
     {
 
         void * ptr = (void *) &(tmp_header);
-//        __builtin_memcpy(ptr, pkt, skb->len);
-//        __builtin_memcpy(ptr, pkt, BYTES(ebpf_packetOffsetInBits));
-
         bpf_skb_load_bytes(skb, 0, ptr, BYTES(ebpf_packetOffsetInBits));
 
         struct psa_ingress_input_metadata_t standard_metadata = {
@@ -405,7 +395,6 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
         u8 hit_1;
         {
             if (headers.vxlan.ebpf_valid) {
-                bpf_trace_message("Tc ingress: vxlan valid: %d\n", headers.outer_ethernet.dst_addr);
                 headers.ethernet.dst_addr = headers.outer_ethernet.dst_addr;
             }
 
@@ -418,12 +407,10 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
                 /* perform lookup */
                 value = BPF_MAP_LOOKUP_ELEM(ingress_vxlan, &key);
                 if (value == NULL) {
-                    //bpf_trace_message("Nie znalezione \n");
                     /* miss; find default action */
                     hit_1 = 0;
                     value = BPF_MAP_LOOKUP_ELEM(ingress_vxlan_defaultAction, &ebpf_zero);
                 } else {
-                    //bpf_trace_message("Znalezione \n");
                     hit_1 = 1;
                 }
                 if (value != NULL) {
@@ -526,7 +513,6 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
         }
 
         int outHeaderOffset = BYTES(outHeaderLength) - BYTES(ebpf_packetOffsetInBits);
-        //bpf_trace_message("Out header offset: %d (%d - %d) \n", outHeaderOffset, outHeaderLength, ebpf_packetOffsetInBits);
         if (outHeaderOffset != 0) {
             int returnCode = 0;
             returnCode = bpf_skb_adjust_room(skb, outHeaderOffset, 1, 0);
@@ -541,9 +527,8 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
                 return TC_ACT_SHOT;
             }
-            //bpf_trace_message("Outer ethernet emit \n");
 
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.outer_ethernet.offset), 14);
+//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.outer_ethernet.offset), 14);
 
             headers.outer_ethernet.dst_addr = htonll(headers.outer_ethernet.dst_addr << 16);
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ethernet.dst_addr), 6);
@@ -556,16 +541,13 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
             headers.outer_ethernet.ether_type = bpf_htons(headers.outer_ethernet.ether_type);
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ethernet.ether_type), 2);
             ebpf_packetOffsetInBits += 16;
-
-            //bpf_trace_message("Bytes emitted: %d \n", BYTES(ebpf_packetOffsetInBits));
         }
         if (headers.outer_ipv4.ebpf_valid) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
                 return TC_ACT_SHOT;
             }
-            //bpf_trace_message("Outer ipv4 emit \n");
 
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.outer_ipv4.offset), 20);//20
+//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.outer_ipv4.offset), 20);//20
 
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ipv4.ver_ihl), 1);
             ebpf_packetOffsetInBits += 8;
@@ -602,17 +584,13 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
             headers.outer_ipv4.dst_addr = htonl(headers.outer_ipv4.dst_addr);
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ipv4.dst_addr), 4);
             ebpf_packetOffsetInBits += 32;
-
-            //bpf_trace_message("Bytes emitted: %d \n", BYTES(ebpf_packetOffsetInBits));
         }
         if (headers.outer_udp.ebpf_valid) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 64)) {
                 return TC_ACT_SHOT;
             }
 
-            //bpf_trace_message("Outer udp emit \n");
-
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.outer_udp.offset), 8);
+//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.outer_udp.offset), 8);
 
             headers.outer_udp.src_port = bpf_htons(headers.outer_udp.src_port);
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_udp.src_port), 2);
@@ -629,17 +607,13 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
             headers.outer_udp.checksum = bpf_htons(headers.outer_udp.checksum);
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_udp.checksum), 2);
             ebpf_packetOffsetInBits += 16;
-
-            //bpf_trace_message("Bytes emitted: %d \n", BYTES(ebpf_packetOffsetInBits));
         }
         if (headers.vxlan.ebpf_valid) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 64)) {
                 return TC_ACT_SHOT;
             }
 
-            //bpf_trace_message("Vxlan emit \n");
-
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.vxlan.offset), 8);
+//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.vxlan.offset), 8);
 
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.vxlan.flags), 1);
             ebpf_packetOffsetInBits += 8;
@@ -654,88 +628,39 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
 
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.vxlan.reserved2), 1);
             ebpf_packetOffsetInBits += 8;
-
-            //bpf_trace_message("Bytes emitted: %d \n", BYTES(ebpf_packetOffsetInBits));
         }
         if (headers.ethernet.ebpf_valid) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
                 return TC_ACT_SHOT;
             }
 
-            bpf_trace_message("Ethernet emit \n");
-            bpf_trace_message("Ethernet offset: %d \n", headers.ethernet.offset);
-
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.ethernet.offset), 14);
-
-
-            //bpf_trace_message("Ethernet: dstAddr=0x%llx (48 bits)\n", (unsigned long long) headers.ethernet.dst_addr);
-            //bpf_trace_message("Ethernet: dstAddr=0x%llx (48 bits)\n", (unsigned long long) tmp_header.ethernet.dst_addr);
-            //bpf_trace_message("Ethernet: srcAddr=0x%llx (48 bits)\n", (unsigned long long) headers.ethernet.src_addr);
-            // Tutaj przydalby sie sprawdzenie, czy ethernet w ogole byl zmieniany. A nie byl w przypadku decap
 
             headers.ethernet.dst_addr = htonll(headers.ethernet.dst_addr << 16);
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ethernet.dst_addr), 6);
             ebpf_packetOffsetInBits += 48;
-
-            // Tego nie emitujemy, bo to nie było sparsowane
-//            headers.ethernet.src_addr = htonll(headers.ethernet.src_addr << 16);
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ethernet.src_addr), 6);
             ebpf_packetOffsetInBits += 48;
-
-//            headers.ethernet.ether_type = bpf_htons(headers.ethernet.ether_type);
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ethernet.ether_type), 2);
             ebpf_packetOffsetInBits += 16;
-
-            //bpf_trace_message("Bytes emitted: %d \n", BYTES(ebpf_packetOffsetInBits));
         }
         if (headers.ipv4.ebpf_valid) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
                 return TC_ACT_SHOT;
             }
 
-            //bpf_trace_message("IPv4 emit \n");
-
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.ipv4.offset), 20);
 
-            // Tutaj przydalby sie sprawdzenie, czy ipv4 w ogole byl zmieniany. A nie byl w przypadku decap
-
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ipv4.ver_ihl), 1);
             ebpf_packetOffsetInBits += 8;
-
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ipv4.diffserv), 1);
             ebpf_packetOffsetInBits += 8;
-
             headers.ipv4.total_len = bpf_htons(headers.ipv4.total_len);
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ipv4.total_len), 2);
             ebpf_packetOffsetInBits += 16;
-
-//            headers.ipv4.identification = bpf_htons(headers.ipv4.identification);
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ipv4.identification), 2);
             ebpf_packetOffsetInBits += 16;
-
-//            headers.ipv4.flags_offset = bpf_htons(headers.ipv4.flags_offset);
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ipv4.flags_offset), 2);
             ebpf_packetOffsetInBits += 16;
-
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ipv4.ttl), 1);
             ebpf_packetOffsetInBits += 8;
-
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ipv4.protocol), 1);
             ebpf_packetOffsetInBits += 8;
-
-//            headers.ipv4.hdr_checksum = bpf_htons(headers.ipv4.hdr_checksum);
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ipv4.hdr_checksum), 2);
             ebpf_packetOffsetInBits += 16;
-
-//            headers.ipv4.src_addr = htonl(headers.ipv4.src_addr);
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ipv4.src_addr), 4);
             ebpf_packetOffsetInBits += 32;
-
-//            headers.ipv4.dst_addr = htonl(headers.ipv4.dst_addr);
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.ipv4.dst_addr), 4);
             ebpf_packetOffsetInBits += 32;
-
-            //bpf_trace_message("Bytes emitted: %d \n", BYTES(ebpf_packetOffsetInBits));
         }
 
     }
@@ -743,13 +668,11 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers_ptr, 
 }
 SEC("classifier/tc-ingress")
 int tc_ingress_func(SK_BUFF *skb) {
-    //bpf_trace_message("TC ingress\n");
     struct psa_ingress_output_metadata_t ostd = {
             .drop = true,
     };
 
     struct empty_metadata_t resubmit_meta;
-//    volatile struct headers_t headers = {
     volatile struct headers_t headers = {
             .ethernet = {
                     .ebpf_valid = 0

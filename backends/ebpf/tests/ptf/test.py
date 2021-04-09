@@ -731,8 +731,11 @@ class VerifyPSATest(P4EbpfTest):
 
 
 class CheckNewParserSpecialization(EbpfTest):
+    """
+    The purpose of this test is to validate "Parser specialization" implementation
+    """
 
-    test_prog_image = "samples/test.o"
+    test_prog_image = "samples/vxlan_pars_spec.o"
 
     def runTest(self):
         pkt = Ether(dst="00:00:00:00:00:01", src="00:00:00:00:00:02")
