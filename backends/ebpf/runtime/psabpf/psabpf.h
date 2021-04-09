@@ -14,11 +14,11 @@ struct mcast_grp_member_t {
     uint16_t instance;
 };
 
-
-
 /*
  * PRE - Clone Sessions
  */
+// TODO: consider to use context
+//  would require init/close context
 int psabpf_clone_session_create(uint32_t id);
 int psabpf_clone_session_delete(uint32_t id);
 int psabpf_clone_session_add_member(uint32_t clone_session_id, struct clone_session_entry_t *entry);
@@ -27,8 +27,8 @@ int psabpf_clone_session_get_member(uint32_t clone_session_id, uint32_t egress_p
                                     struct clone_session_entry_t *entry);
 // TODO: how to implement get members?
 // TODO: Is it the right abstraction?
-int psabpf_clone_session_get_next_member(uint32_t clone_session_id, struct clone_session_entry_t *entry,
-                                         struct clone_session_entry_t *next_entry);
+int psabpf_clone_session_get_next_member(uint32_t clone_session_id, struct clone_session_entry_t *prev_entry,
+                                         struct clone_session_entry_t *entry);
 
 /*
  * PRE - Multicast Groups
@@ -39,6 +39,12 @@ int psabpf_mcast_grp_add_member(uint32_t mcast_grp_id, struct mcast_grp_member_t
 int psabpf_mcast_grp_delete_member(uint32_t mcast_grp_id, uint32_t egress_port, uint16_t instance);
 // TODO: how to implement get members?
 
+
+////// ForwardingConfig
+/* This function should load BPF program and initialize default maps (call map initializer program) */
+int psabpf_prog_load(const char *obj, int *prog_id);
+int psabpf_prog_unload(int prog_id);
+
 /*
  * P4 Tables - option 1
  */
@@ -46,6 +52,18 @@ int psabpf_table_add_ternary(const char *tbl_name, const void *val, const void *
 int psabpf_table_add_exact(const char *tbl_name, const void *val, const void *);
 int psabpf_table_add_lpm();
 int psabpf_table_add_range();
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
  * P4 Tables - option 2
@@ -56,21 +74,28 @@ enum psabpf_key_type_t {
     PSABPF_TERNARY,
     PASBPF_RANGE
 };
+
+// TODO: use union
 struct match_key {
     enum psabpf_key_type_t type;
     const void *val;
     const size_t key_size;  // key_size determines size of val and mask
-
-    // used only for 'ternary'
-    const void *mask;
-    const uint32_t priority;
-
-    // used only for 'lpm'
-    const size_t prefix_len;
-
-    // used only for 'range'
-    uint64_t start;
-    uint64_t end;
+    union {
+        struct {
+            // used only for 'ternary'
+            const void *mask;
+            const uint32_t priority;
+        } ternary;
+        struct {
+            // used only for 'lpm'
+            const size_t prefix_len;
+        } lpm;
+        struct {
+            // used only for 'range'
+            uint64_t start;
+            uint64_t end;
+        } range;
+    } u;
 };
 
 struct action_param {
@@ -82,23 +107,47 @@ struct action_param {
 // Name is not useful in case of actions as PSA-eBPF identifies actions by index
 // P4Info is not useful at all.
 // It seems that the only option is to force CP to iterate over table's actions and find the action index.
-int psabpf_table_add(const char *tbl_name, struct match_key *mkeys, size_t num_keys, )
+int psabpf_table_add_entry(const char *tbl_name, struct match_key *mkeys, size_t num_keys, const uint32_t action_id,
+                     struct action_param *params, size_t num_params);
+int psabpf_table_delete_entry(const char *tbl_name, struct match_key *mkeys, size_t num_keys);
+
+int psabpf_table_get_entry(const char *tbl_name, struct match_key *mkeys, size_t num_keys,
+                           uint32_t *action_id, struct action_param **params, size_t *num_params);
+
+
+int psabpf_table_set_default_entry(const char *tbl_name, const uint32_t action_id,
+                             struct action_param *params, size_t num_params);
+int psabpf_table_get_default_entry(const char *tbl_name, uint32_t *action_id, struct action_param **params, size_t *num_params);
 
 
 /*
  * P4 Counters
  */
+typedef struct {
+    //! member validity: packets, bytes or both?
+    int valid;
+    pi_counter_value_t bytes;
+    pi_counter_value_t packets;
+} psabpf_counter_data_t;
 
-/*
- * P4 Registers
- */
+int psabpf_counter_read(const char *name, size_t index, psabpf_counter_data_t *data);
+int psabpf_counter_reset(const char *name, size_t index);
+
+////// P4 Registers
+// TODO: to be implemented
 
 ////// P4 Digests
 /* Used to read a next Digest message. */
 int psabpf_digest_get_next(const char *name, void **data);
 
+////// PacketIn / PacketOut
+// TODO: to be implemented
+//  - to listen on the specified PSA_PORT_CPU interfaces
+//  - to send packet out of the specified PSA_PORT_CPU interface
+
 ////// MISC
-/* Use to retrieve report about packet processing from the data plane. */
-int psabpf_report_get_next();
+// TODO: to be implemented
+//  /* Use to retrieve report about packet processing from the data plane. */
+//  int psabpf_report_get_next();
 
 #endif //__PSABPF_H
