@@ -103,9 +103,9 @@ class EBPFTable : public EBPFTableBase {
     }
     virtual void emitDirectTypes(CodeBuilder* builder) { (void) builder; }
     cstring actionToActionIDName(const IR::P4Action * action) const;
+    cstring getByteSwapMethod(unsigned int width) const;
 
  private:
-    cstring getByteSwapMethod(unsigned int width) const;
     void declareTmpLpmKey(CodeBuilder *builder, const IR::KeyElement *c, std::string &tmpVar);
     void emitLpmKeyField(CodeBuilder *builder,
                          const cstring &swap,

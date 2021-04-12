@@ -124,18 +124,18 @@ void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
                     auto expr = entry->keys->components[index];
                     if (expr->is<IR::Mask>()) {
                         auto km = expr->to<IR::Mask>();
-                        builder->append("bpf_htonl(");
-                        km->left->apply(cg);
-                        builder->append(")");
-                        builder->endOfStatement(true);
-                        builder->emitIndent();
-                        builder->appendFormat("%s.%s = ", keyName.c_str(), prefixFieldName.c_str());
                         auto ebpfType = ::get(keyTypes, keyElement);
                         unsigned width = 0;
                         if (ebpfType->is<EBPFScalarType>()) {
                             auto scalar = ebpfType->to<EBPFScalarType>();
                             width = scalar->implementationWidthInBits();
                         }
+                        builder->appendFormat("%s(", getByteSwapMethod(width));
+                        km->left->apply(cg);
+                        builder->append(")");
+                        builder->endOfStatement(true);
+                        builder->emitIndent();
+                        builder->appendFormat("%s.%s = ", keyName.c_str(), prefixFieldName.c_str());
                         auto trailing_zeros = [width](const big_int& n) -> int {
                             return (n == 0) ? width : boost::multiprecision::lsb(n); };
                         auto count_ones = [](const big_int& n) -> int {
