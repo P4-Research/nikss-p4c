@@ -143,7 +143,8 @@ void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
                         auto mask = km->right->to<IR::Constant>()->value;
                         auto len = trailing_zeros(mask);
                         if (len + count_ones(mask) != width) {  // any remaining 0s in the prefix?
-                            ::error(ErrorType::ERR_INVALID, "%1% invalid mask for LPM key", keyElement);
+                            ::error(ErrorType::ERR_INVALID,
+                                    "%1% invalid mask for LPM key", keyElement);
                             return;
                         }
                         unsigned prefixLen = width - len;
