@@ -37,7 +37,7 @@ $ sudo apt install -y bison build-essential cmake \
                    libgmp-dev pkg-config python3-pip python3-setuptools \
                    tcpdump libpcap-dev libelf-dev zlib1g-dev llvm \
                    clang iptables net-tools cpp libgc1c2 libgmp10 \
-                   libgmpxx4ldbl python3 binutils-dev libc6-dev-i386 \
+                   libgmpxx4ldbl python3 binutils-dev gcc-multilib \
                    python-setuptools python-six
 
 $ pip3 install scapy==2.4.4 ply==3.8 ipaddr pyroute2
