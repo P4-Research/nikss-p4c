@@ -33,7 +33,7 @@ trap cleanup EXIT
 set -x
 
 # make eBPF programs
-make -C samples
+#make -C samples
 exit_on_error $?
 
 declare -a INTERFACES=("eth0" "eth1" "eth2")

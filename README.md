@@ -37,7 +37,8 @@ $ sudo apt install -y bison build-essential cmake \
                    libgmp-dev pkg-config python3-pip python3-setuptools \
                    tcpdump libpcap-dev libelf-dev zlib1g-dev llvm \
                    clang iptables net-tools cpp libgc1c2 libgmp10 \
-                   libgmpxx4ldbl python3 binutils-dev
+                   libgmpxx4ldbl python3 binutils-dev libc6-dev-i386 \
+                   python-setuptools python-six
 
 $ pip3 install scapy==2.4.4 ply==3.8 ipaddr pyroute2
 
@@ -101,6 +102,14 @@ $ bpftool help
          OBJECT := { prog | map | link | cgroup | perf | net | feature | btf | gen | struct_ops | iter }
          OPTIONS := { {-j|--json} [{-p|--pretty}] | {-f|--bpffs} |
                       {-m|--mapcompat} | {-n|--nomount} }
+```
+
+- To run data plane test you may need to install PTF:
+
+```bash
+$ git clone https://github.com/p4lang/ptf.git
+$ cd ptf/
+$ sudo python setup.py install
 ```
 
 - You're ready to go! You can compile a P4-16 PSA program for eBPF using:
