@@ -103,11 +103,11 @@ void EBPFTablePSA::emitInitializer(CodeBuilder *builder) {
 void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
     CodeGenInspector cg(program->refMap, program->typeMap);
     cg.setBuilder(builder);
-    auto keyName = program->refMap->newName("key");
-    auto valueName = program->refMap->newName("value");
     const IR::EntriesList* entries = table->container->getEntries();
     if (entries != nullptr) {
         for (auto entry : entries->entries) {
+            auto keyName = program->refMap->newName("key");
+            auto valueName = program->refMap->newName("value");
             // construct key
             builder->emitIndent();
             builder->appendFormat("struct %s %s = {}", this->keyTypeName.c_str(), keyName.c_str());
@@ -118,8 +118,42 @@ void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
                 CHECK_NULL(fieldName);
                 builder->emitIndent();
                 builder->appendFormat("%s.%s = ", keyName.c_str(), fieldName.c_str());
-                entry->keys->components[index]->apply(cg);
-                builder->endOfStatement(true);
+                auto mtdecl = program->refMap->getDeclaration(keyElement->matchType->path, true);
+                auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
+                if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
+                    auto expr = entry->keys->components[index];
+                    if (expr->is<IR::Mask>()) {
+                        auto km = expr->to<IR::Mask>();
+                        builder->append("bpf_htonl(");
+                        km->left->apply(cg);
+                        builder->append(")");
+                        builder->endOfStatement(true);
+                        builder->emitIndent();
+                        builder->appendFormat("%s.%s = ", keyName.c_str(), prefixFieldName.c_str());
+                        auto ebpfType = ::get(keyTypes, keyElement);
+                        unsigned width = 0;
+                        if (ebpfType->is<EBPFScalarType>()) {
+                            auto scalar = ebpfType->to<EBPFScalarType>();
+                            width = scalar->implementationWidthInBits();
+                        }
+                        auto trailing_zeros = [width](const big_int& n) -> int {
+                            return (n == 0) ? width : boost::multiprecision::lsb(n); };
+                        auto count_ones = [](const big_int& n) -> int {
+                            return bitcount(n); };
+                        auto mask = km->right->to<IR::Constant>()->value;
+                        auto len = trailing_zeros(mask);
+                        if (len + count_ones(mask) != width) {  // any remaining 0s in the prefix?
+                            ::error(ErrorType::ERR_INVALID, "%1% invalid mask for LPM key", keyElement);
+                            return;
+                        }
+                        unsigned prefixLen = width - len;
+                        builder->append(prefixLen);
+                        builder->endOfStatement(true);
+                    }
+                } else if (matchType->name.name == P4::P4CoreLibrary::instance.exactMatch.name) {
+                    entry->keys->components[index]->apply(cg);
+                    builder->endOfStatement(true);
+                }
             }
 
             // construct value

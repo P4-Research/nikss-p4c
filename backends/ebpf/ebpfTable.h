@@ -63,10 +63,11 @@ class EBPFTableBase : public EBPFObject {
 };
 
 class EBPFTable : public EBPFTableBase {
-    const cstring prefixFieldName = "prefixlen";
     const int prefixLenFieldWidth = 32;
 
  protected:
+    const cstring prefixFieldName = "prefixlen";
+
     bool isLPMTable();
     bool isTernaryTable();
     virtual ActionTranslationVisitor*

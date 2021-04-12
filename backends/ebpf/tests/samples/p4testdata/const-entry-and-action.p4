@@ -110,13 +110,14 @@ control ingress(inout headers hdr,
         }
         actions = { do_forward; NoAction; }
         const entries = {
-            0x11223344 &&& 0xFFFFFF00 : do_forward((PortId_t) 4);
+            0x11223300 &&& 0xFFFFFF00 : do_forward((PortId_t) 6);
+            0x11223355 &&& 0xFFFFFFFF : do_forward((PortId_t) 4);
         }
     }
 
     apply {
-         tbl_entry_action.apply();
-         //tbl_lpm_entry_action.apply();
+        tbl_entry_action.apply();
+        tbl_lpm_entry_action.apply();
     }
 }
 
