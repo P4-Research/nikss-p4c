@@ -53,3 +53,11 @@ class CheckNewParserSpecialization(EbpfTest):
         )
 
         super(EbpfTest, self).tearDown()
+
+
+class LimitFields(CheckNewParserSpecialization):
+    """
+    The purpose of this test is to validate "Parser specialization" implementation with limited number of parsed fields
+    """
+
+    test_prog_image = "samples/vxlan_pars_spec_limit.o"
