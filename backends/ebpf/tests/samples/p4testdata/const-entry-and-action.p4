@@ -104,8 +104,20 @@ control ingress(inout headers hdr,
         size = 100;
     }
 
+    table tbl_lpm_entry_action {
+        key = {
+            hdr.ipv4.dstAddr : lpm;
+        }
+        actions = { do_forward; NoAction; }
+        const entries = {
+            0x11223300 &&& 0xFFFFFF00 : do_forward((PortId_t) 6);
+            0x11223355 &&& 0xFFFFFFFF : do_forward((PortId_t) 4);
+        }
+    }
+
     apply {
-         tbl_entry_action.apply();
+        tbl_entry_action.apply();
+        tbl_lpm_entry_action.apply();
     }
 }
 

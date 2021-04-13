@@ -553,6 +553,14 @@ class ConstEntryAndActionPSATest(P4EbpfTest):
         testutils.send_packet(self, PORT2, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT0)
 
+        # via LPM const entry
+        pkt[IP].dst = 0x11223344
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT2)
+        pkt[IP].dst = 0x11223355
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT0)
+
     def tearDown(self):
         self.remove_maps(
             ["ingress_tbl_entry_action",
