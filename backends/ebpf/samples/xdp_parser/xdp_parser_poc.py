@@ -3,7 +3,7 @@ import copy
 import random
 
 import ptf.testutils as testutils
-from common import *
+from backends.ebpf.tests.ptf.common import *
 
 import ctypes as c
 import struct
