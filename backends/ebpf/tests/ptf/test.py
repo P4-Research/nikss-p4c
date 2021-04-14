@@ -17,6 +17,7 @@ PORT1 = 1
 PORT2 = 2
 ALL_PORTS = [PORT0, PORT1, PORT2]
 
+
 class SimpleForwardingPSATest(P4EbpfTest):
 
     p4_file_path = "samples/p4testdata/simple-fwd.p4"
