@@ -200,7 +200,7 @@ endif()
 set (MIN_KERNEL 5.8.0)
 string (REGEX MATCH "[0-9]+[^-]*" KERNEL_VER ${CMAKE_SYSTEM})
 if (${KERNEL_VER} VERSION_LESS ${MIN_KERNEL} )
-  MESSAGE(WARNING "Kernel version ${KERNEL_VER} too small for PSA, expected ${MIN_KERNEL}. Ignoring ebpf kernel PSA tests...")
+  MESSAGE(WARNING "Kernel version ${KERNEL_VER} too small for PSA, expected ${MIN_KERNEL}. Ignoring ebpf kernel PSA PTF tests...")
   set (SUPPORTS_KERNEL_PSA False)
 else()
   set (SUPPORTS_KERNEL_PSA True)
@@ -266,6 +266,16 @@ find_program(BPFTOOL_PROG "bpftool")
 if (BPFTOOL_PROG)
   message(STATUS "Found bpftool program")
 else()
+  MESSAGE(WARNING "bpftool not found, ignoring ebpf kernel PSA PTF tests...")
+  set (SUPPORTS_KERNEL_PSA False)
+endif()
+
+# check if PTF is available
+find_program(PTF_PROG "ptf")
+if (PTF_PROG)
+  message(STATUS "Found ptf program")
+else()
+  MESSAGE(WARNING "PTF not found, ignoring ebpf kernel PSA PTF tests...")
   set (SUPPORTS_KERNEL_PSA False)
 endif()
 
@@ -288,7 +298,7 @@ p4c_add_test_with_args("ebpf" ${EBPF_DRIVER_TEST} FALSE "testdata/p4_16_samples/
 # We do not have support for dynamic addition of tables in the test framework
 p4c_add_test_with_args("ebpf" ${EBPF_DRIVER_TEST} TRUE "testdata/p4_16_samples/ebpf_conntrack_extern.p4" "testdata/p4_16_samples/ebpf_conntrack_extern.p4" "--extern-file ${P4C_SOURCE_DIR}/testdata/extern_modules/extern-conntrack-ebpf.c" "")
 
-# Execute PSA PTF test only when: (1) kernel is supported, (2) libbpf and (3) bpftool are available
+# Execute PSA PTF test only when: (1) kernel is supported, (2) libbpf (3) bpftool and (4) PTF are available
 if (SUPPORTS_KERNEL_PSA)
   p4c_add_tests("ebpf-psa-ptf" ${EBPF_PTF_DRIVER_TEST} ${EBPF_PSA_PTF_TEST_SUITES} "")
 endif()
