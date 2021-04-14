@@ -24,4 +24,4 @@ jobs:
 
     - name: Run PTF tests (Linux)
       run: |
-        sudo docker run --privileged -w /p4c/build p4c-ptf bash -c 'make check-ebpf-psa-ptf; cat Testing/Temporary/LastTest.log'
+        sudo docker run --privileged -w /p4c/build p4c-ptf bash -c 'make check-ebpf-psa-ptf; EXIT_CODE=$?; cat Testing/Temporary/LastTest.log; exit $EXIT_CODE'
