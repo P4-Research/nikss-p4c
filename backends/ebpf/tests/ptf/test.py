@@ -10,7 +10,6 @@ import struct
 
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import IP, UDP
-from scapy.layers.vxlan import VXLAN
 from ptf.packet import MPLS
 
 PORT0 = 0
