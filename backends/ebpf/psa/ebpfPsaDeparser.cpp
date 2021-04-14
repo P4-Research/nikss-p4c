@@ -320,17 +320,17 @@ void EBPFDeparserPSA::emitDeclaration(CodeBuilder* builder, const IR::Declaratio
         cstring name = di->name.name;
 
         if (type != nullptr && type->path->name.name == "InternetChecksum") {
-            auto instance = new EBPFInternetChecksumPSA(program, decl, name, this->codeGen);
+            auto instance = new EBPFInternetChecksumPSA(program, di, name, this->codeGen);
             checksums.emplace(name, instance);
-            instance->emitVariables(builder, decl);
+            instance->emitVariables(builder);
             return;
         }
 
         if (typeSpec != nullptr &&
                 typeSpec->baseType->to<IR::Type_Name>()->path->name.name == "Checksum") {
-            auto instance = new EBPFChecksumPSA(program, decl, name, this->codeGen);
+            auto instance = new EBPFChecksumPSA(program, di, name, this->codeGen);
             checksums.emplace(name, instance);
-            instance->emitVariables(builder, decl);
+            instance->emitVariables(builder);
             return;
         }
     }

@@ -567,6 +567,13 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
         }
     } else if (instance->type->getName().name == "DirectCounter") {
         return false;
+    } else if (instance->type->getName().name == "Hash") {
+        if (instance->node->is<IR::Declaration_Instance>()) {
+            auto di = instance->node->to<IR::Declaration_Instance>();
+            cstring name = EBPFObject::externalName(di);
+            auto hash = new EBPFHashPSA(program, di, name, control->codeGen);
+            control->hashes.emplace(name, hash);
+        }
     } else {
         ::error(ErrorType::ERR_UNEXPECTED, "Unexpected block %s nested within control",
                 instance->toString());

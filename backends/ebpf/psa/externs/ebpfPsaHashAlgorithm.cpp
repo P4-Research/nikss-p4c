@@ -5,13 +5,11 @@ namespace EBPF {
 
 // ===========================InternetChecksumAlgorithm===========================
 
-void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder,
+void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder, int dataPos,
                                                const IR::MethodCallExpression * expr,
                                                bool addData) {
-    if (expr->arguments->size() != 1) {
-        ::error(ErrorType::ERR_UNEXPECTED, "Expected exactly 1 argument %1%", expr);
-        return;
-    }
+    BUG_CHECK(expr->arguments->size() > ((size_t) dataPos),
+              "Data position %1% is outside of the arguments: %2%", dataPos, expr);
 
     cstring tmpVar = program->refMap->newName(baseName + "_tmp");
 
@@ -24,12 +22,12 @@ void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder,
 
     std::vector<const IR::Expression *> arguments;
 
-    if (expr->arguments->at(0)->expression->is<IR::ListExpression>()) {
-        auto argList = expr->arguments->at(0)->expression->to<IR::ListExpression>();
+    if (expr->arguments->at(dataPos)->expression->is<IR::ListExpression>()) {
+        auto argList = expr->arguments->at(dataPos)->expression->to<IR::ListExpression>();
         for (auto field : argList->components)
             arguments.push_back(field);
     } else {
-        arguments.push_back(expr->arguments->at(0)->expression);
+        arguments.push_back(expr->arguments->at(dataPos)->expression);
     }
 
     int remainingBits = 16, bitsToRead;
@@ -123,18 +121,18 @@ void InternetChecksumAlgorithm::emitClear(CodeBuilder* builder) {
     builder->endOfStatement(true);
 }
 
-void InternetChecksumAlgorithm::emitAddData(CodeBuilder* builder,
+void InternetChecksumAlgorithm::emitAddData(CodeBuilder* builder, int dataPos,
                                             const IR::MethodCallExpression * expr) {
-    updateChecksum(builder, expr, true);
+    updateChecksum(builder, dataPos, expr, true);
 }
 
 void InternetChecksumAlgorithm::emitGet(CodeBuilder* builder) {
     builder->appendFormat("((u16) (~%s))", stateVar.c_str());
 }
 
-void InternetChecksumAlgorithm::emitSubtractData(CodeBuilder* builder,
+void InternetChecksumAlgorithm::emitSubtractData(CodeBuilder* builder, int dataPos,
                                                  const IR::MethodCallExpression * expr) {
-    updateChecksum(builder, expr, false);
+    updateChecksum(builder, dataPos, expr, false);
 }
 
 void InternetChecksumAlgorithm::emitGetInternalState(CodeBuilder* builder) {
@@ -154,5 +152,46 @@ void InternetChecksumAlgorithm::emitSetInternalState(CodeBuilder* builder,
     builder->endOfStatement(true);
 }
 
+// ===========================CRC16ChecksumAlgorithm===========================
+
+void CRC16ChecksumAlgorithm::emitGlobals(CodeBuilder* builder) {
+    (void) builder;
+}
+
+void CRC16ChecksumAlgorithm::emitVariables(CodeBuilder* builder, const IR::Declaration* decl) {
+    /*(void) builder;*/ (void) decl;
+    builder->appendLine("HASWHDFAOIUSHD");
+}
+
+void CRC16ChecksumAlgorithm::emitClear(CodeBuilder* builder) {
+    (void) builder;
+    BUG("Not implemented");
+}
+
+void CRC16ChecksumAlgorithm::emitAddData(CodeBuilder* builder, int dataPos,
+                                         const IR::MethodCallExpression * expr) {
+//    BUG("Not implemented");
+}
+
+void CRC16ChecksumAlgorithm::emitGet(CodeBuilder* builder) {
+//    BUG("Not implemented");
+}
+
+void CRC16ChecksumAlgorithm::emitSubtractData(CodeBuilder* builder, int dataPos,
+                                              const IR::MethodCallExpression * expr) {
+    (void) builder; (void) expr; (void) dataPos;
+    BUG("Not implementable");
+}
+
+void CRC16ChecksumAlgorithm::emitGetInternalState(CodeBuilder* builder) {
+    (void) builder;
+    BUG("Not implemented");
+}
+
+void CRC16ChecksumAlgorithm::emitSetInternalState(CodeBuilder* builder,
+                          const IR::MethodCallExpression * expr) {
+    (void) builder; (void) expr;
+    BUG("Not implemented");
+}
 
 }  // namespace EBPF
