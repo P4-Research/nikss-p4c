@@ -1,0 +1,27 @@
+name: "ptf-p4c"
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  ptf-linux:
+    env:
+      UNIFIED: ON
+      ENABLE_GMP: ON
+    runs-on: self-hosted
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+
+    - name: Build (Linux)
+      run: |
+        tools/start_ccache
+        docker build --network host -t p4c-ptf -f Dockerfile.ptf --build-arg MAKEFLAGS=-j8 --build-arg IMAGE_TYPE=test --build-arg ENABLE_UNIFIED_COMPILATION=$UNIFIED --build-arg ENABLE_GMP=$ENABLE_GMP .
+
+    - name: Run PTF tests (Linux)
+      run: |
+        sudo docker run --privileged -w /p4c/build p4c-ptf bash -c 'make check-ebpf-psa-ptf; cat Testing/Temporary/LastTest.log'
