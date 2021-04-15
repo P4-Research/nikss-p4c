@@ -107,7 +107,8 @@ void InternetChecksumAlgorithm::emitGlobals(CodeBuilder* builder) {
                         "}");
 }
 
-void InternetChecksumAlgorithm::emitVariables(CodeBuilder* builder, const IR::Declaration* decl) {
+void InternetChecksumAlgorithm::emitVariables(CodeBuilder* builder,
+                                              const IR::Declaration_Instance* decl) {
     (void) decl;
     stateVar = program->refMap->newName(baseName + "_state");
     builder->emitIndent();
@@ -158,8 +159,9 @@ void CRC16ChecksumAlgorithm::emitGlobals(CodeBuilder* builder) {
     (void) builder;
 }
 
-void CRC16ChecksumAlgorithm::emitVariables(CodeBuilder* builder, const IR::Declaration* decl) {
-    /*(void) builder;*/ (void) decl;
+void CRC16ChecksumAlgorithm::emitVariables(CodeBuilder* builder,
+                                           const IR::Declaration_Instance* decl) {
+    BUG_CHECK(decl->type->is<IR::Type_Specialized>(), "Must be a specialized type %1%", decl);
     builder->appendLine("HASWHDFAOIUSHD");
 }
 

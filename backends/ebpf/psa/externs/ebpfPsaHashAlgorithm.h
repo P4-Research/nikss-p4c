@@ -28,7 +28,7 @@ class EBPFHashAlgorithmPSA : public EBPFObject {
     EBPFHashAlgorithmPSA(const EBPFProgram* program, cstring name, Visitor * visitor)
         : baseName(name), program(program), visitor(visitor) {}
 
-    virtual void emitVariables(CodeBuilder* builder, const IR::Declaration* decl) = 0;
+    virtual void emitVariables(CodeBuilder* builder, const IR::Declaration_Instance* decl) = 0;
 
     virtual void emitClear(CodeBuilder* builder) = 0;
     virtual void emitAddData(CodeBuilder* builder, int dataPos,
@@ -56,7 +56,7 @@ class InternetChecksumAlgorithm : public EBPFHashAlgorithmPSA {
 
     static void emitGlobals(CodeBuilder* builder);
 
-    void emitVariables(CodeBuilder* builder, const IR::Declaration* decl) override;
+    void emitVariables(CodeBuilder* builder, const IR::Declaration_Instance* decl) override;
 
     void emitClear(CodeBuilder* builder) override;
     void emitAddData(CodeBuilder* builder, int dataPos,
@@ -78,7 +78,7 @@ class CRC16ChecksumAlgorithm : public EBPFHashAlgorithmPSA {
 
     static void emitGlobals(CodeBuilder* builder);
 
-    void emitVariables(CodeBuilder* builder, const IR::Declaration* decl) override;
+    void emitVariables(CodeBuilder* builder, const IR::Declaration_Instance* decl) override;
 
     void emitClear(CodeBuilder* builder) override;
     void emitAddData(CodeBuilder* builder, int dataPos,
