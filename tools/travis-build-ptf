@@ -32,6 +32,7 @@ export P4C_EBPF_DEPS="libpcap-dev \
              llvm \
              clang \
              iptables \
+             iproute2 \
              net-tools"
 
 export P4C_RUNTIME_DEPS="cpp \
