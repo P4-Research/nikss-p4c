@@ -58,6 +58,7 @@ set (P4C_EBPF_SRCS
   psa/externs/ebpfPsaChecksum.cpp
   psa/externs/ebpfPsaCounter.cpp
   psa/externs/ebpfPsaHashAlgorithm.cpp
+  psa/externs/ebpfPsaRegister.cpp
   )
 
 set (P4C_EBPF_HDRS
@@ -107,6 +108,7 @@ set (P4C_EBPF_HDRS
   psa/externs/ebpfPsaChecksum.h
   psa/externs/ebpfPsaCounter.h
   psa/externs/ebpfPsaHashAlgorithm.h
+  psa/externs/ebpfPsaRegister.h
   )
 
 add_cpplint_files(${CMAKE_CURRENT_SOURCE_DIR} "${P4C_EBPF_SRCS};${P4C_EBPF_HDRS}")

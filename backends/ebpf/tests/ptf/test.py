@@ -551,3 +551,22 @@ class VerifyPSATest(P4EbpfTest):
         pkt[Ether].type = 0xFF00
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_other_packets(self)
+
+
+class RegisterPSATest(P4EbpfTest):
+
+    p4_file_path = "samples/p4testdata/register.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+        # initialize default action
+        # TODO: we need to come up with a better solution to initialize default action.
+        self.update_map(name="ingress_tbl_fwd_defaultAction", key="00 00 00 00", value="01 00 00 00 05 00 00 00")
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT1)
+
+        # TODO sprawdzanie rejestru
+
+    def tearDown(self):
+        self.remove_maps(["ingress_tbl_fwd", "ingress_tbl_fwd_defaultAction"])
+        super(RegisterPSATest, self).tearDown()
