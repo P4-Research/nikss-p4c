@@ -79,6 +79,7 @@ TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
 
 # Start tests
 ptf \
+  vxlan_pars_spec.LimitFields \
   --test-dir ptf/ \
   --test-params=$TEST_PARAMS \
   --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
