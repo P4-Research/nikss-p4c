@@ -32,10 +32,6 @@ trap cleanup EXIT
 # Trace all command from this point
 set -x
 
-# make eBPF programs
-make -C samples
-exit_on_error $?
-
 declare -a INTERFACES=("eth0" "eth1" "eth2" "eth3" "eth4" "eth5")
 # For PTF tests parameter
 interface_list=$( IFS=$','; echo "${INTERFACES[*]}" )
