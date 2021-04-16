@@ -109,6 +109,9 @@ class EbpfTest(BaseTest):
         for intf in self.interfaces:
             self.del_port(intf)
         self.exec_ns_cmd("rm -rf /sys/fs/bpf/prog")
+        for filename in os.listdir("/sys/fs/bpf"):
+            if not os.path.isdir(filename):
+                self.remove_map(filename)
         super(EbpfTest, self).tearDown()
 
 
