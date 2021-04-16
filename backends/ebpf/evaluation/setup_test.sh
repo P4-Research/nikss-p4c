@@ -73,7 +73,7 @@ else
   make -f ../runtime/kernel.mk BPFOBJ=out.o ARGS="$ARGS" ebpf CFILE=$CFILE
 fi
 
-bpftool prog loadall out.o /sys/fs/bpf/prog
+load-prog out.o 
 exit_on_error
 
 for intf in ${INTERFACES//,/ } ; do
@@ -83,6 +83,9 @@ for intf in ${INTERFACES//,/ } ; do
   sysctl -w net.ipv6.conf."$intf".accept_ra=0
   
   ifconfig "$intf" promisc
+  # disable VLAN offloading
+  ethtool -K "$intf" rxvlan off
+  ethtool -K "$intf" txvlan off
 
   # TODO: move this to psabpf-ctl
   bpftool net attach xdp pinned /sys/fs/bpf/prog/xdp_xdp-ingress dev "$intf" overwrite
