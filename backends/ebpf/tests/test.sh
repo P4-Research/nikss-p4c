@@ -79,6 +79,9 @@ TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
 LIBBPF_LD_PATH="`pwd`/../runtime/usr/lib64"
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LIBBPF_LD_PATH
 
+# Docker image by default has lower "max locked memory" limit
+ulimit -l 65536
+
 # Start tests
 ptf \
   --test-dir ptf/ \
