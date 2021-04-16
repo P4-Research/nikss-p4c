@@ -107,6 +107,9 @@ build "-DENABLE_UNIFIED_COMPILATION=${ENABLE_UNIFIED_COMPILATION}"
 make install
 ccache -p -s
 
+# Docker image by default has lower "max locked memory" limit
+ulimit -l 65536
+
 if [[ "${IMAGE_TYPE}" == "build" ]] ; then
   apt-get purge -y ${P4C_DEPS} git
   apt-get autoremove --purge -y

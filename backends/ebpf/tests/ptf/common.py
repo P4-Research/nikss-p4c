@@ -100,7 +100,8 @@ class EbpfTest(BaseTest):
             head, tail = os.path.split(self.ctool_file_path)
             filename = tail.split(".")[0]
             so_file_path = head + "/" + filename + ".so"
-            cmd = ["clang", "-fPIC", "-l", "bpf", "-shared", "-o", so_file_path, self.ctool_file_path]
+            cmd = ["clang", "-I../runtime/usr/include", "-L../runtime/usr/lib64",
+                   "-fPIC", "-l", "bpf", "-shared", "-o", so_file_path, self.ctool_file_path]
             self.exec_cmd(cmd, "Ctool compilation error")
             self.so_file_path = so_file_path
 

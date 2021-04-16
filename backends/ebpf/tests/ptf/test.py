@@ -27,8 +27,8 @@ class SimpleForwardingPSATest(P4EbpfTest):
         # initialize default action
         # TODO: we need to come up with a better solution to initialize default action.
         self.update_map(name="ingress_tbl_fwd_defaultAction", key="00 00 00 00", value="01 00 00 00 05 00 00 00")
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT1)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
 
     def tearDown(self):
         self.remove_maps(["ingress_tbl_fwd", "ingress_tbl_fwd_defaultAction"])
@@ -56,8 +56,8 @@ class SimpleTunnelingPSATest(P4EbpfTest):
         exp_pkt = Ether(dst="11:11:11:11:11:11") / MPLS(label=20, cos=5, s=1, ttl=64) / testutils.simple_ip_only_packet(
             ip_dst="192.168.1.1")
 
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet(self, str(exp_pkt), PORT1)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, exp_pkt, PORT1)
 
 
 class PSACloneI2E(P4EbpfTest):
@@ -95,10 +95,10 @@ class EgressTrafficManagerDropPSATest(P4EbpfTest):
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55', eth_src='55:44:33:22:11:00')
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
         pkt[Ether].src = '00:44:33:22:FF:FF'
-        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_other_packets(self)
 
 
@@ -120,11 +120,11 @@ class EgressTrafficManagerClonePSATest(P4EbpfTest):
         self.exec_ns_cmd("prectl clone-session add-member id 8 egress-port 6 instance 1 cos 0")
 
         pkt = testutils.simple_ip_packet(eth_dst='aa:bb:cc:dd:ee:ff', eth_src='55:44:33:22:11:00')
-        testutils.send_packet(self, PORT1, str(pkt))
+        testutils.send_packet(self, PORT1, pkt)
         pkt[Ether].dst = '00:00:00:00:00:11'
-        testutils.verify_packet(self, str(pkt), PORT2)
+        testutils.verify_packet(self, pkt, PORT2)
         pkt[Ether].dst = '00:00:00:00:00:12'
-        testutils.verify_packet(self, str(pkt), PORT1)
+        testutils.verify_packet(self, pkt, PORT1)
 
     def tearDown(self):
         self.exec_ns_cmd("prectl clone-session delete id 8")
@@ -144,15 +144,15 @@ class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55', eth_src='55:44:33:22:11:00')
-        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.send_packet(self, PORT0, pkt)
         pkt[Ether].src = '00:44:33:22:11:00'
-        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
         pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:FE:F0', eth_src='55:44:33:22:11:00')
-        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.send_packet(self, PORT0, pkt)
         pkt[Ether].dst = '00:00:00:00:00:00'
         pkt[Ether].src = '00:44:33:22:11:00'
-        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
 
 class MulticastPSATest(P4EbpfTest):
@@ -197,15 +197,15 @@ class SimpleLpmP4PSATest(P4EbpfTest):
         self.update_map(name="ingress_tbl_fwd_lpm", key="hex 08 00 00 00 0a 0a 0a 0a",
                         value="hex 01 00 00 00 00 00 00 00")
 
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT2)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT2)
 
         pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='192.168.2.1')
         # This command adds LPM entry 192.168.2.1/24 with action forwarding on port 5 (PORT1 in ptf)
         self.update_map(name="ingress_tbl_fwd_lpm", key="hex 18 00 00 00 c0 a8 02 00",
                         value="hex 01 00 00 00 05 00 00 00")
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT1)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
 
     def tearDown(self):
         self.remove_map("ingress_tbl_fwd_lpm")
@@ -223,16 +223,16 @@ class SimpleLpmP4TwoKeysPSATest(P4EbpfTest):
         # Note that prefix value has to be a sum of exact fields size and lpm prefix
         self.update_map(name="ingress_tbl_fwd_exact_lpm", key="hex 38 00 00 00 01 02 03 04 0a 0a 0b 00",
                         value="hex 01 00 00 00 06 00 00 00")
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT2)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT2)
 
         pkt = testutils.simple_ip_packet(ip_src='1.2.3.4', ip_dst='192.168.2.1')
         # This command adds LPM entry 192.168.2.1/24 with action forwarding on port 5 (PORT1 in ptf)
         # Note that prefix value has to be a sum of exact fields size and lpm prefix
         self.update_map(name="ingress_tbl_fwd_exact_lpm", key="hex 38 00 00 00 01 02 03 04 c0 a8 02 00",
                         value="hex 01 00 00 00 05 00 00 00")
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT1)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
 
     def tearDown(self):
         self.remove_map("ingress_tbl_fwd_exact_lpm")
@@ -247,8 +247,8 @@ class CountersPSATest(P4EbpfTest):
         pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55',
                                          eth_src='00:AA:00:00:00:01',
                                          pktlen=100)
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
         self.verify_map_entry("ingress_test1_cnt", "1 0 0 0", "64 00 00 00 00 00 00 00")
         self.verify_map_entry("ingress_test2_cnt", "1 0 0 0", "01 00 00 00")
@@ -257,8 +257,8 @@ class CountersPSATest(P4EbpfTest):
         pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55',
                                          eth_src='00:AA:00:00:01:FE',
                                          pktlen=199)
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
         self.verify_map_entry("ingress_test1_cnt", "hex fe 01 00 00", "c7 00 00 00 00 00 00 00")
         self.verify_map_entry("ingress_test2_cnt", "hex fe 01 00 00", "01 00 00 00")
@@ -281,8 +281,8 @@ class DirectCountersPSATest(P4EbpfTest):
 
         for i in range(3):
             pkt = testutils.simple_ip_packet(pktlen=100, ip_src='10.0.0.{}'.format(i))
-            testutils.send_packet(self, PORT0, str(pkt))
-            testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+            testutils.send_packet(self, PORT0, pkt)
+            testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
         self.verify_map_entry("ingress_tbl1", "0 0 0 10", "01 00 00 00 64 00 00 00 01 00 00 00")
         self.verify_map_entry("ingress_tbl2", "1 0 0 10", "02 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00")
@@ -313,9 +313,9 @@ class DigestPSATest(P4EbpfTest):
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(eth_src="ff:ff:ff:ff:ff:ff")
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.send_packet(self, PORT0, pkt)
 
         for i in range(0, 3):
             value = self.get_digest_value()
@@ -401,13 +401,13 @@ class PSATernaryTest(P4EbpfTest):
 
 
         pkt = testutils.simple_udp_packet(ip_src='1.2.3.4', ip_dst='192.168.2.1')
-        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.send_packet(self, PORT0, pkt)
         pkt[IP].proto = 0x7
         pkt[IP].chksum = 0xb3e7
         pkt[IP].src = '17.17.17.17'
         pkt[IP].dst = '255.255.255.255'
         pkt[UDP].chksum = 0x044D
-        testutils.verify_packet(self, str(pkt), PORT1)
+        testutils.verify_packet(self, pkt, PORT1)
 
     def tearDown(self):
         self.remove_maps(
@@ -458,17 +458,17 @@ class InternetChecksumPSATest(P4EbpfTest):
                                               ip_id=random.randint(0, 0xFFFF))
             pkt[IP].flags = random.randint(0, 7)
             pkt[IP].frag = random.randint(0, 0x1FFF)
-            testutils.send_packet(self, PORT0, str(pkt))
+            testutils.send_packet(self, PORT0, pkt)
             pkt[IP].ttl = pkt[IP].ttl - 2
             pkt[IP].src = '10.0.0.1'
             pkt[IP].chksum = None
             pkt[UDP].chksum = None
-            testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+            testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
             # test packet with invalid checksum
             # Checksum will never contain value 0xFFFF, see RFC 1624 sec. 3.
             pkt[IP].chksum = 0xFFFF
-            testutils.send_packet(self, PORT0, str(pkt))
+            testutils.send_packet(self, PORT0, pkt)
             testutils.verify_no_other_packets(self)
 
 
@@ -487,17 +487,17 @@ class ParserValueSetPSATest(P4EbpfTest):
     def runTest(self):
         pkt = testutils.simple_udp_packet(ip_dst='8.8.8.8', udp_dport=80)
 
-        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_other_packets(self)
 
         self.update_map("IngressParserImpl_pvs", '1 0 0 10', '0 0 0 0')
 
-        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_other_packets(self)
 
         pkt[IP].dst = '10.0.0.1'
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
     def tearDown(self):
         self.remove_map("IngressParserImpl_pvs")
@@ -510,8 +510,8 @@ class ConstDefaultActionPSATest(P4EbpfTest):
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT1)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
 
     def tearDown(self):
         self.remove_maps(
@@ -528,8 +528,8 @@ class ConstEntryPSATest(P4EbpfTest):
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT1)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
 
     def tearDown(self):
         self.remove_maps(
@@ -547,20 +547,20 @@ class ConstEntryAndActionPSATest(P4EbpfTest):
     def runTest(self):
         pkt = testutils.simple_ip_packet()
         # via default action
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT1)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
 
         # via const entry
-        testutils.send_packet(self, PORT2, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT0)
+        testutils.send_packet(self, PORT2, pkt)
+        testutils.verify_packet(self, pkt, PORT0)
 
         # via LPM const entry
         pkt[IP].dst = 0x11223344
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT2)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT2)
         pkt[IP].dst = 0x11223355
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT0)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT0)
 
     def tearDown(self):
         self.remove_maps(
@@ -577,19 +577,19 @@ class VerifyPSATest(P4EbpfTest):
     def runTest(self):
         pkt = testutils.simple_ip_packet()
 
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet_any_port(self, str(pkt), ALL_PORTS)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
         pkt[Ether].src = '00:00:00:00:00:00'
-        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_other_packets(self)
 
         pkt[Ether].src = '00:A0:00:00:00:01'
         pkt[Ether].type = 0x1111
-        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_other_packets(self)
 
         # explicit transition to reject state
         pkt[Ether].type = 0xFF00
-        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_other_packets(self)
