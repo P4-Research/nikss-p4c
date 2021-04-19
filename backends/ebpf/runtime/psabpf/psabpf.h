@@ -1,6 +1,29 @@
 #ifndef __PSABPF_H
 #define __PSABPF_H
 
+/**
+ * \brief          Global PSABPF context. Should be maintained between calls to the PSABPF API.
+ */
+typedef struct psabpf_context {
+
+} psabpf_context_t;
+
+/**
+ * Initialize the PSABPF context.
+ *
+ * @param ctx
+ */
+void psabpf_init(psabpf_context_t *ctx);
+
+/**
+ * Clear the PSABPF context.
+ *
+ * @param ctx
+ */
+void psabpf_free(psabpf_context_t *ctx);
+
+
+
 struct clone_session_entry_t {
     uint32_t egress_port;
     uint16_t instance;
@@ -45,46 +68,22 @@ int psabpf_mcast_grp_delete_member(uint32_t mcast_grp_id, uint32_t egress_port, 
 int psabpf_prog_load(const char *obj, int *prog_id);
 int psabpf_prog_unload(int prog_id);
 
-/*
- * P4 Tables - option 1
- */
-int psabpf_table_add_ternary(const char *tbl_name, const void *val, const void *mask, size_t key_size, uint32_t *handle, const uint32_t prio);
-int psabpf_table_add_exact(const char *tbl_name, const void *val, const void *);
-int psabpf_table_add_lpm();
-int psabpf_table_add_range();
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
- * P4 Tables - option 2
- */
-enum psabpf_key_type_t {
+////// TableEntry
+enum psabpf_matchkind_t {
     PSABPF_EXACT,
     PSABPF_LPM,
     PSABPF_TERNARY,
     PASBPF_RANGE
 };
 
-// TODO: use union
-struct match_key {
-    enum psabpf_key_type_t type;
-    const void *val;
+typedef struct psabpf_match_key {
+    enum psabpf_matchkind_t type;
+    const char *data;
     const size_t key_size;  // key_size determines size of val and mask
     union {
         struct {
             // used only for 'ternary'
             const void *mask;
-            const uint32_t priority;
         } ternary;
         struct {
             // used only for 'lpm'
@@ -92,16 +91,79 @@ struct match_key {
         } lpm;
         struct {
             // used only for 'range'
-            uint64_t start;
-            uint64_t end;
+            const uint64_t start;
+            const uint64_t end;
         } range;
     } u;
-};
+} psabpf_match_key_t;
 
-struct action_param {
-    const void *val;
+typedef struct psabpf_action_param {
+    const char *data;
     const size_t len;
-};
+} psabpf_action_param_t;
+
+typedef struct psabpf_action {
+    uint32_t action_id;
+
+    size_t n_params;
+    psabpf_action_param_t *params;
+} psabpf_action_t;
+
+typedef struct psabpf_table_entry {
+    const char tbl_name[256];
+
+    size_t n_keys;
+    psabpf_match_key_t *match_keys;
+
+    psabpf_action_t *action;
+
+    const uint32_t priority;
+} psabpf_table_entry_t;
+
+
+int psabpf_table_entry_init(psabpf_context_t *ctx, psabpf_table_entry_t *entry);
+int psabpf_table_entry_free(psabpf_context_t *ctx, psabpf_table_entry_t *entry);
+int psabpf_table_entry_tblname(psabpf_table_entry_t *entry, const char *name);
+int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t *mk);
+int psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act);
+int psabpf_table_entry_priority(psabpf_table_entry_t *entry, const uint32_t priority);
+
+int psabpf_table_entry_add(psabpf_table_entry_t *entry);
+/**
+ * Sets a default entry.
+ *
+ * Example code:
+ *  psabpf_table_entry_t entry;
+ *  if (!psabpf_table_entry_init(&entry))
+ *      return;
+ *  psabpf_table_entry_tblname(&entry, "xyz");
+ *
+ *  psabpf_action_t action;
+ *  psabpf_action_init(&action);
+ *  psabpf_action_setid(&action, 1);
+ *  for (action params)
+ *      psabpf_action_param_set(&action, "dsada", 12);
+ *
+ *  if (!psabpf_table_entry_setdefault(&entry))
+ *      psabpf_table_entry_free(&entry);
+ *      return EINVAL;
+ *
+ *  psabpf_table_entry_free(&entry);
+ *
+ * @param entry
+ * @return
+ */
+int psabpf_table_entry_setdefault(psabpf_table_entry_t *entry);
+int psabpf_table_entry_getdefault(psabpf_table_entry_t *entry);
+int psabpf_table_entry_get(psabpf_match_key_t *mk, psabpf_table_entry_t *entry);
+
+
+int psabpf_matchkey_init(psabpf_context_t *ctx, psabpf_match_key_t *mk);
+int psabpf_matchkey_free(psabpf_context_t *ctx, psabpf_match_key_t *mk);
+int psabpf_matchkey_settype(psabpf_match_key_t *mk, enum match_kind_t type);
+int psabpf_matchkey_data(psabpf_match_key_t *mk, const char *data, size_t size);
+int psabpf_matchkey_mask(psabpf_match_key_t *mk, const char *mask, size_t size);
+
 
 // TODO: how should we pass action name/ID? On the CP side we have either name (string) or P4Info ID.
 // Name is not useful in case of actions as PSA-eBPF identifies actions by index
