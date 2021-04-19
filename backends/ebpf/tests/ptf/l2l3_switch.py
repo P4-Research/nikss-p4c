@@ -109,13 +109,13 @@ class SwitchingTest(L2L3SwitchTest):
         # check no connectivity if switching rules are not installed
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:00:03")
         pkt = pkt_add_vlan(pkt, vlan_vid=1)
-        testutils.send_packet(self, PORT1, str(pkt))
+        testutils.send_packet(self, PORT1, pkt)
         testutils.verify_no_other_packets(self)
         pkt[Ether].dst = "00:00:00:00:00:02"
-        testutils.send_packet(self, PORT1, str(pkt))
+        testutils.send_packet(self, PORT1, pkt)
         testutils.verify_no_other_packets(self)
         pkt[Ether].dst = "00:00:00:00:00:01"
-        testutils.send_packet(self, PORT2, str(pkt))
+        testutils.send_packet(self, PORT2, pkt)
         testutils.verify_no_other_packets(self)
 
         # check connectivity between ports in VLAN 1
@@ -124,46 +124,46 @@ class SwitchingTest(L2L3SwitchTest):
         self.update_map(name="ingress_tbl_switching", key="03 00 00 00 00 00 00 00 01 00 00 00 0 0 0 0", value="01 00 00 00 8 00 00 00")
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:00:03")
         pkt = pkt_add_vlan(pkt, vlan_vid=1)
-        testutils.send_packet(self, PORT1, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT4)
+        testutils.send_packet(self, PORT1, pkt)
+        testutils.verify_packet(self, pkt, PORT4)
         pkt[Ether].dst = "00:00:00:00:00:02"
-        testutils.send_packet(self, PORT1, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT2)
+        testutils.send_packet(self, PORT1, pkt)
+        testutils.verify_packet(self, pkt, PORT2)
         pkt[Ether].dst = "00:00:00:00:00:01"
-        testutils.send_packet(self, PORT2, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT1)
+        testutils.send_packet(self, PORT2, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
 
         # check no connectivity between ports with no VLAN if switching rules are not installed
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:00:02")
-        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_other_packets(self)
         pkt[Ether].dst = "00:00:00:00:00:01"
-        testutils.send_packet(self, PORT5, str(pkt))
+        testutils.send_packet(self, PORT5, pkt)
         testutils.verify_no_other_packets(self)
 
         # check connectivity between ports with no VLAN
         self.update_map(name="ingress_tbl_switching", key="01 00 00 00 00 00 00 00 0 00 00 00 0 0 0 0", value="01 00 00 00 04 00 00 00")
         self.update_map(name="ingress_tbl_switching", key="02 00 00 00 00 00 00 00 0 00 00 00 0 0 0 0", value="01 00 00 00 9 00 00 00")
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:00:02")
-        testutils.send_packet(self, PORT0, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT5)
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT5)
         pkt[Ether].dst = "00:00:00:00:00:01"
-        testutils.send_packet(self, PORT5, str(pkt))
-        testutils.verify_packet(self, str(pkt), PORT0)
+        testutils.send_packet(self, PORT5, pkt)
+        testutils.verify_packet(self, pkt, PORT0)
 
         # check no connectivity between VLAN 1 and VLAN 2
         self.update_map(name="ingress_tbl_switching", key="02 02 00 00 00 00 00 00 02 00 00 00 0 0 0 0", value="01 00 00 00 6 00 00 00")
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:02:02")
         pkt = pkt_add_vlan(pkt, vlan_vid=1)
-        testutils.send_packet(self, PORT1, str(pkt))
-        testutils.verify_no_packet(self, str(pkt), PORT3)
+        testutils.send_packet(self, PORT1, pkt)
+        testutils.verify_no_packet(self, pkt, PORT3)
 
         # check no connectivity between VLAN 1 and no VLAN ports
         self.update_map(name="ingress_tbl_switching", key="02 03 00 00 00 00 00 00 00 00 00 00 0 0 0 0", value="01 00 00 00 4 00 00 00")
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:02:02")
         pkt = pkt_add_vlan(pkt, vlan_vid=1)
-        testutils.send_packet(self, PORT1, str(pkt))
-        testutils.verify_no_packet(self, str(pkt), PORT0)
+        testutils.send_packet(self, PORT1, pkt)
+        testutils.verify_no_packet(self, pkt, PORT0)
 
 
 class RoutingTest(L2L3SwitchTest):
@@ -175,8 +175,8 @@ class RoutingTest(L2L3SwitchTest):
         # check no connectivity between VLAN 1 and VLAN 2
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:02:02")
         pkt = pkt_add_vlan(pkt, vlan_vid=1)
-        testutils.send_packet(self, PORT1, str(pkt))
-        testutils.verify_no_packet(self, str(pkt), PORT2)
+        testutils.send_packet(self, PORT1, pkt)
+        testutils.verify_no_packet(self, pkt, PORT2)
 
         # enable routing from VLAN 1 to VLAN 2
         self.update_map(name="ingress_tbl_routable", key="01 01 00 00 00 00 00 00 01 00 00 00 00 00 00 00", value="0 0 0 0")
@@ -187,18 +187,18 @@ class RoutingTest(L2L3SwitchTest):
         pkt = pkt_add_vlan(pkt, vlan_vid=1)
 
         # verify not routable packet
-        testutils.send_packet(self, PORT1, str(pkt))
+        testutils.send_packet(self, PORT1, pkt)
         testutils.verify_no_other_packets(self)
 
         # verify routable packet
         pkt[Ether].dst = "00:00:00:00:01:01"
-        testutils.send_packet(self, PORT1, str(pkt))
+        testutils.send_packet(self, PORT1, pkt)
         exp_pkt = pkt
         exp_pkt[Ether].src = "00:00:00:00:01:02"
         exp_pkt[Ether].dst = "00:00:00:00:02:02"
         exp_pkt[Dot1Q].vlan = 2
         exp_pkt[IP].ttl = 63
-        testutils.verify_packet(self, str(pkt), PORT3)
+        testutils.verify_packet(self, pkt, PORT3)
 
         # enable routing from VLAN 2 to VLAN 1
         self.update_map(name="ingress_tbl_routable", key="02 01 00 00 00 00 00 00 02 00 00 00 00 00 00 00", value="0 0 0 0")
@@ -209,18 +209,18 @@ class RoutingTest(L2L3SwitchTest):
         pkt = pkt_add_vlan(pkt, vlan_vid=2)
 
         # verify not routable packet
-        testutils.send_packet(self, PORT3, str(pkt))
+        testutils.send_packet(self, PORT3, pkt)
         testutils.verify_no_other_packets(self)
 
         # verify routable packet
         pkt[Ether].dst = "00:00:00:00:01:02"
-        testutils.send_packet(self, PORT3, str(pkt))
+        testutils.send_packet(self, PORT3, pkt)
         exp_pkt = pkt
         exp_pkt[Ether].src = "00:00:00:00:01:01"
         exp_pkt[Ether].dst = "00:00:00:00:00:01"
         exp_pkt[Dot1Q].vlan = 1
         exp_pkt[IP].ttl = 63
-        testutils.verify_packet(self, str(pkt), PORT1)
+        testutils.verify_packet(self, pkt, PORT1)
 
 
 class MACLearningTest(L2L3SwitchTest):
@@ -229,7 +229,7 @@ class MACLearningTest(L2L3SwitchTest):
         self.update_map(name="ingress_tbl_mac_learning", key="hex 0a 09 08 07 06 00 00 00", value="00 00 00 00")
         # should NOT generate learn digest
         pkt = testutils.simple_udp_packet(eth_src='00:06:07:08:09:0a')
-        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.send_packet(self, PORT0, pkt)
         value = self.get_digest_value()
         if value.port != 0 and value.mac != 0:
             self.fail("Program should not generate digest")
@@ -244,7 +244,7 @@ class MACLearningTest(L2L3SwitchTest):
 
         for p in pairs:
             pkt = testutils.simple_udp_packet(eth_src=p[1])
-            testutils.send_packet(self, p[0], str(pkt))
+            testutils.send_packet(self, p[0], pkt)
             value = self.get_digest_value()
             if value.port != p[0]+4:
                 self.fail("Digest not generated")
@@ -262,19 +262,19 @@ class BroadcastTest(L2L3SwitchTest):
 
         pkt = testutils.simple_udp_packet(eth_src='00:06:07:08:09:0a',
                                           eth_dst='ff:ff:ff:ff:ff:ff')
-        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.send_packet(self, PORT0, pkt)
         # Check multicast source pruning
         testutils.verify_no_packet(self, pkt, PORT0)
         testutils.verify_packet(self, pkt, PORT5)
 
         pkt_vlan_1 = pkt_add_vlan(pkt, vlan_vid=1)
-        testutils.send_packet(self, PORT1, str(pkt_vlan_1))
+        testutils.send_packet(self, PORT1, pkt_vlan_1)
         # Check multicast source pruning
         testutils.verify_no_packet(self, pkt_vlan_1, PORT1)
         testutils.verify_packets(self, pkt_vlan_1, [PORT2, PORT4])
 
         pkt_vlan_2 = pkt_add_vlan(pkt, vlan_vid=2)
-        testutils.send_packet(self, PORT3, str(pkt_vlan_2))
+        testutils.send_packet(self, PORT3, pkt_vlan_2)
         testutils.verify_no_other_packets(self)
 
 
@@ -286,9 +286,9 @@ class ACLTest(L2L3SwitchTest):
                                                 udp_sport=1234, udp_dport=50051)
         tcp_pkt_1 = testutils.simple_tcp_packet(ip_src="10.0.0.1", ip_dst="10.0.0.2",
                                                 tcp_sport=5050, tcp_dport=50051)
-        testutils.send_packet(self, PORT0, str(udp_pkt_1))
+        testutils.send_packet(self, PORT0, udp_pkt_1)
         testutils.verify_packet(self, udp_pkt_1, PORT5)
-        testutils.send_packet(self, PORT0, str(tcp_pkt_1))
+        testutils.send_packet(self, PORT0, tcp_pkt_1)
         testutils.verify_packet(self, tcp_pkt_1, PORT5)
 
         udp_pkt_2 = testutils.simple_udp_packet(ip_src="10.0.0.1", ip_dst="10.0.0.2",
@@ -298,12 +298,12 @@ class ACLTest(L2L3SwitchTest):
         self.update_map(name="ingress_tbl_acl", key="hex 01 00 00 0a 02 00 00 0a 11 00 50 00 90 1f 00 00", value="01 00 00 00")
         self.update_map(name="ingress_tbl_acl", key="hex 01 00 00 0a 02 00 00 0a 06 00 50 00 90 1f 00 00", value="01 00 00 00")
 
-        testutils.send_packet(self, PORT0, str(udp_pkt_1))
+        testutils.send_packet(self, PORT0, udp_pkt_1)
         testutils.verify_packet(self, udp_pkt_1, PORT5)
-        testutils.send_packet(self, PORT0, str(tcp_pkt_1))
+        testutils.send_packet(self, PORT0, tcp_pkt_1)
         testutils.verify_packet(self, tcp_pkt_1, PORT5)
 
-        testutils.send_packet(self, PORT0, str(udp_pkt_2))
+        testutils.send_packet(self, PORT0, udp_pkt_2)
         testutils.verify_no_packet(self, udp_pkt_2, PORT5)
-        testutils.send_packet(self, PORT0, str(tcp_pkt_2))
+        testutils.send_packet(self, PORT0, tcp_pkt_2)
         testutils.verify_no_packet(self, tcp_pkt_2, PORT5)
