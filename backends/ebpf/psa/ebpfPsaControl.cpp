@@ -31,6 +31,7 @@ bool ControlBodyTranslatorPSA::preorder(const IR::AssignmentStatement* s) {
                 cstring name = EBPFObject::externalName(ext->object);
                 auto hash = control->to<EBPFControlPSA>()->getHash(name);
                 hash->processMethod(builder, "update", ext->expr);
+                builder->emitIndent();
             }
         }
     }

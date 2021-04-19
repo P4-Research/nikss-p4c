@@ -10,6 +10,7 @@ import struct
 
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import IP, UDP
+from scapy.packet import raw
 from ptf.packet import MPLS
 
 PORT0 = 0
@@ -593,3 +594,14 @@ class VerifyPSATest(P4EbpfTest):
         pkt[Ether].type = 0xFF00
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_other_packets(self)
+
+
+class HashCRC16PSATest(P4EbpfTest):
+    p4_file_path ="samples/p4testdata/hash-crc16.p4"
+
+    def runTest(self):
+        pkt = Ether() / raw("123456789{}".format("0000".decode("hex")))
+        exp_pkt = Ether() / raw("123456789{}".format("bb3d".decode("hex")))
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
+

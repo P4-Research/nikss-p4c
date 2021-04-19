@@ -13,6 +13,9 @@ class EBPFHashAlgorithmPSA : public EBPFObject {
     const EBPFProgram* program;
     Visitor * visitor;
 
+    typedef std::vector<const IR::Expression *> argumentsList;
+    argumentsList unpackArguments(const IR::MethodCallExpression * expr, int dataPos);
+
  public:
     // keep this enum in sync with psa.p4 file
     enum HashAlgorithm {
@@ -72,6 +75,9 @@ class InternetChecksumAlgorithm : public EBPFHashAlgorithmPSA {
 };
 
 class CRC16ChecksumAlgorithm : public EBPFHashAlgorithmPSA {
+ protected:
+    cstring registerVar;
+
  public:
     CRC16ChecksumAlgorithm(const EBPFProgram* program, cstring name, Visitor * visitor)
             : EBPFHashAlgorithmPSA(program, name, visitor) {}

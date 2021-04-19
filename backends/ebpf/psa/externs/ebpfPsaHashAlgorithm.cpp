@@ -3,22 +3,10 @@
 
 namespace EBPF {
 
-// ===========================InternetChecksumAlgorithm===========================
-
-void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder, int dataPos,
-                                               const IR::MethodCallExpression * expr,
-                                               bool addData) {
+EBPFHashAlgorithmPSA::argumentsList EBPFHashAlgorithmPSA::unpackArguments(
+        const IR::MethodCallExpression * expr, int dataPos) {
     BUG_CHECK(expr->arguments->size() > ((size_t) dataPos),
               "Data position %1% is outside of the arguments: %2%", dataPos, expr);
-
-    cstring tmpVar = program->refMap->newName(baseName + "_tmp");
-
-    builder->emitIndent();
-    builder->blockStart();
-
-    builder->emitIndent();
-    builder->appendFormat("u16 %s = 0", tmpVar.c_str());
-    builder->endOfStatement(true);
 
     std::vector<const IR::Expression *> arguments;
 
@@ -29,6 +17,25 @@ void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder, int dataPos
     } else {
         arguments.push_back(expr->arguments->at(dataPos)->expression);
     }
+
+    return arguments;
+}
+
+// ===========================InternetChecksumAlgorithm===========================
+
+void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder, int dataPos,
+                                               const IR::MethodCallExpression * expr,
+                                               bool addData) {
+    cstring tmpVar = program->refMap->newName(baseName + "_tmp");
+
+    builder->emitIndent();
+    builder->blockStart();
+
+    builder->emitIndent();
+    builder->appendFormat("u16 %s = 0", tmpVar.c_str());
+    builder->endOfStatement(true);
+
+    auto arguments = unpackArguments(expr, dataPos);
 
     int remainingBits = 16, bitsToRead;
     for (auto field : arguments) {
@@ -156,27 +163,146 @@ void InternetChecksumAlgorithm::emitSetInternalState(CodeBuilder* builder,
 // ===========================CRC16ChecksumAlgorithm===========================
 
 void CRC16ChecksumAlgorithm::emitGlobals(CodeBuilder* builder) {
-    (void) builder;
+    builder->appendLine("static __always_inline\n"
+        "void crc16_update(u16 * reg, const u8 * data, u16 data_size) {\n"
+        "    data += data_size - 1;\n"
+        "    for (u16 i = 0; i < data_size; i++) {\n"
+        "        bpf_trace_message(\"CRC16 byte : %x\\n\", *data);\n"
+        "        for (u8 bit = 0; bit < 8; bit++) {\n"
+        "            u16 bit_flag = *reg >> 15;\n"
+        "            *reg <<= 1;\n"
+        "            *reg |= (*data >> bit) & 1;\n"
+        "            if(bit_flag)\n"
+        "                *reg ^= 0x8005;\n"
+        "        }\n"
+        "        data--;\n"
+        "    }\n"
+        "}\n"
+        "static __always_inline\n"
+        "void crc16_finalize(u16 * reg) {\n"
+        "    for (u8 i = 0; i < 16; i++) {\n"
+        "        u16 bit_flag = *reg >> 15;\n"
+        "        *reg <<= 1;\n"
+        "        if(bit_flag)\n"
+        "            *reg ^= 0x8005;\n"
+        "    }\n"
+        "    u16 result = 0, i = 0x8000, j = 0x0001;\n"
+        "    for (; i != 0; i >>=1, j <<= 1) {\n"
+        "        if (i & (*reg)) result |= j;\n"
+        "    }\n"
+        "    *reg = result;\n"
+        "}");
 }
 
 void CRC16ChecksumAlgorithm::emitVariables(CodeBuilder* builder,
                                            const IR::Declaration_Instance* decl) {
+    registerVar = program->refMap->newName(baseName + "_reg");
+
     BUG_CHECK(decl->type->is<IR::Type_Specialized>(), "Must be a specialized type %1%", decl);
-    builder->appendLine("HASWHDFAOIUSHD");
+    auto ts = decl->type->to<IR::Type_Specialized>();
+    BUG_CHECK(ts->arguments->size() == 1, "Expected 1 specialized type %1%", decl);
+
+    auto otype = ts->arguments->at(0);
+    if (!otype->is<IR::Type_Bits>()) {
+        ::error(ErrorType::ERR_UNSUPPORTED, "Must be bit or int type: %1%", ts);
+        return;
+    }
+    if (otype->width_bits() != 16) {
+        ::error(ErrorType::ERR_TYPE_ERROR, "Must be 16-bits width for CRC16: %1%", ts);
+        return;
+    }
+
+    auto registerType = EBPFTypeFactory::instance->create(otype);
+
+    builder->emitIndent();
+    registerType->emit(builder);
+    builder->appendFormat(" %s = 0", registerVar.c_str());
+    builder->endOfStatement(true);
 }
 
 void CRC16ChecksumAlgorithm::emitClear(CodeBuilder* builder) {
-    (void) builder;
-    BUG("Not implemented");
+    builder->emitIndent();
+    builder->appendFormat("%s = 0", registerVar.c_str());
+    builder->endOfStatement(true);
 }
 
 void CRC16ChecksumAlgorithm::emitAddData(CodeBuilder* builder, int dataPos,
                                          const IR::MethodCallExpression * expr) {
-//    BUG("Not implemented");
+    cstring tmpVar = program->refMap->newName(baseName + "_tmp");
+    auto arguments = unpackArguments(expr, dataPos);
+
+    builder->emitIndent();
+    builder->blockStart();
+
+    builder->emitIndent();
+    builder->appendFormat("u8 %s = 0", tmpVar.c_str());
+    builder->endOfStatement(true);
+
+    bool concatenateBits = false;
+    int remainingBits = 8;
+    for (auto field : arguments) {
+        auto fieldType = field->type->to<IR::Type_Bits>();
+        if (fieldType == nullptr) {
+            ::error(ErrorType::ERR_UNSUPPORTED, "Only bits types are supported %1%", field);
+            return;
+        }
+        const int width = fieldType->width_bits();
+
+        if (width < 8 || concatenateBits) {
+            concatenateBits = true;
+            if (width > remainingBits) {
+                ::error(ErrorType::ERR_UNSUPPORTED,
+                        "Sub-byte fields have to be aligned to bytes %1%", field);
+                return;
+            }
+            if (remainingBits == 8) {
+                // start processing sub-byte fields
+                builder->emitIndent();
+                builder->appendFormat("%s = ", tmpVar.c_str());
+            } else {
+                builder->append(" | ");
+            }
+
+            remainingBits -= width;
+            builder->append("(");
+            visitor->visit(field);
+            builder->appendFormat(" << %d)", remainingBits);
+
+            if (remainingBits == 0) {
+                // last bit, update the crc
+                concatenateBits = false;
+                builder->endOfStatement(true);
+                builder->emitIndent();
+                builder->appendFormat("crc16_update(&%s, &%s, 1)",
+                                      registerVar.c_str(), tmpVar.c_str());
+                builder->endOfStatement(true);
+            }
+        } else {
+            // fields larger than 8 bits
+            if (width % 8 != 0) {
+                ::error(ErrorType::ERR_UNSUPPORTED,
+                        "Fields larger than 8 bits have to be aligned to bytes %1%", field);
+                return;
+            }
+            builder->emitIndent();
+            builder->appendFormat("crc16_update(&%s, (u8 *) &(", registerVar.c_str());
+            visitor->visit(field);
+            builder->appendFormat("), %d)", width / 8);
+            builder->endOfStatement(true);
+        }
+    }
+
+    builder->emitIndent();
+    builder->appendFormat("crc16_finalize(&%s)", registerVar.c_str());
+    builder->endOfStatement(true);
+
+    builder->target->emitTraceMessage(builder, "CRC16 checksum: %x", 1, registerVar.c_str());
+
+    builder->blockEnd(true);
 }
 
 void CRC16ChecksumAlgorithm::emitGet(CodeBuilder* builder) {
-//    BUG("Not implemented");
+    builder->append(registerVar);
 }
 
 void CRC16ChecksumAlgorithm::emitSubtractData(CodeBuilder* builder, int dataPos,
