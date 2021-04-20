@@ -605,3 +605,12 @@ class HashCRC16PSATest(P4EbpfTest):
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
 
+
+class HashCRC32PSATest(P4EbpfTest):
+    p4_file_path ="samples/p4testdata/hash-crc32.p4"
+
+    def runTest(self):
+        pkt = Ether() / raw("123456789{}".format("00000000".decode("hex")))
+        exp_pkt = Ether() / raw("123456789{}".format("cbf43926".decode("hex")))
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)

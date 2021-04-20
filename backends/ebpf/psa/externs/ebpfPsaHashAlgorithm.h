@@ -89,6 +89,8 @@ class CRCChecksumAlgorithm : public EBPFHashAlgorithmPSA {
     CRCChecksumAlgorithm(const EBPFProgram* program, cstring name, Visitor * visitor, int width)
             : EBPFHashAlgorithmPSA(program, name, visitor), crcWidth(width) {}
 
+    static void emitUpdateMethod(CodeBuilder* builder, int crcWidth);
+
     void emitVariables(CodeBuilder* builder, const IR::Declaration_Instance* decl) override;
 
     void emitClear(CodeBuilder* builder) override;
@@ -117,6 +119,19 @@ class CRC16ChecksumAlgorithm : public CRCChecksumAlgorithm {
     static void emitGlobals(CodeBuilder* builder);
 };
 
+class CRC32ChecksumAlgorithm : public CRCChecksumAlgorithm {
+ public:
+    CRC32ChecksumAlgorithm(const EBPFProgram* program, cstring name, Visitor * visitor)
+            : CRCChecksumAlgorithm(program, name, visitor, 32) {
+        initialValue = "0xffffffff";
+        polynomial = reflect("0x04c11db7");
+        updateMethod = "crc32_update";
+        finalizeMethod = "crc32_finalize";
+    }
+
+    static void emitGlobals(CodeBuilder* builder);
+};
+
 class EBPFHashAlgorithmTypeFactoryPSA {
  public:
     static EBPFHashAlgorithmTypeFactoryPSA * instance() {
@@ -126,7 +141,9 @@ class EBPFHashAlgorithmTypeFactoryPSA {
 
     EBPFHashAlgorithmPSA * create(int type, const EBPFProgram* program, cstring name,
                                          Visitor * visitor) {
-        if (type == EBPFHashAlgorithmPSA::HashAlgorithm::CRC16)
+        if (type == EBPFHashAlgorithmPSA::HashAlgorithm::CRC32)
+            return new CRC32ChecksumAlgorithm(program, name, visitor);
+        else if (type == EBPFHashAlgorithmPSA::HashAlgorithm::CRC16)
             return new CRC16ChecksumAlgorithm(program, name, visitor);
         else if (type == EBPFHashAlgorithmPSA::HashAlgorithm::ONES_COMPLEMENT16 ||
                 type == EBPFHashAlgorithmPSA::HashAlgorithm::TARGET_DEFAULT)
@@ -137,6 +154,7 @@ class EBPFHashAlgorithmTypeFactoryPSA {
 
     void emitGlobals(CodeBuilder* builder) {
         CRC16ChecksumAlgorithm::emitGlobals(builder);
+        CRC32ChecksumAlgorithm::emitGlobals(builder);
         InternetChecksumAlgorithm::emitGlobals(builder);
     }
 };

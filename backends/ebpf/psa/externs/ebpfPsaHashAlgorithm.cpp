@@ -163,11 +163,12 @@ void InternetChecksumAlgorithm::emitSetInternalState(CodeBuilder* builder,
 // ===========================CRCChecksumAlgorithm===========================
 
 cstring CRCChecksumAlgorithm::reflect(cstring str) {
+    BUG_CHECK(crcWidth <= 64, "CRC checksum width up to 64 bits is supported");
     unsigned long long poly = std::stoull(str.c_str(), 0, 16);
     unsigned long long result, i, j;
 
     result = 0;
-    i = 1 << (crcWidth - 1);
+    i = 1ull << (crcWidth - 1);
     j = 1;
 
     for (; i != 0; i >>=1, j <<= 1) {
@@ -176,6 +177,26 @@ cstring CRCChecksumAlgorithm::reflect(cstring str) {
     }
 
     return Util::printf_format("%llu", result);
+}
+
+void CRCChecksumAlgorithm::emitUpdateMethod(CodeBuilder* builder, int crcWidth) {
+    // Note that this update method is optimized for our CRC16 and CRC32, custom
+    // version may require other method of update. To deal with byte order data
+    // is read from the end of buffer.
+    cstring code = "static __always_inline\n"
+        "void crc%w%_update(u%w% * reg, const u8 * data, u16 data_size, const u%w% poly) {\n"
+        "    data += data_size - 1;\n"
+        "    for (u16 i = 0; i < data_size; i++) {\n"
+        "        bpf_trace_message(\"CRC%w%: data byte: %x\\n\", *data);\n"
+        "        *reg ^= *data;\n"
+        "        for (u8 bit = 0; bit < 8; bit++) {\n"
+        "            *reg = (*reg) & 1 ? ((*reg) >> 1) ^ poly : (*reg) >> 1;\n"
+        "        }\n"
+        "        data--;\n"
+        "    }\n"
+        "}";
+    code = code.replace("%w%", Util::printf_format("%d", crcWidth));
+    builder->appendLine(code);
 }
 
 void CRCChecksumAlgorithm::emitVariables(CodeBuilder* builder,
@@ -314,20 +335,22 @@ void CRCChecksumAlgorithm::emitSetInternalState(CodeBuilder* builder,
 // ===========================CRC16ChecksumAlgorithm===========================
 
 void CRC16ChecksumAlgorithm::emitGlobals(CodeBuilder* builder) {
-    cstring code = "static __always_inline\n"
-        "void crc16_update(u16 * reg, const u8 * data, u16 data_size, const u16 poly) {\n"
-        "    data += data_size - 1;\n"
-        "    for (u16 i = 0; i < data_size; i++) {\n"
-        "        bpf_trace_message(\"CRC16: byte: %x\\n\", *data);\n"
-        "        *reg ^= *data;\n"
-        "        for (u8 bit = 0; bit < 8; bit++) {\n"
-        "            *reg = (*reg) & 1 ? ((*reg) >> 1) ^ poly : (*reg) >> 1;\n"
-        "        }\n"
-        "        data--;\n"
-        "    }\n"
-        "}\n"
-        "static __always_inline "
+    CRCChecksumAlgorithm::emitUpdateMethod(builder, 16);
+
+    cstring code ="static __always_inline "
         "void crc16_finalize(u16 * reg, const u16 poly) {\n"
+        "}";
+    builder->appendLine(code);
+}
+
+// ===========================CRC32ChecksumAlgorithm===========================
+
+void CRC32ChecksumAlgorithm::emitGlobals(CodeBuilder* builder) {
+    CRCChecksumAlgorithm::emitUpdateMethod(builder, 32);
+
+    cstring code = "static __always_inline "
+        "void crc32_finalize(u32 * reg, const u32 poly) {\n"
+        "    *reg ^= 0xFFFFFFFF;\n"
         "}";
     builder->appendLine(code);
 }
