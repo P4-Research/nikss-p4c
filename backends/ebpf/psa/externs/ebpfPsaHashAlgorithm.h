@@ -74,15 +74,20 @@ class InternetChecksumAlgorithm : public EBPFHashAlgorithmPSA {
                               const IR::MethodCallExpression * expr) override;
 };
 
-class CRC16ChecksumAlgorithm : public EBPFHashAlgorithmPSA {
+class CRCChecksumAlgorithm : public EBPFHashAlgorithmPSA {
  protected:
     cstring registerVar;
+    cstring initialValue;
+    cstring updateMethod;
+    cstring finalizeMethod;
+    cstring polynomial;
+    const int crcWidth;
+
+    cstring reflect(cstring str);
 
  public:
-    CRC16ChecksumAlgorithm(const EBPFProgram* program, cstring name, Visitor * visitor)
-            : EBPFHashAlgorithmPSA(program, name, visitor) {}
-
-    static void emitGlobals(CodeBuilder* builder);
+    CRCChecksumAlgorithm(const EBPFProgram* program, cstring name, Visitor * visitor, int width)
+            : EBPFHashAlgorithmPSA(program, name, visitor), crcWidth(width) {}
 
     void emitVariables(CodeBuilder* builder, const IR::Declaration_Instance* decl) override;
 
@@ -97,6 +102,19 @@ class CRC16ChecksumAlgorithm : public EBPFHashAlgorithmPSA {
     void emitGetInternalState(CodeBuilder* builder) override;
     void emitSetInternalState(CodeBuilder* builder,
                               const IR::MethodCallExpression * expr) override;
+};
+
+class CRC16ChecksumAlgorithm : public CRCChecksumAlgorithm {
+ public:
+    CRC16ChecksumAlgorithm(const EBPFProgram* program, cstring name, Visitor * visitor)
+            : CRCChecksumAlgorithm(program, name, visitor, 16) {
+        initialValue = "0";
+        polynomial = reflect("0x8005");
+        updateMethod = "crc16_update";
+        finalizeMethod = "crc16_finalize";
+    }
+
+    static void emitGlobals(CodeBuilder* builder);
 };
 
 class EBPFHashAlgorithmTypeFactoryPSA {

@@ -160,42 +160,26 @@ void InternetChecksumAlgorithm::emitSetInternalState(CodeBuilder* builder,
     builder->endOfStatement(true);
 }
 
-// ===========================CRC16ChecksumAlgorithm===========================
+// ===========================CRCChecksumAlgorithm===========================
 
-void CRC16ChecksumAlgorithm::emitGlobals(CodeBuilder* builder) {
-    builder->appendLine("static __always_inline\n"
-        "void crc16_update(u16 * reg, const u8 * data, u16 data_size) {\n"
-        "    data += data_size - 1;\n"
-        "    for (u16 i = 0; i < data_size; i++) {\n"
-        "        bpf_trace_message(\"CRC16 byte : %x\\n\", *data);\n"
-        "        for (u8 bit = 0; bit < 8; bit++) {\n"
-        "            u16 bit_flag = *reg >> 15;\n"
-        "            *reg <<= 1;\n"
-        "            *reg |= (*data >> bit) & 1;\n"
-        "            if(bit_flag)\n"
-        "                *reg ^= 0x8005;\n"
-        "        }\n"
-        "        data--;\n"
-        "    }\n"
-        "}\n"
-        "static __always_inline\n"
-        "void crc16_finalize(u16 * reg) {\n"
-        "    for (u8 i = 0; i < 16; i++) {\n"
-        "        u16 bit_flag = *reg >> 15;\n"
-        "        *reg <<= 1;\n"
-        "        if(bit_flag)\n"
-        "            *reg ^= 0x8005;\n"
-        "    }\n"
-        "    u16 result = 0, i = 0x8000, j = 0x0001;\n"
-        "    for (; i != 0; i >>=1, j <<= 1) {\n"
-        "        if (i & (*reg)) result |= j;\n"
-        "    }\n"
-        "    *reg = result;\n"
-        "}");
+cstring CRCChecksumAlgorithm::reflect(cstring str) {
+    unsigned long long poly = std::stoull(str.c_str(), 0, 16);
+    unsigned long long result, i, j;
+
+    result = 0;
+    i = 1 << (crcWidth - 1);
+    j = 1;
+
+    for (; i != 0; i >>=1, j <<= 1) {
+        if (i & poly)
+            result |= j;
+    }
+
+    return Util::printf_format("%llu", result);
 }
 
-void CRC16ChecksumAlgorithm::emitVariables(CodeBuilder* builder,
-                                           const IR::Declaration_Instance* decl) {
+void CRCChecksumAlgorithm::emitVariables(CodeBuilder* builder,
+                                         const IR::Declaration_Instance* decl) {
     registerVar = program->refMap->newName(baseName + "_reg");
 
     BUG_CHECK(decl->type->is<IR::Type_Specialized>(), "Must be a specialized type %1%", decl);
@@ -207,8 +191,8 @@ void CRC16ChecksumAlgorithm::emitVariables(CodeBuilder* builder,
         ::error(ErrorType::ERR_UNSUPPORTED, "Must be bit or int type: %1%", ts);
         return;
     }
-    if (otype->width_bits() != 16) {
-        ::error(ErrorType::ERR_TYPE_ERROR, "Must be 16-bits width for CRC16: %1%", ts);
+    if (otype->width_bits() != crcWidth) {
+        ::error(ErrorType::ERR_TYPE_ERROR, "Must be %1%-bits width: %2%", crcWidth, ts);
         return;
     }
 
@@ -216,18 +200,18 @@ void CRC16ChecksumAlgorithm::emitVariables(CodeBuilder* builder,
 
     builder->emitIndent();
     registerType->emit(builder);
-    builder->appendFormat(" %s = 0", registerVar.c_str());
+    builder->appendFormat(" %s = %s", registerVar.c_str(), initialValue.c_str());
     builder->endOfStatement(true);
 }
 
-void CRC16ChecksumAlgorithm::emitClear(CodeBuilder* builder) {
+void CRCChecksumAlgorithm::emitClear(CodeBuilder* builder) {
     builder->emitIndent();
-    builder->appendFormat("%s = 0", registerVar.c_str());
+    builder->appendFormat("%s = %s", registerVar.c_str(), initialValue.c_str());
     builder->endOfStatement(true);
 }
 
-void CRC16ChecksumAlgorithm::emitAddData(CodeBuilder* builder, int dataPos,
-                                         const IR::MethodCallExpression * expr) {
+void CRCChecksumAlgorithm::emitAddData(CodeBuilder* builder, int dataPos,
+                                       const IR::MethodCallExpression * expr) {
     cstring tmpVar = program->refMap->newName(baseName + "_tmp");
     auto arguments = unpackArguments(expr, dataPos);
 
@@ -273,8 +257,8 @@ void CRC16ChecksumAlgorithm::emitAddData(CodeBuilder* builder, int dataPos,
                 concatenateBits = false;
                 builder->endOfStatement(true);
                 builder->emitIndent();
-                builder->appendFormat("crc16_update(&%s, &%s, 1)",
-                                      registerVar.c_str(), tmpVar.c_str());
+                builder->appendFormat("%s(&%s, &%s, 1, %s)", updateMethod.c_str(),
+                                      registerVar.c_str(), tmpVar.c_str(), polynomial.c_str());
                 builder->endOfStatement(true);
             }
         } else {
@@ -285,41 +269,68 @@ void CRC16ChecksumAlgorithm::emitAddData(CodeBuilder* builder, int dataPos,
                 return;
             }
             builder->emitIndent();
-            builder->appendFormat("crc16_update(&%s, (u8 *) &(", registerVar.c_str());
+            builder->appendFormat("%s(&%s, (u8 *) &(", updateMethod.c_str(), registerVar.c_str());
             visitor->visit(field);
-            builder->appendFormat("), %d)", width / 8);
+            builder->appendFormat("), %d, %s)", width / 8, polynomial.c_str());
             builder->endOfStatement(true);
         }
     }
 
+    cstring varStr = Util::printf_format("(u64) %s", registerVar.c_str());
+
+    builder->target->emitTraceMessage(builder, "CRC: checksum: %llx", 1, varStr.c_str());
+
     builder->emitIndent();
-    builder->appendFormat("crc16_finalize(&%s)", registerVar.c_str());
+    builder->appendFormat("%s(&%s, %s)", finalizeMethod.c_str(),
+                          registerVar.c_str(), polynomial.c_str());
     builder->endOfStatement(true);
 
-    builder->target->emitTraceMessage(builder, "CRC16 checksum: %x", 1, registerVar.c_str());
+    builder->target->emitTraceMessage(builder, "CRC: final checksum: %llx", 1, varStr.c_str());
 
     builder->blockEnd(true);
 }
 
-void CRC16ChecksumAlgorithm::emitGet(CodeBuilder* builder) {
+void CRCChecksumAlgorithm::emitGet(CodeBuilder* builder) {
     builder->append(registerVar);
 }
 
-void CRC16ChecksumAlgorithm::emitSubtractData(CodeBuilder* builder, int dataPos,
-                                              const IR::MethodCallExpression * expr) {
+void CRCChecksumAlgorithm::emitSubtractData(CodeBuilder* builder, int dataPos,
+                                            const IR::MethodCallExpression * expr) {
     (void) builder; (void) expr; (void) dataPos;
     BUG("Not implementable");
 }
 
-void CRC16ChecksumAlgorithm::emitGetInternalState(CodeBuilder* builder) {
+void CRCChecksumAlgorithm::emitGetInternalState(CodeBuilder* builder) {
     (void) builder;
     BUG("Not implemented");
 }
 
-void CRC16ChecksumAlgorithm::emitSetInternalState(CodeBuilder* builder,
-                          const IR::MethodCallExpression * expr) {
+void CRCChecksumAlgorithm::emitSetInternalState(CodeBuilder* builder,
+                                                const IR::MethodCallExpression * expr) {
     (void) builder; (void) expr;
     BUG("Not implemented");
 }
+
+// ===========================CRC16ChecksumAlgorithm===========================
+
+void CRC16ChecksumAlgorithm::emitGlobals(CodeBuilder* builder) {
+    cstring code = "static __always_inline\n"
+        "void crc16_update(u16 * reg, const u8 * data, u16 data_size, const u16 poly) {\n"
+        "    data += data_size - 1;\n"
+        "    for (u16 i = 0; i < data_size; i++) {\n"
+        "        bpf_trace_message(\"CRC16: byte: %x\\n\", *data);\n"
+        "        *reg ^= *data;\n"
+        "        for (u8 bit = 0; bit < 8; bit++) {\n"
+        "            *reg = (*reg) & 1 ? ((*reg) >> 1) ^ poly : (*reg) >> 1;\n"
+        "        }\n"
+        "        data--;\n"
+        "    }\n"
+        "}\n"
+        "static __always_inline "
+        "void crc16_finalize(u16 * reg, const u16 poly) {\n"
+        "}";
+    builder->appendLine(code);
+}
+
 
 }  // namespace EBPF
