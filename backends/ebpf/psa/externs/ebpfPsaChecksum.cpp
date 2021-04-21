@@ -5,6 +5,12 @@ namespace EBPF {
 
 void EBPFChecksumPSA::init(const EBPFProgram* program, cstring name, int type) {
     engine = EBPFHashAlgorithmTypeFactoryPSA::instance()->create(type, program, name, visitor);
+
+    if (engine == nullptr) {
+        ::error(ErrorType::ERR_UNSUPPORTED, "Hash algorithm not yet implemented: %1%",
+                declaration->arguments->at(0));
+        engine = new EBPFHashAlgorithmPSA(program, name, visitor);
+    }
 }
 
 EBPFChecksumPSA::EBPFChecksumPSA(const EBPFProgram* program, const IR::Declaration_Instance* block,

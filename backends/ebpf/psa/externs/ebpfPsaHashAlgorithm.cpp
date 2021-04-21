@@ -22,6 +22,38 @@ EBPFHashAlgorithmPSA::argumentsList EBPFHashAlgorithmPSA::unpackArguments(
     return arguments;
 }
 
+void EBPFHashAlgorithmPSA::emitVariables(CodeBuilder* builder,
+                                         const IR::Declaration_Instance* decl) {
+    (void) builder; (void) decl;
+}
+
+void EBPFHashAlgorithmPSA::emitClear(CodeBuilder *builder) {
+    (void) builder;
+}
+
+void EBPFHashAlgorithmPSA::emitAddData(CodeBuilder *builder, int dataPos,
+                                       const IR::MethodCallExpression *expr) {
+    (void) builder; (void) dataPos; (void) expr;
+}
+
+void EBPFHashAlgorithmPSA::emitGet(CodeBuilder *builder) {
+    (void) builder;
+}
+
+void EBPFHashAlgorithmPSA::emitSubtractData(CodeBuilder *builder, int dataPos,
+                                            const IR::MethodCallExpression *expr) {
+    (void) builder; (void) dataPos; (void) expr;
+}
+
+void EBPFHashAlgorithmPSA::emitGetInternalState(CodeBuilder *builder) {
+    (void) builder;
+}
+
+void EBPFHashAlgorithmPSA::emitSetInternalState(CodeBuilder *builder,
+                                                const IR::MethodCallExpression *expr) {
+    (void) builder; (void) expr;
+}
+
 // ===========================InternetChecksumAlgorithm===========================
 
 void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder, int dataPos,
@@ -301,7 +333,7 @@ void CRCChecksumAlgorithm::emitAddData(CodeBuilder* builder, int dataPos,
     cstring varStr = Util::printf_format("(u64) %s", registerVar.c_str());
     builder->target->emitTraceMessage(builder, "CRC: checksum state: %llx", 1, varStr.c_str());
 
-    cstring final_crc = Util::printf_format("%s(%s, %s)", finalizeMethod.c_str(),
+    cstring final_crc = Util::printf_format("(u64) %s(%s, %s)", finalizeMethod.c_str(),
                                             registerVar.c_str(), polynomial.c_str());
     builder->target->emitTraceMessage(builder, "CRC: final checksum: %llx", 1, final_crc.c_str());
 

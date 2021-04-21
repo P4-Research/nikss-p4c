@@ -31,19 +31,19 @@ class EBPFHashAlgorithmPSA : public EBPFObject {
     EBPFHashAlgorithmPSA(const EBPFProgram* program, cstring name, Visitor * visitor)
         : baseName(name), program(program), visitor(visitor) {}
 
-    virtual void emitVariables(CodeBuilder* builder, const IR::Declaration_Instance* decl) = 0;
+    virtual void emitVariables(CodeBuilder* builder, const IR::Declaration_Instance* decl);
 
-    virtual void emitClear(CodeBuilder* builder) = 0;
+    virtual void emitClear(CodeBuilder* builder);
     virtual void emitAddData(CodeBuilder* builder, int dataPos,
-                             const IR::MethodCallExpression * expr) = 0;
-    virtual void emitGet(CodeBuilder* builder) = 0;
+                             const IR::MethodCallExpression * expr);
+    virtual void emitGet(CodeBuilder* builder);
 
     virtual void emitSubtractData(CodeBuilder* builder, int dataPos,
-                                  const IR::MethodCallExpression * expr) = 0;
+                                  const IR::MethodCallExpression * expr);
 
-    virtual void emitGetInternalState(CodeBuilder* builder) = 0;
+    virtual void emitGetInternalState(CodeBuilder* builder);
     virtual void emitSetInternalState(CodeBuilder* builder,
-                                      const IR::MethodCallExpression * expr) = 0;
+                                      const IR::MethodCallExpression * expr);
 };
 
 class InternetChecksumAlgorithm : public EBPFHashAlgorithmPSA {
@@ -149,7 +149,7 @@ class EBPFHashAlgorithmTypeFactoryPSA {
                 type == EBPFHashAlgorithmPSA::HashAlgorithm::TARGET_DEFAULT)
             return new InternetChecksumAlgorithm(program, name, visitor);
 
-        BUG("Algorithm %1% not yet implemented", type);
+        return nullptr;
     }
 
     void emitGlobals(CodeBuilder* builder) {
