@@ -62,9 +62,13 @@ void EBPFInternetChecksumPSA::processMethod(CodeBuilder* builder, cstring method
 
 void EBPFHashPSA::processMethod(CodeBuilder* builder, cstring method,
                                 const IR::MethodCallExpression * expr) {
+    // Note: "Hash" extern has only one method "get_hash". Method "update" were introduced
+    // in order to be able to calculate hash and then assign it to a destination.
     if (method == "update") {
-        // TODO: we probably should call the "clear" method in order to separate
-        //  each call to "get_hash" on this object
+        // For "Hash" extern, "the data over which to calculate the hash" is passed as
+        // an argument to "get_hash" method. This means that every call to this method
+        // should be independent from other.
+        engine->emitClear(builder);
         engine->emitAddData(builder, expr->arguments->size() == 3 ? 1 : 0, expr);
     } else if (method == "get_hash") {
         emitGetMethod(builder, expr);
