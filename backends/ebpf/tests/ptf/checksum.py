@@ -84,3 +84,13 @@ class HashRangePSATest(P4EbpfTest):
         exp_pkt = Ether() / bytes.fromhex('313233343536373839 {}'.format(format(res, 'x')))
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
+
+
+class ChecksumCRC32MultipleUpdatesPSATest(P4EbpfTest):
+    p4_file_path ="samples/p4testdata/checksum-updates.p4"
+
+    def runTest(self):
+        pkt = Ether() / "1234567890000"
+        exp_pkt = Ether() / bytes.fromhex('313233343536373839 cbf43926')
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)

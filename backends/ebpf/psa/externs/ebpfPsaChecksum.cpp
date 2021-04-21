@@ -57,6 +57,8 @@ void EBPFInternetChecksumPSA::processMethod(CodeBuilder* builder, cstring method
 void EBPFHashPSA::processMethod(CodeBuilder* builder, cstring method,
                                 const IR::MethodCallExpression * expr) {
     if (method == "update") {
+        // TODO: we probably should call the "clear" method in order to separate
+        //  each call to "get_hash" on this object
         engine->emitAddData(builder, expr->arguments->size() == 3 ? 1 : 0, expr);
     } else if (method == "get_hash") {
         emitGetMethod(builder, expr);

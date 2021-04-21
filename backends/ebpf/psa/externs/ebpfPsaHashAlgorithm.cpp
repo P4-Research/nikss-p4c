@@ -299,21 +299,18 @@ void CRCChecksumAlgorithm::emitAddData(CodeBuilder* builder, int dataPos,
     }
 
     cstring varStr = Util::printf_format("(u64) %s", registerVar.c_str());
+    builder->target->emitTraceMessage(builder, "CRC: checksum state: %llx", 1, varStr.c_str());
 
-    builder->target->emitTraceMessage(builder, "CRC: checksum: %llx", 1, varStr.c_str());
-
-    builder->emitIndent();
-    builder->appendFormat("%s(&%s, %s)", finalizeMethod.c_str(),
-                          registerVar.c_str(), polynomial.c_str());
-    builder->endOfStatement(true);
-
-    builder->target->emitTraceMessage(builder, "CRC: final checksum: %llx", 1, varStr.c_str());
+    cstring final_crc = Util::printf_format("%s(%s, %s)", finalizeMethod.c_str(),
+                                            registerVar.c_str(), polynomial.c_str());
+    builder->target->emitTraceMessage(builder, "CRC: final checksum: %llx", 1, final_crc.c_str());
 
     builder->blockEnd(true);
 }
 
 void CRCChecksumAlgorithm::emitGet(CodeBuilder* builder) {
-    builder->append(registerVar);
+    builder->appendFormat("%s(%s, %s)", finalizeMethod.c_str(),
+                          registerVar.c_str(), polynomial.c_str());
 }
 
 void CRCChecksumAlgorithm::emitSubtractData(CodeBuilder* builder, int dataPos,
@@ -339,7 +336,8 @@ void CRC16ChecksumAlgorithm::emitGlobals(CodeBuilder* builder) {
     CRCChecksumAlgorithm::emitUpdateMethod(builder, 16);
 
     cstring code ="static __always_inline "
-        "void crc16_finalize(u16 * reg, const u16 poly) {\n"
+        "u16 crc16_finalize(u16 reg, const u16 poly) {\n"
+        "    return reg;\n"
         "}";
     builder->appendLine(code);
 }
@@ -350,8 +348,8 @@ void CRC32ChecksumAlgorithm::emitGlobals(CodeBuilder* builder) {
     CRCChecksumAlgorithm::emitUpdateMethod(builder, 32);
 
     cstring code = "static __always_inline "
-        "void crc32_finalize(u32 * reg, const u32 poly) {\n"
-        "    *reg ^= 0xFFFFFFFF;\n"
+        "u32 crc32_finalize(u32 reg, const u32 poly) {\n"
+        "    return reg ^ 0xFFFFFFFF;\n"
         "}";
     builder->appendLine(code);
 }
