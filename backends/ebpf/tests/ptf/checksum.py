@@ -59,8 +59,8 @@ class HashCRC16PSATest(P4EbpfTest):
     p4_file_path ="samples/p4testdata/hash-crc16.p4"
 
     def runTest(self):
-        pkt = Ether() / raw("123456789{}".format("0000".decode("hex")))
-        exp_pkt = Ether() / raw("123456789{}".format("bb3d".decode("hex")))
+        pkt = Ether() / "12345678900"
+        exp_pkt = Ether() / bytes.fromhex('313233343536373839 bb3d')
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
 
@@ -69,8 +69,8 @@ class HashCRC32PSATest(P4EbpfTest):
     p4_file_path ="samples/p4testdata/hash-crc32.p4"
 
     def runTest(self):
-        pkt = Ether() / raw("123456789{}".format("00000000".decode("hex")))
-        exp_pkt = Ether() / raw("123456789{}".format("cbf43926".decode("hex")))
+        pkt = Ether() / "1234567890000"
+        exp_pkt = Ether() / bytes.fromhex('313233343536373839 cbf43926')
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
 
@@ -80,7 +80,7 @@ class HashRangePSATest(P4EbpfTest):
 
     def runTest(self):
         res = 50 + (0xbb3d % 200)
-        pkt = Ether() / raw("123456789{}".format("00".decode("hex")))
-        exp_pkt = Ether() / raw("123456789{}".format(format(res, 'x').decode("hex")))
+        pkt = Ether() / "1234567890"
+        exp_pkt = Ether() / bytes.fromhex('313233343536373839 {}'.format(format(res, 'x')))
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
