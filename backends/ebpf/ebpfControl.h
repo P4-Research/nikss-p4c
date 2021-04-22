@@ -25,7 +25,7 @@ namespace EBPF {
 
 class EBPFControl;
 
-class ControlBodyTranslator : public CodeGenInspector {
+class ControlBodyTranslator : public virtual CodeGenInspector {
  protected:
     const EBPFControl* control;
     std::set<const IR::Parameter*> toDereference;

@@ -2,19 +2,10 @@
 #define BACKENDS_EBPF_PSA_EBPFPSACONTROL_H_
 
 #include "ebpfPsaObjects.h"
+#include "ebpfPsaControlTranslators.h"
 #include "backends/ebpf/ebpfControl.h"
 
 namespace EBPF {
-
-class ControlBodyTranslatorPSA : public ControlBodyTranslator {
- public:
-    explicit ControlBodyTranslatorPSA(const EBPFControl* control) :
-            ControlBodyTranslator(control) {}
-
-    bool preorder(const IR::Member* expression) override;
-
-    void processMethod(const P4::ExternMethod* method) override;
-};
 
 class EBPFControlPSA : public EBPFControl {
  public:

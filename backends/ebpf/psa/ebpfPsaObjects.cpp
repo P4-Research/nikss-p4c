@@ -15,6 +15,8 @@ bool ActionTranslationVisitorPSA::preorder(const IR::MethodCallExpression* expre
         return false;
     }
 
+    // Do not call preorder from ControlBodyTranslator[PSA], because here we have
+    // smaller set of allowed function/methods calls
     return CodeGenInspector::preorder(expression);
 }
 
@@ -22,9 +24,7 @@ void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) 
     auto declType = method->originalExternType;
     auto name = method->object->getName();
 
-    if (declType->name.name == "Counter") {
-        program->control->getCounter(name)->emitMethodInvocation(builder, method);
-    } else if (declType->name.name == "DirectCounter") {
+    if (declType->name.name == "DirectCounter") {
         auto ctr = table->getCounter(name);
         if (ctr != nullptr)
             ctr->emitDirectMethodInvocation(builder, method, valueName);
@@ -33,8 +33,7 @@ void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) 
                     "%1%: Table %2% do not own DirectCounter named %3%",
                     method->expr, table->name, name);
     } else {
-        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
-                "%1%: Unexpected method call in action", method->expr);
+        ControlBodyTranslatorPSA::processMethod(method);
     }
 }
 
