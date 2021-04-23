@@ -36,11 +36,11 @@ class ActionTranslationVisitorPSA : public ActionTranslationVisitor,
             ControlBodyTranslatorPSA(program->control),
             table(table) {}
 
-    bool preorder(const IR::MethodCallExpression* expression) override;
     bool preorder(const IR::PathExpression* pe) override
     { return ActionTranslationVisitor::preorder(pe); }
 
     void processMethod(const P4::ExternMethod* method) override;
+    void processApply(const P4::ApplyMethod* method) override;
 };
 
 }  // namespace EBPF

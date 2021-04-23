@@ -5,21 +5,6 @@
 namespace EBPF {
 
 // =====================ActionTranslationVisitorPSA=============================
-bool ActionTranslationVisitorPSA::preorder(const IR::MethodCallExpression* expression) {
-    auto mi = P4::MethodInstance::resolve(expression,
-                                          program->refMap,
-                                          program->typeMap);
-    auto ext = mi->to<P4::ExternMethod>();
-    if (ext != nullptr) {
-        processMethod(ext);
-        return false;
-    }
-
-    // Do not call preorder from ControlBodyTranslator[PSA], because here we have
-    // smaller set of allowed function/methods calls
-    return CodeGenInspector::preorder(expression);
-}
-
 void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) {
     auto declType = method->originalExternType;
     auto name = method->object->getName();
@@ -35,6 +20,10 @@ void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) 
     } else {
         ControlBodyTranslatorPSA::processMethod(method);
     }
+}
+
+void ActionTranslationVisitorPSA::processApply(const P4::ApplyMethod* method) {
+    ::error(ErrorType::ERR_UNSUPPORTED, "%1%: not supported in action", method->expr);
 }
 
 // =====================EBPFTablePSA=============================
