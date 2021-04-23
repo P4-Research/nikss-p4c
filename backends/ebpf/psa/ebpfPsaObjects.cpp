@@ -5,6 +5,14 @@
 namespace EBPF {
 
 // =====================ActionTranslationVisitorPSA=============================
+ActionTranslationVisitorPSA::ActionTranslationVisitorPSA(cstring valueName,
+                                                         const EBPFPipeline *program,
+                                                         const EBPFTablePSA *table) :
+        CodeGenInspector(program->refMap, program->typeMap),
+        ActionTranslationVisitor(valueName, program),
+        ControlBodyTranslatorPSA(program->control),
+        table(table) {}
+
 void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) {
     auto declType = method->originalExternType;
     auto name = method->object->getName();

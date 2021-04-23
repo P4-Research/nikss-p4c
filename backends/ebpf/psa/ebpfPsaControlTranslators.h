@@ -14,9 +14,7 @@ class EBPFPipeline;
 
 class ControlBodyTranslatorPSA : public ControlBodyTranslator {
  public:
-    explicit ControlBodyTranslatorPSA(const EBPFControlPSA* control) :
-            CodeGenInspector(control->program->refMap, control->program->typeMap),
-            ControlBodyTranslator(control) {}
+    explicit ControlBodyTranslatorPSA(const EBPFControlPSA* control);
 
     bool preorder(const IR::Member* expression) override;
 
@@ -30,11 +28,7 @@ class ActionTranslationVisitorPSA : public ActionTranslationVisitor,
 
  public:
     ActionTranslationVisitorPSA(cstring valueName, const EBPFPipeline* program,
-                                const EBPFTablePSA* table):
-            CodeGenInspector(program->refMap, program->typeMap),
-            ActionTranslationVisitor(valueName, program),
-            ControlBodyTranslatorPSA(program->control),
-            table(table) {}
+                                const EBPFTablePSA* table);
 
     bool preorder(const IR::PathExpression* pe) override
     { return ActionTranslationVisitor::preorder(pe); }
