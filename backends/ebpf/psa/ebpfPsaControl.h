@@ -2,7 +2,6 @@
 #define BACKENDS_EBPF_PSA_EBPFPSACONTROL_H_
 
 #include "ebpfPsaObjects.h"
-#include "ebpfPsaControlTranslators.h"
 #include "backends/ebpf/ebpfControl.h"
 
 namespace EBPF {

@@ -7,9 +7,6 @@
 
 namespace EBPF {
 
-class EBPFControlPSA;
-class EBPFDeparserPSA;
-
 /*
  * EBPFPipeline represents a single eBPF program in the TC/XDP hook.
  * A single pipeline is composed of Parser, Control block and Deparser.

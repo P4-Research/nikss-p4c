@@ -1,6 +1,7 @@
 #include "backends/ebpf/ebpfType.h"
 #include "ebpfPsaObjects.h"
 #include "ebpfPipeline.h"
+#include "ebpfPsaControlTranslators.h"
 
 namespace EBPF {
 
@@ -39,6 +40,11 @@ EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* tab
                            CodeGenInspector* codeGen, cstring name, size_t size) :
                            EBPFTable(program, table, codeGen), name(name), size(size) {
     initDirectCounters();
+}
+
+ActionTranslationVisitor* EBPFTablePSA::createActionTranslationVisitor(
+        cstring valueName, const EBPFProgram* program) const {
+    return new ActionTranslationVisitorPSA(valueName, program->to<EBPFPipeline>(), this);
 }
 
 void EBPFTablePSA::initDirectCounters() {

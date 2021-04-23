@@ -1,4 +1,5 @@
 #include "ebpfPsaControl.h"
+#include "ebpfPsaControlTranslators.h"
 
 namespace EBPF {
 

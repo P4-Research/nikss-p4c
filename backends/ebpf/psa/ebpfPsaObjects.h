@@ -4,7 +4,6 @@
 #include "frontends/p4/methodInstance.h"
 #include "backends/ebpf/ebpfTable.h"
 #include "backends/ebpf/psa/externs/ebpfPsaCounter.h"
-#include "ebpfPsaControlTranslators.h"
 
 namespace EBPF {
 
@@ -12,9 +11,7 @@ class EBPFTablePSA : public EBPFTable {
  protected:
     ActionTranslationVisitor*
         createActionTranslationVisitor(cstring valueName,
-                                       const EBPFProgram* program) const override {
-        return new ActionTranslationVisitorPSA(valueName, program->to<EBPFPipeline>(), this);
-    }
+                                       const EBPFProgram* program) const override;
     void initDirectCounters();
 
  private:
