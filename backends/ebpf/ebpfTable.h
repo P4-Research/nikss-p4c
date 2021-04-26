@@ -23,7 +23,7 @@ limitations under the License.
 
 namespace EBPF {
 
-class ActionTranslationVisitor : public CodeGenInspector {
+class ActionTranslationVisitor : public virtual CodeGenInspector {
  protected:
     const EBPFProgram*  program;
     const IR::P4Action* action;

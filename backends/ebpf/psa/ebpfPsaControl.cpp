@@ -1,6 +1,11 @@
 #include "ebpfPsaControl.h"
+#include "ebpfPsaControlTranslators.h"
 
 namespace EBPF {
+
+ControlBodyTranslatorPSA::ControlBodyTranslatorPSA(const EBPFControlPSA* control) :
+        CodeGenInspector(control->program->refMap, control->program->typeMap),
+        ControlBodyTranslator(control) {}
 
 bool ControlBodyTranslatorPSA::preorder(const IR::Member* expression) {
     if (expression->expr->is<IR::TypeNameExpression>()) {

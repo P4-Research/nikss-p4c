@@ -2,6 +2,7 @@
 #include "ebpfPsaParser.h"
 #include "ebpfPsaObjects.h"
 #include "ebpfPsaControl.h"
+#include "ebpfPsaControlTranslators.h"
 #include "xdpProgram.h"
 #include "externs/ebpfPsaCounter.h"
 #include "externs/ebpfPsaHashAlgorithm.h"

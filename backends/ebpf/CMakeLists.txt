@@ -102,6 +102,7 @@ set (P4C_EBPF_HDRS
   psa/ebpfPsaParser.h
   psa/ebpfPsaDeparser.h
   psa/ebpfPsaControl.h
+  psa/ebpfPsaControlTranslators.h
   psa/ebpfPsaObjects.h
   psa/externs/ebpfPsaChecksum.h
   psa/externs/ebpfPsaCounter.h

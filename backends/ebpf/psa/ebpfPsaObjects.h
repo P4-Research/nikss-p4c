@@ -7,29 +7,11 @@
 
 namespace EBPF {
 
-class EBPFTablePSA;
-
-class ActionTranslationVisitorPSA : public ActionTranslationVisitor {
- protected:
-    const EBPFTablePSA* table;
-
- public:
-    ActionTranslationVisitorPSA(cstring valueName, const EBPFProgram* program,
-                                const EBPFTablePSA* table):
-            ActionTranslationVisitor(valueName, program), table(table) { }
-
-    bool preorder(const IR::MethodCallExpression* expression) override;
-
-    void processMethod(const P4::ExternMethod* method);
-};  // ActionTranslationVisitor
-
 class EBPFTablePSA : public EBPFTable {
  protected:
     ActionTranslationVisitor*
         createActionTranslationVisitor(cstring valueName,
-                                       const EBPFProgram* program) const override {
-        return new ActionTranslationVisitorPSA(valueName, program, this);
-    }
+                                       const EBPFProgram* program) const override;
     void initDirectCounters();
 
  private:

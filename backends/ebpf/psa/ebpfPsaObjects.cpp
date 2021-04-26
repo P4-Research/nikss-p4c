@@ -1,30 +1,24 @@
 #include "backends/ebpf/ebpfType.h"
 #include "ebpfPsaObjects.h"
 #include "ebpfPipeline.h"
+#include "ebpfPsaControlTranslators.h"
 
 namespace EBPF {
 
 // =====================ActionTranslationVisitorPSA=============================
-bool ActionTranslationVisitorPSA::preorder(const IR::MethodCallExpression* expression) {
-    auto mi = P4::MethodInstance::resolve(expression,
-                                          program->refMap,
-                                          program->typeMap);
-    auto ext = mi->to<P4::ExternMethod>();
-    if (ext != nullptr) {
-        processMethod(ext);
-        return false;
-    }
-
-    return CodeGenInspector::preorder(expression);
-}
+ActionTranslationVisitorPSA::ActionTranslationVisitorPSA(cstring valueName,
+                                                         const EBPFPipeline *program,
+                                                         const EBPFTablePSA *table) :
+        CodeGenInspector(program->refMap, program->typeMap),
+        ActionTranslationVisitor(valueName, program),
+        ControlBodyTranslatorPSA(program->control),
+        table(table) {}
 
 void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) {
     auto declType = method->originalExternType;
     auto name = method->object->getName();
 
-    if (declType->name.name == "Counter") {
-        program->control->getCounter(name)->emitMethodInvocation(builder, method);
-    } else if (declType->name.name == "DirectCounter") {
+    if (declType->name.name == "DirectCounter") {
         auto ctr = table->getCounter(name);
         if (ctr != nullptr)
             ctr->emitDirectMethodInvocation(builder, method, valueName);
@@ -33,9 +27,12 @@ void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) 
                     "%1%: Table %2% do not own DirectCounter named %3%",
                     method->expr, table->name, name);
     } else {
-        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
-                "%1%: Unexpected method call in action", method->expr);
+        ControlBodyTranslatorPSA::processMethod(method);
     }
+}
+
+void ActionTranslationVisitorPSA::processApply(const P4::ApplyMethod* method) {
+    ::error(ErrorType::ERR_UNSUPPORTED, "%1%: not supported in action", method->expr);
 }
 
 // =====================EBPFTablePSA=============================
@@ -43,6 +40,11 @@ EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* tab
                            CodeGenInspector* codeGen, cstring name, size_t size) :
                            EBPFTable(program, table, codeGen), name(name), size(size) {
     initDirectCounters();
+}
+
+ActionTranslationVisitor* EBPFTablePSA::createActionTranslationVisitor(
+        cstring valueName, const EBPFProgram* program) const {
+    return new ActionTranslationVisitorPSA(valueName, program->to<EBPFPipeline>(), this);
 }
 
 void EBPFTablePSA::initDirectCounters() {

@@ -4,6 +4,7 @@
 namespace EBPF {
 
 DeparserBodyTranslator::DeparserBodyTranslator(const EBPFDeparserPSA *deparser) :
+                        CodeGenInspector(deparser->program->refMap, deparser->program->typeMap),
                         ControlBodyTranslator(deparser), deparser(deparser) {
     setName("DeparserBodyTranslator");
 }
