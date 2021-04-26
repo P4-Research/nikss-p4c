@@ -553,20 +553,65 @@ class VerifyPSATest(P4EbpfTest):
         testutils.verify_no_other_packets(self)
 
 
-class RegisterPSATest(P4EbpfTest):
+class RegisterActionPSATest(P4EbpfTest):
+    """
+    Test register used in an action.
+    0. Install table rule that forwards packets from PORT0 to PORT1
+    1. Send a packet on PORT0
+    2. P4 application will read a value (undefined means 0 at current implementation),
+    add 5 and write it to the register
+    3. Verify a packet at PORT1
+    4. Verify a value stored in register (5)
+    5. Send a packed on PORT0 second time
+    6. P4 application will read a 5, add 10 and write it to the register
+    7. Verify a value stored in register (15)
+    """
 
-    p4_file_path = "samples/p4testdata/register.p4"
+    p4_file_path = "samples/p4testdata/register-action.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
-        # initialize default action
-        # TODO: we need to come up with a better solution to initialize default action.
+
         self.update_map(name="ingress_tbl_fwd", key="hex 04 00 00 00", value="hex 01 00 00 00 05 00 00 00")
+        testutils.send_packet(self, PORT0, str(pkt))
+        testutils.verify_packet(self, str(pkt), PORT1)  # Checks action run
+
+        self.verify_map_entry(name="ingress_reg", key="hex 05 00 00 00", expected_value="05 00 00 00")
+
+        # After next action run in register should be stored a new value - 15
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT1)
 
+        self.verify_map_entry(name="ingress_reg", key="hex 05 00 00 00", expected_value="0f 00 00 00")
 
-        # TODO sprawdzanie rejestru
     def tearDown(self):
-        self.remove_maps(["ingress_tbl_fwd", "ingress_tbl_fwd_defaultAction"])
-        #super(RegisterPSATest, self).tearDown()
+        self.remove_maps(["ingress_tbl_fwd", "ingress_tbl_fwd_defaultAction", "ingress_reg"])
+        super(RegisterActionPSATest, self).tearDown()
+
+
+class RegisterApplyPSATest(P4EbpfTest):
+    """
+        Test register used in an apply block.
+        1. Send a packet on PORT0
+        2. P4 application will read a value (undefined means 0 at current implementation),
+        add 5 and write it to the register
+        3. Verify a value stored in register (5)
+        4. Send a packed on PORT0 second time
+        5. P4 application will read a 5, add 10 and write it to the register
+        6. Verify a value stored in register (15)
+    """
+    p4_file_path = "samples/p4testdata/register-apply.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+
+        testutils.send_packet(self, PORT0, str(pkt))
+        self.verify_map_entry(name="ingress_reg", key="hex 05 00 00 00", expected_value="05 00 00 00")
+
+        # After next action run in register should be stored a new value - 15
+        testutils.send_packet(self, PORT0, str(pkt))
+        self.verify_map_entry(name="ingress_reg", key="hex 05 00 00 00", expected_value="0f 00 00 00")
+
+    def tearDown(self):
+        self.remove_maps(["ingress_tbl_fwd", "ingress_tbl_fwd_defaultAction", "ingress_reg"])
+        super(RegisterApplyPSATest, self).tearDown()
