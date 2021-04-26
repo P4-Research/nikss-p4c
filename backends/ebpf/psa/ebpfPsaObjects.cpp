@@ -14,6 +14,18 @@ ActionTranslationVisitorPSA::ActionTranslationVisitorPSA(cstring valueName,
         ControlBodyTranslatorPSA(program->control),
         table(table) {}
 
+bool ActionTranslationVisitorPSA::preorder(const IR::PathExpression* pe) {
+    auto decl = program->refMap->getDeclaration(pe->path, true);
+    if (decl->is<IR::Parameter>()) {
+        auto param = decl->to<IR::Parameter>();
+        bool isParam = action->parameters->getParameter(param->name) == param;
+        if (isParam) {
+            return ActionTranslationVisitor::preorder(pe);;
+        }
+    }
+    return ControlBodyTranslator::preorder(pe);
+}
+
 void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) {
     auto declType = method->originalExternType;
     auto name = method->object->getName();

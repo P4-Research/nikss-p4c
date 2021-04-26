@@ -31,8 +31,7 @@ class ActionTranslationVisitorPSA : public ActionTranslationVisitor,
     ActionTranslationVisitorPSA(cstring valueName, const EBPFPipeline* program,
                                 const EBPFTablePSA* table);
 
-    bool preorder(const IR::PathExpression* pe) override
-    { return ActionTranslationVisitor::preorder(pe); }
+    bool preorder(const IR::PathExpression* pe) override;
 
     void processMethod(const P4::ExternMethod* method) override;
     void processApply(const P4::ApplyMethod* method) override;
