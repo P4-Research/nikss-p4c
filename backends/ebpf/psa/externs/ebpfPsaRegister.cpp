@@ -53,6 +53,9 @@ void EBPFRegisterPSA::emitInstance(CodeBuilder *builder) {
 
 void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMethod* method,
                       cstring indexParamStr, const IR::Expression* leftExpression) {
+    BUG_CHECK(!indexParamStr.isNullOrEmpty(), "Index param must be provided");
+    BUG_CHECK(leftExpression != nullptr, "Register read must be with left assigment");
+
     cstring keyName = program->refMap->newName("key");
     cstring valueName = program->refMap->newName("value");
     cstring msgStr, varStr;
@@ -68,15 +71,7 @@ void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMet
     builder->endOfStatement(true);
 
     builder->emitIndent();
-    builder->appendFormat("%s %s = ", keyTypeName.c_str(), keyName.c_str());
-
-    auto expression = method->expr;
-    if (!indexParamStr.isNullOrEmpty()) {
-        builder->append(indexParamStr);
-    } else {
-        auto index = expression->arguments->at(0);
-        codeGen->visit(index);
-    }
+    builder->appendFormat("%s %s = %s", keyTypeName.c_str(), keyName.c_str(), indexParamStr.c_str());
     builder->endOfStatement(true);
 
     msgStr = Util::printf_format("Register: reading %s, id=%%u, packets=1, bytes=%%u",
@@ -107,8 +102,10 @@ void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMet
 
 void EBPFRegisterPSA::emitRegisterWrite(CodeBuilder* builder, const P4::ExternMethod* method,
                                         cstring indexParamStr, cstring valueParamStr) {
+    BUG_CHECK(!indexParamStr.isNullOrEmpty(), "Index param must be provided");
+    BUG_CHECK(!valueParamStr.isNullOrEmpty(), "Value param must be provided");
+
     cstring keyName = program->refMap->newName("key");
-//    cstring valueName = program->refMap->newName("value");
     cstring msgStr, varStr;
 
     auto pipeline = dynamic_cast<const EBPFPipeline *>(program);
@@ -117,20 +114,10 @@ void EBPFRegisterPSA::emitRegisterWrite(CodeBuilder* builder, const P4::ExternMe
         return;
     }
 
-//    builder->emitIndent();
-//    builder->appendFormat("%s *%s", valueTypeName.c_str(), valueName.c_str());
-//    builder->endOfStatement(true);
-
     builder->emitIndent();
     builder->appendFormat("%s %s = ", keyTypeName.c_str(), keyName.c_str());
 
-    auto expression = method->expr;
-    if (!indexParamStr.isNullOrEmpty()) {
-        builder->append(indexParamStr);
-    } else {
-        auto index = expression->arguments->at(0);
-        codeGen->visit(index);
-    }
+    builder->append(indexParamStr);
     builder->endOfStatement(true);
 
     msgStr = Util::printf_format("Register: writing %s, id=%%u, packets=1, bytes=%%u",
@@ -138,32 +125,8 @@ void EBPFRegisterPSA::emitRegisterWrite(CodeBuilder* builder, const P4::ExternMe
     varStr = Util::printf_format("%s->len", pipeline->contextVar.c_str());
     builder->target->emitTraceMessage(builder, msgStr.c_str(), 2, keyName.c_str(), varStr.c_str());
 
-    if (auto valueExpr = expression->arguments->at(1)->expression->to<IR::PathExpression>()) {
-        builder->emitIndent();
-        builder->target->emitTableUpdate(builder, dataMapName, keyName, valueExpr->path->name.name);
-//        builder->endOfStatement(true);
-    } else {
-        ::error(ErrorType::ERR_INVALID,
-                "Wrong register value argument",
-                expression->arguments->at(1)->expression->toString());
-    }
-}
-
-void EBPFRegisterPSA::emitMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method,
-                                           cstring indexParamStr, cstring valueParamStr) {
     builder->emitIndent();
-    builder->blockStart();
-    if (method->method->type->name == "read") {
-
-//        return;
-    } else if (method->method->type->name == "write") {
-
-//        return;
-    } else {
-        ::error(ErrorType::ERR_UNSUPPORTED, "Unexpected method %1%", method->expr);
-//        return;
-    }
-    builder->blockEnd(true);
+    builder->target->emitTableUpdate(builder, dataMapName, keyName, valueParamStr);
 }
 
 } // namespace EBPF

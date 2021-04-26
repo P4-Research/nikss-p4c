@@ -23,8 +23,6 @@ class EBPFRegisterPSA : public EBPFTableBase {
     void emitValueType(CodeBuilder* builder);
 
     void emitInstance(CodeBuilder* builder);
-    virtual void emitMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method,
-                                      cstring indexParamStr, cstring valueParamStr);
     void emitRegisterRead(CodeBuilder* builder, const P4::ExternMethod* method,
                           cstring indexParamStr, const IR::Expression* leftExpression);
     void emitRegisterWrite(CodeBuilder* builder, const P4::ExternMethod* method,

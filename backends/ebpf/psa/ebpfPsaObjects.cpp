@@ -59,40 +59,24 @@ void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) 
             ::error(ErrorType::ERR_NOT_FOUND,
                     "%1%: Table %2% do not own DirectCounter named %3%",
                     method->expr, table->name, name);
-    } else if (declType->name.name == "Register") {
-        if (method->method->type->name == "write") {
-            cstring indexParamStr = getIndexActionParam(method);
-            cstring valueParamStr = getValueActionParam(method);
-            auto di = method->object->to<IR::Declaration_Instance>();
-            name = EBPFObject::externalName(di);
-            auto reg = program->to<EBPFPipeline>()->control->getRegister(name);
-            reg->emitRegisterWrite(builder, method, indexParamStr, valueParamStr);
-        }
     } else {
         ControlBodyTranslatorPSA::processMethod(method);
     }
 }
 
-cstring ActionTranslationVisitorPSA::getValueActionParam(const P4::ExternMethod *method) const {
-    cstring valueParamStr;
-    if (method->expr->arguments->size() == 2) {
-        auto valueArg = method->expr->arguments->at(1);
-        auto valueExpr = valueArg->expression->to<IR::PathExpression>();
-        if (isActionParameter(valueExpr)) {
-            valueParamStr = getActionParamStr(valueExpr);
-        }
+cstring ActionTranslationVisitorPSA::getValueActionParam(const IR::PathExpression *valueExpr) {
+    if (isActionParameter(valueExpr)) {
+        return getActionParamStr(valueExpr);
     }
-    return valueParamStr;
+
+    return ControlBodyTranslatorPSA::getValueActionParam(valueExpr);
 }
-cstring ActionTranslationVisitorPSA::getIndexActionParam(const P4::ExternMethod *method) const {
-    cstring indexParamStr;
-    if (auto indexArg = method->expr->arguments->front()) {
-        auto indexExpr = indexArg->expression->to<IR::PathExpression>();
-        if (isActionParameter(indexExpr)) {
-            indexParamStr = getActionParamStr(indexExpr);
-        }
+cstring ActionTranslationVisitorPSA::getIndexActionParam(const IR::PathExpression *indexExpr) {
+    if (isActionParameter(indexExpr)) {
+        return getActionParamStr(indexExpr);
     }
-    return indexParamStr;
+
+    return ControlBodyTranslatorPSA::getIndexActionParam(indexExpr);
 }
 
 void ActionTranslationVisitorPSA::processApply(const P4::ApplyMethod* method) {
