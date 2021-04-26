@@ -140,7 +140,7 @@ file(RELATIVE_PATH
 # remove automake and fix the scripts.
 add_custom_target(linkp4cebpf
   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/load-prog ${P4C_BINARY_DIR}/load-prog
-  COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/prectl ${P4C_BINARY_DIR}/prectl
+  COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/psabpf-ctl ${P4C_BINARY_DIR}/psabpf-ctl
   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/p4c-ebpf ${P4C_BINARY_DIR}/p4c-ebpf
   COMMAND ${CMAKE_COMMAND} -E make_directory ${P4C_BINARY_DIR}/p4include &&
           ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${P4C_EBPF_DIST_HEADERS} ${P4C_BINARY_DIR}/p4include
@@ -244,14 +244,15 @@ else()
 endif()
 
 if (LIBBPF)
-  set (PRECTL_SRCS
-          runtime/prectl/common.c
-          runtime/prectl/clone_session.c
-          runtime/prectl/prectl.c)
-  add_executable(prectl ${PRECTL_SRCS})
+  set (PSABPFCTL_SRCS
+          runtime/psabpf/lib/psabpf.c
+          runtime/psabpf/CLI/common.c
+          runtime/psabpf/CLI/clone_session.c
+          runtime/psabpf/main.c)
+  add_executable(psabpf-ctl ${PSABPFCTL_SRCS})
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/runtime/usr/include)
-  target_link_libraries (prectl z elf ${LIBBPF})
-  install (TARGETS prectl
+  target_link_libraries (psabpf-ctl z elf ${LIBBPF})
+  install (TARGETS psabpf-ctl
           RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
 
   set (LOAD_PROG_SRCS

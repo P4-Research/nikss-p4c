@@ -1,7 +1,3 @@
-//
-// Created by dev on 26.02.2021.
-//
-
 #include <stdbool.h>
 
 #ifndef P4C_COMMON_H

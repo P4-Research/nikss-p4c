@@ -10,6 +10,8 @@
 #include <sys/time.h>
 
 #include "backends/ebpf/runtime/psa.h"
+
+#include "../include/psabpf.h"
 #include "clone_session.h"
 
 /**
@@ -44,81 +46,99 @@ static double end_time;
 
 int clone_session_create(__u32 clone_session_id)
 {
-    start_time = get_current_time();
-    int error;
-    struct bpf_create_map_attr attr = { NULL, };
-    attr.map_type = BPF_MAP_TYPE_HASH;
-    char name[256];
-    snprintf(name, sizeof(name), "clone_session_%d", clone_session_id);
-    attr.name = name;
-    attr.key_size = sizeof(elem_t);
-    attr.value_size = sizeof(struct element);
-    attr.max_entries = MAX_CLONE_SESSION_MEMBERS;
-    attr.map_flags = 0;
+    psabpf_clone_session_ctx_t ctx;
+    psabpf_clone_session_context_init(&ctx);
+    psabpf_clone_session_id(&ctx, clone_session_id);
 
-    int inner_map_fd = bpf_create_map_xattr(&attr);
-    if (inner_map_fd < 0) {
-        printf("failed to create new clone session\n");
-        return -1;
+    if (psabpf_clone_session_exists(&ctx)) {
+        psabpf_clone_session_context_free(&ctx);
+        return EEXIST;
     }
 
-    char path[256];
-    snprintf(path, sizeof(path), "%s/clone_session_%d", BPF_FS, clone_session_id);
-    error = bpf_obj_pin(inner_map_fd, path);
-    if (error < 0) {
-        printf("failed to pin new clone session to a file [%s]\n", strerror(errno));
-        goto ret;
+    if (!psabpf_clone_session_create(&ctx)) {
+        psabpf_clone_session_context_free(&ctx);
     }
 
-    elem_t head_idx = {};
-    head_idx.instance = 0;
-    head_idx.port = 0;
-    struct element head_elem =  {
-            .entry = { 0 },
-            .next_id = { 0 },
-    };
-    error = bpf_map_update_elem(inner_map_fd, &head_idx, &head_elem, 0);
-    if (error < 0) {
-        printf("failed to add head to the list [%s]\n", strerror(errno));
-        goto ret;
-    }
-
-    char pinned_file[256];
-    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", BPF_FS,
-             CLONE_SESSION_TABLE);
-
-    long outer_map_fd = bpf_obj_get(pinned_file);
-    if (outer_map_fd < 0) {
-        fprintf(stderr, "could not find map %s [%s].\n",
-                CLONE_SESSION_TABLE, strerror(errno));
-        error = -1;
-        goto ret;
-    }
-
-    error = bpf_map_update_elem((unsigned int)outer_map_fd, &clone_session_id, &inner_map_fd, 0);
-    if (error < 0) {
-        fprintf(stderr, "failed to create clone session with id %u [%s].\n",
-                clone_session_id, strerror(errno));
-        goto ret;
-    }
-
-    printf("Clone session ID %d successfully created\n", clone_session_id);
-
-    close(inner_map_fd);
-    close(outer_map_fd);
-ret:
-    end_time = get_current_time();
-    printf("Completed in %fs\n", end_time-start_time);
-    if (inner_map_fd > 0) {
-        close(inner_map_fd);
-    }
-
-    if (outer_map_fd > 0) {
-        close(outer_map_fd);
-    }
-
-    return error;
+    return 0;
 }
+
+//int clone_session_create(__u32 clone_session_id)
+//{
+//    start_time = get_current_time();
+//    int error;
+//    struct bpf_create_map_attr attr = { NULL, };
+//    attr.map_type = BPF_MAP_TYPE_HASH;
+//    char name[256];
+//    snprintf(name, sizeof(name), "clone_session_%d", clone_session_id);
+//    attr.name = name;
+//    attr.key_size = sizeof(elem_t);
+//    attr.value_size = sizeof(struct element);
+//    attr.max_entries = MAX_CLONE_SESSION_MEMBERS;
+//    attr.map_flags = 0;
+//
+//    int inner_map_fd = bpf_create_map_xattr(&attr);
+//    if (inner_map_fd < 0) {
+//        printf("failed to create new clone session\n");
+//        return -1;
+//    }
+//
+//    char path[256];
+//    snprintf(path, sizeof(path), "%s/clone_session_%d", BPF_FS, clone_session_id);
+//    error = bpf_obj_pin(inner_map_fd, path);
+//    if (error < 0) {
+//        printf("failed to pin new clone session to a file [%s]\n", strerror(errno));
+//        goto ret;
+//    }
+//
+//    elem_t head_idx = {};
+//    head_idx.instance = 0;
+//    head_idx.port = 0;
+//    struct element head_elem =  {
+//            .entry = { 0 },
+//            .next_id = { 0 },
+//    };
+//    error = bpf_map_update_elem(inner_map_fd, &head_idx, &head_elem, 0);
+//    if (error < 0) {
+//        printf("failed to add head to the list [%s]\n", strerror(errno));
+//        goto ret;
+//    }
+//
+//    char pinned_file[256];
+//    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", BPF_FS,
+//             CLONE_SESSION_TABLE);
+//
+//    long outer_map_fd = bpf_obj_get(pinned_file);
+//    if (outer_map_fd < 0) {
+//        fprintf(stderr, "could not find map %s [%s].\n",
+//                CLONE_SESSION_TABLE, strerror(errno));
+//        error = -1;
+//        goto ret;
+//    }
+//
+//    error = bpf_map_update_elem((unsigned int)outer_map_fd, &clone_session_id, &inner_map_fd, 0);
+//    if (error < 0) {
+//        fprintf(stderr, "failed to create clone session with id %u [%s].\n",
+//                clone_session_id, strerror(errno));
+//        goto ret;
+//    }
+//
+//    printf("Clone session ID %d successfully created\n", clone_session_id);
+//
+//    close(inner_map_fd);
+//    close(outer_map_fd);
+//ret:
+//    end_time = get_current_time();
+//    printf("Completed in %fs\n", end_time-start_time);
+//    if (inner_map_fd > 0) {
+//        close(inner_map_fd);
+//    }
+//
+//    if (outer_map_fd > 0) {
+//        close(outer_map_fd);
+//    }
+//
+//    return error;
+//}
 
 int clone_session_delete(__u32 clone_session_id)
 {
