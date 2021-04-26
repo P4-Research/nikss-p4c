@@ -73,7 +73,7 @@ class EBPFControl : public EBPFObject {
                 const IR::Parameter* parserHeaders);
     virtual void emit(CodeBuilder* builder);
     virtual void emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl);
-    void emitTableTypes(CodeBuilder* builder);
+    virtual void emitTableTypes(CodeBuilder* builder);
     virtual void emitTableInitializers(CodeBuilder* builder);
     virtual void emitTableInstances(CodeBuilder* builder);
     virtual bool build();

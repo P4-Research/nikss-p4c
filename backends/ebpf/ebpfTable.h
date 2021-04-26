@@ -38,6 +38,8 @@ class ActionTranslationVisitor : public virtual CodeGenInspector {
     bool preorder(const IR::PathExpression* expression);
 
     bool preorder(const IR::P4Action* act);
+    cstring getActionParamStr(const IR::Expression *expression) const;
+    bool isActionParameter(const IR::PathExpression *expression) const;
 };  // ActionTranslationVisitor
 
 // Also used to represent counters
@@ -89,7 +91,7 @@ class EBPFTable : public EBPFTableBase {
     virtual void emitInstance(CodeBuilder* builder);
     void emitActionArguments(CodeBuilder* builder, const IR::P4Action* action, cstring name);
     virtual void emitKeyType(CodeBuilder* builder);
-    void emitValueType(CodeBuilder* builder);
+    virtual void emitValueType(CodeBuilder* builder);
     void emitKey(CodeBuilder* builder, cstring keyName);
     void emitAction(CodeBuilder* builder, cstring valueName);
     virtual void emitInitializer(CodeBuilder* builder);

@@ -6,6 +6,7 @@
 #include "xdpProgram.h"
 #include "externs/ebpfPsaCounter.h"
 #include "externs/ebpfPsaHashAlgorithm.h"
+#include "externs/ebpfPsaRegister.h"
 
 namespace EBPF {
 
@@ -574,6 +575,11 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
             auto hash = new EBPFHashPSA(program, di, name, control->codeGen);
             control->hashes.emplace(name, hash);
         }
+    } else if (instance->type->getName().name == "Register") {
+        auto di = instance->node->to<IR::Declaration_Instance>();
+        cstring name = EBPFObject::externalName(di);
+        auto reg = new EBPFRegisterPSA(program, name, di, control->codeGen);
+        control->registers.emplace(name, reg);
     } else {
         ::error(ErrorType::ERR_UNEXPECTED, "Unexpected block %s nested within control",
                 instance->toString());

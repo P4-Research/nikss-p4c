@@ -1,6 +1,16 @@
 #include <core.p4>
 #include "psa.p4"
 
+#define PACKET_COUNT_WIDTH 32
+#define BYTE_COUNT_WIDTH 32
+//#define PACKET_BYTE_COUNT_WIDTH (PACKET_COUNT_WIDTH + BYTE_COUNT_WIDTH)
+#define PACKET_BYTE_COUNT_WIDTH 32
+
+#define PACKET_COUNT_RANGE (PACKET_BYTE_COUNT_WIDTH-1):BYTE_COUNT_WIDTH
+#define BYTE_COUNT_RANGE (BYTE_COUNT_WIDTH-1):0
+
+typedef bit<PACKET_BYTE_COUNT_WIDTH> PacketByteCountState_t;
+
 typedef bit<48>  EthernetAddress;
 
 header ethernet_t {
@@ -88,14 +98,32 @@ control ingress(inout headers hdr,
                 inout psa_ingress_output_metadata_t ostd)
 {
 
+    Register<PacketByteCountState_t, PortId_t>(10) port_pkt_ip_bytes_in;
     Register<bit<32>, PortId_t>(10) reg;
+    Counter<bit<64>, bit<32>>(1024, PSA_CounterType_t.BYTES) test1_cnt;
     //Register<PacketByteCountState_t, PortId_t>(NUM_PORTS)
     //        port_pkt_ip_bytes_in;
 
     action do_forward(PortId_t egress_port) {
-        bit<32> tmp = reg.read(egress_port);
-        tmp = tmp + 1;
+        bit<32> tmp;
+        tmp = reg.read(egress_port);
+        if (tmp < 5) {
+            tmp = tmp + 5;
+        } else {
+            tmp = tmp + 10;
+        }
+        //tmp = tmp + 1;
         reg.write(egress_port, tmp);
+
+        //PacketByteCountState_t tmp;
+        //tmp = port_pkt_ip_bytes_in.read(istd.ingress_port);
+        //if (tmp == (PacketByteCountState_t)5) {
+        //   tmp = tmp + 5;
+        //} else {
+        //   tmp = tmp + 10;
+        //}
+        //port_pkt_ip_bytes_in.write(istd.ingress_port, tmp);
+
         send_to_port(ostd, egress_port);
     }
 
@@ -108,8 +136,43 @@ control ingress(inout headers hdr,
         size = 100;
     }
 
+    //action update_pkt_ip_byte_count (inout PacketByteCountState_t s,
+    //                                 in bit<16> ip_length_bytes) {
+    //    s[PACKET_COUNT_RANGE] = s[PACKET_COUNT_RANGE] + 1;
+    //    s[BYTE_COUNT_RANGE] = (s[BYTE_COUNT_RANGE] +
+    //                           (bit<BYTE_COUNT_WIDTH>) ip_length_bytes);
+    //}
+
     apply {
+         //PortId_t egress_port = (PortId_t)5;
+         //bit<32> tmp;
+         //tmp = reg.read(egress_port);
+         //tmp = tmp + 1;
+         //reg.write(egress_port, tmp);
+         //test1_cnt.count(hdr.ethernet.srcAddr[31:0]);
          tbl_fwd.apply();
+
+         //bit<32> tmp;
+         //tmp = reg.read(egress_port);
+         //if (tmp < 5) {
+         //    tmp = tmp + 5;
+         //} else {
+         //    tmp = tmp + 10;
+         //}
+         //tmp = tmp + 1;
+         //reg.write(egress_port, tmp);
+
+         //ostd.egress_port = (PortId_t) 0;
+         //{
+         //    PacketByteCountState_t tmp;
+         //    tmp = port_pkt_ip_bytes_in.read(istd.ingress_port);
+         //    if (tmp == (PacketByteCountState_t)5) {
+         //       tmp = tmp + 5;
+         //    } else {
+         //       tmp = tmp + 10;
+         //    }
+         //    port_pkt_ip_bytes_in.write(istd.ingress_port, tmp);
+         //}
     }
 }
 

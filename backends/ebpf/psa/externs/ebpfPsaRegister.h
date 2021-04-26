@@ -6,14 +6,31 @@
 namespace EBPF {
 
 class EBPFRegisterPSA : public EBPFTableBase {
+ protected:
+    size_t size;
+    EBPFType *keyType;
+    EBPFType *valueType;
+
  public:
 
-    EBPFRegisterPSA(const EBPFProgram* program, cstring instanceName,
-                    CodeGenInspector* codeGen) {
 
-    }
+    EBPFRegisterPSA(const EBPFProgram* program, cstring instanceName,
+                    const IR::Declaration_Instance* di,
+                    CodeGenInspector* codeGen);
+
+    void emitTypes(CodeBuilder* builder);
+    void emitKeyType(CodeBuilder* builder);
+    void emitValueType(CodeBuilder* builder);
+
+    void emitInstance(CodeBuilder* builder);
+    virtual void emitMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method,
+                                      cstring indexParamStr, cstring valueParamStr);
+    void emitRegisterRead(CodeBuilder* builder, const P4::ExternMethod* method,
+                          cstring indexParamStr, const IR::Expression* leftExpression);
+    void emitRegisterWrite(CodeBuilder* builder, const P4::ExternMethod* method,
+                          cstring indexParamStr, cstring valueParamStr);
 };
 
-}
+}  // namespace EBPF
 
 #endif //P4C_BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAREGISTER_H_

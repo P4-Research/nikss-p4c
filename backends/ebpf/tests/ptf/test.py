@@ -561,12 +561,12 @@ class RegisterPSATest(P4EbpfTest):
         pkt = testutils.simple_ip_packet()
         # initialize default action
         # TODO: we need to come up with a better solution to initialize default action.
-        self.update_map(name="ingress_tbl_fwd_defaultAction", key="00 00 00 00", value="01 00 00 00 05 00 00 00")
+        self.update_map(name="ingress_tbl_fwd", key="hex 04 00 00 00", value="hex 01 00 00 00 05 00 00 00")
         testutils.send_packet(self, PORT0, str(pkt))
         testutils.verify_packet(self, str(pkt), PORT1)
 
-        # TODO sprawdzanie rejestru
 
+        # TODO sprawdzanie rejestru
     def tearDown(self):
         self.remove_maps(["ingress_tbl_fwd", "ingress_tbl_fwd_defaultAction"])
-        super(RegisterPSATest, self).tearDown()
+        #super(RegisterPSATest, self).tearDown()
