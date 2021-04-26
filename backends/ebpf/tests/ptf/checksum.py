@@ -65,6 +65,16 @@ class HashCRC16PSATest(P4EbpfTest):
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
 
 
+class HashInActionPSATest(P4EbpfTest):
+    p4_file_path ="samples/p4testdata/hash-action.p4"
+
+    def runTest(self):
+        pkt = Ether() / "12345678900"
+        exp_pkt = Ether() / bytes.fromhex('313233343536373839 bb3d')
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
+
+
 class HashCRC32PSATest(P4EbpfTest):
     p4_file_path ="samples/p4testdata/hash-crc32.p4"
 
