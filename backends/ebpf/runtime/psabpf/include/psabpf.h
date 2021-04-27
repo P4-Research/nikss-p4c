@@ -32,19 +32,21 @@ void psabpf_free(psabpf_context_t *ctx);
  */
 typedef uint32_t psabpf_clone_session_id_t;
 
-typedef struct psabpf_clone_session_entry {
-    uint32_t egress_port;
-    uint16_t instance;
-    uint8_t  class_of_service;
-    uint8_t  truncate;
-    uint8_t  packet_length_bytes;
-} psabpf_clone_session_entry_t;
-
 typedef struct psabpf_clone_session_ctx {
     psabpf_clone_session_id_t id;
+
+    // TODO: to consider if this is the best way to iterate
     size_t curr_idx;
-    psabpf_clone_session_entry_t *prev;
+    psabpf_clone_session_entry_t *next_id;
 } psabpf_clone_session_ctx_t;
+
+typedef struct psabpf_clone_session_entry {
+    uint32_t  egress_port;
+    uint16_t  instance;
+    uint8_t   class_of_service;
+    uint8_t   truncate;
+    uint16_t  packet_length_bytes;
+} psabpf_clone_session_entry_t;
 
 /*
  * We do we need clone session context? It is mainly useful for iteration over clone session members.
@@ -53,18 +55,23 @@ void psabpf_clone_session_context_init(psabpf_clone_session_ctx_t *ctx);
 void psabpf_clone_session_context_free(psabpf_clone_session_ctx_t *ctx);
 
 void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_id_t id);
+
+// TODO: add function to get all identifiers of clone sessions, which are created.
 int psabpf_clone_session_create(psabpf_clone_session_ctx_t *ctx);
 int psabpf_clone_session_exists(psabpf_clone_session_ctx_t *ctx);
 int psabpf_clone_session_delete(psabpf_clone_session_ctx_t *ctx);
 
 int psabpf_clone_session_member_init(psabpf_clone_session_entry_t *entry);
 int psabpf_clone_session_member_free(psabpf_clone_session_entry_t *entry);
+
 int psabpf_clone_session_member_port(psabpf_clone_session_entry_t *entry, uint32_t egress_port);
 int psabpf_clone_session_member_instance(psabpf_clone_session_entry_t *entry, uint16_t instance);
 int psabpf_clone_session_member_cos(psabpf_clone_session_entry_t *entry, uint8_t class_of_service);
-int psabpf_clone_session_member_truncate(psabpf_clone_session_entry_t *entry, uint8_t packet_length_bytes);
+int psabpf_clone_session_member_truncate(psabpf_clone_session_entry_t *entry, uint16_t packet_length_bytes);
+// The function to set 'truncate' to false.
+int psabpf_clone_session_member_untruncate(psabpf_clone_session_entry_t *entry);
 
-int psabpf_clone_session_member_add(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
+int psabpf_clone_session_member_update(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
 int psabpf_clone_session_member_delete(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
 int psabpf_clone_session_member_exists(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
 int psabpf_clone_session_member_get(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
@@ -116,7 +123,7 @@ int psabpf_mcast_grp_member_free(psabpf_mcast_grp_member_t *member);
 int psabpf_mcast_grp_member_port(psabpf_mcast_grp_member_t *member, uint32_t egress_port);
 int psabpf_mcast_grp_member_instance(psabpf_mcast_grp_member_t *member, uint16_t instance);
 
-int psabpf_mcast_grp_member_add(psabpf_mcast_grp_ctx_t *ctx, psabpf_mcast_grp_member_t *member);
+int psabpf_mcast_grp_member_update(psabpf_mcast_grp_ctx_t *ctx, psabpf_mcast_grp_member_t *member);
 int psabpf_mcast_grp_member_exists(psabpf_mcast_grp_ctx_t *ctx, psabpf_mcast_grp_member_t *member);
 int psabpf_mcast_grp_member_delete(psabpf_mcast_grp_ctx_t *ctx, psabpf_mcast_grp_member_t *member);
 // psabpf_mcast_grp_member_get does not make sense as mcast grp member does not have additional parameters
@@ -124,6 +131,8 @@ int psabpf_mcast_grp_member_delete(psabpf_mcast_grp_ctx_t *ctx, psabpf_mcast_grp
 ////// ForwardingConfig
 typedef struct psabpf_prog {
     const char *obj;
+
+    // TODO: consider to move it to the global context
     int prog_id;
 } psabpf_prog_t;
 
@@ -131,11 +140,12 @@ int psabpf_prog_init(psabpf_prog_t *prog);
 int psabpf_prog_free(psabpf_prog_t *prog);
 
 int psabpf_prog_setobj(psabpf_prog_t *prog, char *obj);
-int psabpf_prog_setid(psabpf_prog_t *prog, int prog_id);
-int psabpf_prog_getid(psabpf_prog_t *prog, int *prog_id);
 
 /* This function should load BPF program and initialize default maps (call map initializer program) */
 int psabpf_prog_load(psabpf_prog_t *prog);
+int psabpf_prog_getid(psabpf_prog_t *prog, int *prog_id);
+
+int psabpf_prog_setid(psabpf_prog_t *prog, int prog_id);
 int psabpf_prog_unload(psabpf_prog_t *prog);
 
 ////// TableEntry
@@ -209,7 +219,10 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx);
 void psabpf_table_entry_init(psabpf_table_entry_t *entry);
 void psabpf_table_entry_free(psabpf_table_entry_t *entry);
 void psabpf_table_entry_tblname(psabpf_table_entry_t *entry, const char *name);
+
+// can be invoked multiple times
 int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t *mk);
+
 void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act);
 void psabpf_table_entry_priority(psabpf_table_entry_t *entry, const uint32_t priority);
 
@@ -217,6 +230,8 @@ void psabpf_matchkey_init(psabpf_match_key_t *mk);
 void psabpf_matchkey_free(psabpf_match_key_t *mk);
 void psabpf_matchkey_type(psabpf_match_key_t *mk, enum psabpf_matchkind_t type);
 int psabpf_matchkey_data(psabpf_match_key_t *mk, const char *data, size_t size);
+
+// only for lpm
 int psabpf_matchkey_prefix(psabpf_match_key_t *mk, uint32_t prefix);
 
 // only for ternary
@@ -233,6 +248,7 @@ void psabpf_action_free(psabpf_action_t *action);
 void psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param);
 
 int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
+int psabpf_table_entry_update(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 int psabpf_table_entry_get(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t **entry);
 int psabpf_table_entry_getnext(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t **entry);
@@ -264,10 +280,10 @@ int psabpf_table_entry_getnext(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry
 int psabpf_table_entry_setdefault(psabpf_table_entry_t *entry);
 int psabpf_table_entry_getdefault(psabpf_table_entry_t *entry);
 
-
 /*
  * P4 Counters
  */
+// TODO: design API for Counters
 
 typedef uint64_t psabpf_counter_value_t;
 
