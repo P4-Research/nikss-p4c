@@ -634,5 +634,5 @@ class RegisterDefaultPSATest(P4EbpfTest):
         self.verify_map_entry(name="ingress_reg", key="hex 05 00 00 00", expected_value="10 00 00 00")
 
     def tearDown(self):
-        self.remove_maps(["ingress_tbl_fwd", "ingress_tbl_fwd_defaultAction", "ingress_reg"])
+        self.remove_maps(["ingress_reg"])
         super(RegisterDefaultPSATest, self).tearDown()
