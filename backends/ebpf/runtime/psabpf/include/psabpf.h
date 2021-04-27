@@ -31,6 +31,15 @@ void psabpf_free(psabpf_context_t *ctx);
  * PRE - Clone Sessions
  */
 typedef uint32_t psabpf_clone_session_id_t;
+struct psabpf_clone_session_entry {
+    uint32_t  egress_port;
+    uint16_t  instance;
+    uint8_t   class_of_service;
+    uint8_t   truncate;
+    uint16_t  packet_length_bytes;
+} __attribute__((aligned(4)));
+
+typedef struct psabpf_clone_session_entry psabpf_clone_session_entry_t;
 
 typedef struct psabpf_clone_session_ctx {
     psabpf_clone_session_id_t id;
@@ -40,13 +49,6 @@ typedef struct psabpf_clone_session_ctx {
     psabpf_clone_session_entry_t *next_id;
 } psabpf_clone_session_ctx_t;
 
-typedef struct psabpf_clone_session_entry {
-    uint32_t  egress_port;
-    uint16_t  instance;
-    uint8_t   class_of_service;
-    uint8_t   truncate;
-    uint16_t  packet_length_bytes;
-} psabpf_clone_session_entry_t;
 
 /*
  * We do we need clone session context? It is mainly useful for iteration over clone session members.
@@ -61,20 +63,20 @@ int psabpf_clone_session_create(psabpf_clone_session_ctx_t *ctx);
 int psabpf_clone_session_exists(psabpf_clone_session_ctx_t *ctx);
 int psabpf_clone_session_delete(psabpf_clone_session_ctx_t *ctx);
 
-int psabpf_clone_session_member_init(psabpf_clone_session_entry_t *entry);
-int psabpf_clone_session_member_free(psabpf_clone_session_entry_t *entry);
+void psabpf_clone_session_entry_init(psabpf_clone_session_entry_t *entry);
+void psabpf_clone_session_entry_free(psabpf_clone_session_entry_t *entry);
 
-int psabpf_clone_session_member_port(psabpf_clone_session_entry_t *entry, uint32_t egress_port);
-int psabpf_clone_session_member_instance(psabpf_clone_session_entry_t *entry, uint16_t instance);
-int psabpf_clone_session_member_cos(psabpf_clone_session_entry_t *entry, uint8_t class_of_service);
-int psabpf_clone_session_member_truncate(psabpf_clone_session_entry_t *entry, uint16_t packet_length_bytes);
+void psabpf_clone_session_entry_port(psabpf_clone_session_entry_t *entry, uint32_t egress_port);
+void psabpf_clone_session_entry_instance(psabpf_clone_session_entry_t *entry, uint16_t instance);
+void psabpf_clone_session_entry_cos(psabpf_clone_session_entry_t *entry, uint8_t class_of_service);
+int psabpf_clone_session_entry_truncate_enable(psabpf_clone_session_entry_t *entry, uint16_t packet_length_bytes);
 // The function to set 'truncate' to false.
-int psabpf_clone_session_member_untruncate(psabpf_clone_session_entry_t *entry);
+int psabpf_clone_session_entry_truncate_disable(psabpf_clone_session_entry_t *entry);
 
-int psabpf_clone_session_member_update(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
-int psabpf_clone_session_member_delete(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
-int psabpf_clone_session_member_exists(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
-int psabpf_clone_session_member_get(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
+int psabpf_clone_session_entry_update(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
+int psabpf_clone_session_entry_delete(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
+int psabpf_clone_session_entry_exists(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
+int psabpf_clone_session_entry_get(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
 
 /*
  * Example:
@@ -82,17 +84,17 @@ int psabpf_clone_session_member_get(psabpf_clone_session_ctx_t *ctx, psabpf_clon
  * psabpf_clone_session_context_init(&ctx);
  *
  * psabpf_clone_session_entry_t entry;
- * psabpf_clone_session_member_init(&entry);
+ * psabpf_clone_session_entry_init(&entry);
  *
- * while(psabpf_clone_session_member_getnext(&ctx, &entry)) {
+ * while(psabpf_clone_session_entry_getnext(&ctx, &entry)) {
  *     // print entry fields
  * }
  *
- * psabpf_clone_session_member_free(&entry);
+ * psabpf_clone_session_entry_free(&entry);
  * psabpf_clone_session_context_free(&ctx);
  *
  */
-int psabpf_clone_session_member_getnext(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t **entry);
+int psabpf_clone_session_entry_getnext(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t **entry);
 
 /*
  * PRE - Multicast Groups

@@ -55,126 +55,74 @@ int clone_session_create(__u32 clone_session_id)
         return EEXIST;
     }
 
-    if (!psabpf_clone_session_create(&ctx)) {
+    if (psabpf_clone_session_create(&ctx)) {
         psabpf_clone_session_context_free(&ctx);
         return -1;
     }
 
+    psabpf_clone_session_context_free(&ctx);
     return 0;
 }
 
 int clone_session_delete(__u32 clone_session_id)
 {
-    start_time = get_current_time();
-    int error = 0;
-    char session_map_path[256];
-    snprintf(session_map_path, sizeof(session_map_path), "%s/clone_session_%d", BPF_FS,
-             clone_session_id);
+    psabpf_clone_session_ctx_t ctx;
+    psabpf_clone_session_context_init(&ctx);
+    psabpf_clone_session_id(&ctx, clone_session_id);
 
-    char pinned_file[256];
-    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", BPF_FS,
-             CLONE_SESSION_TABLE);
-    long outer_map_fd = bpf_obj_get(pinned_file);
-    if (outer_map_fd < 0) {
-        fprintf(stderr, "could not find map %s [%s].\n",
-                CLONE_SESSION_TABLE, strerror(errno));
-        error = -1;
-        goto ret;
+    if (psabpf_clone_session_exists(&ctx)) {
+        psabpf_clone_session_context_free(&ctx);
+        return EEXIST;
     }
 
-    error = bpf_map_delete_elem((int)outer_map_fd, &clone_session_id);
-    if (error < 0) {
-        fprintf(stderr, "failed to clear clone session with id %u [%s].\n",
-                clone_session_id, strerror(errno));
-        goto ret;
+    if (psabpf_clone_session_delete(&ctx)) {
+        psabpf_clone_session_context_free(&ctx);
+        return -1;
     }
 
-    if (remove(session_map_path)) {
-        fprintf(stderr, "failed to delete clone session %u [%s].\n",
-                clone_session_id, strerror(errno));
-        error = -1;
-        goto ret;
-    }
-
-    printf("Successfully deleted clone session with ID %d\n", clone_session_id);
-
-ret:
-    end_time = get_current_time();
-    printf("Completed in %fs\n", end_time-start_time);
-    if (outer_map_fd > 0) {
-        close(outer_map_fd);
-    }
-
-    return error;
+    psabpf_clone_session_context_free(&ctx);
+    return 0;
 }
 
-int clone_session_add_member(__u32 clone_session_id, struct clone_session_entry entry)
+int clone_session_add_member(psabpf_clone_session_id_t clone_session_id,
+                             uint32_t  egress_port,
+                             uint16_t  instance,
+                             uint8_t   class_of_service,
+                             bool      truncate,
+                             uint16_t  packet_length_bytes)
 {
-    start_time = get_current_time();
     int error = 0;
 
-    char pinned_file[256];
-    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", BPF_FS,
-             CLONE_SESSION_TABLE);
+    psabpf_clone_session_ctx_t ctx;
+    psabpf_clone_session_entry_t entry;
 
-    long outer_map_fd = bpf_obj_get(pinned_file);
-    if (outer_map_fd < 0) {
-        fprintf(stderr, "could not find map %s. Clone session doesn't exists? [%s].\n",
-                CLONE_SESSION_TABLE, strerror(errno));
-        return -1;
+    psabpf_clone_session_context_init(&ctx);
+    psabpf_clone_session_id(&ctx, clone_session_id);
+
+    error = psabpf_clone_session_exists(&ctx);
+    if (error) {
+        psabpf_clone_session_context_free(&ctx);
+        return error;
     }
 
-    uint32_t inner_map_id;
-    int ret = bpf_map_lookup_elem(outer_map_fd, &clone_session_id, &inner_map_id);
-    if (ret < 0) {
-        fprintf(stderr, "could not find inner map [%s]\n", strerror(errno));
-        return -1;
+    psabpf_clone_session_entry_init(&entry);
+    psabpf_clone_session_entry_port(&entry, egress_port);
+    psabpf_clone_session_entry_instance(&entry, instance);
+    psabpf_clone_session_entry_cos(&entry, class_of_service);
+
+    if (truncate) {
+        psabpf_clone_session_entry_truncate_enable(&entry, packet_length_bytes);
     }
 
-    int inner_fd = bpf_map_get_fd_by_id(inner_map_id);
-
-    /* 1. Gead head. */
-    elem_t head_idx = {0, 0};
-    struct element head;
-    ret = bpf_map_lookup_elem(inner_fd, &head_idx, &head);
-    if (ret < 0) {
-        fprintf(stderr, "error getting head of list, err = %d, errno = %d\n", ret, errno);
-        return -1;
+    error = psabpf_clone_session_entry_update(&ctx, &entry);
+    if (error) {
+        psabpf_clone_session_entry_free(&entry);
+        psabpf_clone_session_context_free(&ctx);
+        return error;
     }
 
-    /* 2. Allocate new element and put in the data. */
-    struct element el = {
-            .entry = entry,
-            /* 3. Make next of new node as next of head */
-            .next_id = head.next_id,
-    };
-    elem_t idx;
-    idx.port = entry.egress_port;
-    idx.instance = entry.instance;
-    ret = bpf_map_update_elem(inner_fd, &idx, &el, BPF_NOEXIST);
-    if (ret < 0 && errno == EEXIST) {
-        fprintf(stderr, "Clone session member [port=%d, instance=%d] already exists. "
-                        "Increment 'instance' to clone more than one packet to the same port.\n",
-                        entry.egress_port,
-                        entry.instance);
-        return -1;
-    } else if (ret < 0) {
-            printf("error creating list element, err = %d, errno = %d\n", ret, errno);
-            return -1;
-    }
-
-    /* 4. move the head to point to the new node */
-    head.next_id = idx;
-    ret = bpf_map_update_elem(inner_fd, &head_idx, &head, 0);
-    if (ret < 0) {
-        printf("error updating head, err = %d [%s]\n", ret, strerror(errno));
-        return -1;
-    }
-
-    end_time = get_current_time();
-    printf("Completed in %fs\n", end_time-start_time);
-    fprintf(stdout, "New member of clone session %d added successfully\n",
-            clone_session_id);
+    psabpf_clone_session_entry_free(&entry);
+    psabpf_clone_session_context_free(&ctx);
 
     return error;
 }
@@ -288,15 +236,7 @@ int do_add_member(int argc, char **argv)
         }
     }
 
-    struct clone_session_entry entry = {
-        .egress_port = egress_port,
-        .instance = instance,
-        .class_of_service = cos,
-        .truncate = truncate,
-        .packet_length_bytes = plen_bytes,
-    };
-
-    return clone_session_add_member(id, entry);
+    return clone_session_add_member(id, egress_port, instance, cos, truncate, plen_bytes);
 }
 
 int clone_session_del_member(__u32 clone_session_id, __u32 egress_port, __u16 instance)
