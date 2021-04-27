@@ -87,10 +87,10 @@ control ingress(inout headers hdr,
                 in    psa_ingress_input_metadata_t  istd,
                 inout psa_ingress_output_metadata_t ostd)
 {
-    Register<bit<32>, PortId_t>(10, bit<32> 6) reg;
+    Register<bit<32>, PortId_t>(10, (bit<32>) 6) reg;
 
     apply {
-         PortId_t egress_port = (PortId_t)5;
+         PortId_t egress_port = (PortId_t) 5;
          bit<32> tmp;
          tmp = reg.read(egress_port);
          if (tmp < 5) {

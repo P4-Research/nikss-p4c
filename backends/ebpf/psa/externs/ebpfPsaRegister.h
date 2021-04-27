@@ -8,6 +8,7 @@ namespace EBPF {
 class EBPFRegisterPSA : public EBPFTableBase {
  protected:
     size_t size;
+    const IR::Constant *initialValue = nullptr;
     EBPFType *keyType;
     EBPFType *valueType;
 
@@ -22,6 +23,7 @@ class EBPFRegisterPSA : public EBPFTableBase {
     void emitKeyType(CodeBuilder* builder);
     void emitValueType(CodeBuilder* builder);
 
+    void emitInitializer(CodeBuilder* builder);
     void emitInstance(CodeBuilder* builder);
     void emitRegisterRead(CodeBuilder* builder, const P4::ExternMethod* method,
                           cstring indexParamStr, const IR::Expression* leftExpression);

@@ -22,6 +22,10 @@ EBPFRegisterPSA::EBPFRegisterPSA(const EBPFProgram *program,
         return;
     }
     size = declaredSize->asUnsigned();
+
+    if (di->arguments->size() == 2) {
+        this->initialValue = di->arguments->at(1)->expression->to<IR::Constant>();
+    }
 }
 
 void EBPFRegisterPSA::emitTypes(CodeBuilder* builder) {
@@ -43,6 +47,37 @@ void EBPFRegisterPSA::emitValueType(CodeBuilder* builder) {
     this->valueType->emit(builder);
     builder->appendFormat(" %s", valueTypeName.c_str());
     builder->endOfStatement(true);
+}
+
+void EBPFRegisterPSA::emitInitializer(CodeBuilder* builder) {
+    if (this->initialValue != nullptr) {
+        auto ret = program->refMap->newName("ret");
+        cstring keyName = program->refMap->newName("key");
+        cstring valueName = program->refMap->newName("value");
+
+        builder->emitIndent();
+        builder->appendFormat("%s %s", keyTypeName.c_str(), keyName.c_str());
+        builder->endOfStatement(true);
+
+        builder->emitIndent();
+        builder->appendFormat("%s %s = ", valueTypeName.c_str(), valueName.c_str());
+        builder->append(this->initialValue->value.str());
+        builder->endOfStatement(true);
+
+        builder->emitIndent();
+        builder->appendFormat("for (size_t index = 0; index < %u; index++) ", this->size);
+        builder->blockStart();
+        builder->emitIndent();
+        builder->appendFormat("%s = index", keyName.c_str());
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        builder->appendFormat("int %s = ", ret.c_str());
+        builder->target->emitTableUpdate(builder, instanceName,
+                                         keyName, valueName);
+        builder->newline();
+
+        builder->blockEnd(true);
+    }
 }
 
 void EBPFRegisterPSA::emitInstance(CodeBuilder *builder) {
@@ -126,7 +161,7 @@ void EBPFRegisterPSA::emitRegisterWrite(CodeBuilder* builder, const P4::ExternMe
     builder->target->emitTraceMessage(builder, msgStr.c_str(), 2, keyName.c_str(), varStr.c_str());
 
     builder->emitIndent();
-    builder->target->emitTableUpdate(builder, dataMapName, keyName, valueParamStr);
+    builder->target->emitTableUpdate(builder, instanceName, keyName, valueParamStr);
 }
 
 } // namespace EBPF

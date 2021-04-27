@@ -138,5 +138,10 @@ void EBPFControlPSA::emitTableInitializers(CodeBuilder* builder) {
     for (auto it : tables) {
         it.second->emitInitializer(builder);
     }
+    for (auto it : registers) {
+        it.second->emitInitializer(builder);
+    }
 }
+
+//TODO na jutro analogicznie emitRegistersInitializers i update w pętli po max entries (no bo musi być array map)
 }  // namespace EBPF

@@ -613,7 +613,7 @@ class RegisterApplyPSATest(P4EbpfTest):
         self.verify_map_entry(name="ingress_reg", key="hex 05 00 00 00", expected_value="0f 00 00 00")
 
     def tearDown(self):
-        self.remove_maps(["ingress_tbl_fwd", "ingress_tbl_fwd_defaultAction", "ingress_reg"])
+        self.remove_maps(["ingress_reg"])
         super(RegisterApplyPSATest, self).tearDown()
 
 
@@ -623,7 +623,7 @@ class RegisterDefaultPSATest(P4EbpfTest):
     1. Send a packet on PORT0
     2. P4 application will read a value (6),
     add 15 and write it to the register
-    3. Verify a value stored in register (15)
+    3. Verify a value stored in register (16)
     """
     p4_file_path = "samples/p4testdata/register-default.p4"
 
@@ -631,7 +631,7 @@ class RegisterDefaultPSATest(P4EbpfTest):
         pkt = testutils.simple_ip_packet()
 
         testutils.send_packet(self, PORT0, pkt)
-        self.verify_map_entry(name="ingress_reg", key="hex 05 00 00 00", expected_value="0f 00 00 00")
+        self.verify_map_entry(name="ingress_reg", key="hex 05 00 00 00", expected_value="10 00 00 00")
 
     def tearDown(self):
         self.remove_maps(["ingress_tbl_fwd", "ingress_tbl_fwd_defaultAction", "ingress_reg"])
