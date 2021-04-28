@@ -10,11 +10,17 @@ EBPFRegisterPSA::EBPFRegisterPSA(const EBPFProgram *program,
 
     auto ts = di->type->to<IR::Type_Specialized>();
 
-    auto kT = EBPFTypeFactory::instance->create(ts->arguments->at(0));;
-    auto vT = EBPFTypeFactory::instance->create(ts->arguments->at(1));
+    auto keyArg = ts->arguments->at(0);
+    auto valueArg = ts->arguments->at(1);
+    this->keyType = EBPFTypeFactory::instance->create(keyArg);
+    this->valueType = EBPFTypeFactory::instance->create(valueArg);
 
-    this->keyType = kT;
-    this->valueType = vT;
+    if (keyArg->is<IR::Type_Bits>()) {
+        unsigned keyWidth = keyArg->width_bits();
+        // For keys <= 32 bit register is based on array map,
+        // otherwise we use hash map
+        arrayMapBased = (keyWidth <= 32);
+    }
 
     auto declaredSize = di->arguments->at(0)->expression->to<IR::Constant>();
     if (!declaredSize->fitsInt()) {
@@ -50,7 +56,7 @@ void EBPFRegisterPSA::emitValueType(CodeBuilder* builder) {
 }
 
 void EBPFRegisterPSA::emitInitializer(CodeBuilder* builder) {
-    if (this->initialValue != nullptr) {
+    if (arrayMapBased && this->initialValue != nullptr) {
         auto ret = program->refMap->newName("ret");
         cstring keyName = program->refMap->newName("key");
         cstring valueName = program->refMap->newName("value");
@@ -76,12 +82,22 @@ void EBPFRegisterPSA::emitInitializer(CodeBuilder* builder) {
                                          keyName, valueName);
         builder->newline();
 
+        builder->emitIndent();
+        builder->appendFormat("if (%s) ", ret.c_str());
+        builder->blockStart();
+        cstring msgStr = Util::printf_format("Map initializer: Error while map (%s) update, code: %s",
+                                             instanceName, "%d");
+        builder->target->emitTraceMessage(builder,
+                                          msgStr, 1, ret.c_str());
+
+        builder->blockEnd(true);
+
         builder->blockEnd(true);
     }
 }
 
 void EBPFRegisterPSA::emitInstance(CodeBuilder *builder) {
-    builder->target->emitTableDecl(builder, instanceName, TableArray,
+    builder->target->emitTableDecl(builder, instanceName, TableHash,
                                    this->keyTypeName,
                                    this->valueTypeName, size);
 }
@@ -125,13 +141,24 @@ void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMet
     codeGen->visit(leftExpression);
     builder->appendFormat(" = *%s", valueName);
     builder->endOfStatement(true);
+    builder->target->emitTraceMessage(builder,
+                                      "Register: Entry found! (index: 0x%%llx, value: 0x%%llx)",
+                                      2, keyName.c_str(), Util::printf_format("*%s", valueName.c_str()));
     builder->blockEnd(false);
     builder->appendFormat(" else ");
     builder->blockStart();
-    builder->target->emitTraceMessage(builder, "Register: Entry not found, aborting");
     builder->emitIndent();
-    builder->appendFormat("return %s", builder->target->abortReturnCode().c_str());
+
+    codeGen->visit(leftExpression);
+    builder->append(" = ");
+    if (this->initialValue != nullptr) {
+        builder->append(this->initialValue->value.str());
+    } else {
+        valueType->emitInitializer(builder);
+    }
     builder->endOfStatement(true);
+
+    builder->target->emitTraceMessage(builder, "Register: Entry not found, using default value");
     builder->blockEnd(true);
 }
 

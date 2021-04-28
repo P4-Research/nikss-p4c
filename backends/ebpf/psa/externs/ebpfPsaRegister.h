@@ -11,6 +11,7 @@ class EBPFRegisterPSA : public EBPFTableBase {
     const IR::Constant *initialValue = nullptr;
     EBPFType *keyType;
     EBPFType *valueType;
+    bool arrayMapBased = false;
 
  public:
 
