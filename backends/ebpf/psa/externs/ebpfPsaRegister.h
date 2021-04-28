@@ -14,8 +14,6 @@ class EBPFRegisterPSA : public EBPFTableBase {
     bool arrayMapBased = false;
 
  public:
-
-
     EBPFRegisterPSA(const EBPFProgram* program, cstring instanceName,
                     const IR::Declaration_Instance* di,
                     CodeGenInspector* codeGen);
@@ -34,4 +32,4 @@ class EBPFRegisterPSA : public EBPFTableBase {
 
 }  // namespace EBPF
 
-#endif //P4C_BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAREGISTER_H_
+#endif  // P4C_BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAREGISTER_H_

@@ -26,27 +26,6 @@ bool ActionTranslationVisitorPSA::preorder(const IR::PathExpression* pe) {
     return ControlBodyTranslator::preorder(pe);
 }
 
-bool ActionTranslationVisitorPSA::preorder(const IR::AssignmentStatement* a) {
-    if (auto methodCallExpr = a->right->to<IR::MethodCallExpression>()) {
-        auto mi = P4::MethodInstance::resolve(methodCallExpr,
-                                              program->refMap,
-                                              program->typeMap);
-        if (auto ext = mi->to<P4::ExternMethod>()) {
-            if (ext->originalExternType->name.name == "Register" &&
-                    ext->method->type->name == "read") {
-                cstring name = EBPFObject::externalName(ext->object);
-                auto reg = program->to<EBPFPipeline>()->control->getRegister(name);
-                cstring indexParamStr = getIndexActionParam(ext);
-                cstring valueParamStr = getValueActionParam(ext);
-                reg->emitRegisterRead(builder, ext, indexParamStr, a->left);
-                return false;
-            }
-        }
-    }
-
-    return CodeGenInspector::preorder(a);
-}
-
 void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) {
     auto declType = method->originalExternType;
     auto name = method->object->getName();

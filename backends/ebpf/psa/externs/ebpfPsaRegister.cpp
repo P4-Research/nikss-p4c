@@ -7,7 +7,6 @@ EBPFRegisterPSA::EBPFRegisterPSA(const EBPFProgram *program,
                                  CodeGenInspector *codeGen) : EBPFTableBase(program,
                                                                             instanceName,
                                                                             codeGen) {
-
     auto ts = di->type->to<IR::Type_Specialized>();
 
     auto keyArg = ts->arguments->at(0);
@@ -85,10 +84,10 @@ void EBPFRegisterPSA::emitInitializer(CodeBuilder* builder) {
         builder->emitIndent();
         builder->appendFormat("if (%s) ", ret.c_str());
         builder->blockStart();
-        cstring msgStr = Util::printf_format("Map initializer: Error while map (%s) update, code: %s",
-                                             instanceName, "%d");
-        builder->target->emitTraceMessage(builder,
-                                          msgStr, 1, ret.c_str());
+        cstring msgStr = Util::printf_format(
+                "Map initializer: Error while map (%s) update, code: %s", instanceName, "%d");
+        builder->target->emitTraceMessage(builder, msgStr,
+                                          1, ret.c_str());
 
         builder->blockEnd(true);
 
@@ -122,7 +121,8 @@ void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMet
     builder->endOfStatement(true);
 
     builder->emitIndent();
-    builder->appendFormat("%s %s = %s", keyTypeName.c_str(), keyName.c_str(), indexParamStr.c_str());
+    builder->appendFormat("%s %s = %s", keyTypeName.c_str(), keyName.c_str(),
+                          indexParamStr.c_str());
     builder->endOfStatement(true);
 
     msgStr = Util::printf_format("Register: reading %s, id=%%u, packets=1, bytes=%%u",
@@ -143,7 +143,8 @@ void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMet
     builder->endOfStatement(true);
     builder->target->emitTraceMessage(builder,
                                       "Register: Entry found! (index: 0x%%llx, value: 0x%%llx)",
-                                      2, keyName.c_str(), Util::printf_format("*%s", valueName.c_str()));
+                                      2, keyName.c_str(),
+                                      Util::printf_format("*%s", valueName.c_str()));
     builder->blockEnd(false);
     builder->appendFormat(" else ");
     builder->blockStart();
@@ -191,4 +192,4 @@ void EBPFRegisterPSA::emitRegisterWrite(CodeBuilder* builder, const P4::ExternMe
     builder->target->emitTableUpdate(builder, instanceName, keyName, valueParamStr);
 }
 
-} // namespace EBPF
+}  // namespace EBPF

@@ -36,7 +36,8 @@ bool ControlBodyTranslatorPSA::preorder(const IR::AssignmentStatement* a) {
                     ext->method->type->name == "read") {
                 cstring name = EBPFObject::externalName(ext->object);
                 auto reg = control->to<EBPFControlPSA>()->getRegister(name);
-                auto indexArg = methodCallExpr->arguments->at(0)->expression->to<IR::PathExpression>();
+                auto indexArg = methodCallExpr->arguments->at(0)->
+                        expression->to<IR::PathExpression>();
                 cstring indexParamStr = getIndexActionParam(indexArg);
                 reg->emitRegisterRead(builder, ext, indexParamStr, a->left);
                 return false;
@@ -143,5 +144,4 @@ void EBPFControlPSA::emitTableInitializers(CodeBuilder* builder) {
     }
 }
 
-//TODO na jutro analogicznie emitRegistersInitializers i update w pętli po max entries (no bo musi być array map)
 }  // namespace EBPF
