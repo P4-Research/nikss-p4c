@@ -29,6 +29,8 @@ class EbpfOptions : public CompilerOptions {
     bool emitExterns = false;
     // Tracing eBPF code execution
     bool emitTraceMessages = false;
+    
+    bool generateToXDP = false;
     EbpfOptions();
 };
 

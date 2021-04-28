@@ -134,7 +134,6 @@ void KernelSamplesTarget::emitPreamble(Util::SourceCodeBuilder* builder) const {
         macro = "#define bpf_trace_message(fmt, ...)";
     }
     builder->appendLine(macro);
-    builder->newline();
 }
 
 void KernelSamplesTarget::emitTraceMessage(Util::SourceCodeBuilder* builder, const char* format,

@@ -1,43 +1,6 @@
 #include "ebpfPsaControl.h"
-#include "ebpfPsaControlTranslators.h"
-#include "frontends/p4/methodInstance.h"
 
 namespace EBPF {
-
-ControlBodyTranslatorPSA::ControlBodyTranslatorPSA(const EBPFControlPSA* control) :
-        CodeGenInspector(control->program->refMap, control->program->typeMap),
-        ControlBodyTranslator(control) {}
-
-bool ControlBodyTranslatorPSA::preorder(const IR::Member* expression) {
-    if (expression->expr->is<IR::TypeNameExpression>()) {
-        auto tne = expression->expr->to<IR::TypeNameExpression>();
-        if (tne->typeName->path->name.name == "error") {
-            builder->append(expression->member);
-            return false;
-        }
-    }
-
-    return CodeGenInspector::preorder(expression);
-}
-
-bool ControlBodyTranslatorPSA::preorder(const IR::AssignmentStatement* s) {
-    if (s->right->is<IR::MethodCallExpression>()) {
-        auto mi = P4::MethodInstance::resolve(s->right->to<IR::MethodCallExpression>(),
-                                              control->program->refMap,
-                                              control->program->typeMap);
-        auto ext = mi->to<P4::ExternMethod>();
-        if (ext != nullptr) {
-            if (ext->originalExternType->name.name == "Hash") {
-                cstring name = EBPFObject::externalName(ext->object);
-                auto hash = control->to<EBPFControlPSA>()->getHash(name);
-                hash->processMethod(builder, "update", ext->expr);
-                builder->emitIndent();
-            }
-        }
-    }
-
-    return CodeGenInspector::preorder(s);
-}
 
 void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
     auto decl = method->object;
@@ -48,10 +11,6 @@ void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
     if (declType->name.name == "Counter") {
         auto counterMap = control->getCounter(name);
         counterMap->emitMethodInvocation(builder, method);
-        return;
-    } else if (declType->name.name == "Hash") {
-        auto hash = control->to<EBPFControlPSA>()->getHash(name);
-        hash->processMethod(builder, method->method->name.name, method->expr);
         return;
     }
 
@@ -83,8 +42,6 @@ void EBPFControlPSA::emit(CodeBuilder *builder) {
     builder->endOfStatement(true);
     for (auto a : p4Control->controlLocals)
         emitDeclaration(builder, a);
-    for (auto h : hashes)
-        h.second->emitVariables(builder);
     builder->emitIndent();
     codeGen->setBuilder(builder);
     p4Control->body->apply(*codeGen);

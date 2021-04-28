@@ -26,10 +26,6 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     builder->append(":");
     builder->newline();
     builder->emitIndent();
-    builder->appendFormat("%s.parser_error = %s",
-                          control->inputStandardMetadata->name.name.c_str(), errorVar.c_str());
-    builder->endOfStatement(true);
-    builder->emitIndent();
     builder->blockStart();
     // TODO: add more info: packet length, ingress port
     msgStr = Util::printf_format("%s control: packet processing started", sectionName);
@@ -53,25 +49,33 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
 void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("unsigned %s = 0;", offsetVar.c_str());
+    builder->newline();
+
+    builder->emitIndent();
     builder->appendFormat("unsigned %s_save = 0;", offsetVar.c_str());
     builder->newline();
+
     builder->emitIndent();
     builder->appendFormat("%s %s = %s;", errorType.c_str(), errorVar.c_str(),
                           P4::P4CoreLibrary::instance.noError.str());
     builder->newline();
+
     builder->emitIndent();
     builder->appendFormat("void* %s = %s;",
                           packetStartVar.c_str(),
                           builder->target->dataOffset(model.CPacketName.str()).c_str());
     builder->newline();
+
     builder->emitIndent();
     builder->appendFormat("void* %s = %s;",
                           packetEndVar.c_str(),
                           builder->target->dataEnd(model.CPacketName.str()).c_str());
     builder->newline();
+
     builder->emitIndent();
     builder->appendFormat("u32 %s = 0;", zeroKey.c_str());
     builder->newline();
+
     builder->emitIndent();
     builder->appendFormat("unsigned char %s;", byteVar.c_str());
     builder->newline();
@@ -100,12 +104,13 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->append("static __always_inline");
     builder->spc();
 
+    cstring ptrToHeadersVar = parser->headers->name.name + "_ptr";
     builder->appendFormat(
             "int %s(SK_BUFF *%s, %s %s *%s, struct psa_ingress_output_metadata_t *%s, ",
             processFunctionName, model.CPacketName.str(),
             parser->headerType->to<EBPFStructType>()->kind,
             parser->headerType->to<EBPFStructType>()->name,
-            parser->headers->name.name,
+            ptrToHeadersVar,
             control->outputStandardMetadata->name.name);
     auto type = EBPFTypeFactory::instance->create(
             deparser->to<EBPFIngressDeparserPSA>()->resubmit_meta->type);
@@ -137,6 +142,10 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
                         "    }\n"
                         "    *ether_type = md->pkt_ether_type;\n");
     builder->blockEnd(true);
+
+    builder->emitIndent();
+    parser->headerType->declare(builder, parser->headers->name.name, false);
+    builder->appendFormat(" = *%s;", ptrToHeadersVar);
 
     builder->emitIndent();
     auto user_md_type = typeMap->getType(control->user_metadata);
@@ -190,7 +199,6 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
 
     builder->emitIndent();
     deparser->to<EBPFIngressDeparserPSA>()->emitSharedMetadataInitializer(builder);
-
 
     emitHeaderInstances(builder);
 
@@ -360,7 +368,252 @@ void EBPFEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     varStr = Util::printf_format("%s->ifindex", contextVar);
     builder->target->emitTraceMessage(builder, "EgressTM: output packet to port %d",
                                       1, varStr.c_str());
+
     builder->emitIndent();
+    builder->appendLine("int map_index = 0;\n"
+                        "    struct timestamp_t *timestamp = (struct timestamp_t *) bpf_map_lookup_elem(&TIMESTAMP_MAP, &map_index);\n"
+                        "    if(!timestamp) {\n"
+                        "       return TC_ACT_SHOT;\n"
+                        "    }\n"
+                        "\n"
+                        "    timestamp->end = bpf_ktime_get_ns();\n"
+                        "    bpf_printk(\"\\n\\t\\t\\t [EGRESS PIPE]: Packet out at %d.\\n\", timestamp->end);\n"
+                        "\n"
+                        "    unsigned delta = timestamp->end - timestamp->start;\n"
+                        "    bpf_printk(\"\\n\\t\\t\\t\\t\\t\\t\\t\\t   processing time = %d ns.\\n\", delta);");
+    builder->newline();
+    
+    builder->appendFormat("return %s", builder->target->forwardReturnCode());
+    builder->endOfStatement(true);
+}
+
+// =====================XDPIngressPipeline=============================
+void XDPIngressPipeline::emit(CodeBuilder *builder) {
+    cstring msgStr, varStr;
+    
+    control->codeGen->asPointerVariables.clear();
+    builder->target->emitCodeSection(builder, sectionName);
+    builder->emitIndent();
+    builder->appendFormat("int %s(struct xdp_md *%s)", functionName, model.CPacketName.str()); 
+    builder->spc();
+    
+    builder->blockStart();
+    
+    builder->emitIndent();
+    builder->appendLine("time_start = bpf_ktime_get_ns();");
+    builder->emitIndent();
+    builder->appendLine("bpf_printk(\"\\n\\t\\t\\t [INGRESS PIPE]: Packet in at %d.\\n\", time_start);");
+    builder->newline();
+
+    builder->emitIndent();
+    deparser->to<XDPIngressDeparserPSA>()->emitSharedMetadataInitializer(builder);
+    builder->newline();
+    
+    emitHeaderInstances(builder);
+    builder->newline();
+
+    emitLocalVariables(builder);
+    builder->newline();
+
+    emitPSAControlDataTypes(builder);
+    builder->newline();
+
+    builder->emitIndent();
+    builder->appendLine("struct psa_ingress_output_metadata_t ostd = {\n"
+                        "            .drop = true,\n"
+                        "    };");
+    builder->newline();
+
+    // PRS
+    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d", sectionName);
+    varStr = Util::printf_format("%s.packet_path", control->inputStandardMetadata->name.name);
+    builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, varStr.c_str());
+    parser->emit(builder);
+    builder->newline();
+
+    // CTRL
+    builder->append(IR::ParserState::accept);
+    builder->append(":");
+    builder->spc();
+    builder->blockStart();
+    builder->decreaseIndent();
+    msgStr = Util::printf_format("%s control: packet processing started", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    control->emit(builder);
+    builder->blockEnd(true);
+    msgStr = Util::printf_format("%s control: packet processing finished", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+
+    // DEPRS
+    builder->emitIndent();
+    builder->blockStart();
+    msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    deparser->emit(builder);
+    builder->blockEnd(true);
+    msgStr = Util::printf_format("%s deparser: packet deparsing finished", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    
+    this->emitTrafficManager(builder);
+    builder->decreaseIndent();
+    builder->blockEnd(true);
+    builder->newline();
+}
+
+void XDPIngressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
+    builder->emitIndent();
+    builder->appendFormat("struct psa_ingress_input_metadata_t %s = {\n"
+                        "        .ingress_port = skb->ingress_ifindex,\n"
+                        "        .ingress_timestamp = bpf_ktime_get_ns(),\n"
+                        "        .parser_error = %s,\n"
+                        "    };", control->inputStandardMetadata->name.name, errorVar.c_str());
+    builder->newline();
+}
+
+/*
+ * The Traffic Manager for Ingress pipeline SHOULD implements:
+ * - Multicast handling
+ * - send to port
+ */
+void XDPIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
+    cstring mcast_grp = Util::printf_format("ostd.multicast_group");
+    builder->emitIndent();
+    builder->appendFormat("if (%s != 0) ", mcast_grp.c_str());
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendFormat("bpf_printk(\"[INGRESS PRS] Warning: XDP does\'nt"
+                            " support Multicast. Operation ignored.\\n\")");
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
+
+    builder->emitIndent();
+    builder->appendLine("return bpf_redirect_map(&tx_port, ostd.egress_port, 0);");
+}
+
+// =====================XDPEgressPipeline=============================
+void XDPEgressPipeline::emit(CodeBuilder* builder) {
+    cstring msgStr, varStr;
+
+    control->codeGen->asPointerVariables.clear();
+    builder->target->emitCodeSection(builder, sectionName);
+    builder->emitIndent();
+    builder->appendFormat("int %s(struct xdp_md *%s)", 
+                            functionName, model.CPacketName.str());
+    builder->spc();
+    builder->blockStart();
+
+    emitLocalVariables(builder);
+    builder->newline();
+
+    emitPSAControlDataTypes(builder);
+    builder->newline();
+
+    emitHeaderInstances(builder);
+    builder->newline();
+
+    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d", 
+                                    sectionName);
+    varStr = Util::printf_format("%s.packet_path", 
+                                    control->inputStandardMetadata->name.name);
+    builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, varStr.c_str());
+    parser->emit(builder);
+    builder->emitIndent();
+    builder->append(IR::ParserState::accept);
+    builder->append(":");
+    builder->newline();
+    builder->emitIndent();
+    builder->blockStart();
+
+    msgStr = Util::printf_format("%s control: packet processing started", 
+                                    sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    control->emit(builder);
+    builder->blockEnd(true);
+    msgStr = Util::printf_format("%s control: packet processing finished", 
+                                    sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    builder->emitIndent();
+    builder->blockStart();
+    msgStr = Util::printf_format("%s deparser: packet deparsing started", 
+                                    sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    deparser->emit(builder);
+    builder->blockEnd(true);
+    msgStr = Util::printf_format("%s deparser: packet deparsing finished", 
+                                    sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    this->emitTrafficManager(builder);
+    builder->newline();
+    builder->blockEnd(true);
+}
+
+void XDPEgressPipeline::emitPSAControlDataTypes(CodeBuilder* builder) {
+    cstring outputMdVar, inputMdVar;
+    outputMdVar = control->outputStandardMetadata->name.name;
+    inputMdVar = control->inputStandardMetadata->name.name;
+
+    builder->emitIndent();
+    builder->appendFormat("struct psa_egress_input_metadata_t %s = {\n"
+                          "        .egress_port = skb->ingress_ifindex,\n"
+                          "        .egress_timestamp = bpf_ktime_get_ns(),\n"
+                          "        .parser_error = %s,\n"
+                          "    };", inputMdVar.c_str(), errorVar.c_str());
+    builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat("struct psa_egress_output_metadata_t %s = {\n", 
+                                outputMdVar.c_str());
+    builder->appendLine("        .clone = false,\n"
+                        "        .drop = false,\n"
+                        "    };");
+}
+
+void XDPEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
+    cstring varStr, outputMdVar, inputMdVar;
+    outputMdVar = control->outputStandardMetadata->name.name;
+    inputMdVar = control->inputStandardMetadata->name.name;
+
+    // clone support
+    builder->emitIndent();
+    builder->appendFormat("if (%s.clone) ", outputMdVar.c_str());
+    builder->blockStart();
+
+    builder->emitIndent();
+    builder->appendLine("bpf_printk(\"[EGRESS DPRS] Warning: XDP does\'nt"
+                            " support cloning. Operation ignored.\\n\");");
+    builder->blockEnd(true);
+
+    builder->newline();
+
+    // drop support
+    builder->emitIndent();
+    builder->appendFormat("if (%s.drop) ", outputMdVar.c_str());
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder, 
+                                    "EgressTM: Packet dropped due to metadata");
+    builder->emitIndent();
+    builder->appendFormat("return %s", builder->target->dropReturnCode().c_str());
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
+
+    builder->newline();
+
+    // normal packet to port
+    varStr = Util::printf_format("%s->egress_ifindex", contextVar);
+    builder->target->emitTraceMessage(builder, 
+                                        "EgressTM: output packet to port %d",
+                                      1, varStr.c_str());
+    
+    builder->emitIndent();
+    builder->appendLine("time_end = bpf_ktime_get_ns();");
+    builder->emitIndent();
+    builder->appendLine("bpf_printk(\"\\n\\t\\t\\t [EGRESS PIPE]:" 
+                            " Packet out at %d.\\n\", time_end);");
+    builder->emitIndent();
+    builder->appendLine("bpf_printk(\"\\n\\t\\t\\t\\t\\t\\t\\t\\t   " 
+                            "processing time = %d ns.\\n\", time_end - time_start);");
+    builder->newline();
+
     builder->appendFormat("return %s", builder->target->forwardReturnCode());
     builder->endOfStatement(true);
 }

@@ -83,6 +83,30 @@ class EBPFEgressDeparserPSA : public EBPFDeparserPSA {
     bool build() override;
 };
 
+class XDPIngressDeparserPSA : public EBPFDeparserPSA {
+public:
+    const IR::Parameter* resubmit_meta;
+    XDPIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
+                          const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
+                EBPFDeparserPSA(program, control, parserHeaders, istd) { }
+
+    void emit(CodeBuilder *builder) override;
+    bool build() override;
+    void emitPreDeparser(CodeBuilder *builder);
+    void emitSharedMetadataInitializer(CodeBuilder *builder);
+};
+
+class XDPEgressDeparserPSA : public EBPFDeparserPSA {
+ public:
+    XDPEgressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
+                          const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
+            EBPFDeparserPSA(program, control, parserHeaders, istd) { }
+
+    void emit(CodeBuilder *builder) override;
+    bool build() override;
+};
+
+
 }  // namespace EBPF
 
 #endif /* BACKENDS_EBPF_PSA_EBPFPSADEPARSER_H_ */

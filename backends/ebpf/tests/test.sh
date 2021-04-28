@@ -23,8 +23,6 @@ function cleanup() {
       ip netns exec switch ip link del psa_cpu
       ip netns pids switch | (xargs kill 2>/dev/null)
       ip netns del switch
-      # remove all pinned eBPF objects
-      rm -rf /sys/fs/bpf/*
       echo "Cleaning finished"
 }
 
@@ -34,7 +32,11 @@ trap cleanup EXIT
 # Trace all command from this point
 set -x
 
-declare -a INTERFACES=("eth0" "eth1" "eth2" "eth3" "eth4" "eth5")
+# make eBPF programs
+make -C samples
+exit_on_error $?
+
+declare -a INTERFACES=("eth0" "eth1" "eth2")
 # For PTF tests parameter
 interface_list=$( IFS=$','; echo "${INTERFACES[*]}" )
 interface_list="psa_recirc,""$interface_list"
@@ -75,16 +77,8 @@ silent_echo_conf
 
 TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
 
-# Add path to our libbpf
-LIBBPF_LD_PATH="`pwd`/../runtime/usr/lib64"
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LIBBPF_LD_PATH
-
-# Docker image by default has lower "max locked memory" limit
-ulimit -l 65536
-
 # Start tests
 ptf \
   --test-dir ptf/ \
   --test-params=$TEST_PARAMS \
-  --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
-  --interface 4@s1-eth4 --interface 5@s1-eth5 $@
+  --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 $@

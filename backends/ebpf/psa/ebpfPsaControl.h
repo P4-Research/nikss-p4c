@@ -3,9 +3,16 @@
 
 #include "ebpfPsaObjects.h"
 #include "backends/ebpf/ebpfControl.h"
-#include "backends/ebpf/psa/externs/ebpfPsaChecksum.h"
 
 namespace EBPF {
+
+class ControlBodyTranslatorPSA : public ControlBodyTranslator {
+ public:
+    explicit ControlBodyTranslatorPSA(const EBPFControl* control) :
+            ControlBodyTranslator(control) {}
+
+    void processMethod(const P4::ExternMethod* method) override;
+};
 
 class EBPFControlPSA : public EBPFControl {
  public:
@@ -17,8 +24,6 @@ class EBPFControlPSA : public EBPFControl {
     const IR::Parameter* inputStandardMetadata;
     const IR::Parameter* outputStandardMetadata;
 
-    std::map<cstring, EBPFHashPSA*> hashes;
-
     EBPFControlPSA(const EBPFProgram* program, const IR::ControlBlock* control,
                    const IR::Parameter* parserHeaders) :
         EBPFControl(program, control, parserHeaders), p4Control(control->container) {}
@@ -27,11 +32,6 @@ class EBPFControlPSA : public EBPFControl {
     void emit(CodeBuilder* builder) override;
     void emitTableInstances(CodeBuilder* builder) override;
     void emitTableInitializers(CodeBuilder* builder) override;
-
-    EBPFHashPSA* getHash(cstring name) const {
-        auto result = ::get(hashes, name);
-        BUG_CHECK(result != nullptr, "No hash named %1%", name);
-        return result; }
 };
 
 }  // namespace EBPF

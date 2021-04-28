@@ -48,8 +48,9 @@ set (P4C_EBPF_SRCS
   ../bmv2/common/parser.cpp
   ../bmv2/common/programStructure.cpp
   ../bmv2/psa_switch/psaSwitch.cpp
+  psa/xdpTarget.cpp
   psa/ebpfPsaArch.cpp
-  psa/xdpProgram.cpp
+  psa/xdpHelpProgram.cpp
   psa/ebpfPipeline.cpp
   psa/ebpfPsaParser.cpp
   psa/ebpfPsaDeparser.cpp
@@ -96,13 +97,13 @@ set (P4C_EBPF_HDRS
   ../bmv2/common/programStructure.h
   ../bmv2/common/sharedActionSelectorCheck.h
   ../bmv2/psa_switch/psaSwitch.h
+  psa/xdpTarget.h
   psa/ebpfPsaArch.h
-  psa/xdpProgram.h
+  psa/xdpHelpProgram.h
   psa/ebpfPipeline.h
   psa/ebpfPsaParser.h
   psa/ebpfPsaDeparser.h
   psa/ebpfPsaControl.h
-  psa/ebpfPsaControlTranslators.h
   psa/ebpfPsaObjects.h
   psa/externs/ebpfPsaChecksum.h
   psa/externs/ebpfPsaCounter.h
@@ -140,7 +141,7 @@ file(RELATIVE_PATH
 # remove automake and fix the scripts.
 add_custom_target(linkp4cebpf
   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/load-prog ${P4C_BINARY_DIR}/load-prog
-  COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/psabpf-ctl ${P4C_BINARY_DIR}/psabpf-ctl
+  COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/prectl ${P4C_BINARY_DIR}/prectl
   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/p4c-ebpf ${P4C_BINARY_DIR}/p4c-ebpf
   COMMAND ${CMAKE_COMMAND} -E make_directory ${P4C_BINARY_DIR}/p4include &&
           ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${P4C_EBPF_DIST_HEADERS} ${P4C_BINARY_DIR}/p4include
@@ -158,7 +159,6 @@ add_dependencies(p4c_driver linkp4cebpf)
 set(EBPF_DRIVER_KERNEL "${CMAKE_CURRENT_SOURCE_DIR}/run-ebpf-test.py -t kernel -c \"${P4C_BINARY_DIR}/p4c-ebpf\"")
 set(EBPF_DRIVER_BCC "${CMAKE_CURRENT_SOURCE_DIR}/run-ebpf-test.py -t bcc -c \"${P4C_BINARY_DIR}/p4c-ebpf\"")
 set(EBPF_DRIVER_TEST "${CMAKE_CURRENT_SOURCE_DIR}/run-ebpf-test.py -t test -c \"${P4C_BINARY_DIR}/p4c-ebpf\"")
-set(EBPF_PTF_DRIVER_TEST "${CMAKE_CURRENT_SOURCE_DIR}/run-ptf-tests.sh")
 
 set (XFAIL_TESTS_KERNEL
   # Rejected by kernel verifier, likely reasons:
@@ -177,10 +177,6 @@ set (EBPF_TEST_SUITES
   "${P4C_SOURCE_DIR}/testdata/p4_16_samples/*_ebpf.p4"
   )
 
-set (EBPF_PSA_PTF_TEST_SUITES
-  "${CMAKE_CURRENT_SOURCE_DIR}/tests/test.sh"
-  )
-
 # determine the kernel version
 execute_process(COMMAND uname -r
   OUTPUT_VARIABLE P4C_EBPF_KERNEL_VER
@@ -195,16 +191,6 @@ if (${KERNEL_VER} VERSION_LESS ${MIN_KERNEL} )
   set (SUPPORTS_KERNEL False)
 else()
   set (SUPPORTS_KERNEL True)
-endif()
-
-# Check if the kernel version is new enough to support some features required for PSA
-set (MIN_KERNEL 5.8.0)
-string (REGEX MATCH "[0-9]+[^-]*" KERNEL_VER ${CMAKE_SYSTEM})
-if (${KERNEL_VER} VERSION_LESS ${MIN_KERNEL} )
-  MESSAGE(WARNING "Kernel version ${KERNEL_VER} too small for PSA, expected ${MIN_KERNEL}. Ignoring ebpf kernel PSA PTF tests...")
-  set (SUPPORTS_KERNEL_PSA False)
-else()
-  set (SUPPORTS_KERNEL_PSA True)
 endif()
 
 # Check if we have the right llvm version
@@ -240,19 +226,17 @@ else()
   " You can install libbpf by running './build_libbpf' in the "
   "${CMAKE_CURRENT_SOURCE_DIR}/runtime folder.")
   set (SUPPORTS_KERNEL False)
-  set (SUPPORTS_KERNEL_PSA False)
 endif()
 
 if (LIBBPF)
-  set (PSABPFCTL_SRCS
-          runtime/psabpf/lib/psabpf.c
-          runtime/psabpf/CLI/common.c
-          runtime/psabpf/CLI/clone_session.c
-          runtime/psabpf/main.c)
-  add_executable(psabpf-ctl ${PSABPFCTL_SRCS})
+  set (PRECTL_SRCS
+          runtime/prectl/common.c
+          runtime/prectl/clone_session.c
+          runtime/prectl/prectl.c)
+  add_executable(prectl ${PRECTL_SRCS})
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/runtime/usr/include)
-  target_link_libraries (psabpf-ctl z elf ${LIBBPF})
-  install (TARGETS psabpf-ctl
+  target_link_libraries (prectl z elf ${LIBBPF})
+  install (TARGETS prectl
           RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
 
   set (LOAD_PROG_SRCS
@@ -261,24 +245,6 @@ if (LIBBPF)
   target_link_libraries (load-prog z elf ${LIBBPF})
   install (TARGETS load-prog
           RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
-endif()
-
-# check if bpftool is available
-find_program(BPFTOOL_PROG "bpftool")
-if (BPFTOOL_PROG)
-  message(STATUS "Found bpftool program")
-else()
-  MESSAGE(WARNING "bpftool not found, ignoring ebpf kernel PSA PTF tests...")
-  set (SUPPORTS_KERNEL_PSA False)
-endif()
-
-# check if PTF is available
-find_program(PTF_PROG "ptf")
-if (PTF_PROG)
-  message(STATUS "Found ptf program")
-else()
-  MESSAGE(WARNING "PTF not found, ignoring ebpf kernel PSA PTF tests...")
-  set (SUPPORTS_KERNEL_PSA False)
 endif()
 
 # Only add the kernel tests if the two requirements are met
@@ -299,10 +265,4 @@ p4c_add_test_with_args("ebpf" ${EBPF_DRIVER_TEST} FALSE "testdata/p4_16_samples/
 # FIXME:This does not work yet
 # We do not have support for dynamic addition of tables in the test framework
 p4c_add_test_with_args("ebpf" ${EBPF_DRIVER_TEST} TRUE "testdata/p4_16_samples/ebpf_conntrack_extern.p4" "testdata/p4_16_samples/ebpf_conntrack_extern.p4" "--extern-file ${P4C_SOURCE_DIR}/testdata/extern_modules/extern-conntrack-ebpf.c" "")
-
-# Execute PSA PTF test only when: (1) kernel is supported, (2) libbpf (3) bpftool and (4) PTF are available
-if (SUPPORTS_KERNEL_PSA)
-  p4c_add_tests("ebpf-psa-ptf" ${EBPF_PTF_DRIVER_TEST} ${EBPF_PSA_PTF_TEST_SUITES} "")
-endif()
-
 message(STATUS "Done with configuring BPF back end")

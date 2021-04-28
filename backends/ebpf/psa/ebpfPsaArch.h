@@ -7,7 +7,7 @@
 #include "backends/ebpf/ebpfObject.h"
 #include "backends/ebpf/ebpfOptions.h"
 #include "ebpfPsaParser.h"
-#include "xdpProgram.h"
+#include "xdpHelpProgram.h"
 #include "ebpfPipeline.h"
 
 namespace EBPF {
@@ -23,22 +23,38 @@ class PSAArch {
     static const unsigned MaxCloneSessions = 1024;
 
     std::vector<EBPFType*> ebpfTypes;
-    XDPProgram*            xdp;
+    XDPHelpProgram*            xdp;
     EBPFPipeline*          tcIngress;
     EBPFPipeline*          tcEgress;
 
-    PSAArch(std::vector<EBPFType*> ebpfTypes, XDPProgram* xdp, EBPFPipeline* tcIngress,
-            EBPFPipeline* tcEgress) : ebpfTypes(ebpfTypes), xdp(xdp), tcIngress(tcIngress),
+    EBPFPipeline*          xdpIngress;
+    EBPFPipeline*          xdpEgress;
+
+    PSAArch(std::vector<EBPFType*> ebpfTypes, XDPHelpProgram* xdp, EBPFPipeline* tcIngress,
+            EBPFPipeline* tcEgress) : 
+            ebpfTypes(ebpfTypes), xdp(xdp), tcIngress(tcIngress),
             tcEgress(tcEgress) { }
 
-    void emit(CodeBuilder* builder) const;  // emits C file for eBPF program
-    void emitPreamble(CodeBuilder *builder) const;
-    void emitInternalStructures(CodeBuilder *pBuilder) const;
-    void emitTypes(CodeBuilder *builder) const;
-    void emitInstances(CodeBuilder *builder) const;
-    void emitPSAIncludes(CodeBuilder *builder) const;
-    void emitHelperFunctions(CodeBuilder *builder) const;
-    void emitInitializer(CodeBuilder *p_builder) const;
+    PSAArch(std::vector<EBPFType*> ebpfTypes, EBPFPipeline* xdpIngress, 
+            EBPFPipeline* xdpEgress) : ebpfTypes(ebpfTypes), 
+            xdpIngress(xdpIngress), xdpEgress(xdpEgress) { }
+
+    void emit2TC(CodeBuilder* builder) const;  // emits C file for eBPF program - at TC layer
+    void emitPreamble2TC(CodeBuilder* builder) const;
+    void emitInternalStructures2TC(CodeBuilder* pBuilder) const;
+    void emitTypes2TC(CodeBuilder *builder) const;
+    void emitInstances2TC(CodeBuilder *builder) const;
+    void emitPSAIncludes2TC(CodeBuilder *builder) const;
+    void emitHelperFunctions2TC(CodeBuilder *builder) const;
+    void emitInitializer2TC(CodeBuilder *p_builder) const;
+
+    void emit2XDP(CodeBuilder* builder) const;
+    void emitPreamble2XDP(CodeBuilder* builder) const;
+    void emitTypes2XDP(CodeBuilder *builder) const;
+    void emitInstances2XDP(CodeBuilder *builder) const;
+    void emitPSAIncludes2XDP(CodeBuilder *builder) const;
+    void emitInitializer2XDP(CodeBuilder *p_builder) const;
+    void emitDummy2XDP(CodeBuilder *builder) const;
 };
 
 class ConvertToEbpfPSA : public Transform {
@@ -88,23 +104,13 @@ class ConvertToEbpfPipeline : public Inspector {
 
 class ConvertToEBPFParserPSA : public Inspector {
     EBPF::EBPFProgram *program;
-    pipeline_type type;
-
     P4::TypeMap *typemap;
     P4::ReferenceMap *refmap;
     EBPF::EBPFPsaParser* parser;
 
  public:
     ConvertToEBPFParserPSA(EBPF::EBPFProgram* program, P4::ReferenceMap* refmap,
-            P4::TypeMap* typemap) : program(program), typemap(typemap), refmap(refmap) {
-        if (program->is<EBPFIngressPipeline>()) {
-            type = INGRESS;
-        } else if (program->is<EBPFEgressPipeline>()) {
-            type = EGRESS;
-        } else {
-            BUG("undefined pipeline type, cannot build parser");
-        }
-    }
+            P4::TypeMap* typemap) : program(program), typemap(typemap), refmap(refmap) { }
 
     bool preorder(const IR::ParserBlock *prsr) override;
     bool preorder(const IR::ParserState *s) override;
@@ -115,27 +121,16 @@ class ConvertToEBPFParserPSA : public Inspector {
 
 class ConvertToEBPFControlPSA : public Inspector {
     EBPF::EBPFProgram *program;
-    pipeline_type type;
-
     const IR::Parameter* parserHeaders;
     P4::TypeMap *typemap;
     P4::ReferenceMap *refmap;
 
     EBPF::EBPFControlPSA *control;
-
  public:
     ConvertToEBPFControlPSA(EBPF::EBPFProgram *program, const IR::Parameter* parserHeaders,
                             P4::ReferenceMap *refmap,
                             P4::TypeMap *typemap) : program(program), parserHeaders(parserHeaders),
-                            typemap(typemap), refmap(refmap) {
-        if (program->is<EBPFIngressPipeline>()) {
-            type = INGRESS;
-        } else if (program->is<EBPFEgressPipeline>()) {
-            type = EGRESS;
-        } else {
-            BUG("undefined pipeline type, cannot build control block");
-        }
-    }
+                            typemap(typemap), refmap(refmap) { }
 
     bool preorder(const IR::P4Action *) override;
     bool preorder(const IR::TableBlock *) override;
@@ -158,17 +153,20 @@ class ConvertToEBPFDeparserPSA : public Inspector {
     P4::P4CoreLibrary& p4lib;
     EBPF::EBPFDeparserPSA* deparser;
 
+    const EbpfOptions &options;
+
  public:
     ConvertToEBPFDeparserPSA(EBPFProgram* program, const IR::Parameter* parserHeaders,
                              const IR::Parameter* istd,
-                             P4::ReferenceMap* refmap,
-                             P4::TypeMap* typemap) : program(program),
+                             P4::ReferenceMap* refmap, P4::TypeMap* typemap,
+                             const EbpfOptions &options) : program(program),
                                                      parserHeaders(parserHeaders), istd(istd),
                                                      typemap(typemap), refmap(refmap),
-                                                     p4lib(P4::P4CoreLibrary::instance) {
-        if (program->is<EBPFIngressPipeline>()) {
+                                                     p4lib(P4::P4CoreLibrary::instance),
+                                                     options(options) {
+        if (program->is<EBPFIngressPipeline>() || program->is<XDPIngressPipeline>()) {
             type = INGRESS;
-        } else if (program->is<EBPFEgressPipeline>()) {
+        } else if (program->is<EBPFEgressPipeline>() || program->is<XDPEgressPipeline>()) {
             type = EGRESS;
         } else {
             BUG("undefined pipeline type, cannot build deparser");

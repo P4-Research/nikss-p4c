@@ -294,12 +294,13 @@ void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
         }
     }
     builder->blockStart();
-
+    builder->increaseIndent();
     BUG_CHECK(method->expr->arguments->size() == 0, "%1%: table apply with arguments", method);
     cstring keyname = "key";
     if (table->keyGenerator != nullptr) {
-        builder->emitIndent();
-        builder->appendLine("/* construct key */");
+        //builder->emitIndent();
+        builder->append("/* construct key */");
+        builder->newline();
         builder->emitIndent();
         builder->appendFormat("struct %s %s = {}", table->keyTypeName.c_str(), keyname.c_str());
         builder->endOfStatement(true);
@@ -433,12 +434,6 @@ bool ControlBodyTranslator::preorder(const IR::SwitchStatement* statement) {
     builder->append(newName);
     builder->append(") ");
     builder->blockStart();
-
-    BUG_CHECK(mem->expr->type->is<IR::Type_Declaration>(),
-              "%1%: expected table with name", mem->expr);
-    cstring tableName = mem->expr->type->to<IR::Type_Declaration>()->name.name;
-    auto table = control->getTable(tableName);
-
     for (auto c : statement->cases) {
         builder->emitIndent();
         if (c->label->is<IR::DefaultExpression>()) {
@@ -449,10 +444,10 @@ bool ControlBodyTranslator::preorder(const IR::SwitchStatement* statement) {
             auto decl = control->program->refMap->getDeclaration(pe->path, true);
             BUG_CHECK(decl->is<IR::P4Action>(), "%1%: expected an action", pe);
             auto act = decl->to<IR::P4Action>();
-            cstring fullActionName = table->actionToActionIDName(act);
+            cstring name = EBPFObject::externalName(act);
             act->name.originalName == P4::P4CoreLibrary::instance.noAction.name ?
                 builder->append("0") :
-                builder->append(fullActionName);
+                builder->append(cstring("ACT_" + name.toUpper()));
         }
         builder->append(":");
         builder->newline();

@@ -1,36 +1,30 @@
 #include "backends/ebpf/ebpfType.h"
 #include "ebpfPsaObjects.h"
 #include "ebpfPipeline.h"
-#include "ebpfPsaControlTranslators.h"
 
 namespace EBPF {
 
 // =====================ActionTranslationVisitorPSA=============================
-ActionTranslationVisitorPSA::ActionTranslationVisitorPSA(cstring valueName,
-                                                         const EBPFPipeline *program,
-                                                         const EBPFTablePSA *table) :
-        CodeGenInspector(program->refMap, program->typeMap),
-        ActionTranslationVisitor(valueName, program),
-        ControlBodyTranslatorPSA(program->control),
-        table(table) {}
-
-bool ActionTranslationVisitorPSA::preorder(const IR::PathExpression* pe) {
-    auto decl = program->refMap->getDeclaration(pe->path, true);
-    if (decl->is<IR::Parameter>()) {
-        auto param = decl->to<IR::Parameter>();
-        bool isParam = action->parameters->getParameter(param->name) == param;
-        if (isParam) {
-            return ActionTranslationVisitor::preorder(pe);;
-        }
+bool ActionTranslationVisitorPSA::preorder(const IR::MethodCallExpression* expression) {
+    auto mi = P4::MethodInstance::resolve(expression,
+                                          program->refMap,
+                                          program->typeMap);
+    auto ext = mi->to<P4::ExternMethod>();
+    if (ext != nullptr) {
+        processMethod(ext);
+        return false;
     }
-    return ControlBodyTranslator::preorder(pe);
+
+    return CodeGenInspector::preorder(expression);
 }
 
 void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) {
     auto declType = method->originalExternType;
     auto name = method->object->getName();
 
-    if (declType->name.name == "DirectCounter") {
+    if (declType->name.name == "Counter") {
+        program->control->getCounter(name)->emitMethodInvocation(builder, method);
+    } else if (declType->name.name == "DirectCounter") {
         auto ctr = table->getCounter(name);
         if (ctr != nullptr)
             ctr->emitDirectMethodInvocation(builder, method, valueName);
@@ -39,12 +33,9 @@ void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) 
                     "%1%: Table %2% do not own DirectCounter named %3%",
                     method->expr, table->name, name);
     } else {
-        ControlBodyTranslatorPSA::processMethod(method);
+        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                "%1%: Unexpected method call in action", method->expr);
     }
-}
-
-void ActionTranslationVisitorPSA::processApply(const P4::ApplyMethod* method) {
-    ::error(ErrorType::ERR_UNSUPPORTED, "%1%: not supported in action", method->expr);
 }
 
 // =====================EBPFTablePSA=============================
@@ -52,11 +43,6 @@ EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* tab
                            CodeGenInspector* codeGen, cstring name, size_t size) :
                            EBPFTable(program, table, codeGen), name(name), size(size) {
     initDirectCounters();
-}
-
-ActionTranslationVisitor* EBPFTablePSA::createActionTranslationVisitor(
-        cstring valueName, const EBPFProgram* program) const {
-    return new ActionTranslationVisitorPSA(valueName, program->to<EBPFPipeline>(), this);
 }
 
 void EBPFTablePSA::initDirectCounters() {
@@ -117,11 +103,11 @@ void EBPFTablePSA::emitInitializer(CodeBuilder *builder) {
 void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
     CodeGenInspector cg(program->refMap, program->typeMap);
     cg.setBuilder(builder);
+    auto keyName = program->refMap->newName("key");
+    auto valueName = program->refMap->newName("value");
     const IR::EntriesList* entries = table->container->getEntries();
     if (entries != nullptr) {
         for (auto entry : entries->entries) {
-            auto keyName = program->refMap->newName("key");
-            auto valueName = program->refMap->newName("value");
             // construct key
             builder->emitIndent();
             builder->appendFormat("struct %s %s = {}", this->keyTypeName.c_str(), keyName.c_str());
@@ -132,43 +118,8 @@ void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
                 CHECK_NULL(fieldName);
                 builder->emitIndent();
                 builder->appendFormat("%s.%s = ", keyName.c_str(), fieldName.c_str());
-                auto mtdecl = program->refMap->getDeclaration(keyElement->matchType->path, true);
-                auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
-                if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
-                    auto expr = entry->keys->components[index];
-                    if (expr->is<IR::Mask>()) {
-                        auto km = expr->to<IR::Mask>();
-                        auto ebpfType = ::get(keyTypes, keyElement);
-                        unsigned width = 0;
-                        if (ebpfType->is<EBPFScalarType>()) {
-                            auto scalar = ebpfType->to<EBPFScalarType>();
-                            width = scalar->implementationWidthInBits();
-                        }
-                        builder->appendFormat("%s(", getByteSwapMethod(width));
-                        km->left->apply(cg);
-                        builder->append(")");
-                        builder->endOfStatement(true);
-                        builder->emitIndent();
-                        builder->appendFormat("%s.%s = ", keyName.c_str(), prefixFieldName.c_str());
-                        auto trailing_zeros = [width](const big_int& n) -> int {
-                            return (n == 0) ? width : boost::multiprecision::lsb(n); };
-                        auto count_ones = [](const big_int& n) -> int {
-                            return bitcount(n); };
-                        auto mask = km->right->to<IR::Constant>()->value;
-                        auto len = trailing_zeros(mask);
-                        if (len + count_ones(mask) != width) {  // any remaining 0s in the prefix?
-                            ::error(ErrorType::ERR_INVALID,
-                                    "%1% invalid mask for LPM key", keyElement);
-                            return;
-                        }
-                        unsigned prefixLen = width - len;
-                        builder->append(prefixLen);
-                        builder->endOfStatement(true);
-                    }
-                } else if (matchType->name.name == P4::P4CoreLibrary::instance.exactMatch.name) {
-                    entry->keys->components[index]->apply(cg);
-                    builder->endOfStatement(true);
-                }
+                entry->keys->components[index]->apply(cg);
+                builder->endOfStatement(true);
             }
 
             // construct value
@@ -248,7 +199,7 @@ void EBPFTablePSA::emitTableValue(CodeBuilder* builder, const IR::MethodCallExpr
     if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
         builder->append(".action = 0,");
     } else {
-        cstring fullActionName = actionToActionIDName(action);
+        cstring fullActionName = "ACT_" + actionName.toUpper();
         builder->appendFormat(".action = %s,", fullActionName);
     }
     builder->newline();

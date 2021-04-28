@@ -1,0 +1,2131 @@
+14:17:40.028  root      : INFO    : ++++++++ Sun Apr  4 14:17:40 2021 ++++++++
+14:17:40.597  root      : INFO    : ROCEv2 support found in Scapy
+14:17:40.598  root      : WARNING : VXLAN support not found in Scapy
+14:17:40.601  root      : WARNING : ERSPAN support not found in Scapy
+14:17:40.604  root      : INFO    : GENEVE support found in Scapy
+14:17:40.606  root      : INFO    : MPLS support found in Scapy
+14:17:40.606  root      : WARNING : NVGRE support not found in Scapy
+14:17:40.608  root      : INFO    : IGMP support found in Scapy
+14:17:40.654  root      : DEBUG   : Parsed test parameters:
+14:17:40.654  root      : DEBUG   : 	*namespace=switch
+14:17:40.654  root      : DEBUG   : 	*interfaces=psa_recirc,eth0,eth1,eth2
+14:17:40.654  root      : DEBUG   : If something is missing, make sure you used the correct syntax: --test-params="[k=v;]*k=v"
+14:17:40.668  root      : INFO    : Importing platform: eth
+14:17:40.672  root      : DEBUG   : Configuration: {'xunit_dir': 'xunit', 'disable_ipv6': False, 'minsize': 0, 'list_test_names': False, 'test_file': None, 'test_spec': '', 'allow_user': False, 'test_order_seed': 2746, 'default_negative_timeout': 0.1, 'platform': 'eth', 'log_dir': None, 'xunit': False, 'disable_erspan': False, 'device_sockets': [], 'disable_geneve': False, 'socket_recv_size': 4096, 'profile': False, 'default_timeout': 2.0, 'platform_args': None, 'relax': False, 'disable_rocev2': False, 'random_seed': None, 'interfaces': [(0, 0, 's1-eth0'), (0, 1, 's1-eth1'), (0, 2, 's1-eth2')], 'test_case_timeout': None, 'port_map': {(0, 1): 's1-eth1', (0, 0): 's1-eth0', (0, 2): 's1-eth2'}, 'disable_vxlan': False, 'disable_nvgre': False, 'qlen': 100, 'test_order': 'default', 'profile_file': 'profile.out', 'fail_skipped': False, 'test_params': 'interfaces="psa_recirc,eth0,eth1,eth2";namespace="switch"', 'test_dir': 'ptf/', 'list': False, 'platform_dir': '/usr/local/lib/python2.7/dist-packages/ptf-0.9.1-py2.7.egg/ptf/platforms', 'disable_igmp': False, 'disable_mpls': False, 'debug': 'verbose', 'log_file': 'ptf.log', 'failfast': False}
+14:17:40.672  root      : INFO    : port map: {(0, 1): 's1-eth1', (0, 0): 's1-eth0', (0, 2): 's1-eth2'}
+14:17:40.672  root      : INFO    : Autogen random seed: 65361880
+14:17:40.683  root      : INFO    : *** TEST RUN START: Sun Apr  4 14:17:40 2021
+14:17:42.554  root      : INFO    : ** START TEST CASE test.DigestPSATest
+14:17:42.555  eBPFTest  : INFO    : Using namespace: switch
+14:17:42.555  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:17:42.569  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/digest.o']
+14:17:42.570  eBPFTest  : INFO    : Return code: 1
+14:17:42.570  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/digest.o), code: -2
+14:17:42.571  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:17:42.597  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:17:42.597  eBPFTest  : INFO    : Return code: 234
+14:17:42.597  eBPFTest  : INFO    : STDOUT: 
+14:17:42.598  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:42.630  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:42.630  eBPFTest  : INFO    : Return code: 1
+14:17:42.630  eBPFTest  : INFO    : STDOUT: 
+14:17:42.631  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:42.649  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:42.650  eBPFTest  : INFO    : Return code: 1
+14:17:42.651  eBPFTest  : INFO    : STDOUT: 
+14:17:42.651  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:42.666  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:17:42.666  eBPFTest  : INFO    : Return code: 234
+14:17:42.666  eBPFTest  : INFO    : STDOUT: 
+14:17:42.667  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:42.694  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:42.694  eBPFTest  : INFO    : Return code: 1
+14:17:42.694  eBPFTest  : INFO    : STDOUT: 
+14:17:42.694  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:42.709  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:42.710  eBPFTest  : INFO    : Return code: 1
+14:17:42.710  eBPFTest  : INFO    : STDOUT: 
+14:17:42.710  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:42.729  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:17:42.730  eBPFTest  : INFO    : Return code: 234
+14:17:42.730  eBPFTest  : INFO    : STDOUT: 
+14:17:42.730  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:42.753  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:42.753  eBPFTest  : INFO    : Return code: 1
+14:17:42.753  eBPFTest  : INFO    : STDOUT: 
+14:17:42.753  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:42.762  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:42.764  eBPFTest  : INFO    : Return code: 1
+14:17:42.765  eBPFTest  : INFO    : STDOUT: 
+14:17:42.766  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:42.796  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:17:42.797  eBPFTest  : INFO    : Return code: 234
+14:17:42.797  eBPFTest  : INFO    : STDOUT: 
+14:17:42.797  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:42.840  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:42.842  eBPFTest  : INFO    : Return code: 1
+14:17:42.843  eBPFTest  : INFO    : STDOUT: 
+14:17:42.845  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:42.859  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:42.861  eBPFTest  : INFO    : Return code: 1
+14:17:42.864  eBPFTest  : INFO    : STDOUT: 
+14:17:42.864  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:43.084  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:17:43.085  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:17:43.086  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:17:43.097  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/mac_learn_digest_0']
+14:17:43.097  eBPFTest  : INFO    : Return code: 1
+14:17:43.097  eBPFTest  : INFO    : STDOUT: 
+14:17:43.097  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/mac_learn_digest_0': No such file or directory
+
+14:17:43.104  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/clone_session_tbl']
+14:17:43.104  eBPFTest  : INFO    : Return code: 1
+14:17:43.104  eBPFTest  : INFO    : STDOUT: 
+14:17:43.104  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/clone_session_tbl': No such file or directory
+
+14:17:43.114  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/multicast_grp_tbl']
+14:17:43.114  eBPFTest  : INFO    : Return code: 1
+14:17:43.114  eBPFTest  : INFO    : STDOUT: 
+14:17:43.114  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/multicast_grp_tbl': No such file or directory
+
+14:17:43.262  root      : INFO    : ** END TEST CASE test.DigestPSATest
+14:17:44.766  root      : INFO    : ** START TEST CASE test.PSATernaryTest
+14:17:44.766  eBPFTest  : INFO    : Using namespace: switch
+14:17:44.767  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:17:44.772  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/psa-ternary.o']
+14:17:44.772  eBPFTest  : INFO    : Return code: 1
+14:17:44.772  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/psa-ternary.o), code: -2
+14:17:44.773  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:17:44.781  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:17:44.781  eBPFTest  : INFO    : Return code: 234
+14:17:44.781  eBPFTest  : INFO    : STDOUT: 
+14:17:44.781  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:44.800  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:44.801  eBPFTest  : INFO    : Return code: 1
+14:17:44.801  eBPFTest  : INFO    : STDOUT: 
+14:17:44.802  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:44.814  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:44.814  eBPFTest  : INFO    : Return code: 1
+14:17:44.814  eBPFTest  : INFO    : STDOUT: 
+14:17:44.814  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:44.824  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:17:44.824  eBPFTest  : INFO    : Return code: 234
+14:17:44.824  eBPFTest  : INFO    : STDOUT: 
+14:17:44.824  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:44.861  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:44.862  eBPFTest  : INFO    : Return code: 1
+14:17:44.863  eBPFTest  : INFO    : STDOUT: 
+14:17:44.864  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:44.879  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:44.879  eBPFTest  : INFO    : Return code: 1
+14:17:44.879  eBPFTest  : INFO    : STDOUT: 
+14:17:44.880  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:44.891  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:17:44.891  eBPFTest  : INFO    : Return code: 234
+14:17:44.892  eBPFTest  : INFO    : STDOUT: 
+14:17:44.892  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:44.916  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:44.916  eBPFTest  : INFO    : Return code: 1
+14:17:44.917  eBPFTest  : INFO    : STDOUT: 
+14:17:44.918  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:44.936  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:44.936  eBPFTest  : INFO    : Return code: 1
+14:17:44.937  eBPFTest  : INFO    : STDOUT: 
+14:17:44.937  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:44.950  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:17:44.950  eBPFTest  : INFO    : Return code: 234
+14:17:44.951  eBPFTest  : INFO    : STDOUT: 
+14:17:44.951  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:44.971  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:44.972  eBPFTest  : INFO    : Return code: 1
+14:17:44.972  eBPFTest  : INFO    : STDOUT: 
+14:17:44.972  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:44.979  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:44.980  eBPFTest  : INFO    : Return code: 1
+14:17:44.980  eBPFTest  : INFO    : STDOUT: 
+14:17:44.980  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:44.990  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_0_prefixes', 'key', '00', '00', '00', '00', 'value', '01', '00', '00', '00', '00', '0xff', '0xff', '0xff', '01', '00', '00', '00']
+14:17:44.991  eBPFTest  : INFO    : Return code: 255
+14:17:44.991  eBPFTest  : INFO    : STDOUT: 
+14:17:44.991  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_ternary_0_prefixes): No such file or directory
+
+14:17:45.001  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_0_prefixes', 'key', '00', '0xff', '0xff', '0xff', 'value', '01', '00', '00', '00', '0xff', '00', '0xff', '0xff', '01', '00', '00', '00']
+14:17:45.001  eBPFTest  : INFO    : Return code: 255
+14:17:45.001  eBPFTest  : INFO    : STDOUT: 
+14:17:45.001  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_ternary_0_prefixes): No such file or directory
+
+14:17:45.009  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_0_prefixes', 'key', '0xff', '00', '0xff', '0xff', 'value', '02', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00']
+14:17:45.009  eBPFTest  : INFO    : Return code: 255
+14:17:45.009  eBPFTest  : INFO    : STDOUT: 
+14:17:45.009  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_ternary_0_prefixes): No such file or directory
+
+14:17:45.091  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_0_tuples_map', 'key', '01', '0', '0', '0', 'value', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_0_tuple_1', 'any']
+14:17:45.091  eBPFTest  : INFO    : Return code: 255
+14:17:45.092  eBPFTest  : INFO    : STDOUT: 
+14:17:45.092  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_ternary_0_tuples_map): No such file or directory
+
+14:17:45.100  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_0_tuples_map', 'key', '02', '0', '0', '0', 'value', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_0_tuple_2', 'any']
+14:17:45.101  eBPFTest  : INFO    : Return code: 255
+14:17:45.101  eBPFTest  : INFO    : STDOUT: 
+14:17:45.101  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_ternary_0_tuples_map): No such file or directory
+
+14:17:45.110  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_1_prefixes', 'key', '00', '00', '00', '00', '00', '00', '00', '00', 'value', '01', '00', '00', '00', '00', '0xff', '0xff', '0xff', '0xff', '00', '00', '00', '01', '00', '00', '00']
+14:17:45.110  eBPFTest  : INFO    : Return code: 255
+14:17:45.110  eBPFTest  : INFO    : STDOUT: 
+14:17:45.110  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_ternary_1_prefixes): No such file or directory
+
+14:17:45.121  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_1_prefixes', 'key', '00', '0xff', '0xff', '0xff', '0xff', '00', '00', '00', 'value', '06', '00', '00', '00', '00', '0xff', '0xff', '0xff', '00', '00', '00', '00', '01', '00', '00', '00']
+14:17:45.121  eBPFTest  : INFO    : Return code: 255
+14:17:45.122  eBPFTest  : INFO    : STDOUT: 
+14:17:45.122  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_ternary_1_prefixes): No such file or directory
+
+14:17:45.166  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_1_prefixes', 'key', '00', '0xff', '0xff', '0xff', '00', '00', '00', '00', 'value', '07', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00']
+14:17:45.166  eBPFTest  : INFO    : Return code: 255
+14:17:45.167  eBPFTest  : INFO    : STDOUT: 
+14:17:45.167  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_ternary_1_prefixes): No such file or directory
+
+14:17:45.243  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_1_tuples_map', 'key', '06', '00', '00', '00', 'value', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_1_tuple_6', 'any']
+14:17:45.244  eBPFTest  : INFO    : Return code: 255
+14:17:45.244  eBPFTest  : INFO    : STDOUT: 
+14:17:45.244  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_ternary_1_tuples_map): No such file or directory
+
+14:17:45.257  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_1_tuples_map', 'key', '07', '00', '00', '00', 'value', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_1_tuple_7', 'any']
+14:17:45.258  eBPFTest  : INFO    : Return code: 255
+14:17:45.258  eBPFTest  : INFO    : STDOUT: 
+14:17:45.258  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_ternary_1_tuples_map): No such file or directory
+
+14:17:45.287  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_2_prefixes', 'key', '00', '00', '00', '00', '00', '00', '00', '00', 'value', '01', '00', '00', '00', '00', '00', '0xff', '0xff', '0xff', '00', '00', '00', '01', '00', '00', '00']
+14:17:45.287  eBPFTest  : INFO    : Return code: 255
+14:17:45.288  eBPFTest  : INFO    : STDOUT: 
+14:17:45.288  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_ternary_2_prefixes): No such file or directory
+
+14:17:45.313  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_2_prefixes', 'key', '00', '00', '0xff', '0xff', '0xff', '00', '00', '00', 'value', '03', '00', '00', '00', '00', '00', '0xff', '0xff', '00', '00', '00', '00', '01', '00', '00', '00']
+14:17:45.313  eBPFTest  : INFO    : Return code: 255
+14:17:45.313  eBPFTest  : INFO    : STDOUT: 
+14:17:45.313  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_ternary_2_prefixes): No such file or directory
+
+14:17:45.323  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_2_prefixes', 'key', '00', '00', '0xff', '0xff', '00', '00', '00', '00', 'value', '05', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00']
+14:17:45.323  eBPFTest  : INFO    : Return code: 255
+14:17:45.323  eBPFTest  : INFO    : STDOUT: 
+14:17:45.323  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_ternary_2_prefixes): No such file or directory
+
+14:17:45.422  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_2_tuples_map', 'key', '03', '00', '00', '00', 'value', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_2_tuple_3', 'any']
+14:17:45.422  eBPFTest  : INFO    : Return code: 255
+14:17:45.423  eBPFTest  : INFO    : STDOUT: 
+14:17:45.423  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_ternary_2_tuples_map): No such file or directory
+
+14:17:45.441  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_2_tuples_map', 'key', '05', '00', '00', '00', 'value', 'pinned', '/sys/fs/bpf/ingress_tbl_ternary_2_tuple_5', 'any']
+14:17:45.441  eBPFTest  : INFO    : Return code: 255
+14:17:45.441  eBPFTest  : INFO    : STDOUT: 
+14:17:45.442  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_ternary_2_tuples_map): No such file or directory
+
+14:17:45.444  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:17:45.445  root      : DEBUG   : Checking for pkt on device 0, port 1
+14:17:45.445  dataplane : DEBUG   : Grabbing packet
+14:17:45.445  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:17:45.445  dataplane : DEBUG   : Did not find packet
+14:17:45.733  dataplane : DEBUG   : Grabbing packet
+14:17:45.733  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:17:45.733  dataplane : DEBUG   : Did not find packet
+14:17:46.725  dataplane : DEBUG   : Grabbing packet
+14:17:46.725  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:17:46.725  dataplane : DEBUG   : Did not find packet
+14:17:47.446  dataplane : DEBUG   : Poll timeout, no packet from device 0, port 1
+14:17:47.457  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_ternary_0_prefixes']
+14:17:47.457  eBPFTest  : INFO    : Return code: 1
+14:17:47.457  eBPFTest  : INFO    : STDOUT: 
+14:17:47.457  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_ternary_0_prefixes': No such file or directory
+
+14:17:47.464  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_ternary_0_tuples_map']
+14:17:47.465  eBPFTest  : INFO    : Return code: 1
+14:17:47.465  eBPFTest  : INFO    : STDOUT: 
+14:17:47.466  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_ternary_0_tuples_map': No such file or directory
+
+14:17:47.491  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_ternary_0_defaultAction']
+14:17:47.491  eBPFTest  : INFO    : Return code: 1
+14:17:47.491  eBPFTest  : INFO    : STDOUT: 
+14:17:47.492  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_ternary_0_defaultAction': No such file or directory
+
+14:17:47.499  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_ternary_1_prefixes']
+14:17:47.499  eBPFTest  : INFO    : Return code: 1
+14:17:47.500  eBPFTest  : INFO    : STDOUT: 
+14:17:47.500  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_ternary_1_prefixes': No such file or directory
+
+14:17:47.507  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_ternary_1_tuples_map']
+14:17:47.508  eBPFTest  : INFO    : Return code: 1
+14:17:47.508  eBPFTest  : INFO    : STDOUT: 
+14:17:47.508  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_ternary_1_tuples_map': No such file or directory
+
+14:17:47.530  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_ternary_1_defaultAction']
+14:17:47.530  eBPFTest  : INFO    : Return code: 1
+14:17:47.530  eBPFTest  : INFO    : STDOUT: 
+14:17:47.530  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_ternary_1_defaultAction': No such file or directory
+
+14:17:47.537  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_ternary_2_prefixes']
+14:17:47.537  eBPFTest  : INFO    : Return code: 1
+14:17:47.537  eBPFTest  : INFO    : STDOUT: 
+14:17:47.537  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_ternary_2_prefixes': No such file or directory
+
+14:17:47.543  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_ternary_2_tuples_map']
+14:17:47.544  eBPFTest  : INFO    : Return code: 1
+14:17:47.544  eBPFTest  : INFO    : STDOUT: 
+14:17:47.544  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_ternary_2_tuples_map': No such file or directory
+
+14:17:47.565  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_ternary_2_defaultAction']
+14:17:47.565  eBPFTest  : INFO    : Return code: 1
+14:17:47.565  eBPFTest  : INFO    : STDOUT: 
+14:17:47.565  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_ternary_2_defaultAction': No such file or directory
+
+14:17:47.572  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/clone_session_tbl']
+14:17:47.572  eBPFTest  : INFO    : Return code: 1
+14:17:47.572  eBPFTest  : INFO    : STDOUT: 
+14:17:47.572  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/clone_session_tbl': No such file or directory
+
+14:17:47.582  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/multicast_grp_tbl']
+14:17:47.584  eBPFTest  : INFO    : Return code: 1
+14:17:47.584  eBPFTest  : INFO    : STDOUT: 
+14:17:47.584  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/multicast_grp_tbl': No such file or directory
+
+14:17:47.714  root      : INFO    : ** END TEST CASE test.PSATernaryTest
+14:17:49.034  root      : INFO    : ** START TEST CASE test.ParserValueSetPSATest
+14:17:49.035  eBPFTest  : INFO    : Using namespace: switch
+14:17:49.035  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:17:49.042  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/pvs.o']
+14:17:49.043  eBPFTest  : INFO    : Return code: 1
+14:17:49.043  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/pvs.o), code: -2
+14:17:49.043  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:17:49.053  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:17:49.053  eBPFTest  : INFO    : Return code: 234
+14:17:49.054  eBPFTest  : INFO    : STDOUT: 
+14:17:49.054  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:49.077  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:49.078  eBPFTest  : INFO    : Return code: 1
+14:17:49.078  eBPFTest  : INFO    : STDOUT: 
+14:17:49.078  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:49.089  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:49.090  eBPFTest  : INFO    : Return code: 1
+14:17:49.090  eBPFTest  : INFO    : STDOUT: 
+14:17:49.090  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:49.100  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:17:49.101  eBPFTest  : INFO    : Return code: 234
+14:17:49.101  eBPFTest  : INFO    : STDOUT: 
+14:17:49.101  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:49.116  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:49.117  eBPFTest  : INFO    : Return code: 1
+14:17:49.117  eBPFTest  : INFO    : STDOUT: 
+14:17:49.117  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:49.125  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:49.125  eBPFTest  : INFO    : Return code: 1
+14:17:49.126  eBPFTest  : INFO    : STDOUT: 
+14:17:49.126  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:49.140  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:17:49.141  eBPFTest  : INFO    : Return code: 234
+14:17:49.141  eBPFTest  : INFO    : STDOUT: 
+14:17:49.141  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:49.161  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:49.161  eBPFTest  : INFO    : Return code: 1
+14:17:49.162  eBPFTest  : INFO    : STDOUT: 
+14:17:49.163  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:49.182  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:49.183  eBPFTest  : INFO    : Return code: 1
+14:17:49.183  eBPFTest  : INFO    : STDOUT: 
+14:17:49.184  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:49.201  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:17:49.202  eBPFTest  : INFO    : Return code: 234
+14:17:49.202  eBPFTest  : INFO    : STDOUT: 
+14:17:49.203  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:49.230  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:49.231  eBPFTest  : INFO    : Return code: 1
+14:17:49.232  eBPFTest  : INFO    : STDOUT: 
+14:17:49.232  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:49.243  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:49.244  eBPFTest  : INFO    : Return code: 1
+14:17:49.245  eBPFTest  : INFO    : STDOUT: 
+14:17:49.245  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:49.249  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:17:49.249  root      : DEBUG   : Checking for unexpected packets on all ports of device 0
+14:17:49.250  dataplane : DEBUG   : Grabbing packet
+14:17:49.250  dataplane : DEBUG   : Out of packets on all ports
+14:17:49.250  dataplane : DEBUG   : Did not find packet
+14:17:49.350  dataplane : DEBUG   : Poll timeout, no packet from device 0, port None
+14:17:49.370  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/IngressParserImpl_pvs', 'key', '1', '0', '0', '10', 'value', '0', '0', '0', '0']
+14:17:49.371  eBPFTest  : INFO    : Return code: 255
+14:17:49.372  eBPFTest  : INFO    : STDOUT: 
+14:17:49.372  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/IngressParserImpl_pvs): No such file or directory
+
+14:17:49.374  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:17:49.375  root      : DEBUG   : Checking for unexpected packets on all ports of device 0
+14:17:49.375  dataplane : DEBUG   : Grabbing packet
+14:17:49.375  dataplane : DEBUG   : Out of packets on all ports
+14:17:49.375  dataplane : DEBUG   : Did not find packet
+14:17:49.475  dataplane : DEBUG   : Poll timeout, no packet from device 0, port None
+14:17:49.478  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:17:49.481  root      : DEBUG   : Checking for pkt on device 0, port [0, 1, 2]
+14:17:49.481  dataplane : WARNING : Dataplane poll with exp_pkt but no port number
+14:17:49.481  dataplane : DEBUG   : Grabbing packet
+14:17:49.481  dataplane : DEBUG   : Out of packets on all ports
+14:17:49.481  dataplane : DEBUG   : Did not find packet
+14:17:49.751  dataplane : DEBUG   : Grabbing packet
+14:17:49.751  dataplane : DEBUG   : Out of packets on all ports
+14:17:49.752  dataplane : DEBUG   : Did not find packet
+14:17:50.722  dataplane : DEBUG   : Grabbing packet
+14:17:50.722  dataplane : DEBUG   : Out of packets on all ports
+14:17:50.722  dataplane : DEBUG   : Did not find packet
+14:17:51.481  dataplane : DEBUG   : Poll timeout, no packet from device 0, port None
+14:17:51.482  root      : DEBUG   : Checking for unexpected packets on all ports of device 0
+14:17:51.482  dataplane : DEBUG   : Grabbing packet
+14:17:51.482  dataplane : DEBUG   : Out of packets on all ports
+14:17:51.482  dataplane : DEBUG   : Did not find packet
+14:17:51.582  dataplane : DEBUG   : Poll timeout, no packet from device 0, port None
+14:17:51.590  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/IngressParserImpl_pvs']
+14:17:51.590  eBPFTest  : INFO    : Return code: 1
+14:17:51.591  eBPFTest  : INFO    : STDOUT: 
+14:17:51.591  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/IngressParserImpl_pvs': No such file or directory
+
+14:17:51.599  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/clone_session_tbl']
+14:17:51.599  eBPFTest  : INFO    : Return code: 1
+14:17:51.599  eBPFTest  : INFO    : STDOUT: 
+14:17:51.600  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/clone_session_tbl': No such file or directory
+
+14:17:51.605  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/multicast_grp_tbl']
+14:17:51.606  eBPFTest  : INFO    : Return code: 1
+14:17:51.606  eBPFTest  : INFO    : STDOUT: 
+14:17:51.606  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/multicast_grp_tbl': No such file or directory
+
+14:17:51.715  root      : INFO    : ** END TEST CASE test.ParserValueSetPSATest
+14:17:52.935  root      : INFO    : ** START TEST CASE test.SimpleTunnelingPSATest
+14:17:52.936  eBPFTest  : INFO    : Using namespace: switch
+14:17:52.936  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:17:52.942  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/psa-tunneling.o']
+14:17:52.942  eBPFTest  : INFO    : Return code: 1
+14:17:52.942  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/psa-tunneling.o), code: -2
+14:17:52.942  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:17:52.951  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:17:52.951  eBPFTest  : INFO    : Return code: 234
+14:17:52.951  eBPFTest  : INFO    : STDOUT: 
+14:17:52.952  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:52.971  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:52.972  eBPFTest  : INFO    : Return code: 1
+14:17:52.972  eBPFTest  : INFO    : STDOUT: 
+14:17:52.972  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:52.986  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:52.987  eBPFTest  : INFO    : Return code: 1
+14:17:52.987  eBPFTest  : INFO    : STDOUT: 
+14:17:52.987  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:52.997  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:17:52.997  eBPFTest  : INFO    : Return code: 234
+14:17:52.997  eBPFTest  : INFO    : STDOUT: 
+14:17:52.997  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:53.022  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:53.023  eBPFTest  : INFO    : Return code: 1
+14:17:53.024  eBPFTest  : INFO    : STDOUT: 
+14:17:53.024  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:53.036  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:53.036  eBPFTest  : INFO    : Return code: 1
+14:17:53.036  eBPFTest  : INFO    : STDOUT: 
+14:17:53.036  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:53.048  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:17:53.048  eBPFTest  : INFO    : Return code: 234
+14:17:53.048  eBPFTest  : INFO    : STDOUT: 
+14:17:53.049  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:53.067  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:53.068  eBPFTest  : INFO    : Return code: 1
+14:17:53.068  eBPFTest  : INFO    : STDOUT: 
+14:17:53.068  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:53.074  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:53.075  eBPFTest  : INFO    : Return code: 1
+14:17:53.075  eBPFTest  : INFO    : STDOUT: 
+14:17:53.075  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:53.097  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:17:53.097  eBPFTest  : INFO    : Return code: 234
+14:17:53.097  eBPFTest  : INFO    : STDOUT: 
+14:17:53.098  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:53.129  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:53.130  eBPFTest  : INFO    : Return code: 1
+14:17:53.130  eBPFTest  : INFO    : STDOUT: 
+14:17:53.130  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:53.139  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:53.140  eBPFTest  : INFO    : Return code: 1
+14:17:53.141  eBPFTest  : INFO    : STDOUT: 
+14:17:53.141  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:53.147  dataplane : DEBUG   : Sending 114 bytes to device 0, port 0
+14:17:53.152  root      : DEBUG   : Checking for pkt on device 0, port 1
+14:17:53.152  dataplane : DEBUG   : Grabbing packet
+14:17:53.153  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:17:53.153  dataplane : DEBUG   : Did not find packet
+14:17:53.732  dataplane : DEBUG   : Grabbing packet
+14:17:53.732  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:17:53.732  dataplane : DEBUG   : Did not find packet
+14:17:54.766  dataplane : DEBUG   : Grabbing packet
+14:17:54.766  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:17:54.766  dataplane : DEBUG   : Did not find packet
+14:17:55.161  dataplane : DEBUG   : Poll timeout, no packet from device 0, port 1
+14:17:55.170  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/clone_session_tbl']
+14:17:55.170  eBPFTest  : INFO    : Return code: 1
+14:17:55.170  eBPFTest  : INFO    : STDOUT: 
+14:17:55.171  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/clone_session_tbl': No such file or directory
+
+14:17:55.181  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/multicast_grp_tbl']
+14:17:55.181  eBPFTest  : INFO    : Return code: 1
+14:17:55.181  eBPFTest  : INFO    : STDOUT: 
+14:17:55.181  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/multicast_grp_tbl': No such file or directory
+
+14:17:55.283  root      : INFO    : ** END TEST CASE test.SimpleTunnelingPSATest
+14:17:56.353  root      : INFO    : ** START TEST CASE test.PSACloneI2E
+14:17:56.353  eBPFTest  : INFO    : Using namespace: switch
+14:17:56.353  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:17:56.359  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/psa-i2e-cloning-basic-bmv2.o']
+14:17:56.359  eBPFTest  : INFO    : Return code: 1
+14:17:56.359  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/psa-i2e-cloning-basic-bmv2.o), code: -2
+14:17:56.359  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:17:56.367  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:17:56.367  eBPFTest  : INFO    : Return code: 234
+14:17:56.367  eBPFTest  : INFO    : STDOUT: 
+14:17:56.368  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:56.382  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:56.383  eBPFTest  : INFO    : Return code: 1
+14:17:56.383  eBPFTest  : INFO    : STDOUT: 
+14:17:56.383  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:56.394  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:56.394  eBPFTest  : INFO    : Return code: 1
+14:17:56.395  eBPFTest  : INFO    : STDOUT: 
+14:17:56.395  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:56.427  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:17:56.427  eBPFTest  : INFO    : Return code: 234
+14:17:56.428  eBPFTest  : INFO    : STDOUT: 
+14:17:56.428  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:56.455  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:56.455  eBPFTest  : INFO    : Return code: 1
+14:17:56.455  eBPFTest  : INFO    : STDOUT: 
+14:17:56.455  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:56.469  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:56.470  eBPFTest  : INFO    : Return code: 1
+14:17:56.470  eBPFTest  : INFO    : STDOUT: 
+14:17:56.470  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:56.482  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:17:56.483  eBPFTest  : INFO    : Return code: 234
+14:17:56.483  eBPFTest  : INFO    : STDOUT: 
+14:17:56.483  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:56.509  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:56.509  eBPFTest  : INFO    : Return code: 1
+14:17:56.509  eBPFTest  : INFO    : STDOUT: 
+14:17:56.509  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:56.537  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:56.538  eBPFTest  : INFO    : Return code: 1
+14:17:56.538  eBPFTest  : INFO    : STDOUT: 
+14:17:56.538  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:56.554  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:17:56.554  eBPFTest  : INFO    : Return code: 234
+14:17:56.554  eBPFTest  : INFO    : STDOUT: 
+14:17:56.554  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:17:56.572  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:17:56.573  eBPFTest  : INFO    : Return code: 1
+14:17:56.573  eBPFTest  : INFO    : STDOUT: 
+14:17:56.573  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:17:56.579  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:17:56.580  eBPFTest  : INFO    : Return code: 1
+14:17:56.580  eBPFTest  : INFO    : STDOUT: 
+14:17:56.580  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:17:56.597  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'prectl', 'clone-session', 'create', 'id', '8']
+14:17:56.597  eBPFTest  : INFO    : Return code: 255
+14:17:56.598  eBPFTest  : INFO    : STDOUT: failed to pin new clone session to a file [File exists]
+Completed in 0.000090s
+
+14:17:56.598  eBPFTest  : INFO    : STDERR: 
+14:17:56.614  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'prectl', 'clone-session', 'add-member', 'id', '8', 'egress-port', '6', 'instance', '1', 'cos', '0']
+14:17:56.615  eBPFTest  : INFO    : Return code: 255
+14:17:56.616  eBPFTest  : INFO    : STDOUT: 
+14:17:56.616  eBPFTest  : INFO    : STDERR: could not find map clone_session_tbl. Clone session doesn't exists? [No such file or directory].
+
+14:17:56.625  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'prectl', 'clone-session', 'add-member', 'id', '8', 'egress-port', '6', 'instance', '2', 'cos', '1']
+14:17:56.626  eBPFTest  : INFO    : Return code: 255
+14:17:56.626  eBPFTest  : INFO    : STDOUT: 
+14:17:56.627  eBPFTest  : INFO    : STDERR: could not find map clone_session_tbl. Clone session doesn't exists? [No such file or directory].
+
+14:17:56.628  dataplane : DEBUG   : Sending 60 bytes to device 0, port 0
+14:17:56.629  root      : DEBUG   : Checking for pkt on device 0, port 2
+14:17:56.629  dataplane : DEBUG   : Grabbing packet
+14:17:56.629  dataplane : DEBUG   : Out of packets on device 0, port 2
+14:17:56.629  dataplane : DEBUG   : Did not find packet
+14:17:56.754  dataplane : DEBUG   : Grabbing packet
+14:17:56.754  dataplane : DEBUG   : Out of packets on device 0, port 2
+14:17:56.754  dataplane : DEBUG   : Did not find packet
+14:17:57.768  dataplane : DEBUG   : Grabbing packet
+14:17:57.768  dataplane : DEBUG   : Out of packets on device 0, port 2
+14:17:57.768  dataplane : DEBUG   : Did not find packet
+14:17:58.630  dataplane : DEBUG   : Poll timeout, no packet from device 0, port 2
+14:17:58.638  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'prectl', 'clone-session', 'delete', 'id', '8']
+14:17:58.638  eBPFTest  : INFO    : Return code: 255
+14:17:58.639  eBPFTest  : INFO    : STDOUT: Completed in 0.000052s
+
+14:17:58.639  eBPFTest  : INFO    : STDERR: could not find map clone_session_tbl [No such file or directory].
+
+14:17:58.733  root      : INFO    : ** END TEST CASE test.PSACloneI2E
+14:18:00.074  root      : INFO    : ** START TEST CASE test.ConstEntryAndActionPSATest
+14:18:00.074  eBPFTest  : INFO    : Using namespace: switch
+14:18:00.074  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:18:00.080  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/const-entry-and-action.o']
+14:18:00.081  eBPFTest  : INFO    : Return code: 1
+14:18:00.081  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/const-entry-and-action.o), code: -2
+14:18:00.081  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:18:00.090  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:18:00.092  eBPFTest  : INFO    : Return code: 234
+14:18:00.092  eBPFTest  : INFO    : STDOUT: 
+14:18:00.092  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:00.119  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:00.119  eBPFTest  : INFO    : Return code: 1
+14:18:00.119  eBPFTest  : INFO    : STDOUT: 
+14:18:00.119  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:00.127  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:00.127  eBPFTest  : INFO    : Return code: 1
+14:18:00.127  eBPFTest  : INFO    : STDOUT: 
+14:18:00.127  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:00.140  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:18:00.141  eBPFTest  : INFO    : Return code: 234
+14:18:00.141  eBPFTest  : INFO    : STDOUT: 
+14:18:00.141  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:00.162  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:00.163  eBPFTest  : INFO    : Return code: 1
+14:18:00.163  eBPFTest  : INFO    : STDOUT: 
+14:18:00.163  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:00.182  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:00.182  eBPFTest  : INFO    : Return code: 1
+14:18:00.183  eBPFTest  : INFO    : STDOUT: 
+14:18:00.183  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:00.193  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:18:00.194  eBPFTest  : INFO    : Return code: 234
+14:18:00.194  eBPFTest  : INFO    : STDOUT: 
+14:18:00.194  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:00.240  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:00.241  eBPFTest  : INFO    : Return code: 1
+14:18:00.241  eBPFTest  : INFO    : STDOUT: 
+14:18:00.241  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:00.257  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:00.257  eBPFTest  : INFO    : Return code: 1
+14:18:00.257  eBPFTest  : INFO    : STDOUT: 
+14:18:00.257  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:00.267  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:18:00.267  eBPFTest  : INFO    : Return code: 234
+14:18:00.267  eBPFTest  : INFO    : STDOUT: 
+14:18:00.267  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:00.283  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:00.283  eBPFTest  : INFO    : Return code: 1
+14:18:00.283  eBPFTest  : INFO    : STDOUT: 
+14:18:00.284  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:00.303  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:00.303  eBPFTest  : INFO    : Return code: 1
+14:18:00.304  eBPFTest  : INFO    : STDOUT: 
+14:18:00.304  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:00.307  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:18:00.308  root      : DEBUG   : Checking for pkt on device 0, port 1
+14:18:00.308  dataplane : DEBUG   : Grabbing packet
+14:18:00.308  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:00.308  dataplane : DEBUG   : Did not find packet
+14:18:00.740  dataplane : DEBUG   : Grabbing packet
+14:18:00.741  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:00.741  dataplane : DEBUG   : Did not find packet
+14:18:01.770  dataplane : DEBUG   : Grabbing packet
+14:18:01.770  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:01.771  dataplane : DEBUG   : Did not find packet
+14:18:02.308  dataplane : DEBUG   : Poll timeout, no packet from device 0, port 1
+14:18:02.315  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_entry_action']
+14:18:02.316  eBPFTest  : INFO    : Return code: 1
+14:18:02.316  eBPFTest  : INFO    : STDOUT: 
+14:18:02.316  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_entry_action': No such file or directory
+
+14:18:02.325  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_entry_action_defaultAction']
+14:18:02.325  eBPFTest  : INFO    : Return code: 1
+14:18:02.325  eBPFTest  : INFO    : STDOUT: 
+14:18:02.325  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_entry_action_defaultAction': No such file or directory
+
+14:18:02.427  root      : INFO    : ** END TEST CASE test.ConstEntryAndActionPSATest
+14:18:03.383  root      : INFO    : ** START TEST CASE test.EgressTrafficManagerClonePSATest
+14:18:03.383  eBPFTest  : INFO    : Using namespace: switch
+14:18:03.383  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:18:03.391  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/etm-clone-e2e.o']
+14:18:03.391  eBPFTest  : INFO    : Return code: 1
+14:18:03.391  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/etm-clone-e2e.o), code: -2
+14:18:03.392  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:18:03.401  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:18:03.402  eBPFTest  : INFO    : Return code: 234
+14:18:03.402  eBPFTest  : INFO    : STDOUT: 
+14:18:03.402  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:03.427  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:03.428  eBPFTest  : INFO    : Return code: 1
+14:18:03.429  eBPFTest  : INFO    : STDOUT: 
+14:18:03.429  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:03.436  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:03.437  eBPFTest  : INFO    : Return code: 1
+14:18:03.437  eBPFTest  : INFO    : STDOUT: 
+14:18:03.437  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:03.448  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:18:03.449  eBPFTest  : INFO    : Return code: 234
+14:18:03.449  eBPFTest  : INFO    : STDOUT: 
+14:18:03.449  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:03.483  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:03.485  eBPFTest  : INFO    : Return code: 1
+14:18:03.485  eBPFTest  : INFO    : STDOUT: 
+14:18:03.485  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:03.499  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:03.501  eBPFTest  : INFO    : Return code: 1
+14:18:03.501  eBPFTest  : INFO    : STDOUT: 
+14:18:03.501  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:03.510  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:18:03.511  eBPFTest  : INFO    : Return code: 234
+14:18:03.511  eBPFTest  : INFO    : STDOUT: 
+14:18:03.511  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:03.568  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:03.568  eBPFTest  : INFO    : Return code: 1
+14:18:03.569  eBPFTest  : INFO    : STDOUT: 
+14:18:03.569  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:03.577  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:03.577  eBPFTest  : INFO    : Return code: 1
+14:18:03.577  eBPFTest  : INFO    : STDOUT: 
+14:18:03.577  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:03.591  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:18:03.591  eBPFTest  : INFO    : Return code: 234
+14:18:03.591  eBPFTest  : INFO    : STDOUT: 
+14:18:03.591  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:03.625  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:03.625  eBPFTest  : INFO    : Return code: 1
+14:18:03.625  eBPFTest  : INFO    : STDOUT: 
+14:18:03.625  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:03.635  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:03.636  eBPFTest  : INFO    : Return code: 1
+14:18:03.638  eBPFTest  : INFO    : STDOUT: 
+14:18:03.638  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:03.648  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'prectl', 'clone-session', 'create', 'id', '8']
+14:18:03.648  eBPFTest  : INFO    : Return code: 255
+14:18:03.649  eBPFTest  : INFO    : STDOUT: failed to pin new clone session to a file [File exists]
+Completed in 0.000172s
+
+14:18:03.650  eBPFTest  : INFO    : STDERR: 
+14:18:03.682  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'prectl', 'clone-session', 'add-member', 'id', '8', 'egress-port', '6', 'instance', '1', 'cos', '0']
+14:18:03.683  eBPFTest  : INFO    : Return code: 255
+14:18:03.683  eBPFTest  : INFO    : STDOUT: 
+14:18:03.683  eBPFTest  : INFO    : STDERR: could not find map clone_session_tbl. Clone session doesn't exists? [No such file or directory].
+
+14:18:03.685  dataplane : DEBUG   : Sending 100 bytes to device 0, port 1
+14:18:03.686  root      : DEBUG   : Checking for pkt on device 0, port 2
+14:18:03.686  dataplane : DEBUG   : Grabbing packet
+14:18:03.686  dataplane : DEBUG   : Out of packets on device 0, port 2
+14:18:03.686  dataplane : DEBUG   : Did not find packet
+14:18:03.754  dataplane : DEBUG   : Grabbing packet
+14:18:03.754  dataplane : DEBUG   : Out of packets on device 0, port 2
+14:18:03.754  dataplane : DEBUG   : Did not find packet
+14:18:04.758  dataplane : DEBUG   : Grabbing packet
+14:18:04.759  dataplane : DEBUG   : Out of packets on device 0, port 2
+14:18:04.759  dataplane : DEBUG   : Did not find packet
+14:18:05.687  dataplane : DEBUG   : Poll timeout, no packet from device 0, port 2
+14:18:05.695  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'prectl', 'clone-session', 'delete', 'id', '8']
+14:18:05.695  eBPFTest  : INFO    : Return code: 255
+14:18:05.696  eBPFTest  : INFO    : STDOUT: Completed in 0.000077s
+
+14:18:05.696  eBPFTest  : INFO    : STDERR: could not find map clone_session_tbl [No such file or directory].
+
+14:18:05.703  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/clone_session_tbl']
+14:18:05.704  eBPFTest  : INFO    : Return code: 1
+14:18:05.704  eBPFTest  : INFO    : STDOUT: 
+14:18:05.704  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/clone_session_tbl': No such file or directory
+
+14:18:05.712  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/multicast_grp_tbl']
+14:18:05.713  eBPFTest  : INFO    : Return code: 1
+14:18:05.713  eBPFTest  : INFO    : STDOUT: 
+14:18:05.714  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/multicast_grp_tbl': No such file or directory
+
+14:18:05.858  root      : INFO    : ** END TEST CASE test.EgressTrafficManagerClonePSATest
+14:18:07.293  root      : INFO    : ** START TEST CASE test.ConstEntryPSATest
+14:18:07.293  eBPFTest  : INFO    : Using namespace: switch
+14:18:07.293  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:18:07.300  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/const-entry.o']
+14:18:07.301  eBPFTest  : INFO    : Return code: 1
+14:18:07.301  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/const-entry.o), code: -2
+14:18:07.301  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:18:07.310  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:18:07.311  eBPFTest  : INFO    : Return code: 234
+14:18:07.311  eBPFTest  : INFO    : STDOUT: 
+14:18:07.311  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:07.325  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:07.326  eBPFTest  : INFO    : Return code: 1
+14:18:07.326  eBPFTest  : INFO    : STDOUT: 
+14:18:07.326  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:07.335  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:07.335  eBPFTest  : INFO    : Return code: 1
+14:18:07.335  eBPFTest  : INFO    : STDOUT: 
+14:18:07.336  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:07.346  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:18:07.347  eBPFTest  : INFO    : Return code: 234
+14:18:07.347  eBPFTest  : INFO    : STDOUT: 
+14:18:07.347  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:07.363  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:07.363  eBPFTest  : INFO    : Return code: 1
+14:18:07.363  eBPFTest  : INFO    : STDOUT: 
+14:18:07.363  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:07.370  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:07.371  eBPFTest  : INFO    : Return code: 1
+14:18:07.371  eBPFTest  : INFO    : STDOUT: 
+14:18:07.371  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:07.380  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:18:07.380  eBPFTest  : INFO    : Return code: 234
+14:18:07.380  eBPFTest  : INFO    : STDOUT: 
+14:18:07.381  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:07.415  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:07.416  eBPFTest  : INFO    : Return code: 1
+14:18:07.416  eBPFTest  : INFO    : STDOUT: 
+14:18:07.416  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:07.424  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:07.424  eBPFTest  : INFO    : Return code: 1
+14:18:07.425  eBPFTest  : INFO    : STDOUT: 
+14:18:07.425  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:07.435  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:18:07.435  eBPFTest  : INFO    : Return code: 234
+14:18:07.435  eBPFTest  : INFO    : STDOUT: 
+14:18:07.435  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:07.462  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:07.463  eBPFTest  : INFO    : Return code: 1
+14:18:07.463  eBPFTest  : INFO    : STDOUT: 
+14:18:07.463  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:07.489  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:07.489  eBPFTest  : INFO    : Return code: 1
+14:18:07.489  eBPFTest  : INFO    : STDOUT: 
+14:18:07.489  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:07.491  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:18:07.493  root      : DEBUG   : Checking for pkt on device 0, port 1
+14:18:07.493  dataplane : DEBUG   : Grabbing packet
+14:18:07.493  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:07.493  dataplane : DEBUG   : Did not find packet
+14:18:07.762  dataplane : DEBUG   : Grabbing packet
+14:18:07.763  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:07.763  dataplane : DEBUG   : Did not find packet
+14:18:08.745  dataplane : DEBUG   : Grabbing packet
+14:18:08.745  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:08.745  dataplane : DEBUG   : Did not find packet
+14:18:09.494  dataplane : DEBUG   : Poll timeout, no packet from device 0, port 1
+14:18:09.505  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_const_entry']
+14:18:09.506  eBPFTest  : INFO    : Return code: 1
+14:18:09.506  eBPFTest  : INFO    : STDOUT: 
+14:18:09.506  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_const_entry': No such file or directory
+
+14:18:09.516  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_const_entry_defaultAction']
+14:18:09.517  eBPFTest  : INFO    : Return code: 1
+14:18:09.517  eBPFTest  : INFO    : STDOUT: 
+14:18:09.517  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_const_entry_defaultAction': No such file or directory
+
+14:18:09.614  root      : INFO    : ** END TEST CASE test.ConstEntryPSATest
+14:18:10.830  root      : INFO    : ** START TEST CASE test.InternetChecksumPSATest
+14:18:10.830  eBPFTest  : INFO    : Using namespace: switch
+14:18:10.830  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:18:10.838  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/internet-checksum.o']
+14:18:10.838  eBPFTest  : INFO    : Return code: 1
+14:18:10.838  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/internet-checksum.o), code: -2
+14:18:10.838  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:18:10.848  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:18:10.849  eBPFTest  : INFO    : Return code: 234
+14:18:10.849  eBPFTest  : INFO    : STDOUT: 
+14:18:10.849  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:10.865  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:10.866  eBPFTest  : INFO    : Return code: 1
+14:18:10.866  eBPFTest  : INFO    : STDOUT: 
+14:18:10.866  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:10.875  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:10.876  eBPFTest  : INFO    : Return code: 1
+14:18:10.876  eBPFTest  : INFO    : STDOUT: 
+14:18:10.877  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:10.890  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:18:10.890  eBPFTest  : INFO    : Return code: 234
+14:18:10.890  eBPFTest  : INFO    : STDOUT: 
+14:18:10.891  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:10.906  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:10.907  eBPFTest  : INFO    : Return code: 1
+14:18:10.907  eBPFTest  : INFO    : STDOUT: 
+14:18:10.907  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:10.916  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:10.916  eBPFTest  : INFO    : Return code: 1
+14:18:10.917  eBPFTest  : INFO    : STDOUT: 
+14:18:10.917  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:10.930  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:18:10.930  eBPFTest  : INFO    : Return code: 234
+14:18:10.931  eBPFTest  : INFO    : STDOUT: 
+14:18:10.931  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:10.960  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:10.961  eBPFTest  : INFO    : Return code: 1
+14:18:10.961  eBPFTest  : INFO    : STDOUT: 
+14:18:10.961  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:10.970  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:10.971  eBPFTest  : INFO    : Return code: 1
+14:18:10.971  eBPFTest  : INFO    : STDOUT: 
+14:18:10.971  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:10.982  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:18:10.983  eBPFTest  : INFO    : Return code: 234
+14:18:10.983  eBPFTest  : INFO    : STDOUT: 
+14:18:10.983  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:11.012  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:11.013  eBPFTest  : INFO    : Return code: 1
+14:18:11.013  eBPFTest  : INFO    : STDOUT: 
+14:18:11.013  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:11.031  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:11.032  eBPFTest  : INFO    : Return code: 1
+14:18:11.033  eBPFTest  : INFO    : STDOUT: 
+14:18:11.033  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:11.043  dataplane : DEBUG   : Sending 417 bytes to device 0, port 0
+14:18:11.045  root      : DEBUG   : Checking for pkt on device 0, port [0, 1, 2]
+14:18:11.045  dataplane : WARNING : Dataplane poll with exp_pkt but no port number
+14:18:11.046  dataplane : DEBUG   : Grabbing packet
+14:18:11.046  dataplane : DEBUG   : Out of packets on all ports
+14:18:11.046  dataplane : DEBUG   : Did not find packet
+14:18:11.778  dataplane : DEBUG   : Grabbing packet
+14:18:11.779  dataplane : DEBUG   : Out of packets on all ports
+14:18:11.779  dataplane : DEBUG   : Did not find packet
+14:18:12.755  dataplane : DEBUG   : Grabbing packet
+14:18:12.755  dataplane : DEBUG   : Out of packets on all ports
+14:18:12.755  dataplane : DEBUG   : Did not find packet
+14:18:13.050  dataplane : DEBUG   : Poll timeout, no packet from device 0, port None
+14:18:13.050  root      : DEBUG   : Checking for unexpected packets on all ports of device 0
+14:18:13.050  dataplane : DEBUG   : Grabbing packet
+14:18:13.050  dataplane : DEBUG   : Out of packets on all ports
+14:18:13.050  dataplane : DEBUG   : Did not find packet
+14:18:13.151  dataplane : DEBUG   : Poll timeout, no packet from device 0, port None
+14:18:13.162  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/clone_session_tbl']
+14:18:13.162  eBPFTest  : INFO    : Return code: 1
+14:18:13.163  eBPFTest  : INFO    : STDOUT: 
+14:18:13.163  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/clone_session_tbl': No such file or directory
+
+14:18:13.170  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/multicast_grp_tbl']
+14:18:13.171  eBPFTest  : INFO    : Return code: 1
+14:18:13.171  eBPFTest  : INFO    : STDOUT: 
+14:18:13.171  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/multicast_grp_tbl': No such file or directory
+
+14:18:13.264  root      : INFO    : ** END TEST CASE test.InternetChecksumPSATest
+14:18:14.262  root      : INFO    : ** START TEST CASE test.MulticastPSATest
+14:18:14.262  eBPFTest  : INFO    : Using namespace: switch
+14:18:14.262  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:18:14.268  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/psa-multicast-basic-bmv2.o']
+14:18:14.269  eBPFTest  : INFO    : Return code: 1
+14:18:14.269  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/psa-multicast-basic-bmv2.o), code: -2
+14:18:14.269  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:18:14.277  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:18:14.278  eBPFTest  : INFO    : Return code: 234
+14:18:14.278  eBPFTest  : INFO    : STDOUT: 
+14:18:14.278  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:14.294  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:14.295  eBPFTest  : INFO    : Return code: 1
+14:18:14.295  eBPFTest  : INFO    : STDOUT: 
+14:18:14.295  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:14.305  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:14.305  eBPFTest  : INFO    : Return code: 1
+14:18:14.305  eBPFTest  : INFO    : STDOUT: 
+14:18:14.305  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:14.316  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:18:14.316  eBPFTest  : INFO    : Return code: 234
+14:18:14.316  eBPFTest  : INFO    : STDOUT: 
+14:18:14.317  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:14.330  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:14.331  eBPFTest  : INFO    : Return code: 1
+14:18:14.331  eBPFTest  : INFO    : STDOUT: 
+14:18:14.331  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:14.338  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:14.338  eBPFTest  : INFO    : Return code: 1
+14:18:14.338  eBPFTest  : INFO    : STDOUT: 
+14:18:14.339  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:14.346  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:18:14.347  eBPFTest  : INFO    : Return code: 234
+14:18:14.347  eBPFTest  : INFO    : STDOUT: 
+14:18:14.347  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:14.375  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:14.376  eBPFTest  : INFO    : Return code: 1
+14:18:14.377  eBPFTest  : INFO    : STDOUT: 
+14:18:14.377  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:14.392  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:14.393  eBPFTest  : INFO    : Return code: 1
+14:18:14.393  eBPFTest  : INFO    : STDOUT: 
+14:18:14.394  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:14.406  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:18:14.407  eBPFTest  : INFO    : Return code: 234
+14:18:14.416  eBPFTest  : INFO    : STDOUT: 
+14:18:14.416  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:14.446  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:14.446  eBPFTest  : INFO    : Return code: 1
+14:18:14.447  eBPFTest  : INFO    : STDOUT: 
+14:18:14.447  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:14.460  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:14.461  eBPFTest  : INFO    : Return code: 1
+14:18:14.461  eBPFTest  : INFO    : STDOUT: 
+14:18:14.461  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:14.506  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/multicast_grp_tbl', 'key', '8', '0', '0', '0', 'value', 'pinned', '/sys/fs/bpf/mcast_grp_8', 'any']
+14:18:14.506  eBPFTest  : INFO    : Return code: 255
+14:18:14.506  eBPFTest  : INFO    : STDOUT: 
+14:18:14.506  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/multicast_grp_tbl): No such file or directory
+
+14:18:14.507  dataplane : DEBUG   : Sending 60 bytes to device 0, port 0
+14:18:14.507  root      : DEBUG   : Checking for unexpected packets on all ports of device 0
+14:18:14.508  dataplane : DEBUG   : Grabbing packet
+14:18:14.508  dataplane : DEBUG   : Out of packets on all ports
+14:18:14.508  dataplane : DEBUG   : Did not find packet
+14:18:14.608  dataplane : DEBUG   : Poll timeout, no packet from device 0, port None
+14:18:14.609  dataplane : DEBUG   : Sending 60 bytes to device 0, port 0
+14:18:14.610  root      : DEBUG   : Checking for pkt on device 0, port 1
+14:18:14.610  dataplane : DEBUG   : Grabbing packet
+14:18:14.610  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:14.610  dataplane : DEBUG   : Did not find packet
+14:18:14.776  dataplane : DEBUG   : Grabbing packet
+14:18:14.777  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:14.777  dataplane : DEBUG   : Did not find packet
+14:18:15.762  dataplane : DEBUG   : Grabbing packet
+14:18:15.762  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:15.762  dataplane : DEBUG   : Did not find packet
+14:18:16.611  dataplane : DEBUG   : Poll timeout, no packet from device 0, port 1
+14:18:16.627  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/clone_session_tbl']
+14:18:16.628  eBPFTest  : INFO    : Return code: 1
+14:18:16.628  eBPFTest  : INFO    : STDOUT: 
+14:18:16.628  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/clone_session_tbl': No such file or directory
+
+14:18:16.637  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/multicast_grp_tbl']
+14:18:16.638  eBPFTest  : INFO    : Return code: 1
+14:18:16.638  eBPFTest  : INFO    : STDOUT: 
+14:18:16.638  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/multicast_grp_tbl': No such file or directory
+
+14:18:16.741  root      : INFO    : ** END TEST CASE test.MulticastPSATest
+14:18:18.073  root      : INFO    : ** START TEST CASE test.ConstDefaultActionPSATest
+14:18:18.073  eBPFTest  : INFO    : Using namespace: switch
+14:18:18.073  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:18:18.080  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/action-const-default.o']
+14:18:18.080  eBPFTest  : INFO    : Return code: 1
+14:18:18.081  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/action-const-default.o), code: -2
+14:18:18.081  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:18:18.090  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:18:18.091  eBPFTest  : INFO    : Return code: 234
+14:18:18.091  eBPFTest  : INFO    : STDOUT: 
+14:18:18.092  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:18.110  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:18.111  eBPFTest  : INFO    : Return code: 1
+14:18:18.111  eBPFTest  : INFO    : STDOUT: 
+14:18:18.111  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:18.120  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:18.120  eBPFTest  : INFO    : Return code: 1
+14:18:18.121  eBPFTest  : INFO    : STDOUT: 
+14:18:18.121  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:18.131  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:18:18.131  eBPFTest  : INFO    : Return code: 234
+14:18:18.131  eBPFTest  : INFO    : STDOUT: 
+14:18:18.132  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:18.165  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:18.166  eBPFTest  : INFO    : Return code: 1
+14:18:18.167  eBPFTest  : INFO    : STDOUT: 
+14:18:18.167  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:18.186  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:18.187  eBPFTest  : INFO    : Return code: 1
+14:18:18.187  eBPFTest  : INFO    : STDOUT: 
+14:18:18.188  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:18.199  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:18:18.201  eBPFTest  : INFO    : Return code: 234
+14:18:18.201  eBPFTest  : INFO    : STDOUT: 
+14:18:18.201  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:18.237  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:18.238  eBPFTest  : INFO    : Return code: 1
+14:18:18.238  eBPFTest  : INFO    : STDOUT: 
+14:18:18.238  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:18.254  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:18.255  eBPFTest  : INFO    : Return code: 1
+14:18:18.255  eBPFTest  : INFO    : STDOUT: 
+14:18:18.255  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:18.271  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:18:18.272  eBPFTest  : INFO    : Return code: 234
+14:18:18.272  eBPFTest  : INFO    : STDOUT: 
+14:18:18.272  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:18.293  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:18.294  eBPFTest  : INFO    : Return code: 1
+14:18:18.294  eBPFTest  : INFO    : STDOUT: 
+14:18:18.294  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:18.317  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:18.318  eBPFTest  : INFO    : Return code: 1
+14:18:18.318  eBPFTest  : INFO    : STDOUT: 
+14:18:18.318  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:18.321  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:18:18.322  root      : DEBUG   : Checking for pkt on device 0, port 1
+14:18:18.322  dataplane : DEBUG   : Grabbing packet
+14:18:18.322  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:18.322  dataplane : DEBUG   : Did not find packet
+14:18:18.795  dataplane : DEBUG   : Grabbing packet
+14:18:18.795  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:18.795  dataplane : DEBUG   : Did not find packet
+14:18:19.772  dataplane : DEBUG   : Grabbing packet
+14:18:19.773  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:19.773  dataplane : DEBUG   : Did not find packet
+14:18:20.323  dataplane : DEBUG   : Poll timeout, no packet from device 0, port 1
+14:18:20.329  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_const_action']
+14:18:20.329  eBPFTest  : INFO    : Return code: 1
+14:18:20.329  eBPFTest  : INFO    : STDOUT: 
+14:18:20.329  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_const_action': No such file or directory
+
+14:18:20.335  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_const_action_defaultAction']
+14:18:20.336  eBPFTest  : INFO    : Return code: 1
+14:18:20.336  eBPFTest  : INFO    : STDOUT: 
+14:18:20.336  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_const_action_defaultAction': No such file or directory
+
+14:18:20.420  root      : INFO    : ** END TEST CASE test.ConstDefaultActionPSATest
+14:18:21.379  root      : INFO    : ** START TEST CASE test.PSAResubmitTest
+14:18:21.379  eBPFTest  : INFO    : Using namespace: switch
+14:18:21.379  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:18:21.387  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/resubmit.o']
+14:18:21.387  eBPFTest  : INFO    : Return code: 1
+14:18:21.388  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/resubmit.o), code: -2
+14:18:21.388  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:18:21.400  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:18:21.400  eBPFTest  : INFO    : Return code: 234
+14:18:21.400  eBPFTest  : INFO    : STDOUT: 
+14:18:21.401  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:21.415  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:21.416  eBPFTest  : INFO    : Return code: 1
+14:18:21.416  eBPFTest  : INFO    : STDOUT: 
+14:18:21.416  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:21.422  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:21.422  eBPFTest  : INFO    : Return code: 1
+14:18:21.423  eBPFTest  : INFO    : STDOUT: 
+14:18:21.423  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:21.437  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:18:21.438  eBPFTest  : INFO    : Return code: 234
+14:18:21.438  eBPFTest  : INFO    : STDOUT: 
+14:18:21.438  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:21.471  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:21.472  eBPFTest  : INFO    : Return code: 1
+14:18:21.472  eBPFTest  : INFO    : STDOUT: 
+14:18:21.472  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:21.479  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:21.479  eBPFTest  : INFO    : Return code: 1
+14:18:21.479  eBPFTest  : INFO    : STDOUT: 
+14:18:21.479  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:21.487  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:18:21.488  eBPFTest  : INFO    : Return code: 234
+14:18:21.488  eBPFTest  : INFO    : STDOUT: 
+14:18:21.488  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:21.502  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:21.503  eBPFTest  : INFO    : Return code: 1
+14:18:21.503  eBPFTest  : INFO    : STDOUT: 
+14:18:21.503  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:21.510  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:21.510  eBPFTest  : INFO    : Return code: 1
+14:18:21.510  eBPFTest  : INFO    : STDOUT: 
+14:18:21.510  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:21.517  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:18:21.517  eBPFTest  : INFO    : Return code: 234
+14:18:21.518  eBPFTest  : INFO    : STDOUT: 
+14:18:21.518  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:21.547  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:21.547  eBPFTest  : INFO    : Return code: 1
+14:18:21.547  eBPFTest  : INFO    : STDOUT: 
+14:18:21.548  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:21.565  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:21.566  eBPFTest  : INFO    : Return code: 1
+14:18:21.566  eBPFTest  : INFO    : STDOUT: 
+14:18:21.566  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:21.568  dataplane : DEBUG   : Sending 60 bytes to device 0, port 0
+14:18:21.568  root      : DEBUG   : Checking for pkt on device 0, port 1
+14:18:21.568  dataplane : DEBUG   : Grabbing packet
+14:18:21.568  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:21.568  dataplane : DEBUG   : Did not find packet
+14:18:21.792  dataplane : DEBUG   : Grabbing packet
+14:18:21.792  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:21.793  dataplane : DEBUG   : Did not find packet
+14:18:22.807  dataplane : DEBUG   : Grabbing packet
+14:18:22.807  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:22.808  dataplane : DEBUG   : Did not find packet
+14:18:23.569  dataplane : DEBUG   : Poll timeout, no packet from device 0, port 1
+14:18:23.577  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/clone_session_tbl']
+14:18:23.577  eBPFTest  : INFO    : Return code: 1
+14:18:23.578  eBPFTest  : INFO    : STDOUT: 
+14:18:23.578  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/clone_session_tbl': No such file or directory
+
+14:18:23.583  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/multicast_grp_tbl']
+14:18:23.584  eBPFTest  : INFO    : Return code: 1
+14:18:23.584  eBPFTest  : INFO    : STDOUT: 
+14:18:23.584  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/multicast_grp_tbl': No such file or directory
+
+14:18:23.659  root      : INFO    : ** END TEST CASE test.PSAResubmitTest
+14:18:24.321  root      : INFO    : ** START TEST CASE test.CountersPSATest
+14:18:24.321  eBPFTest  : INFO    : Using namespace: switch
+14:18:24.322  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:18:24.327  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/counters.o']
+14:18:24.327  eBPFTest  : INFO    : Return code: 1
+14:18:24.328  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/counters.o), code: -2
+14:18:24.328  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:18:24.335  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:18:24.336  eBPFTest  : INFO    : Return code: 234
+14:18:24.336  eBPFTest  : INFO    : STDOUT: 
+14:18:24.336  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:24.372  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:24.372  eBPFTest  : INFO    : Return code: 1
+14:18:24.372  eBPFTest  : INFO    : STDOUT: 
+14:18:24.372  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:24.398  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:24.399  eBPFTest  : INFO    : Return code: 1
+14:18:24.399  eBPFTest  : INFO    : STDOUT: 
+14:18:24.399  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:24.419  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:18:24.420  eBPFTest  : INFO    : Return code: 234
+14:18:24.420  eBPFTest  : INFO    : STDOUT: 
+14:18:24.420  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:24.434  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:24.434  eBPFTest  : INFO    : Return code: 1
+14:18:24.435  eBPFTest  : INFO    : STDOUT: 
+14:18:24.435  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:24.440  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:24.440  eBPFTest  : INFO    : Return code: 1
+14:18:24.440  eBPFTest  : INFO    : STDOUT: 
+14:18:24.440  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:24.461  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:18:24.462  eBPFTest  : INFO    : Return code: 234
+14:18:24.462  eBPFTest  : INFO    : STDOUT: 
+14:18:24.462  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:24.502  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:24.503  eBPFTest  : INFO    : Return code: 1
+14:18:24.503  eBPFTest  : INFO    : STDOUT: 
+14:18:24.503  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:24.527  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:24.528  eBPFTest  : INFO    : Return code: 1
+14:18:24.528  eBPFTest  : INFO    : STDOUT: 
+14:18:24.528  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:24.551  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:18:24.552  eBPFTest  : INFO    : Return code: 234
+14:18:24.553  eBPFTest  : INFO    : STDOUT: 
+14:18:24.553  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:24.568  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:24.568  eBPFTest  : INFO    : Return code: 1
+14:18:24.568  eBPFTest  : INFO    : STDOUT: 
+14:18:24.568  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:24.573  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:24.574  eBPFTest  : INFO    : Return code: 1
+14:18:24.574  eBPFTest  : INFO    : STDOUT: 
+14:18:24.574  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:24.576  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:18:24.577  root      : DEBUG   : Checking for pkt on device 0, port [0, 1, 2]
+14:18:24.577  dataplane : WARNING : Dataplane poll with exp_pkt but no port number
+14:18:24.577  dataplane : DEBUG   : Grabbing packet
+14:18:24.577  dataplane : DEBUG   : Out of packets on all ports
+14:18:24.577  dataplane : DEBUG   : Did not find packet
+14:18:24.804  dataplane : DEBUG   : Grabbing packet
+14:18:24.804  dataplane : DEBUG   : Out of packets on all ports
+14:18:24.804  dataplane : DEBUG   : Did not find packet
+14:18:25.806  dataplane : DEBUG   : Grabbing packet
+14:18:25.806  dataplane : DEBUG   : Out of packets on all ports
+14:18:25.806  dataplane : DEBUG   : Did not find packet
+14:18:26.577  dataplane : DEBUG   : Poll timeout, no packet from device 0, port None
+14:18:26.578  root      : DEBUG   : Checking for unexpected packets on all ports of device 0
+14:18:26.578  dataplane : DEBUG   : Grabbing packet
+14:18:26.578  dataplane : DEBUG   : Out of packets on all ports
+14:18:26.578  dataplane : DEBUG   : Did not find packet
+14:18:26.678  dataplane : DEBUG   : Poll timeout, no packet from device 0, port None
+14:18:26.688  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_test1_cnt']
+14:18:26.688  eBPFTest  : INFO    : Return code: 1
+14:18:26.688  eBPFTest  : INFO    : STDOUT: 
+14:18:26.688  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_test1_cnt': No such file or directory
+
+14:18:26.705  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_test2_cnt']
+14:18:26.705  eBPFTest  : INFO    : Return code: 1
+14:18:26.705  eBPFTest  : INFO    : STDOUT: 
+14:18:26.705  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_test2_cnt': No such file or directory
+
+14:18:26.715  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_test3_cnt']
+14:18:26.715  eBPFTest  : INFO    : Return code: 1
+14:18:26.716  eBPFTest  : INFO    : STDOUT: 
+14:18:26.716  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_test3_cnt': No such file or directory
+
+14:18:26.723  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/clone_session_tbl']
+14:18:26.724  eBPFTest  : INFO    : Return code: 1
+14:18:26.724  eBPFTest  : INFO    : STDOUT: 
+14:18:26.724  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/clone_session_tbl': No such file or directory
+
+14:18:26.750  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/multicast_grp_tbl']
+14:18:26.751  eBPFTest  : INFO    : Return code: 1
+14:18:26.751  eBPFTest  : INFO    : STDOUT: 
+14:18:26.751  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/multicast_grp_tbl': No such file or directory
+
+14:18:26.871  root      : INFO    : ** END TEST CASE test.CountersPSATest
+14:18:27.587  root      : INFO    : ** START TEST CASE test.EgressTrafficManagerDropPSATest
+14:18:27.587  eBPFTest  : INFO    : Using namespace: switch
+14:18:27.587  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:18:27.593  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/etm-drop.o']
+14:18:27.593  eBPFTest  : INFO    : Return code: 1
+14:18:27.593  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/etm-drop.o), code: -2
+14:18:27.593  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:18:27.601  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:18:27.602  eBPFTest  : INFO    : Return code: 234
+14:18:27.602  eBPFTest  : INFO    : STDOUT: 
+14:18:27.602  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:27.615  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:27.615  eBPFTest  : INFO    : Return code: 1
+14:18:27.615  eBPFTest  : INFO    : STDOUT: 
+14:18:27.615  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:27.621  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:27.621  eBPFTest  : INFO    : Return code: 1
+14:18:27.622  eBPFTest  : INFO    : STDOUT: 
+14:18:27.622  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:27.630  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:18:27.630  eBPFTest  : INFO    : Return code: 234
+14:18:27.631  eBPFTest  : INFO    : STDOUT: 
+14:18:27.631  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:27.650  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:27.652  eBPFTest  : INFO    : Return code: 1
+14:18:27.652  eBPFTest  : INFO    : STDOUT: 
+14:18:27.652  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:27.659  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:27.660  eBPFTest  : INFO    : Return code: 1
+14:18:27.660  eBPFTest  : INFO    : STDOUT: 
+14:18:27.660  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:27.669  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:18:27.669  eBPFTest  : INFO    : Return code: 234
+14:18:27.670  eBPFTest  : INFO    : STDOUT: 
+14:18:27.670  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:27.699  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:27.699  eBPFTest  : INFO    : Return code: 1
+14:18:27.700  eBPFTest  : INFO    : STDOUT: 
+14:18:27.700  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:27.709  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:27.710  eBPFTest  : INFO    : Return code: 1
+14:18:27.710  eBPFTest  : INFO    : STDOUT: 
+14:18:27.710  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:27.720  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:18:27.721  eBPFTest  : INFO    : Return code: 234
+14:18:27.721  eBPFTest  : INFO    : STDOUT: 
+14:18:27.721  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:27.736  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:27.737  eBPFTest  : INFO    : Return code: 1
+14:18:27.737  eBPFTest  : INFO    : STDOUT: 
+14:18:27.737  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:27.760  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:27.760  eBPFTest  : INFO    : Return code: 1
+14:18:27.760  eBPFTest  : INFO    : STDOUT: 
+14:18:27.761  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:27.763  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:18:27.763  root      : DEBUG   : Checking for pkt on device 0, port [0, 1, 2]
+14:18:27.763  dataplane : WARNING : Dataplane poll with exp_pkt but no port number
+14:18:27.764  dataplane : DEBUG   : Grabbing packet
+14:18:27.764  dataplane : DEBUG   : Out of packets on all ports
+14:18:27.764  dataplane : DEBUG   : Did not find packet
+14:18:27.782  dataplane : DEBUG   : Grabbing packet
+14:18:27.783  dataplane : DEBUG   : Out of packets on all ports
+14:18:27.783  dataplane : DEBUG   : Did not find packet
+14:18:28.775  dataplane : DEBUG   : Grabbing packet
+14:18:28.775  dataplane : DEBUG   : Out of packets on all ports
+14:18:28.775  dataplane : DEBUG   : Did not find packet
+14:18:29.764  dataplane : DEBUG   : Poll timeout, no packet from device 0, port None
+14:18:29.765  root      : DEBUG   : Checking for unexpected packets on all ports of device 0
+14:18:29.765  dataplane : DEBUG   : Grabbing packet
+14:18:29.765  dataplane : DEBUG   : Out of packets on all ports
+14:18:29.765  dataplane : DEBUG   : Did not find packet
+14:18:29.782  dataplane : DEBUG   : Grabbing packet
+14:18:29.782  dataplane : DEBUG   : Out of packets on all ports
+14:18:29.782  dataplane : DEBUG   : Did not find packet
+14:18:29.865  dataplane : DEBUG   : Poll timeout, no packet from device 0, port None
+14:18:29.873  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/clone_session_tbl']
+14:18:29.874  eBPFTest  : INFO    : Return code: 1
+14:18:29.875  eBPFTest  : INFO    : STDOUT: 
+14:18:29.875  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/clone_session_tbl': No such file or directory
+
+14:18:29.882  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/multicast_grp_tbl']
+14:18:29.883  eBPFTest  : INFO    : Return code: 1
+14:18:29.883  eBPFTest  : INFO    : STDOUT: 
+14:18:29.883  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/multicast_grp_tbl': No such file or directory
+
+14:18:29.951  root      : INFO    : ** END TEST CASE test.EgressTrafficManagerDropPSATest
+14:18:30.960  root      : INFO    : ** START TEST CASE test.SimpleLpmP4PSATest
+14:18:30.960  eBPFTest  : INFO    : Using namespace: switch
+14:18:30.960  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:18:30.976  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/psa-lpm.o']
+14:18:30.977  eBPFTest  : INFO    : Return code: 1
+14:18:30.977  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/psa-lpm.o), code: -2
+14:18:30.977  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:18:30.984  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:18:30.985  eBPFTest  : INFO    : Return code: 234
+14:18:30.986  eBPFTest  : INFO    : STDOUT: 
+14:18:30.986  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:31.006  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:31.007  eBPFTest  : INFO    : Return code: 1
+14:18:31.007  eBPFTest  : INFO    : STDOUT: 
+14:18:31.007  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:31.017  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:31.017  eBPFTest  : INFO    : Return code: 1
+14:18:31.017  eBPFTest  : INFO    : STDOUT: 
+14:18:31.017  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:31.024  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:18:31.024  eBPFTest  : INFO    : Return code: 234
+14:18:31.024  eBPFTest  : INFO    : STDOUT: 
+14:18:31.024  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:31.036  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:31.036  eBPFTest  : INFO    : Return code: 1
+14:18:31.036  eBPFTest  : INFO    : STDOUT: 
+14:18:31.036  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:31.042  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:31.042  eBPFTest  : INFO    : Return code: 1
+14:18:31.042  eBPFTest  : INFO    : STDOUT: 
+14:18:31.042  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:31.049  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:18:31.050  eBPFTest  : INFO    : Return code: 234
+14:18:31.050  eBPFTest  : INFO    : STDOUT: 
+14:18:31.050  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:31.078  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:31.079  eBPFTest  : INFO    : Return code: 1
+14:18:31.079  eBPFTest  : INFO    : STDOUT: 
+14:18:31.079  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:31.089  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:31.089  eBPFTest  : INFO    : Return code: 1
+14:18:31.089  eBPFTest  : INFO    : STDOUT: 
+14:18:31.089  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:31.097  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:18:31.098  eBPFTest  : INFO    : Return code: 234
+14:18:31.098  eBPFTest  : INFO    : STDOUT: 
+14:18:31.098  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:31.109  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:31.110  eBPFTest  : INFO    : Return code: 1
+14:18:31.110  eBPFTest  : INFO    : STDOUT: 
+14:18:31.110  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:31.134  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:31.134  eBPFTest  : INFO    : Return code: 1
+14:18:31.135  eBPFTest  : INFO    : STDOUT: 
+14:18:31.135  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:31.155  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_fwd_lpm', 'key', 'hex', '10', '00', '00', '00', '0a', '0a', '00', '00', 'value', 'hex', '01', '00', '00', '00', '06', '00', '00', '00']
+14:18:31.156  eBPFTest  : INFO    : Return code: 255
+14:18:31.156  eBPFTest  : INFO    : STDOUT: 
+14:18:31.156  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_fwd_lpm): No such file or directory
+
+14:18:31.164  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_fwd_lpm', 'key', 'hex', '08', '00', '00', '00', '0a', '0a', '0a', '0a', 'value', 'hex', '01', '00', '00', '00', '00', '00', '00', '00']
+14:18:31.166  eBPFTest  : INFO    : Return code: 255
+14:18:31.166  eBPFTest  : INFO    : STDOUT: 
+14:18:31.166  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_fwd_lpm): No such file or directory
+
+14:18:31.167  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:18:31.168  root      : DEBUG   : Checking for pkt on device 0, port 2
+14:18:31.168  dataplane : DEBUG   : Grabbing packet
+14:18:31.168  dataplane : DEBUG   : Out of packets on device 0, port 2
+14:18:31.168  dataplane : DEBUG   : Did not find packet
+14:18:31.802  dataplane : DEBUG   : Grabbing packet
+14:18:31.802  dataplane : DEBUG   : Out of packets on device 0, port 2
+14:18:31.802  dataplane : DEBUG   : Did not find packet
+14:18:32.800  dataplane : DEBUG   : Grabbing packet
+14:18:32.800  dataplane : DEBUG   : Out of packets on device 0, port 2
+14:18:32.800  dataplane : DEBUG   : Did not find packet
+14:18:33.169  dataplane : DEBUG   : Poll timeout, no packet from device 0, port 2
+14:18:33.176  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_fwd_lpm']
+14:18:33.176  eBPFTest  : INFO    : Return code: 1
+14:18:33.177  eBPFTest  : INFO    : STDOUT: 
+14:18:33.177  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_fwd_lpm': No such file or directory
+
+14:18:33.183  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_fwd_lpm_defaultAction']
+14:18:33.184  eBPFTest  : INFO    : Return code: 1
+14:18:33.184  eBPFTest  : INFO    : STDOUT: 
+14:18:33.184  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_fwd_lpm_defaultAction': No such file or directory
+
+14:18:33.189  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/clone_session_tbl']
+14:18:33.189  eBPFTest  : INFO    : Return code: 1
+14:18:33.189  eBPFTest  : INFO    : STDOUT: 
+14:18:33.189  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/clone_session_tbl': No such file or directory
+
+14:18:33.198  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/multicast_grp_tbl']
+14:18:33.198  eBPFTest  : INFO    : Return code: 1
+14:18:33.199  eBPFTest  : INFO    : STDOUT: 
+14:18:33.199  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/multicast_grp_tbl': No such file or directory
+
+14:18:33.308  root      : INFO    : ** END TEST CASE test.SimpleLpmP4PSATest
+14:18:34.276  root      : INFO    : ** START TEST CASE test.SimpleLpmP4TwoKeysPSATest
+14:18:34.277  eBPFTest  : INFO    : Using namespace: switch
+14:18:34.277  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:18:34.282  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/psa-lpm-two-keys.o']
+14:18:34.283  eBPFTest  : INFO    : Return code: 1
+14:18:34.284  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/psa-lpm-two-keys.o), code: -2
+14:18:34.284  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:18:34.296  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:18:34.297  eBPFTest  : INFO    : Return code: 234
+14:18:34.297  eBPFTest  : INFO    : STDOUT: 
+14:18:34.297  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:34.315  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:34.315  eBPFTest  : INFO    : Return code: 1
+14:18:34.315  eBPFTest  : INFO    : STDOUT: 
+14:18:34.315  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:34.321  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:34.321  eBPFTest  : INFO    : Return code: 1
+14:18:34.321  eBPFTest  : INFO    : STDOUT: 
+14:18:34.322  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:34.344  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:18:34.344  eBPFTest  : INFO    : Return code: 234
+14:18:34.344  eBPFTest  : INFO    : STDOUT: 
+14:18:34.344  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:34.391  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:34.392  eBPFTest  : INFO    : Return code: 1
+14:18:34.392  eBPFTest  : INFO    : STDOUT: 
+14:18:34.392  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:34.417  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:34.417  eBPFTest  : INFO    : Return code: 1
+14:18:34.417  eBPFTest  : INFO    : STDOUT: 
+14:18:34.417  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:34.435  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:18:34.436  eBPFTest  : INFO    : Return code: 234
+14:18:34.436  eBPFTest  : INFO    : STDOUT: 
+14:18:34.436  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:34.463  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:34.464  eBPFTest  : INFO    : Return code: 1
+14:18:34.464  eBPFTest  : INFO    : STDOUT: 
+14:18:34.465  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:34.474  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:34.474  eBPFTest  : INFO    : Return code: 1
+14:18:34.475  eBPFTest  : INFO    : STDOUT: 
+14:18:34.475  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:34.483  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:18:34.484  eBPFTest  : INFO    : Return code: 234
+14:18:34.484  eBPFTest  : INFO    : STDOUT: 
+14:18:34.484  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:34.500  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:34.500  eBPFTest  : INFO    : Return code: 1
+14:18:34.500  eBPFTest  : INFO    : STDOUT: 
+14:18:34.501  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:34.507  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:34.508  eBPFTest  : INFO    : Return code: 1
+14:18:34.508  eBPFTest  : INFO    : STDOUT: 
+14:18:34.508  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:34.524  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_fwd_exact_lpm', 'key', 'hex', '38', '00', '00', '00', '01', '02', '03', '04', '0a', '0a', '0b', '00', 'value', 'hex', '01', '00', '00', '00', '06', '00', '00', '00']
+14:18:34.525  eBPFTest  : INFO    : Return code: 255
+14:18:34.525  eBPFTest  : INFO    : STDOUT: 
+14:18:34.526  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_fwd_exact_lpm): No such file or directory
+
+14:18:34.527  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:18:34.527  root      : DEBUG   : Checking for pkt on device 0, port 2
+14:18:34.528  dataplane : DEBUG   : Grabbing packet
+14:18:34.528  dataplane : DEBUG   : Out of packets on device 0, port 2
+14:18:34.528  dataplane : DEBUG   : Did not find packet
+14:18:34.796  dataplane : DEBUG   : Grabbing packet
+14:18:34.797  dataplane : DEBUG   : Out of packets on device 0, port 2
+14:18:34.797  dataplane : DEBUG   : Did not find packet
+14:18:35.822  dataplane : DEBUG   : Grabbing packet
+14:18:35.822  dataplane : DEBUG   : Out of packets on device 0, port 2
+14:18:35.822  dataplane : DEBUG   : Did not find packet
+14:18:36.528  dataplane : DEBUG   : Poll timeout, no packet from device 0, port 2
+14:18:36.535  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_fwd_exact_lpm']
+14:18:36.535  eBPFTest  : INFO    : Return code: 1
+14:18:36.535  eBPFTest  : INFO    : STDOUT: 
+14:18:36.535  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_fwd_exact_lpm': No such file or directory
+
+14:18:36.542  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_fwd_exact_lpm_defaultAction']
+14:18:36.543  eBPFTest  : INFO    : Return code: 1
+14:18:36.543  eBPFTest  : INFO    : STDOUT: 
+14:18:36.543  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_fwd_exact_lpm_defaultAction': No such file or directory
+
+14:18:36.551  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/clone_session_tbl']
+14:18:36.552  eBPFTest  : INFO    : Return code: 1
+14:18:36.552  eBPFTest  : INFO    : STDOUT: 
+14:18:36.552  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/clone_session_tbl': No such file or directory
+
+14:18:36.560  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/multicast_grp_tbl']
+14:18:36.561  eBPFTest  : INFO    : Return code: 1
+14:18:36.561  eBPFTest  : INFO    : STDOUT: 
+14:18:36.561  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/multicast_grp_tbl': No such file or directory
+
+14:18:36.637  root      : INFO    : ** END TEST CASE test.SimpleLpmP4TwoKeysPSATest
+14:18:37.701  root      : INFO    : ** START TEST CASE test.SimpleForwardingPSATest
+14:18:37.701  eBPFTest  : INFO    : Using namespace: switch
+14:18:37.701  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:18:37.707  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/simple-fwd.o']
+14:18:37.708  eBPFTest  : INFO    : Return code: 1
+14:18:37.708  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/simple-fwd.o), code: -2
+14:18:37.708  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:18:37.716  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:18:37.716  eBPFTest  : INFO    : Return code: 234
+14:18:37.716  eBPFTest  : INFO    : STDOUT: 
+14:18:37.717  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:37.729  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:37.730  eBPFTest  : INFO    : Return code: 1
+14:18:37.730  eBPFTest  : INFO    : STDOUT: 
+14:18:37.730  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:37.741  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:37.741  eBPFTest  : INFO    : Return code: 1
+14:18:37.741  eBPFTest  : INFO    : STDOUT: 
+14:18:37.741  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:37.753  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:18:37.754  eBPFTest  : INFO    : Return code: 234
+14:18:37.754  eBPFTest  : INFO    : STDOUT: 
+14:18:37.754  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:37.777  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:37.777  eBPFTest  : INFO    : Return code: 1
+14:18:37.777  eBPFTest  : INFO    : STDOUT: 
+14:18:37.778  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:37.790  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:37.792  eBPFTest  : INFO    : Return code: 1
+14:18:37.792  eBPFTest  : INFO    : STDOUT: 
+14:18:37.792  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:37.804  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:18:37.804  eBPFTest  : INFO    : Return code: 234
+14:18:37.805  eBPFTest  : INFO    : STDOUT: 
+14:18:37.805  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:37.832  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:37.832  eBPFTest  : INFO    : Return code: 1
+14:18:37.832  eBPFTest  : INFO    : STDOUT: 
+14:18:37.832  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:37.859  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:37.860  eBPFTest  : INFO    : Return code: 1
+14:18:37.861  eBPFTest  : INFO    : STDOUT: 
+14:18:37.861  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:37.892  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:18:37.893  eBPFTest  : INFO    : Return code: 234
+14:18:37.893  eBPFTest  : INFO    : STDOUT: 
+14:18:37.893  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:37.918  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:37.918  eBPFTest  : INFO    : Return code: 1
+14:18:37.918  eBPFTest  : INFO    : STDOUT: 
+14:18:37.918  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:37.928  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:37.929  eBPFTest  : INFO    : Return code: 1
+14:18:37.929  eBPFTest  : INFO    : STDOUT: 
+14:18:37.929  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:37.938  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl_fwd_defaultAction', 'key', '00', '00', '00', '00', 'value', '01', '00', '00', '00', '05', '00', '00', '00']
+14:18:37.939  eBPFTest  : INFO    : Return code: 255
+14:18:37.939  eBPFTest  : INFO    : STDOUT: 
+14:18:37.939  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl_fwd_defaultAction): No such file or directory
+
+14:18:37.940  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:18:37.941  root      : DEBUG   : Checking for pkt on device 0, port 1
+14:18:37.941  dataplane : DEBUG   : Grabbing packet
+14:18:37.941  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:37.941  dataplane : DEBUG   : Did not find packet
+14:18:38.828  dataplane : DEBUG   : Grabbing packet
+14:18:38.828  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:38.828  dataplane : DEBUG   : Did not find packet
+14:18:39.822  dataplane : DEBUG   : Grabbing packet
+14:18:39.822  dataplane : DEBUG   : Out of packets on device 0, port 1
+14:18:39.823  dataplane : DEBUG   : Did not find packet
+14:18:39.942  dataplane : DEBUG   : Poll timeout, no packet from device 0, port 1
+14:18:39.949  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_fwd']
+14:18:39.950  eBPFTest  : INFO    : Return code: 1
+14:18:39.950  eBPFTest  : INFO    : STDOUT: 
+14:18:39.950  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_fwd': No such file or directory
+
+14:18:39.957  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl_fwd_defaultAction']
+14:18:39.958  eBPFTest  : INFO    : Return code: 1
+14:18:39.958  eBPFTest  : INFO    : STDOUT: 
+14:18:39.958  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl_fwd_defaultAction': No such file or directory
+
+14:18:39.967  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/clone_session_tbl']
+14:18:39.968  eBPFTest  : INFO    : Return code: 1
+14:18:39.968  eBPFTest  : INFO    : STDOUT: 
+14:18:39.968  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/clone_session_tbl': No such file or directory
+
+14:18:39.982  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/multicast_grp_tbl']
+14:18:39.982  eBPFTest  : INFO    : Return code: 1
+14:18:39.983  eBPFTest  : INFO    : STDOUT: 
+14:18:39.983  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/multicast_grp_tbl': No such file or directory
+
+14:18:40.097  root      : INFO    : ** END TEST CASE test.SimpleForwardingPSATest
+14:18:40.816  eBPFTest  : INFO    : Command failed: ['clang', '-O2', '-target', 'bpf', '-Werror', '-DBTF', '-DPSA_PORT_RECIRCULATE=2', '-g', '-c', 'ptf_out/etm-recirc.c', '-o', 'ptf_out/etm-recirc.o', '-I../runtime', '-I../runtime/contrib/libbpf/include/uapi/', '-I../runtime/contrib/libbpf/src/']
+14:18:40.816  eBPFTest  : INFO    : Return code: 1
+14:18:40.816  eBPFTest  : INFO    : STDOUT: 
+14:18:40.816  eBPFTest  : INFO    : STDERR: ptf_out/etm-recirc.c:462:59: error: '&' within '|' [-Werror,-Wbitwise-op-parentheses]
+parsed_hdr.ethernet.srcAddr = parsed_hdr.ethernet.srcAddr & ~281470681743360 | (u64)68 << 32 & 281470681743360;
+                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~ ~
+ptf_out/etm-recirc.c:462:59: note: place parentheses around the '&' expression to silence this warning
+parsed_hdr.ethernet.srcAddr = parsed_hdr.ethernet.srcAddr & ~281470681743360 | (u64)68 << 32 & 281470681743360;
+                                                          ^
+                              (                                             )
+ptf_out/etm-recirc.c:462:94: error: '&' within '|' [-Werror,-Wbitwise-op-parentheses]
+parsed_hdr.ethernet.srcAddr = parsed_hdr.ethernet.srcAddr & ~281470681743360 | (u64)68 << 32 & 281470681743360;
+                                                                             ~ ~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~
+ptf_out/etm-recirc.c:462:94: note: place parentheses around the '&' expression to silence this warning
+parsed_hdr.ethernet.srcAddr = parsed_hdr.ethernet.srcAddr & ~281470681743360 | (u64)68 << 32 & 281470681743360;
+                                                                                             ^
+                                                                               (                              )
+2 errors generated.
+
+14:18:41.788  root      : INFO    : ** START TEST CASE test.DirectCountersPSATest
+14:18:41.788  eBPFTest  : INFO    : Using namespace: switch
+14:18:41.788  eBPFTest  : INFO    : Using interfaces: ['psa_recirc', 'eth0', 'eth1', 'eth2']
+14:18:41.793  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'load-prog', 'ptf_out/direct-counters.o']
+14:18:41.794  eBPFTest  : INFO    : Return code: 1
+14:18:41.794  eBPFTest  : INFO    : STDOUT: Could not load a program (ptf_out/direct-counters.o), code: -2
+14:18:41.794  eBPFTest  : INFO    : STDERR: libbpf: DATASEC '.maps' not found.
+
+14:18:41.804  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'psa_recirc', 'overwrite']
+14:18:41.804  eBPFTest  : INFO    : Return code: 234
+14:18:41.804  eBPFTest  : INFO    : STDOUT: 
+14:18:41.805  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:41.831  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:41.831  eBPFTest  : INFO    : Return code: 1
+14:18:41.832  eBPFTest  : INFO    : STDOUT: 
+14:18:41.832  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:41.839  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'psa_recirc', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:41.840  eBPFTest  : INFO    : Return code: 1
+14:18:41.840  eBPFTest  : INFO    : STDOUT: 
+14:18:41.840  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:41.864  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth0', 'overwrite']
+14:18:41.864  eBPFTest  : INFO    : Return code: 234
+14:18:41.865  eBPFTest  : INFO    : STDOUT: 
+14:18:41.865  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:41.896  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:41.898  eBPFTest  : INFO    : Return code: 1
+14:18:41.898  eBPFTest  : INFO    : STDOUT: 
+14:18:41.899  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:41.907  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth0', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:41.907  eBPFTest  : INFO    : Return code: 1
+14:18:41.908  eBPFTest  : INFO    : STDOUT: 
+14:18:41.908  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:41.921  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth1', 'overwrite']
+14:18:41.921  eBPFTest  : INFO    : Return code: 234
+14:18:41.921  eBPFTest  : INFO    : STDOUT: 
+14:18:41.921  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:41.945  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:41.946  eBPFTest  : INFO    : Return code: 1
+14:18:41.946  eBPFTest  : INFO    : STDOUT: 
+14:18:41.946  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:41.956  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth1', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:41.956  eBPFTest  : INFO    : Return code: 1
+14:18:41.957  eBPFTest  : INFO    : STDOUT: 
+14:18:41.957  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:41.970  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'net', 'attach', 'xdp', 'pinned', '/sys/fs/bpf/prog/xdp_xdp-ingress', 'dev', 'eth2', 'overwrite']
+14:18:41.970  eBPFTest  : INFO    : Return code: 234
+14:18:41.970  eBPFTest  : INFO    : STDOUT: 
+14:18:41.970  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/prog/xdp_xdp-ingress): No such file or directory
+
+14:18:41.998  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'ingress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-ingress']
+14:18:41.998  eBPFTest  : INFO    : Return code: 1
+14:18:41.999  eBPFTest  : INFO    : STDOUT: 
+14:18:41.999  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-ingress': No such file or directory
+Unable to parse bpf command line
+
+14:18:42.008  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'tc', 'filter', 'add', 'dev', 'eth2', 'egress', 'bpf', 'da', 'fd', '/sys/fs/bpf/prog/classifier_tc-egress']
+14:18:42.008  eBPFTest  : INFO    : Return code: 1
+14:18:42.009  eBPFTest  : INFO    : STDOUT: 
+14:18:42.009  eBPFTest  : INFO    : STDERR: Couldn't retrieve pinned program '/sys/fs/bpf/prog/classifier_tc-egress': No such file or directory
+Unable to parse bpf command line
+
+14:18:42.023  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl1', 'key', '0', '0', '0', '10', 'value', '1', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
+14:18:42.023  eBPFTest  : INFO    : Return code: 255
+14:18:42.024  eBPFTest  : INFO    : STDOUT: 
+14:18:42.024  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl1): No such file or directory
+
+14:18:42.032  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl2', 'key', '1', '0', '0', '10', 'value', '2', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
+14:18:42.032  eBPFTest  : INFO    : Return code: 255
+14:18:42.032  eBPFTest  : INFO    : STDOUT: 
+14:18:42.033  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl2): No such file or directory
+
+14:18:42.041  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'bpftool', 'map', 'update', 'pinned', '/sys/fs/bpf/ingress_tbl2', 'key', '2', '0', '0', '10', 'value', '3', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
+14:18:42.042  eBPFTest  : INFO    : Return code: 255
+14:18:42.042  eBPFTest  : INFO    : STDOUT: 
+14:18:42.042  eBPFTest  : INFO    : STDERR: Error: bpf obj get (/sys/fs/bpf/ingress_tbl2): No such file or directory
+
+14:18:42.044  dataplane : DEBUG   : Sending 100 bytes to device 0, port 0
+14:18:42.045  root      : DEBUG   : Checking for pkt on device 0, port [0, 1, 2]
+14:18:42.045  dataplane : WARNING : Dataplane poll with exp_pkt but no port number
+14:18:42.045  dataplane : DEBUG   : Grabbing packet
+14:18:42.045  dataplane : DEBUG   : Out of packets on all ports
+14:18:42.046  dataplane : DEBUG   : Did not find packet
+14:18:42.830  dataplane : DEBUG   : Grabbing packet
+14:18:42.830  dataplane : DEBUG   : Out of packets on all ports
+14:18:42.830  dataplane : DEBUG   : Did not find packet
+14:18:43.812  dataplane : DEBUG   : Grabbing packet
+14:18:43.813  dataplane : DEBUG   : Out of packets on all ports
+14:18:43.813  dataplane : DEBUG   : Did not find packet
+14:18:44.046  dataplane : DEBUG   : Poll timeout, no packet from device 0, port None
+14:18:44.046  root      : DEBUG   : Checking for unexpected packets on all ports of device 0
+14:18:44.046  dataplane : DEBUG   : Grabbing packet
+14:18:44.046  dataplane : DEBUG   : Out of packets on all ports
+14:18:44.046  dataplane : DEBUG   : Did not find packet
+14:18:44.147  dataplane : DEBUG   : Poll timeout, no packet from device 0, port None
+14:18:44.154  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl1']
+14:18:44.154  eBPFTest  : INFO    : Return code: 1
+14:18:44.155  eBPFTest  : INFO    : STDOUT: 
+14:18:44.155  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl1': No such file or directory
+
+14:18:44.161  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl1_defaultAction']
+14:18:44.161  eBPFTest  : INFO    : Return code: 1
+14:18:44.161  eBPFTest  : INFO    : STDOUT: 
+14:18:44.161  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl1_defaultAction': No such file or directory
+
+14:18:44.169  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl2']
+14:18:44.169  eBPFTest  : INFO    : Return code: 1
+14:18:44.169  eBPFTest  : INFO    : STDOUT: 
+14:18:44.169  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl2': No such file or directory
+
+14:18:44.174  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/ingress_tbl2_defaultAction']
+14:18:44.175  eBPFTest  : INFO    : Return code: 1
+14:18:44.175  eBPFTest  : INFO    : STDOUT: 
+14:18:44.175  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/ingress_tbl2_defaultAction': No such file or directory
+
+14:18:44.183  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/clone_session_tbl']
+14:18:44.183  eBPFTest  : INFO    : Return code: 1
+14:18:44.183  eBPFTest  : INFO    : STDOUT: 
+14:18:44.184  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/clone_session_tbl': No such file or directory
+
+14:18:44.191  eBPFTest  : INFO    : Command failed: ['nsenter', '--net=/var/run/netns/switch', 'rm', '/sys/fs/bpf/multicast_grp_tbl']
+14:18:44.191  eBPFTest  : INFO    : Return code: 1
+14:18:44.191  eBPFTest  : INFO    : STDOUT: 
+14:18:44.191  eBPFTest  : INFO    : STDERR: rm: cannot remove '/sys/fs/bpf/multicast_grp_tbl': No such file or directory
+
+14:18:44.288  root      : INFO    : ** END TEST CASE test.DirectCountersPSATest
+14:18:44.290  root      : INFO    : *** TEST RUN END  : Sun Apr  4 14:18:44 2021
+14:18:44.290  dataplane : INFO    : Thread exit

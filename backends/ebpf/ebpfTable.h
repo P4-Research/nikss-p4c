@@ -23,7 +23,7 @@ limitations under the License.
 
 namespace EBPF {
 
-class ActionTranslationVisitor : public virtual CodeGenInspector {
+class ActionTranslationVisitor : public CodeGenInspector {
  protected:
     const EBPFProgram*  program;
     const IR::P4Action* action;
@@ -63,15 +63,14 @@ class EBPFTableBase : public EBPFObject {
 };
 
 class EBPFTable : public EBPFTableBase {
+    const cstring prefixFieldName = "prefixlen";
     const int prefixLenFieldWidth = 32;
 
  protected:
-    const cstring prefixFieldName = "prefixlen";
-
     bool isLPMTable();
     bool isTernaryTable();
     virtual ActionTranslationVisitor*
-        createActionTranslationVisitor(cstring valueName, const EBPFProgram* program) const {
+        createActionTranslationVisitor(cstring valueName, const EBPFProgram* program) {
         return new ActionTranslationVisitor(valueName, program);
     }
 
@@ -102,10 +101,9 @@ class EBPFTable : public EBPFTableBase {
                matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name;
     }
     virtual void emitDirectTypes(CodeBuilder* builder) { (void) builder; }
-    cstring actionToActionIDName(const IR::P4Action * action) const;
-    cstring getByteSwapMethod(unsigned int width) const;
 
  private:
+    cstring getByteSwapMethod(unsigned int width) const;
     void declareTmpLpmKey(CodeBuilder *builder, const IR::KeyElement *c, std::string &tmpVar);
     void emitLpmKeyField(CodeBuilder *builder,
                          const cstring &swap,
