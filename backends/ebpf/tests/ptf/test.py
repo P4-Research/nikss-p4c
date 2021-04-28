@@ -652,7 +652,7 @@ class RegisterBigKeyPSATest(P4EbpfTest):
         pkt = testutils.simple_ip_packet()
 
         testutils.send_packet(self, PORT0, pkt)
-        self.verify_map_entry(name="ingress_reg", key="hex 05 00 00 00", expected_value="10 00 00 00")
+        self.verify_map_entry(name="ingress_reg", key="hex 05 00 00 00 00 00 00 00", expected_value="10 00 00 00")
 
     def tearDown(self):
         self.remove_maps(["ingress_reg"])

@@ -9,8 +9,8 @@ EBPFRegisterPSA::EBPFRegisterPSA(const EBPFProgram *program,
                                                                             codeGen) {
     auto ts = di->type->to<IR::Type_Specialized>();
 
-    auto keyArg = ts->arguments->at(0);
-    auto valueArg = ts->arguments->at(1);
+    auto keyArg = ts->arguments->at(1);
+    auto valueArg = ts->arguments->at(0);
     this->keyType = EBPFTypeFactory::instance->create(keyArg);
     this->valueType = EBPFTypeFactory::instance->create(valueArg);
 
