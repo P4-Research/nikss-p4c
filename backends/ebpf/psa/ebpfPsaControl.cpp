@@ -45,7 +45,7 @@ bool ControlBodyTranslatorPSA::preorder(const IR::AssignmentStatement* a) {
         }
     }
 
-    return CodeGenInspector::preorder(s);
+    return CodeGenInspector::preorder(a);
 }
 
 void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
