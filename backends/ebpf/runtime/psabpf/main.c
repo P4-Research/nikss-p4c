@@ -4,6 +4,14 @@
 #include "CLI/common.h"
 #include "CLI/clone_session.h"
 
+/*
+ * Formats:
+ * psabpf-ctl clone-session create id 5
+ * psabpf-ctl clone-session delete id 5
+ * psabpf-ctl clone-session add-member id 5 egress-port 1 instance 1
+ * psabpf-ctl clone-session del-member id 5 egress-port 1 instance 1
+ */
+
 static int last_argc;
 static char **last_argv;
 static int (*last_do_help)(int argc, char **argv);
