@@ -128,10 +128,12 @@ bool EBPFTablePSA::hasImplementation() const {
 }
 
 void EBPFTablePSA::emitValueActionIDNames(CodeBuilder* builder) {
-    // For action_run method we always preserve these ID names for actions
+    // For action_run method we preserve these ID names for actions.
     // Values are the same as for implementation, because the same action
     // set is enforced.
-    EBPFTable::emitValueActionIDNames(builder);
+    if (singleActionRun()) {
+        EBPFTable::emitValueActionIDNames(builder);
+    }
 }
 
 void EBPFTablePSA::emitValueStructStructure(CodeBuilder* builder) {
