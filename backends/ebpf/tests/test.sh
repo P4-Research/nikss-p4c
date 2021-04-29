@@ -24,7 +24,7 @@ function cleanup() {
       ip netns pids switch | (xargs kill 2>/dev/null)
       ip netns del switch
       # remove all pinned eBPF objects
-      #rm -rf /sys/fs/bpf/*
+      rm -rf /sys/fs/bpf/*
       echo "Cleaning finished"
 }
 
