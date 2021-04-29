@@ -117,11 +117,9 @@ void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMet
     this->valueType->declare(builder, valueName, true);
     builder->endOfStatement(true);
 
-    msgStr = Util::printf_format("Register: reading %s, id=%%u, packets=1, bytes=%%u",
+    msgStr = Util::printf_format("Register: reading %s",
                                  instanceName.c_str());
-    varStr = Util::printf_format("%s->len", pipeline->contextVar.c_str());
-    builder->target->emitTraceMessage(builder, msgStr.c_str(), 2,
-                                      indexParamStr.c_str(), varStr.c_str());
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     builder->emitIndent();
     builder->target->emitTableLookup(builder, dataMapName, indexParamStr, valueName);
@@ -134,10 +132,7 @@ void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMet
     codeGen->visit(leftExpression);
     builder->appendFormat(" = *%s", valueName);
     builder->endOfStatement(true);
-    builder->target->emitTraceMessage(builder,
-                                      "Register: Entry found! (index: 0x%%llx, value: 0x%%llx)",
-                                      2, indexParamStr.c_str(),
-                                      Util::printf_format("*%s", valueName.c_str()));
+    builder->target->emitTraceMessage(builder, "Register: Entry found!");
     builder->blockEnd(false);
     builder->appendFormat(" else ");
     builder->blockStart();
@@ -148,7 +143,10 @@ void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMet
     if (this->initialValue != nullptr) {
         builder->append(this->initialValue->value.str());
     } else {
-        valueType->emitInitializer(builder);
+        builder->append("(");
+        this->valueType->declare(builder, cstring::empty, false);
+        builder->append(")");
+        this->valueType->emitInitializer(builder);
     }
     builder->endOfStatement(true);
 
@@ -169,14 +167,25 @@ void EBPFRegisterPSA::emitRegisterWrite(CodeBuilder* builder, const P4::ExternMe
         return;
     }
 
-    msgStr = Util::printf_format("Register: writing %s, id=%%u, packets=1, bytes=%%u",
+    msgStr = Util::printf_format("Register: writing %s",
                                  instanceName.c_str());
-    varStr = Util::printf_format("%s->len", pipeline->contextVar.c_str());
-    builder->target->emitTraceMessage(builder, msgStr.c_str(), 2,
-                                      indexParamStr.c_str(), varStr.c_str());
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     builder->emitIndent();
+    auto ret = program->refMap->newName("ret");
+    builder->appendFormat("int %s = ", ret.c_str());
     builder->target->emitTableUpdate(builder, instanceName, indexParamStr, valueParamStr);
+    builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat("if (%s) ", ret.c_str());
+    builder->blockStart();
+    msgStr = Util::printf_format(
+            "Register: Error while map (%s) update, code: %s", instanceName, "%d");
+    builder->target->emitTraceMessage(builder, msgStr,
+                                      1, ret.c_str());
+
+    builder->blockEnd(true);
 }
 
 }  // namespace EBPF
