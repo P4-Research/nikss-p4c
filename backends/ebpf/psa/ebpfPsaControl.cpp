@@ -119,13 +119,6 @@ void EBPFControlPSA::emit(CodeBuilder *builder) {
     builder->newline();
 }
 
-void EBPFControlPSA::emitTableTypes(CodeBuilder *builder) {
-    EBPFControl::emitTableTypes(builder);
-
-    for (auto it : registers)
-        it.second->emitTypes(builder);
-}
-
 void EBPFControlPSA::emitTableInstances(CodeBuilder* builder) {
     for (auto it : tables)
         it.second->emitInstance(builder);

@@ -33,27 +33,6 @@ EBPFRegisterPSA::EBPFRegisterPSA(const EBPFProgram *program,
     }
 }
 
-void EBPFRegisterPSA::emitTypes(CodeBuilder* builder) {
-    emitKeyType(builder);
-    emitValueType(builder);
-}
-
-void EBPFRegisterPSA::emitKeyType(CodeBuilder* builder) {
-    builder->emitIndent();
-    builder->append("typedef ");
-    this->keyType->emit(builder);
-    builder->appendFormat(" %s", keyTypeName.c_str());
-    builder->endOfStatement(true);
-}
-
-void EBPFRegisterPSA::emitValueType(CodeBuilder* builder) {
-    builder->emitIndent();
-    builder->append("typedef ");
-    this->valueType->emit(builder);
-    builder->appendFormat(" %s", valueTypeName.c_str());
-    builder->endOfStatement(true);
-}
-
 void EBPFRegisterPSA::emitInitializer(CodeBuilder* builder) {
     if (arrayMapBased && this->initialValue != nullptr) {
         auto ret = program->refMap->newName("ret");
@@ -106,7 +85,6 @@ void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMet
     BUG_CHECK(!indexParamStr.isNullOrEmpty(), "Index param must be provided");
     BUG_CHECK(leftExpression != nullptr, "Register read must be with left assigment");
 
-    cstring keyName = program->refMap->newName("key");
     cstring valueName = program->refMap->newName("value");
     cstring msgStr, varStr;
 
@@ -117,21 +95,17 @@ void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMet
     }
 
     builder->emitIndent();
-    builder->appendFormat("%s *%s = NULL", valueTypeName.c_str(), valueName.c_str());
-    builder->endOfStatement(true);
-
-    builder->emitIndent();
-    builder->appendFormat("%s %s = %s", keyTypeName.c_str(), keyName.c_str(),
-                          indexParamStr.c_str());
+    this->valueType->declare(builder, valueName, true);
     builder->endOfStatement(true);
 
     msgStr = Util::printf_format("Register: reading %s, id=%%u, packets=1, bytes=%%u",
                                  instanceName.c_str());
     varStr = Util::printf_format("%s->len", pipeline->contextVar.c_str());
-    builder->target->emitTraceMessage(builder, msgStr.c_str(), 2, keyName.c_str(), varStr.c_str());
+    builder->target->emitTraceMessage(builder, msgStr.c_str(), 2,
+                                      indexParamStr.c_str(), varStr.c_str());
 
     builder->emitIndent();
-    builder->target->emitTableLookup(builder, dataMapName, keyName, valueName);
+    builder->target->emitTableLookup(builder, dataMapName, indexParamStr, valueName);
     builder->endOfStatement(true);
 
     builder->emitIndent();
@@ -143,7 +117,7 @@ void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMet
     builder->endOfStatement(true);
     builder->target->emitTraceMessage(builder,
                                       "Register: Entry found! (index: 0x%%llx, value: 0x%%llx)",
-                                      2, keyName.c_str(),
+                                      2, indexParamStr.c_str(),
                                       Util::printf_format("*%s", valueName.c_str()));
     builder->blockEnd(false);
     builder->appendFormat(" else ");
@@ -168,7 +142,6 @@ void EBPFRegisterPSA::emitRegisterWrite(CodeBuilder* builder, const P4::ExternMe
     BUG_CHECK(!indexParamStr.isNullOrEmpty(), "Index param must be provided");
     BUG_CHECK(!valueParamStr.isNullOrEmpty(), "Value param must be provided");
 
-    cstring keyName = program->refMap->newName("key");
     cstring msgStr, varStr;
 
     auto pipeline = dynamic_cast<const EBPFPipeline *>(program);
@@ -177,19 +150,14 @@ void EBPFRegisterPSA::emitRegisterWrite(CodeBuilder* builder, const P4::ExternMe
         return;
     }
 
-    builder->emitIndent();
-    builder->appendFormat("%s %s = ", keyTypeName.c_str(), keyName.c_str());
-
-    builder->append(indexParamStr);
-    builder->endOfStatement(true);
-
     msgStr = Util::printf_format("Register: writing %s, id=%%u, packets=1, bytes=%%u",
                                  instanceName.c_str());
     varStr = Util::printf_format("%s->len", pipeline->contextVar.c_str());
-    builder->target->emitTraceMessage(builder, msgStr.c_str(), 2, keyName.c_str(), varStr.c_str());
+    builder->target->emitTraceMessage(builder, msgStr.c_str(), 2,
+                                      indexParamStr.c_str(), varStr.c_str());
 
     builder->emitIndent();
-    builder->target->emitTableUpdate(builder, instanceName, keyName, valueParamStr);
+    builder->target->emitTableUpdate(builder, instanceName, indexParamStr, valueParamStr);
 }
 
 }  // namespace EBPF

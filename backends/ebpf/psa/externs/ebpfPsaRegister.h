@@ -18,10 +18,6 @@ class EBPFRegisterPSA : public EBPFTableBase {
                     const IR::Declaration_Instance* di,
                     CodeGenInspector* codeGen);
 
-    void emitTypes(CodeBuilder* builder);
-    void emitKeyType(CodeBuilder* builder);
-    void emitValueType(CodeBuilder* builder);
-
     void emitInitializer(CodeBuilder* builder);
     void emitInstance(CodeBuilder* builder);
     void emitRegisterRead(CodeBuilder* builder, const P4::ExternMethod* method,
