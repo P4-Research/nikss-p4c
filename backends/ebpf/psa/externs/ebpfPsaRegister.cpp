@@ -9,8 +9,8 @@ EBPFRegisterPSA::EBPFRegisterPSA(const EBPFProgram *program,
                                                                             codeGen) {
     auto ts = di->type->to<IR::Type_Specialized>();
 
-    auto keyArg = ts->arguments->at(1);
-    auto valueArg = ts->arguments->at(0);
+    this->keyArg = ts->arguments->at(1);
+    this->valueArg = ts->arguments->at(0);
     this->keyType = EBPFTypeFactory::instance->create(keyArg);
     this->valueType = EBPFTypeFactory::instance->create(valueArg);
 
@@ -31,6 +31,25 @@ EBPFRegisterPSA::EBPFRegisterPSA(const EBPFProgram *program,
     if (di->arguments->size() == 2) {
         this->initialValue = di->arguments->at(1)->expression->to<IR::Constant>();
     }
+}
+
+void EBPFRegisterPSA::emitTypes(CodeBuilder* builder) {
+    emitKeyType(builder);
+    emitValueType(builder);
+}
+
+void EBPFRegisterPSA::emitKeyType(CodeBuilder* builder) {
+    builder->emitIndent();
+    builder->append("typedef ");
+    this->keyType->declare(builder, keyTypeName, false);
+    builder->endOfStatement(true);
+}
+
+void EBPFRegisterPSA::emitValueType(CodeBuilder* builder) {
+    builder->emitIndent();
+    builder->append("typedef ");
+    this->valueType->declare(builder, valueTypeName, false);
+    builder->endOfStatement(true);
 }
 
 void EBPFRegisterPSA::emitInitializer(CodeBuilder* builder) {
