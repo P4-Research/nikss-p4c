@@ -622,7 +622,7 @@ class RegisterDefaultPSATest(P4EbpfTest):
     Test register used with default value.
     1. Send a packet on PORT0
     2. P4 application will read a value (6),
-    add 15 and write it to the register
+    add 10 and write it to the register
     3. Verify a value stored in register (16)
     """
     p4_file_path = "samples/p4testdata/register-default.p4"
@@ -643,7 +643,7 @@ class RegisterBigKeyPSATest(P4EbpfTest):
     Test register used with default value and 64 bit key (using hash map).
     1. Send a packet on PORT0
     2. P4 application will read a value (6),
-    add 15 and write it to the register
+    add 10 and write it to the register
     3. Verify a value stored in register (16)
     """
     p4_file_path = "samples/p4testdata/register-big-key.p4"
@@ -657,3 +657,24 @@ class RegisterBigKeyPSATest(P4EbpfTest):
     def tearDown(self):
         self.remove_maps(["ingress_reg"])
         super(RegisterBigKeyPSATest, self).tearDown()
+
+
+class RegisterStructsPSATest(P4EbpfTest):
+    """
+    Test register with key and value as a struct.
+    1. Send a packet on PORT0
+    2. P4 application will read a value (0),
+    add 5 and write it to the register
+    3. Verify a value stored in register (5)
+    """
+    p4_file_path = "samples/p4testdata/register-structs.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+
+        testutils.send_packet(self, PORT0, pkt)
+        self.verify_map_entry(name="ingress_reg", key="hex 05 00 00 00 00 00 00 00", expected_value="05 00 00 00")
+
+    def tearDown(self):
+        self.remove_maps(["ingress_reg"])
+        super(RegisterStructsPSATest, self).tearDown()

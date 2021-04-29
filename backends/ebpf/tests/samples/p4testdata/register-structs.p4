@@ -98,7 +98,7 @@ control ingress(inout headers hdr,
                 in    psa_ingress_input_metadata_t  istd,
                 inout psa_ingress_output_metadata_t ostd)
 {
-    Register<reg_value_t, reg_key_t>(10) reg;//TODO inicjalizacja
+    Register<reg_value_t, reg_key_t>(10) reg;
 
     apply {
          reg_key_t reg_key;
