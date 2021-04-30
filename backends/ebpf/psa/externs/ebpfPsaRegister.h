@@ -29,7 +29,8 @@ class EBPFRegisterPSA : public EBPFTableBase {
     void emitInitializer(CodeBuilder* builder);
     void emitInstance(CodeBuilder* builder);
     void emitRegisterRead(CodeBuilder* builder, const P4::ExternMethod* method,
-                          ControlBodyTranslatorPSA* translator, const IR::Expression* leftExpression);
+                          ControlBodyTranslatorPSA* translator,
+                          const IR::Expression* leftExpression);
     void emitRegisterWrite(CodeBuilder* builder, const P4::ExternMethod* method,
                            ControlBodyTranslatorPSA* translator);
 };

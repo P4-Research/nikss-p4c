@@ -105,7 +105,8 @@ void EBPFRegisterPSA::emitInstance(CodeBuilder *builder) {
 }
 
 void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMethod* method,
-                                       ControlBodyTranslatorPSA* translator, const IR::Expression* leftExpression) {
+                                       ControlBodyTranslatorPSA* translator,
+                                       const IR::Expression* leftExpression) {
     auto indexArg = method->expr->arguments->at(0)->expression->to<IR::PathExpression>();
     cstring indexParamStr = translator->getIndexActionParam(indexArg);
     BUG_CHECK(!indexParamStr.isNullOrEmpty(), "Index param cannot be empty");
