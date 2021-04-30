@@ -70,6 +70,32 @@ class EBPFEgressPipeline : public EBPFPipeline {
     void emitPSAControlDataTypes(CodeBuilder *builder) override;
 };
 
+class XDPIngressPipeline : public EBPFPipeline {
+public:
+    XDPIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
+                        P4::TypeMap* typeMap) :
+                    EBPFPipeline(name, options, refMap, typeMap) { 
+            sectionName = "xdp_ingress/" + name;
+        }
+
+    void emit(CodeBuilder *builder) override;
+    void emitTrafficManager(CodeBuilder *builder) override;
+    void emitPSAControlDataTypes(CodeBuilder *builder) override;
+};
+
+class XDPEgressPipeline : public EBPFPipeline {
+public:
+    XDPEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap, 
+                        P4::TypeMap* typeMap): 
+                    EBPFPipeline(name, options, refMap, typeMap) {
+        sectionName = "xdp_devmap/" + name;
+    }
+
+    void emit(CodeBuilder *builder) override;
+    void emitTrafficManager(CodeBuilder *builder) override;
+    void emitPSAControlDataTypes(CodeBuilder *builder) override;
+};
+
 }  // namespace EBPF
 
 #endif /* BACKENDS_EBPF_PSA_EBPFPIPELINE_H_ */

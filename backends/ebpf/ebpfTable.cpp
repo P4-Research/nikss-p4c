@@ -458,7 +458,6 @@ void EBPFTable::emitAction(CodeBuilder* builder, cstring valueName) {
         builder->newline();
         builder->emitIndent();
         builder->appendLine("break;");
-        builder->decreaseIndent();
     }
 
     builder->emitIndent();

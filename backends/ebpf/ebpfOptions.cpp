@@ -23,4 +23,7 @@ EbpfOptions::EbpfOptions() {
         registerOption("--trace", nullptr,
                 [this](const char*) { emitTraceMessages = true; return true; },
                 "Enable tracing of packet flow");
+        registerOption("--xdp", nullptr,
+                [this](const char*) { generateToXDP = true; return true; },
+                "Compile and generate the P4 prog to XDP layer");
 }

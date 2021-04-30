@@ -1,8 +1,8 @@
-#include "xdpProgram.h"
+#include "xdpHelpProgram.h"
 
 namespace EBPF {
 
-void XDPProgram::emit(CodeBuilder *builder) {
+void XDPHelpProgram::emit(CodeBuilder *builder) {
     builder->target->emitCodeSection(builder, sectionName);
     builder->emitIndent();
     builder->appendFormat("int %s(struct xdp_md *%s)",
@@ -12,7 +12,15 @@ void XDPProgram::emit(CodeBuilder *builder) {
     builder->emitIndent();
 
     // this is static program, so we can just paste a piece of code.
-    builder->appendLine("void *data = (void *)(long)skb->data;\n"
+    builder->appendLine("int map_index = 0;\n\n"
+                        "    struct timestamp_t timestamp;\n"
+                        "    timestamp.start = bpf_ktime_get_ns();\n"
+                        "    timestamp.end = 0;\n"
+                        "    bpf_printk(\"\\n\\t\\t\\t [INGRESS PIPE]: Packet in at %d.\\n\", timestamp.start);\n"
+                        "\n"
+                        "    bpf_map_update_elem(&TIMESTAMP_MAP, &map_index, &timestamp, BPF_ANY);\n"
+                        "\n"
+                        "    void *data = (void *)(long)skb->data;\n"
                         "    void *data_end = (void *)(long)skb->data_end;\n"
                         "\n"
                         "    struct internal_metadata *meta;\n"
