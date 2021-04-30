@@ -16,7 +16,7 @@ ActionTranslationVisitorPSA::ActionTranslationVisitorPSA(cstring valueName,
 
 bool ActionTranslationVisitorPSA::preorder(const IR::PathExpression* pe) {
     if (isActionParameter(pe)) {
-        return ActionTranslationVisitor::preorder(pe);;
+        return ActionTranslationVisitor::preorder(pe);
     }
     return ControlBodyTranslator::preorder(pe);
 }

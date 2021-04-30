@@ -1,10 +1,11 @@
 #ifndef P4C_BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAREGISTER_H_
 #define P4C_BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAREGISTER_H_
 
-#include <ebpf/psa/ebpfPsaControlTranslators.h>
 #include "backends/ebpf/ebpfTable.h"
 
 namespace EBPF {
+
+class ControlBodyTranslatorPSA;
 
 class EBPFRegisterPSA : public EBPFTableBase {
  protected:
