@@ -1,6 +1,7 @@
 #ifndef P4C_BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAREGISTER_H_
 #define P4C_BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAREGISTER_H_
 
+#include <ebpf/psa/ebpfPsaControlTranslators.h>
 #include "backends/ebpf/ebpfTable.h"
 
 namespace EBPF {
@@ -27,9 +28,9 @@ class EBPFRegisterPSA : public EBPFTableBase {
     void emitInitializer(CodeBuilder* builder);
     void emitInstance(CodeBuilder* builder);
     void emitRegisterRead(CodeBuilder* builder, const P4::ExternMethod* method,
-                          cstring indexParamStr, const IR::Expression* leftExpression);
+                          ControlBodyTranslatorPSA* translator, const IR::Expression* leftExpression);
     void emitRegisterWrite(CodeBuilder* builder, const P4::ExternMethod* method,
-                          cstring indexParamStr, cstring valueParamStr);
+                           ControlBodyTranslatorPSA* translator);
 };
 
 }  // namespace EBPF

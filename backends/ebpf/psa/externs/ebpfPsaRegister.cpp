@@ -69,6 +69,7 @@ void EBPFRegisterPSA::emitInitializer(CodeBuilder* builder) {
 
         builder->emitIndent();
         builder->appendFormat("%s %s = ", valueTypeName.c_str(), valueName.c_str());
+        //TODO nie inicjalizuj jak zero
         builder->append(this->initialValue->value.str());
         builder->endOfStatement(true);
 
@@ -105,8 +106,10 @@ void EBPFRegisterPSA::emitInstance(CodeBuilder *builder) {
 }
 
 void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMethod* method,
-                      cstring indexParamStr, const IR::Expression* leftExpression) {
-    BUG_CHECK(!indexParamStr.isNullOrEmpty(), "Index param must be provided");
+                                       ControlBodyTranslatorPSA* translator, const IR::Expression* leftExpression) {
+    auto indexArg = method->expr->arguments->at(0)->expression->to<IR::PathExpression>();
+    cstring indexParamStr = translator->getIndexActionParam(indexArg);
+    BUG_CHECK(!indexParamStr.isNullOrEmpty(), "Index param cannot be empty");
     BUG_CHECK(leftExpression != nullptr, "Register read must be with left assigment");
 
     cstring valueName = program->refMap->newName("value");
@@ -160,9 +163,13 @@ void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMet
 }
 
 void EBPFRegisterPSA::emitRegisterWrite(CodeBuilder* builder, const P4::ExternMethod* method,
-                                        cstring indexParamStr, cstring valueParamStr) {
-    BUG_CHECK(!indexParamStr.isNullOrEmpty(), "Index param must be provided");
-    BUG_CHECK(!valueParamStr.isNullOrEmpty(), "Value param must be provided");
+                                        ControlBodyTranslatorPSA* translator) {
+    auto indexArgExpr = method->expr->arguments->at(0)->expression->to<IR::PathExpression>();
+    cstring indexParamStr = translator->getIndexActionParam(indexArgExpr);
+    auto valueArgExpr = method->expr->arguments->at(1)->expression->to<IR::PathExpression>();
+    cstring valueParamStr = translator->getValueActionParam(valueArgExpr);
+    BUG_CHECK(!indexParamStr.isNullOrEmpty(), "Index param cannot be empty");
+    BUG_CHECK(!valueParamStr.isNullOrEmpty(), "Value param cannot be empty");
 
     cstring msgStr, varStr;
 

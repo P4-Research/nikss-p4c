@@ -36,10 +36,7 @@ bool ControlBodyTranslatorPSA::preorder(const IR::AssignmentStatement* a) {
                     ext->method->type->name == "read") {
                 cstring name = EBPFObject::externalName(ext->object);
                 auto reg = control->to<EBPFControlPSA>()->getRegister(name);
-                auto indexArg = methodCallExpr->arguments->at(0)->
-                        expression->to<IR::PathExpression>();
-                cstring indexParamStr = getIndexActionParam(indexArg);
-                reg->emitRegisterRead(builder, ext, indexParamStr, a->left);
+                reg->emitRegisterRead(builder, ext, this, a->left);
                 return false;
             }
         }
@@ -64,14 +61,10 @@ void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
         return;
     } else if (declType->name.name == "Register") {
         if (method->method->type->name == "write") {
-            auto indexArg = method->expr->arguments->at(0)->expression->to<IR::PathExpression>();
-            cstring indexParamStr = getIndexActionParam(indexArg);
-            auto valueArg = method->expr->arguments->at(1)->expression->to<IR::PathExpression>();
-            cstring valueParamStr = getValueActionParam(valueArg);
             auto di = method->object->to<IR::Declaration_Instance>();
             name = EBPFObject::externalName(di);
             auto reg = control->to<EBPFControlPSA>()->getRegister(name);
-            reg->emitRegisterWrite(builder, method, indexParamStr, valueParamStr);
+            reg->emitRegisterWrite(builder, method, this);
             return;
         }
     }
