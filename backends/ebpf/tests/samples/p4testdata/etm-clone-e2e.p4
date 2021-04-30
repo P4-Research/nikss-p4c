@@ -1,5 +1,5 @@
 #include <core.p4>
-#include "psa.p4"
+#include <psa.p4>
 
 // TODO: use clone_i2e_metadata_t
 

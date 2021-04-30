@@ -15,13 +15,8 @@ ActionTranslationVisitorPSA::ActionTranslationVisitorPSA(cstring valueName,
         table(table) {}
 
 bool ActionTranslationVisitorPSA::preorder(const IR::PathExpression* pe) {
-    auto decl = program->refMap->getDeclaration(pe->path, true);
-    if (decl->is<IR::Parameter>()) {
-        auto param = decl->to<IR::Parameter>();
-        bool isParam = action->parameters->getParameter(param->name) == param;
-        if (isParam) {
-            return ActionTranslationVisitor::preorder(pe);;
-        }
+    if (isActionParameter(pe)) {
+        return ActionTranslationVisitor::preorder(pe);;
     }
     return ControlBodyTranslator::preorder(pe);
 }

@@ -7,6 +7,11 @@ EBPFRegisterPSA::EBPFRegisterPSA(const EBPFProgram *program,
                                  CodeGenInspector *codeGen) : EBPFTableBase(program,
                                                                             instanceName,
                                                                             codeGen) {
+    CHECK_NULL(di);
+    if (!di->type->is<IR::Type_Specialized>()) {
+        ::error(ErrorType::ERR_MODEL, "Missing specialization: %1%", di);
+        return;
+    }
     auto ts = di->type->to<IR::Type_Specialized>();
 
     this->keyArg = ts->arguments->at(1);
@@ -22,7 +27,7 @@ EBPFRegisterPSA::EBPFRegisterPSA(const EBPFProgram *program,
     }
 
     auto declaredSize = di->arguments->at(0)->expression->to<IR::Constant>();
-    if (!declaredSize->fitsInt()) {
+    if (!declaredSize->fitsUint()) {
         ::error(ErrorType::ERR_OVERLIMIT, "%1%: size too large", declaredSize);
         return;
     }
