@@ -19,11 +19,11 @@ EBPFRegisterPSA::EBPFRegisterPSA(const EBPFProgram *program,
     this->keyType = EBPFTypeFactory::instance->create(keyArg);
     this->valueType = EBPFTypeFactory::instance->create(valueArg);
 
-    if (keyArg->is<IR::Type_Bits>()) {
-        unsigned keyWidth = keyArg->width_bits();
+    if (auto wt = dynamic_cast<IHasWidth*>(this->keyType)) {
+        unsigned keyWidth = wt->widthInBits();
         // For keys <= 32 bit register is based on array map,
         // otherwise we use hash map
-        arrayMapBased = (keyWidth <= 32);
+        arrayMapBased = (keyWidth > 0 && keyWidth <= 32);
     }
 
     auto declaredSize = di->arguments->at(0)->expression->to<IR::Constant>();
@@ -58,7 +58,7 @@ void EBPFRegisterPSA::emitValueType(CodeBuilder* builder) {
 }
 
 void EBPFRegisterPSA::emitInitializer(CodeBuilder* builder) {
-    if (arrayMapBased && this->initialValue != nullptr) {
+    if (arrayMapBased && this->initialValue != nullptr && !this->initialValue->value.is_zero()) {
         auto ret = program->refMap->newName("ret");
         cstring keyName = program->refMap->newName("key");
         cstring valueName = program->refMap->newName("value");
@@ -69,7 +69,6 @@ void EBPFRegisterPSA::emitInitializer(CodeBuilder* builder) {
 
         builder->emitIndent();
         builder->appendFormat("%s %s = ", valueTypeName.c_str(), valueName.c_str());
-        //TODO nie inicjalizuj jak zero
         builder->append(this->initialValue->value.str());
         builder->endOfStatement(true);
 
