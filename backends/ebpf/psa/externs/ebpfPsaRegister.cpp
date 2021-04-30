@@ -1,4 +1,5 @@
 #include "ebpfPsaRegister.h"
+#include "backends/ebpf/psa/ebpfPipeline.h"
 
 namespace EBPF {
 
