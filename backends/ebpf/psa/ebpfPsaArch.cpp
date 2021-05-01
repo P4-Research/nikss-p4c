@@ -558,7 +558,7 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
             return new PSAArch(ebpfTypes, xdpIngress, xdpEgress);
     }
 }
-
+ 
 const IR::Node * ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
     ebpf_psa_arch = build(tlb);
     return tlb;

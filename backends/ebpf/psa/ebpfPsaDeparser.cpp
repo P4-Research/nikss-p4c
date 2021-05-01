@@ -1,7 +1,7 @@
 #include "ebpfPsaDeparser.h"
 #include "ebpfPipeline.h"
 
-namespace EBPF {
+namespace EBPF { 
 
 DeparserBodyTranslator::DeparserBodyTranslator(const EBPFDeparserPSA *deparser) :
                         CodeGenInspector(deparser->program->refMap, deparser->program->typeMap),

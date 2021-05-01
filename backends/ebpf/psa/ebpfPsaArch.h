@@ -164,7 +164,7 @@ class ConvertToEBPFControlPSA : public Inspector {
     bool preorder(const IR::ExternBlock *) override;
 
     EBPF::EBPFControlPSA *getEBPFControl() { return control; }
-};
+}; 
 
 class ConvertToEBPFDeparserPSA : public Inspector {
     EBPF::EBPFProgram* program;

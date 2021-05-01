@@ -169,7 +169,7 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder, msgStr.c_str());
     builder->emitIndent();
     builder->blockStart();
-
+ 
     deparser->emit(builder);
     builder->blockEnd(true);
     builder->emitIndent();
