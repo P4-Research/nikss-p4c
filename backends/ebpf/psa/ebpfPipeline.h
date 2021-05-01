@@ -42,12 +42,12 @@ class EBPFPipeline : public EBPFProgram {
     virtual void emit(CodeBuilder* builder);
 };
 
-class EBPFIngressPipeline : public EBPFPipeline {
+class TCIngressPipeline : public EBPFPipeline {
  public:
     cstring processFunctionName;
     unsigned int maxResubmitDepth;
 
-    EBPFIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
+    TCIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                         P4::TypeMap* typeMap) :
             EBPFPipeline(name, options, refMap, typeMap) {
         processFunctionName = "process";
@@ -60,9 +60,9 @@ class EBPFIngressPipeline : public EBPFPipeline {
     void emitPSAControlDataTypes(CodeBuilder *builder) override;
 };
 
-class EBPFEgressPipeline : public EBPFPipeline {
+class TCEgressPipeline : public EBPFPipeline {
  public:
-    EBPFEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
+    TCEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                        P4::TypeMap* typeMap) :
             EBPFPipeline(name, options, refMap, typeMap) { }
 

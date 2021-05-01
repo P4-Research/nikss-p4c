@@ -400,7 +400,7 @@ void PSAArch::emitInstances2XDP(CodeBuilder *builder) const {
 }
 
 void PSAArch::emitInitializer2XDP(CodeBuilder *builder) const {
-    builder->appendLine("SEC(\"classifier/map-initializer\")");
+    builder->appendLine("SEC(\"xdp/map-initializer\")");
     builder->appendFormat("int %s()",
                           "map_initialize");
     builder->spc();
@@ -572,9 +572,9 @@ const IR::Node * ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
 bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
     if(!options.generateToXDP) {
         if (type == INGRESS) {
-            pipeline = new EBPFIngressPipeline(name, options, refmap, typemap);
+            pipeline = new TCIngressPipeline(name, options, refmap, typemap);
         } else if (type == EGRESS) {
-            pipeline = new EBPFEgressPipeline(name, options, refmap, typemap);
+            pipeline = new TCEgressPipeline(name, options, refmap, typemap);
         } else {
             ::error(ErrorType::ERR_INVALID, "unknown type of pipeline");
             return false;
@@ -790,8 +790,8 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
     // constructor of ConvertToEBPFDeparserPSA ensures that no other type can be set.
     if(!options.generateToXDP) {
         type == INGRESS ?
-            deparser = new EBPFIngressDeparserPSA(program, ctrl, parserHeaders, istd) :
-            deparser = new EBPFEgressDeparserPSA(program, ctrl, parserHeaders, istd);
+            deparser = new TCIngressDeparserPSA(program, ctrl, parserHeaders, istd) :
+            deparser = new TCEgressDeparserPSA(program, ctrl, parserHeaders, istd);
     }
     else {
         type == INGRESS ?

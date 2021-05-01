@@ -93,8 +93,8 @@ void EBPFPipeline::emitGlobalMetadataInitializer(CodeBuilder *builder) {
             "struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->cb;");
 }
 
-// =====================EBPFIngressPipeline=============================
-void EBPFIngressPipeline::emit(CodeBuilder *builder) {
+// =====================TCIngressPipeline=============================
+void TCIngressPipeline::emit(CodeBuilder *builder) {
     cstring msgStr;
     // firstly emit process() in-lined function and then the actual BPF section.
     builder->append("static __always_inline");
@@ -108,9 +108,9 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
             parser->headers->name.name,
             control->outputStandardMetadata->name.name);
     auto type = EBPFTypeFactory::instance->create(
-            deparser->to<EBPFIngressDeparserPSA>()->resubmit_meta->type);
+            deparser->to<TCIngressDeparserPSA>()->resubmit_meta->type);
     type->declare(builder,
-            deparser->to<EBPFIngressDeparserPSA>()->resubmit_meta->name.name,
+            deparser->to<TCIngressDeparserPSA>()->resubmit_meta->name.name,
             true);
     builder->append(")");
     builder->newline();
@@ -189,7 +189,7 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->newline();
 
     builder->emitIndent();
-    deparser->to<EBPFIngressDeparserPSA>()->emitSharedMetadataInitializer(builder);
+    deparser->to<TCIngressDeparserPSA>()->emitSharedMetadataInitializer(builder);
 
 
     emitHeaderInstances(builder);
@@ -210,7 +210,7 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
             parser->headerType->to<EBPFStructType>()->kind,
             parser->headerType->to<EBPFStructType>()->name,
             parser->headers->name.name,
-            deparser->to<EBPFIngressDeparserPSA>()->resubmit_meta->name.name);
+            deparser->to<TCIngressDeparserPSA>()->resubmit_meta->name.name);
     builder->newline();
     builder->append("        if (ostd.drop == 1 || ostd.resubmit == 0) {\n"
                     "            break;\n"
@@ -232,7 +232,7 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->blockEnd(true);
 }
 
-void EBPFIngressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
+void TCIngressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("struct psa_ingress_input_metadata_t %s = {\n"
                         "            .ingress_port = skb->ifindex,\n"
@@ -248,7 +248,7 @@ void EBPFIngressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
  * - Multicast handling
  * - send to port
  */
-void EBPFIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
+void TCIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
     cstring mcast_grp = Util::printf_format("ostd.multicast_group");
     builder->emitIndent();
     builder->appendFormat("if (%s != 0) ", mcast_grp.c_str());
@@ -272,8 +272,8 @@ void EBPFIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->appendLine("return bpf_redirect(ostd.egress_port, 0);");
 }
 
-// =====================EBPFEgressPipeline=============================
-void EBPFEgressPipeline::emitPSAControlDataTypes(CodeBuilder* builder) {
+// =====================TCEgressPipeline=============================
+void TCEgressPipeline::emitPSAControlDataTypes(CodeBuilder* builder) {
     cstring outputMdVar, inputMdVar;
     outputMdVar = control->outputStandardMetadata->name.name;
     inputMdVar = control->inputStandardMetadata->name.name;
@@ -306,7 +306,7 @@ void EBPFEgressPipeline::emitPSAControlDataTypes(CodeBuilder* builder) {
     builder->newline();
 }
 
-void EBPFEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
+void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     cstring varStr, outputMdVar, inputMdVar;
     outputMdVar = control->outputStandardMetadata->name.name;
     inputMdVar = control->inputStandardMetadata->name.name;

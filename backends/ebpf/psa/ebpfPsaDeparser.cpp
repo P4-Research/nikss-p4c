@@ -86,11 +86,7 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     builder->appendFormat("int %s = 0", this->returnCode.c_str());
     builder->endOfStatement(true);
     builder->emitIndent();
-    builder->appendFormat("%s = bpf_skb_adjust_room(%s, %s, 1, 0)",
-                          this->returnCode.c_str(),
-                          pipelineProgram->contextVar.c_str(),
-                          this->outerHdrOffsetVar.c_str());
-    builder->endOfStatement(true);
+    emitResizeHead(builder, pipelineProgram->contextVar.c_str());
 
     builder->emitIndent();
     builder->appendFormat("if (%s) ", this->returnCode.c_str());
@@ -338,8 +334,8 @@ void EBPFDeparserPSA::emitDeclaration(CodeBuilder* builder, const IR::Declaratio
     EBPFControlPSA::emitDeclaration(builder, decl);
 }
 
-// =====================EBPFIngressDeparserPSA=============================
-bool EBPFIngressDeparserPSA::build() {
+// =====================TCIngressDeparserPSA=============================
+bool TCIngressDeparserPSA::build() {
     auto pl = controlBlock->container->type->applyParams;
     auto it = pl->parameters.begin();
     packet_out = *it;
@@ -363,7 +359,7 @@ bool EBPFIngressDeparserPSA::build() {
  * - early packet drop
  * - resubmission
  */
-void EBPFIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
+void TCIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->emitIndent();
 
     builder->newline();
@@ -400,14 +396,23 @@ void EBPFIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->blockEnd(true);
 }
 
-void EBPFIngressDeparserPSA::emitSharedMetadataInitializer(CodeBuilder *builder) {
+void TCIngressDeparserPSA::emitSharedMetadataInitializer(CodeBuilder *builder) {
     auto type = EBPFTypeFactory::instance->create(resubmit_meta->type);
     type->declare(builder, resubmit_meta->name.name, false);
     builder->endOfStatement(true);
 }
 
-// =====================EBPFEgressDeparserPSA=============================
-bool EBPFEgressDeparserPSA::build() {
+void TCIngressDeparserPSA::emitResizeHead(CodeBuilder *builder, 
+                                            const cstring context_var) {
+    builder->appendFormat("%s = bpf_skb_adjust_room(%s, %s, 1, 0)",
+                          this->returnCode.c_str(),
+                          context_var,
+                          this->outerHdrOffsetVar.c_str());
+    builder->endOfStatement(true);
+}
+
+// =====================TCEgressDeparserPSA=============================
+bool TCEgressDeparserPSA::build() {
     auto pl = controlBlock->container->type->applyParams;
     auto it = pl->parameters.begin();
     packet_out = *it;
@@ -422,95 +427,16 @@ bool EBPFEgressDeparserPSA::build() {
     return true;
 }
 
-// =====================XDPIngressDeparserPSA=============================
-void XDPIngressDeparserPSA::emit(CodeBuilder* builder) {
-    codeGen->setBuilder(builder);
-
-    for (auto a : controlBlock->container->controlLocals)
-        emitDeclaration(builder, a);
-
-    controlBlock->container->body->apply(*codeGen);
-    builder->newline();
-
-    emitPreDeparser(builder);
-
-    const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
-    builder->emitIndent();
-    builder->appendFormat("int %s = 0", this->outerHdrLengthVar.c_str());
-    builder->endOfStatement(true);
-
-    for (unsigned long i = 0; i < this->headersToEmit.size(); i++) {
-        auto headerToEmit = headersToEmit[i];
-        auto headerExpression = headersExpressions[i];
-        unsigned width = headerToEmit->width_bits();
-        builder->emitIndent();
-        builder->append("if (");
-        builder->append(headerExpression);
-        builder->append(".ebpf_valid) ");
-        builder->blockStart();
-        builder->emitIndent();
-        builder->appendFormat("%s += %d;", this->outerHdrLengthVar.c_str(), width);
-        builder->newline();
-        builder->blockEnd(true);
-    }
-
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat("int %s = BYTES(%s) - BYTES(%s)",
-                          this->outerHdrOffsetVar.c_str(),
-                          this->outerHdrLengthVar.c_str(),
-                          pipelineProgram->offsetVar.c_str());
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->appendFormat("if (%s != 0) ", this->outerHdrOffsetVar.c_str());
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusting by %d B",
-                                      1, this->outerHdrOffsetVar.c_str());
-    builder->emitIndent();
-    builder->appendFormat("int %s = 0", this->returnCode.c_str());
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->appendFormat("%s = bpf_xdp_adjust_head(%s, %s)",
+void TCEgressDeparserPSA::emitResizeHead(CodeBuilder *builder, 
+                                            const cstring context_var) {
+    builder->appendFormat("%s = bpf_skb_adjust_room(%s, %s, 1, 0)",
                           this->returnCode.c_str(),
-                          pipelineProgram->contextVar.c_str(),
+                          context_var,
                           this->outerHdrOffsetVar.c_str());
     builder->endOfStatement(true);
-
-    builder->emitIndent();
-    builder->appendFormat("if (%s) ", this->returnCode.c_str());
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjust failed");
-    builder->emitIndent();
-    // We immediately return instead of jumping to reject state.
-    // It avoids reaching BPF_COMPLEXITY_LIMIT_JMP_SEQ.
-    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
-    builder->newline();
-    builder->blockEnd(true);
-    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusted");
-    builder->blockEnd(true);
-    builder->emitIndent();
-    builder->appendFormat("%s = %s;",
-                          program->packetStartVar,
-                          builder->target->dataOffset(program->model.CPacketName.str()));
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat("%s = %s;",
-                          program->packetEndVar,
-                          builder->target->dataEnd(program->model.CPacketName.str()));
-    builder->newline();
-
-    builder->emitIndent();
-    builder->appendFormat("%s = 0", pipelineProgram->offsetVar.c_str());
-    builder->endOfStatement(true);
-
-    for (unsigned long i = 0; i < this->headersToEmit.size(); i++) {
-        auto headerToEmit = headersToEmit[i];
-        auto headerExpression = headersExpressions[i];
-        emitHeader(builder, headerToEmit, headerExpression);
-    }
-    builder->newline();
 }
 
+// =====================XDPIngressDeparserPSA=============================
 bool XDPIngressDeparserPSA::build() {
     auto pl = controlBlock->container->type->applyParams;
     auto it = pl->parameters.begin();
@@ -527,6 +453,15 @@ bool XDPIngressDeparserPSA::build() {
     codeGen->asPointerVariables.insert(resubmit_meta->name.name);
     codeGen->substitute(this->headers, parserHeaders);
     return true;
+}
+
+void XDPIngressDeparserPSA::emitResizeHead(CodeBuilder *builder,
+                                            const cstring context_var) {
+    builder->appendFormat("%s = bpf_xdp_adjust_head(%s, %s)",
+                          this->returnCode.c_str(),
+                          context_var,
+                          this->outerHdrOffsetVar.c_str());
+    builder->endOfStatement(true);
 }
 
 /*
@@ -574,94 +509,6 @@ void XDPIngressDeparserPSA::emitSharedMetadataInitializer(CodeBuilder *builder) 
 }
 
 // =====================XDPEgressDeparserPSA=============================
-void XDPEgressDeparserPSA::emit(CodeBuilder* builder) {
-    codeGen->setBuilder(builder);
-
-    for (auto a : controlBlock->container->controlLocals)
-        emitDeclaration(builder, a);
-
-    controlBlock->container->body->apply(*codeGen);
-    builder->newline();
-
-    emitPreDeparser(builder);
-
-    const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
-    builder->emitIndent();
-    builder->appendFormat("int %s = 0", this->outerHdrLengthVar.c_str());
-    builder->endOfStatement(true);
-
-    for (unsigned long i = 0; i < this->headersToEmit.size(); i++) {
-        auto headerToEmit = headersToEmit[i];
-        auto headerExpression = headersExpressions[i];
-        unsigned width = headerToEmit->width_bits();
-        builder->emitIndent();
-        builder->append("if (");
-        builder->append(headerExpression);
-        builder->append(".ebpf_valid) ");
-        builder->blockStart();
-        builder->emitIndent();
-        builder->appendFormat("%s += %d;", this->outerHdrLengthVar.c_str(), width);
-        builder->newline();
-        builder->blockEnd(true);
-    }
-
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat("int %s = BYTES(%s) - BYTES(%s)",
-                          this->outerHdrOffsetVar.c_str(),
-                          this->outerHdrLengthVar.c_str(),
-                          pipelineProgram->offsetVar.c_str());
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->appendFormat("if (%s != 0) ", this->outerHdrOffsetVar.c_str());
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusting by %d B",
-                                      1, this->outerHdrOffsetVar.c_str());
-    builder->emitIndent();
-    builder->appendFormat("int %s = 0", this->returnCode.c_str());
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->appendFormat("%s = bpf_xdp_adjust_head(%s, %s)",
-                          this->returnCode.c_str(),
-                          pipelineProgram->contextVar.c_str(),
-                          this->outerHdrOffsetVar.c_str());
-    builder->endOfStatement(true);
-
-    builder->emitIndent();
-    builder->appendFormat("if (%s) ", this->returnCode.c_str());
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjust failed");
-    builder->emitIndent();
-    // We immediately return instead of jumping to reject state.
-    // It avoids reaching BPF_COMPLEXITY_LIMIT_JMP_SEQ.
-    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
-    builder->newline();
-    builder->blockEnd(true);
-    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusted");
-    builder->blockEnd(true);
-    builder->emitIndent();
-    builder->appendFormat("%s = %s;",
-                          program->packetStartVar,
-                          builder->target->dataOffset(program->model.CPacketName.str()));
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat("%s = %s;",
-                          program->packetEndVar,
-                          builder->target->dataEnd(program->model.CPacketName.str()));
-    builder->newline();
-
-    builder->emitIndent();
-    builder->appendFormat("%s = 0", pipelineProgram->offsetVar.c_str());
-    builder->endOfStatement(true);
-
-    for (unsigned long i = 0; i < this->headersToEmit.size(); i++) {
-        auto headerToEmit = headersToEmit[i];
-        auto headerExpression = headersExpressions[i];
-        emitHeader(builder, headerToEmit, headerExpression);
-    }
-    builder->newline();
-}
-
 bool XDPEgressDeparserPSA::build() {
     auto pl = controlBlock->container->type->applyParams;
     auto it = pl->parameters.begin();
@@ -675,6 +522,15 @@ bool XDPEgressDeparserPSA::build() {
     headerType = EBPFTypeFactory::instance->create(ht);
 
     return true;
+}
+
+void XDPEgressDeparserPSA::emitResizeHead(CodeBuilder *builder,
+                                           const cstring context_var) {
+    builder->appendFormat("%s = bpf_xdp_adjust_head(%s, %s)",
+                          this->returnCode.c_str(),
+                          context_var,
+                          this->outerHdrOffsetVar.c_str());
+    builder->endOfStatement(true);
 }
 
 }  // namespace EBPF

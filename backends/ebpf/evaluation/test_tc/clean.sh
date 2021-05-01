@@ -11,3 +11,5 @@ sudo ip link del dev veth1
 sudo ip link del psa_recirc
 
 sudo ip netns delete ns0
+
+rm -f out-tc.*

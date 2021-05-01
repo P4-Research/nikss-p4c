@@ -116,9 +116,9 @@ class ConvertToEBPFParserPSA : public Inspector {
     ConvertToEBPFParserPSA(EBPF::EBPFProgram* program, P4::ReferenceMap* refmap,
             P4::TypeMap* typemap, const EbpfOptions &options) : 
             program(program), typemap(typemap), refmap(refmap), options(options) {
-        if (program->is<EBPFIngressPipeline>() || program->is<XDPIngressPipeline>()) {
+        if (program->is<TCIngressPipeline>() || program->is<XDPIngressPipeline>()) {
             type = INGRESS;
-        } else if (program->is<EBPFEgressPipeline>() || program->is<XDPEgressPipeline>()) {
+        } else if (program->is<TCEgressPipeline>() || program->is<XDPEgressPipeline>()) {
             type = EGRESS;
         } else {
             BUG("undefined pipeline type, cannot build parser");
@@ -147,9 +147,9 @@ class ConvertToEBPFControlPSA : public Inspector {
                             P4::ReferenceMap *refmap,
                             P4::TypeMap *typemap) : program(program), parserHeaders(parserHeaders),
                             typemap(typemap), refmap(refmap) {
-        if (program->is<EBPFIngressPipeline>() || program->is<XDPIngressPipeline>()) {
+        if (program->is<TCIngressPipeline>() || program->is<XDPIngressPipeline>()) {
             type = INGRESS;
-        } else if (program->is<EBPFEgressPipeline>() || program->is<XDPEgressPipeline>()) {
+        } else if (program->is<TCEgressPipeline>() || program->is<XDPEgressPipeline>()) {
             type = EGRESS;
         } else {
             BUG("undefined pipeline type, cannot build control block");
@@ -188,9 +188,9 @@ class ConvertToEBPFDeparserPSA : public Inspector {
                                                      typemap(typemap), refmap(refmap),
                                                      p4lib(P4::P4CoreLibrary::instance),
                                                      options(options) {
-        if (program->is<EBPFIngressPipeline>() || program->is<XDPIngressPipeline>()) {
+        if (program->is<TCIngressPipeline>() || program->is<XDPIngressPipeline>()) {
             type = INGRESS;
-        } else if (program->is<EBPFEgressPipeline>() || program->is<XDPEgressPipeline>()) {
+        } else if (program->is<TCEgressPipeline>() || program->is<XDPEgressPipeline>()) {
             type = EGRESS;
         } else {
             BUG("undefined pipeline type, cannot build deparser");
