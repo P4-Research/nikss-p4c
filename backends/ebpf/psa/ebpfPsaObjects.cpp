@@ -15,13 +15,8 @@ ActionTranslationVisitorPSA::ActionTranslationVisitorPSA(cstring valueName,
         table(table) {}
 
 bool ActionTranslationVisitorPSA::preorder(const IR::PathExpression* pe) {
-    auto decl = program->refMap->getDeclaration(pe->path, true);
-    if (decl->is<IR::Parameter>()) {
-        auto param = decl->to<IR::Parameter>();
-        bool isParam = action->parameters->getParameter(param->name) == param;
-        if (isParam) {
-            return ActionTranslationVisitor::preorder(pe);;
-        }
+    if (isActionParameter(pe)) {
+        return ActionTranslationVisitor::preorder(pe);
     }
     return ControlBodyTranslator::preorder(pe);
 }
@@ -41,6 +36,21 @@ void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) 
     } else {
         ControlBodyTranslatorPSA::processMethod(method);
     }
+}
+
+cstring ActionTranslationVisitorPSA::getValueActionParam(const IR::PathExpression *valueExpr) {
+    if (isActionParameter(valueExpr)) {
+        return getActionParamStr(valueExpr);
+    }
+
+    return ControlBodyTranslatorPSA::getValueActionParam(valueExpr);
+}
+cstring ActionTranslationVisitorPSA::getIndexActionParam(const IR::PathExpression *indexExpr) {
+    if (isActionParameter(indexExpr)) {
+        return getActionParamStr(indexExpr);
+    }
+
+    return ControlBodyTranslatorPSA::getIndexActionParam(indexExpr);
 }
 
 void ActionTranslationVisitorPSA::processApply(const P4::ApplyMethod* method) {

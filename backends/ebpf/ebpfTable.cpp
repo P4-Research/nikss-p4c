@@ -23,22 +23,30 @@ limitations under the License.
 namespace EBPF {
 
 bool ActionTranslationVisitor::preorder(const IR::PathExpression* expression) {
-    auto decl = program->refMap->getDeclaration(expression->path, true);
-    if (decl->is<IR::Parameter>()) {
-        auto param = decl->to<IR::Parameter>();
-        bool isParam = action->parameters->getParameter(param->name) == param;
-        if (isParam) {
-            builder->append(valueName);
-            builder->append("->u.");
-            cstring name = EBPFObject::externalName(action);
-            builder->append(name);
-            builder->append(".");
-            builder->append(expression->path->toString());  // original name
-            return false;
-        }
+    if (isActionParameter(expression)) {
+        cstring paramStr = getActionParamStr(expression);
+        builder->append(paramStr.c_str());
+        return false;
     }
     visit(expression->path);
     return false;
+}
+
+bool ActionTranslationVisitor::isActionParameter(const IR::PathExpression *expression) const {
+    auto decl = program->refMap->getDeclaration(expression->path, true);
+    if (decl->is<IR::Parameter>()) {
+        auto param = decl->to<IR::Parameter>();
+        return action->parameters->getParameter(param->name) == param;
+    }
+    return false;
+}
+
+cstring ActionTranslationVisitor::getActionParamStr(const IR::Expression *expression) const {
+    cstring actionName = EBPFObject::externalName(action);
+    auto paramStr = Util::printf_format("%s->u.%s.%s",
+                                        valueName, actionName,
+                                        expression->toString());
+    return paramStr;
 }
 
 bool ActionTranslationVisitor::preorder(const IR::P4Action* act) {
