@@ -730,11 +730,11 @@ int tc_ingress_func(SK_BUFF *skb) {
 #pragma clang loop unroll(disable)
     for (int i = 0; i < 4; i++) {
         ostd.resubmit = 0;
-        ret = process(skb, (struct parser_headers_t *) &headers, &ostd, &resubmit_meta);
+        ret = process(skb, (struct headers_t *) &headers, &ostd, &resubmit_meta);
         if (ostd.drop == 1 || ostd.resubmit == 0) {
             break;
         }
-        __builtin_memset((void *) &headers, 0, sizeof(struct parser_headers_t));
+        __builtin_memset((void *) &headers, 0, sizeof(struct headers_t));
     }
     if (ret != TC_ACT_UNSPEC) {
         return ret;

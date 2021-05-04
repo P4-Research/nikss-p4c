@@ -119,7 +119,7 @@ const IR::ToplevelBlock* MidEnd::run(EbpfOptions& options,
         }
 
         if (options.listMidendPasses) {
-            midEnd.listPasses(*outStream, ",\n");
+            midEnd.listPasses(*outStream, "\n");
             *outStream << std::endl;
         }
         if (options.excludeMidendPasses) {
