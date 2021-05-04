@@ -33,6 +33,9 @@ limitations under the License.
 #define htonl(d) bpf_htonl(d)
 #define htonll(d) bpf_cpu_to_be64(d)
 #define ntohll(x) bpf_be64_to_cpu(x)
+#ifndef bpf_htonll
+#define bpf_htonll(x) htonll(x)
+#endif
 
 #define load_byte(data, b) (*(((u8*)(data)) + (b)))
 #define load_half(data, b) bpf_ntohs(*(u16 *)((u8*)(data) + (b)))

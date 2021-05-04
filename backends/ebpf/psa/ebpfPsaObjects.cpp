@@ -138,6 +138,12 @@ void EBPFTablePSA::emitValueActionIDNames(CodeBuilder* builder) {
 
 void EBPFTablePSA::emitValueStructStructure(CodeBuilder* builder) {
     if (hasImplementation()) {
+        if (isTernaryTable()) {
+            builder->emitIndent();
+            builder->append("__u32 priority;");
+            builder->newline();
+        }
+
         for (auto impl : implementations) {
             impl->emitReferenceEntry(builder);
         }

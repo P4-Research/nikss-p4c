@@ -1,4 +1,5 @@
 #include "ebpfPsaTableImplementation.h"
+#include "backends/ebpf/psa/ebpfPsaControl.h"
 
 namespace EBPF {
 
@@ -135,9 +136,12 @@ void EBPFActionProfilePSA::emitInstance(CodeBuilder *builder) {
     if (table == nullptr)  // no table(s)
         return;
 
-    auto tableKind = TableArray;  // or might be TableHash?
-    builder->target->emitTableDecl(builder, name, tableKind,
-                                   "u32",
+    // Control plane must have ability to know if given reference exists or is used.
+    // Problem with TableArray: id of NoAction is 0 and default value of entry is also 0.
+    //   If user change action for given reference to NoAction, it will be hard to
+    //   distinguish it from non-existing entry using only key value.
+    auto tableKind = TableHash;
+    builder->target->emitTableDecl(builder, name, tableKind, "u32",
                                    cstring("struct ") + valueTypeName, size);
 }
 
@@ -162,6 +166,9 @@ void EBPFActionProfilePSA::applyImplementation(CodeBuilder* builder, cstring tab
     builder->emitIndent();
     builder->appendFormat("if (%s != NULL) ", apValueName.c_str());
     builder->blockStart();
+
+    // Do not set hit variable here, because other instance before
+    // may it already set to 0 (no match).
 
     emitAction(builder, apValueName, cstring::empty);
 

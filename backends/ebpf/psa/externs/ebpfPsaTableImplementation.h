@@ -2,6 +2,7 @@
 #define BACKENDS_EBPF_PSA_EXTERNS_EBPFPSATABLEIMPLEMENTATION_H_
 
 #include "backends/ebpf/ebpfTable.h"
+#include "backends/ebpf/psa/ebpfPsaObjects.h"
 
 namespace EBPF {
 
