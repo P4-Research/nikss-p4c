@@ -1,7 +1,9 @@
-#ifndef P4C_BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAREGISTER_H_
-#define P4C_BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAREGISTER_H_
+#ifndef BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAREGISTER_H_
+#define BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAREGISTER_H_
 
 #include "backends/ebpf/ebpfTable.h"
+//#include "backends/ebpf/ebpfPsaControlTranslators.h"
+//#include <ebpf/psa/ebpfPsaControlTranslators.h>
 
 namespace EBPF {
 
@@ -37,4 +39,4 @@ class EBPFRegisterPSA : public EBPFTableBase {
 
 }  // namespace EBPF
 
-#endif  // P4C_BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAREGISTER_H_
+#endif  // BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAREGISTER_H_
