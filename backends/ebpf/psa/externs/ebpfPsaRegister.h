@@ -2,8 +2,6 @@
 #define BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAREGISTER_H_
 
 #include "backends/ebpf/ebpfTable.h"
-//#include "backends/ebpf/psa/ebpfPsaControlTranslators.h"
-//#include <ebpf/psa/ebpfPsaControlTranslators.h>
 
 namespace EBPF {
 
