@@ -12,6 +12,7 @@ logger = logging.getLogger('eBPFTest')
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler())
 
+
 class EbpfTest(BaseTest):
     switch_ns = 'test'
     test_prog_image = 'generic.o'  # default, if test case not specify program
@@ -131,14 +132,16 @@ class P4EbpfTest(EbpfTest):
 
         head, tail = os.path.split(self.p4_file_path)
         filename = tail.split(".")[0]
-        c_file_path = os.path.join("ptf_out", filename + ".c")
-        cmd = ["p4c-ebpf", "--trace", "--arch", "psa", "-o", c_file_path, self.p4_file_path]
-        self.exec_cmd(cmd, "P4 compilation error")
-        output_file_path = os.path.join("ptf_out", filename + ".o")
-
-        cmd = ["clang", "-O2", "-target", "bpf", "-Werror", "-DBTF", "-DPSA_PORT_RECIRCULATE=2", "-g", "-c", c_file_path, "-o", output_file_path, "-I../runtime", "-I../runtime/contrib/libbpf/include/uapi/", "-I../runtime/contrib/libbpf/src/" ]
-        self.exec_cmd(cmd, "Clang compilation error")
-        self.test_prog_image = output_file_path
+        self.test_prog_image = os.path.join("ptf_out", filename + ".o")
+        self.exec_cmd("make -f {mkfile} BPFOBJ={output} P4FILE={p4file} "
+                      "ARGS=\"{cargs}\" P4C=\"{p4c}\" P4ARGS=\"{p4args}\"".format(
+                            mkfile="../runtime/kernel.mk",
+                            output=self.test_prog_image,
+                            p4file=self.p4_file_path,
+                            cargs="-target bpf -DPSA_PORT_RECIRCULATE=2 -DBTF",
+                            p4args="--arch psa --trace",
+                            p4c="p4c-ebpf"),
+                      "Compilation error")
 
         super(P4EbpfTest, self).setUp()
 
