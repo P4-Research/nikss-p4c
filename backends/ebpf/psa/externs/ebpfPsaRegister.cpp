@@ -1,6 +1,6 @@
 #include "ebpfPsaRegister.h"
 #include "backends/ebpf/psa/ebpfPipeline.h"
-//#include "backends/ebpf/ebpfPsaControlTranslators.h"
+#include "backends/ebpf/psa/ebpfPsaControlTranslators.h"
 
 namespace EBPF {
 
