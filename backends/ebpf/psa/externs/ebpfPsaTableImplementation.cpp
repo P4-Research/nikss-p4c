@@ -172,6 +172,13 @@ void EBPFActionProfilePSA::applyImplementation(CodeBuilder* builder, cstring tab
 
     emitAction(builder, apValueName, cstring::empty);
 
+    if (!actionRunVariable.isNullOrEmpty()) {
+        builder->emitIndent();
+        builder->appendFormat("%s = %s->action",
+                              actionRunVariable.c_str(), apValueName.c_str());
+        builder->endOfStatement(true);
+    }
+
     builder->blockEnd(false);
     builder->append(" else ");
 
@@ -185,13 +192,6 @@ void EBPFActionProfilePSA::applyImplementation(CodeBuilder* builder, cstring tab
 
     msg = Util::printf_format("ActionProfile: %s applied", name.c_str());
     builder->target->emitTraceMessage(builder, msg.c_str());
-
-    if (!actionRunVariable.isNullOrEmpty()) {
-        builder->emitIndent();
-        builder->appendFormat("%s = %s->action",
-                              actionRunVariable.c_str(), apValueName.c_str());
-        builder->endOfStatement(true);
-    }
 }
 
 }  // namespace EBPF

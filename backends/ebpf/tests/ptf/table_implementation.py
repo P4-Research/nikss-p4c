@@ -95,38 +95,48 @@ class ActionProfileTernaryTablePSATest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/action-profile-ternary.p4"
 
     def runTest(self):
-        self.update_map(name="MyIC_ap", key="hex 1 0 0 0", value="hex 2 0 0 0  0 0 0 0  22 11 0 0 0 0 0 0")
-        # hdr.eth.srcAddr=11:xx:xx:xx:55:66 => action ref 1 priority 10
-        self.update_map(name="MyIC_tbl_prefixes", key="00 00 00 00",
-                        value="01 00 00 00 00 0xff 0xff 0xff 01 00 00 00")
-        self.update_map(name="MyIC_tbl_prefixes", key="00 0xff 0xff 0xff",
-                        value="01 00 00 00 0xff 00 0xff 0xff 01 00 00 00")
-        self.update_map(name="MyIC_tbl_prefixes", key="0xff 00 0xff 0xff",
-                        value="02 00 00 00 00 00 00 00 00 00 00 00")
-
-        self.create_map(name="ingress_tbl_ternary_0_tuple_1", type="hash", key_size=4, value_size=8,
-                        max_entries=100)
-        self.update_map(name="ingress_tbl_ternary_0_tuple_1", key="00 0x03 0x02 0x01",
-                        value="00 00 00 00 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_0_tuples_map", key="01 0 0 0",
-                        value="ingress_tbl_ternary_0_tuple_1", map_in_map=True)
+        pass
 
 
-# class ActionProfileActionRunPSATest(P4EbpfTest):
-#     """
-#     Test statement table.apply().action_run
-#     """
-#     p4_file_path = "samples/p4testdata/action-profile.p4"
-#
-#     def runTest(self):
-#         pass
-#
-#
-# class ActionProfileHitSATest(P4EbpfTest):
-#     """
-#     Test statement table.apply().hit
-#     """
-#     p4_file_path = "samples/p4testdata/action-profile.p4"
-#
-#     def runTest(self):
-#         pass
+class ActionProfileActionRunPSATest(P4EbpfTest):
+    """
+    Test statement table.apply().action_run
+    """
+    p4_file_path = "samples/p4testdata/action-profile-action-run.p4"
+
+    def runTest(self):
+        self.update_map(name="MyIC_ap", key="hex 10 0 0 0", value="hex 2 0 0 0  0 0 0 0  22 11 0 0 0 0 0 0")
+        self.update_map(name="MyIC_ap", key="hex 20 0 0 0", value="hex 1 0 0 0  0 0 0 0  FF EE DD CC BB AA 0 0")
+        self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 11 0 0", value="hex 10 0 0 0")
+        self.update_map(name="MyIC_tbl", key="hex FF EE DD CC BB AA 0 0", value="hex 20 0 0 0")
+
+        # action MyIC_a1
+        pkt = testutils.simple_ip_packet(eth_src="AA:BB:CC:DD:EE:FF", eth_dst="22:33:44:55:66:77")
+        testutils.send_packet(self, PORT0, pkt)
+        pkt[Ether].dst = "AA:BB:CC:DD:EE:FF"
+        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
+
+        # action MyIC_a2
+        pkt = testutils.simple_ip_packet(eth_src="11:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
+        testutils.send_packet(self, PORT0, pkt)
+        pkt[Ether].type = 0x1122
+        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
+
+
+class ActionProfileHitSATest(P4EbpfTest):
+    """
+    Test statement table.apply().hit
+    """
+    p4_file_path = "samples/p4testdata/action-profile-hit.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet(eth_src="11:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_no_other_packets(self)
+
+        self.update_map(name="MyIC_ap", key="hex 10 0 0 0", value="hex 2 0 0 0  0 0 0 0  22 11 0 0 0 0 0 0")
+        self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 11 0 0", value="hex 10 0 0 0")
+
+        testutils.send_packet(self, PORT0, pkt)
+        pkt[Ether].type = 0x1122
+        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)

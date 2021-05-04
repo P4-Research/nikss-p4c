@@ -370,9 +370,11 @@ void EBPFTernaryTablePSA::emitInstance(CodeBuilder *builder) {
                                       TableHash, "struct " + keyTypeName,
                                       "struct " + valueTypeName, size,
                                       name + "_tuples_map", TableArray, "__u32", size);
-    builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
-                                   program->arrayIndexType,
-                                   cstring("struct ") + valueTypeName, 1);
+    if (!hasImplementation()) {
+        builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
+                                       program->arrayIndexType,
+                                       cstring("struct ") + valueTypeName, 1);
+    }
 }
 
 void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
