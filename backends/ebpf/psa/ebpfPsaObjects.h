@@ -7,7 +7,7 @@
 
 namespace EBPF {
 
-class EBPFTableImplementationAPIPSA;
+class EBPFTableImplementationPSA;
 
 class EBPFTablePSA : public EBPFTable {
  protected:
@@ -58,7 +58,7 @@ class EBPFTablePSA : public EBPFTable {
     std::vector<std::pair<cstring, EBPFCounterPSA *>> counters;
     std::vector<cstring> meters;  // TODO: implement, now needed for ActionProfile
 
-    std::vector<EBPFTableImplementationAPIPSA *> implementations;
+    std::vector<EBPFTableImplementationPSA *> implementations;
 
     EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* table,
                  CodeGenInspector* codeGen, cstring name, size_t size);

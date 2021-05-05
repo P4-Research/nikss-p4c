@@ -3,30 +3,30 @@
 
 namespace EBPF {
 
-EBPFTableImplementationAPIPSA::EBPFTableImplementationAPIPSA(const EBPFProgram* program,
+EBPFTableImplementationPSA::EBPFTableImplementationPSA(const EBPFProgram* program,
         CodeGenInspector* codeGen, const IR::Declaration_Instance* decl) :
         EBPFTablePSA(program, codeGen, externalName(decl)), declaration(decl) {
     referenceName = name + "_key";
 }
 
-void EBPFTableImplementationAPIPSA::emitTypes(CodeBuilder* builder) {
+void EBPFTableImplementationPSA::emitTypes(CodeBuilder* builder) {
     if (table == nullptr)
         return;
     // key is u32
     emitValueType(builder);
 }
 
-void EBPFTableImplementationAPIPSA::emitInitializer(CodeBuilder *builder) {
+void EBPFTableImplementationPSA::emitInitializer(CodeBuilder *builder) {
     (void) builder;
 }
 
-void EBPFTableImplementationAPIPSA::emitReferenceEntry(CodeBuilder *builder) {
+void EBPFTableImplementationPSA::emitReferenceEntry(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("u32 %s", referenceName.c_str());
     builder->endOfStatement(true);
 }
 
-void EBPFTableImplementationAPIPSA::registerTable(const EBPFTablePSA * instance) {
+void EBPFTableImplementationPSA::registerTable(const EBPFTablePSA * instance) {
     // verify table instance
     verifyTableNoEntries(instance);
     verifyTableNoDefaultAction(instance);
@@ -43,7 +43,7 @@ void EBPFTableImplementationAPIPSA::registerTable(const EBPFTablePSA * instance)
     }
 }
 
-void EBPFTableImplementationAPIPSA::verifyTableActionList(const EBPFTablePSA * instance) {
+void EBPFTableImplementationPSA::verifyTableActionList(const EBPFTablePSA * instance) {
     bool printError = false;
     if (actionList == nullptr)
         return;
@@ -75,7 +75,7 @@ void EBPFTableImplementationAPIPSA::verifyTableActionList(const EBPFTablePSA * i
     }
 }
 
-void EBPFTableImplementationAPIPSA::verifyTableNoDefaultAction(const EBPFTablePSA * instance) {
+void EBPFTableImplementationPSA::verifyTableNoDefaultAction(const EBPFTablePSA * instance) {
     auto defaultAction = instance->table->container->getDefaultAction();
     BUG_CHECK(defaultAction->is<IR::MethodCallExpression>(),
               "%1%: expected an action call", defaultAction);
@@ -92,7 +92,7 @@ void EBPFTableImplementationAPIPSA::verifyTableNoDefaultAction(const EBPFTablePS
     }
 }
 
-void EBPFTableImplementationAPIPSA::verifyTableNoDirectObjects(const EBPFTablePSA * instance) {
+void EBPFTableImplementationPSA::verifyTableNoDirectObjects(const EBPFTablePSA * instance) {
     if (!instance->counters.empty() || !instance->meters.empty()) {
         ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
                 "%1%: DirectCounter and DirectMeter externs are not supported "
@@ -101,7 +101,7 @@ void EBPFTableImplementationAPIPSA::verifyTableNoDirectObjects(const EBPFTablePS
     }
 }
 
-void EBPFTableImplementationAPIPSA::verifyTableNoEntries(const EBPFTablePSA * instance) {
+void EBPFTableImplementationPSA::verifyTableNoEntries(const EBPFTablePSA * instance) {
     // PSA documentation v1.1 says: "Directly specifying the action as part of the table
     //    entry is not allowed for tables with an action profile implementation."
     // I believe that this sentence forbids (const) entries in a table in P4 code at all.
@@ -118,7 +118,7 @@ void EBPFTableImplementationAPIPSA::verifyTableNoEntries(const EBPFTablePSA * in
 
 EBPFActionProfilePSA::EBPFActionProfilePSA(const EBPFProgram* program, CodeGenInspector* codeGen,
                                            const IR::Declaration_Instance* decl) :
-        EBPFTableImplementationAPIPSA(program, codeGen, decl) {
+        EBPFTableImplementationPSA(program, codeGen, decl) {
     auto sizeType = decl->arguments->at(0)->expression;
     if (!sizeType->is<IR::Constant>()) {
         ::error(ErrorType::ERR_UNSUPPORTED, "Must be constant value: %1%", sizeType);

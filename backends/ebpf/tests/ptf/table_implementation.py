@@ -95,6 +95,7 @@ class ActionProfileTernaryTablePSATest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/action-profile-ternary.p4"
 
     def runTest(self):
+        # TODO: Add entry to the ternary table and test similar to the others test cases
         pass
 
 

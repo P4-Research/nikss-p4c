@@ -6,10 +6,10 @@
 
 namespace EBPF {
 
-class EBPFTableImplementationAPIPSA : public EBPFTablePSA {
+class EBPFTableImplementationPSA : public EBPFTablePSA {
  public:
-    EBPFTableImplementationAPIPSA(const EBPFProgram* program, CodeGenInspector* codeGen,
-                                  const IR::Declaration_Instance* decl);
+    EBPFTableImplementationPSA(const EBPFProgram* program, CodeGenInspector* codeGen,
+                               const IR::Declaration_Instance* decl);
 
     void emitTypes(CodeBuilder* builder) override;
     void emitInitializer(CodeBuilder *builder) override;
@@ -30,7 +30,7 @@ class EBPFTableImplementationAPIPSA : public EBPFTablePSA {
     void verifyTableNoEntries(const EBPFTablePSA * instance);
 };
 
-class EBPFActionProfilePSA : public EBPFTableImplementationAPIPSA {
+class EBPFActionProfilePSA : public EBPFTableImplementationPSA {
  public:
     EBPFActionProfilePSA(const EBPFProgram* program, CodeGenInspector* codeGen,
                          const IR::Declaration_Instance* decl);

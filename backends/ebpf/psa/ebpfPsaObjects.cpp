@@ -69,7 +69,7 @@ EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* tab
 }
 
 EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name) :
-        EBPFTable(program, codeGen, name), name(name), size(1) {}
+        EBPFTable(program, codeGen, name), name(name) {}
 
 ActionTranslationVisitor* EBPFTablePSA::createActionTranslationVisitor(
         cstring valueName, const EBPFProgram* program) const {
@@ -105,10 +105,10 @@ void EBPFTablePSA::initImplementations() {
         auto decl = program->refMap->getDeclaration(pe->path, true);
         auto di = decl->to<IR::Declaration_Instance>();
         CHECK_NULL(di);
-        EBPFTableImplementationAPIPSA * implementation = nullptr;
+        EBPFTableImplementationPSA * implementation = nullptr;
         if (di->type->toString() == "ActionProfile") {
             auto ap = program->control->getTable(di->name.name);
-            implementation = ap->to<EBPFTableImplementationAPIPSA>();
+            implementation = ap->to<EBPFTableImplementationPSA>();
         }
 
         if (implementation != nullptr) {
