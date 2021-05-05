@@ -92,7 +92,7 @@ class EbpfTest(BaseTest):
         self.interfaces = testutils.test_param_get("interfaces").split(",")
         logger.info("Using interfaces: %s", str(self.interfaces))
 
-        self.exec_ns_cmd("load-prog {}".format(self.test_prog_image))
+        self.exec_ns_cmd("load-prog {}".format(self.test_prog_image), "Can\'t load programs into eBPF subsystem")
 
         for intf in self.interfaces:
             self.add_port(dev=intf)
@@ -133,12 +133,11 @@ class P4EbpfTest(EbpfTest):
         head, tail = os.path.split(self.p4_file_path)
         filename = tail.split(".")[0]
         self.test_prog_image = os.path.join("ptf_out", filename + ".o")
-        self.exec_cmd("make -f {mkfile} BPFOBJ={output} P4FILE={p4file} "
-                      "ARGS=\"{cargs}\" P4C=\"{p4c}\" P4ARGS=\"{p4args}\"".format(
-                            mkfile="../runtime/kernel.mk",
+        self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "
+                      "ARGS=\"{cargs}\" P4C=\"{p4c}\" P4ARGS=\"{p4args}\" psa".format(
                             output=self.test_prog_image,
                             p4file=self.p4_file_path,
-                            cargs="-target bpf -DPSA_PORT_RECIRCULATE=2 -DBTF",
+                            cargs="-DPSA_PORT_RECIRCULATE=2",
                             p4args="--arch psa --trace",
                             p4c="p4c-ebpf"),
                       "Compilation error")

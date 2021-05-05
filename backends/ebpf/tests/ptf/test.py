@@ -1,9 +1,7 @@
 #!/usr/bin/env python
-import copy
-
-import ptf.testutils as testutils
 from common import *
 
+import copy
 import ctypes as c
 import struct
 
