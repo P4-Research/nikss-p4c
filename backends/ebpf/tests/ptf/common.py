@@ -134,12 +134,11 @@ class P4EbpfTest(EbpfTest):
         filename = tail.split(".")[0]
         self.test_prog_image = os.path.join("ptf_out", filename + ".o")
         self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "
-                      "ARGS=\"{cargs}\" P4C=\"{p4c}\" P4ARGS=\"{p4args}\" psa".format(
+                      "ARGS=\"{cargs}\" P4C=p4c-ebpf P4ARGS=\"{p4args}\" psa".format(
                             output=self.test_prog_image,
                             p4file=self.p4_file_path,
                             cargs="-DPSA_PORT_RECIRCULATE=2",
-                            p4args="--arch psa --trace",
-                            p4c="p4c-ebpf"),
+                            p4args="--trace"),
                       "Compilation error")
 
         super(P4EbpfTest, self).setUp()
