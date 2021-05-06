@@ -140,7 +140,7 @@ class EBPFHashAlgorithmTypeFactoryPSA {
     }
 
     EBPFHashAlgorithmPSA * create(int type, const EBPFProgram* program, cstring name,
-                                         Visitor * visitor) {
+                                  Visitor * visitor) {
         if (type == EBPFHashAlgorithmPSA::HashAlgorithm::CRC32)
             return new CRC32ChecksumAlgorithm(program, name, visitor);
         else if (type == EBPFHashAlgorithmPSA::HashAlgorithm::CRC16)

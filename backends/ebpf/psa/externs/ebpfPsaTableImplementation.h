@@ -3,6 +3,7 @@
 
 #include "backends/ebpf/ebpfTable.h"
 #include "backends/ebpf/psa/ebpfPsaObjects.h"
+#include "backends/ebpf/psa/externs/ebpfPsaHashAlgorithm.h"
 
 namespace EBPF {
 
@@ -28,6 +29,8 @@ class EBPFTableImplementationPSA : public EBPFTablePSA {
     void verifyTableNoDefaultAction(const EBPFTablePSA * instance);
     void verifyTableNoDirectObjects(const EBPFTablePSA * instance);
     void verifyTableNoEntries(const EBPFTablePSA * instance);
+
+    unsigned getUintFromExpression(const IR::Expression * expr, unsigned defaultValue);
 };
 
 class EBPFActionProfilePSA : public EBPFTableImplementationPSA {
@@ -38,6 +41,32 @@ class EBPFActionProfilePSA : public EBPFTableImplementationPSA {
     void emitInstance(CodeBuilder *builder) override;
     void applyImplementation(CodeBuilder* builder, cstring tableValueName,
                              cstring actionRunVariable) override;
+};
+
+class EBPFActionSelectorPSA : public EBPFTableImplementationPSA {
+ public:
+    EBPFActionSelectorPSA(const EBPFProgram* program, CodeGenInspector* codeGen,
+                          const IR::Declaration_Instance* decl);
+
+    void emitInstance(CodeBuilder *builder) override;
+
+    void applyImplementation(CodeBuilder* builder, cstring tableValueName,
+                             cstring actionRunVariable) override;
+
+    void registerTable(const EBPFTablePSA * instance) override;
+
+ protected:
+    typedef std::vector<const IR::KeyElement *> selectorsListType;
+
+    const IR::Property * emptyGroupAction;
+    EBPFHashAlgorithmPSA * hashEngine;
+    selectorsListType selectors;
+
+    selectorsListType getSelectorsFromTable(const EBPFTablePSA * instance);
+
+    void verifyTableSelectorKeySet(const EBPFTablePSA * instance);
+    void verifyTableEmptyGroupAction(const EBPFTablePSA * instance);
+    void verifyEmptyGroupAction();
 };
 
 }  // namespace EBPF

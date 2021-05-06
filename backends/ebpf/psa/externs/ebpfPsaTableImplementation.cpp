@@ -48,9 +48,6 @@ void EBPFTableImplementationPSA::verifyTableActionList(const EBPFTablePSA * inst
     if (actionList == nullptr)
         return;
 
-    if (instance->actionList->size() != actionList->size())
-        printError = true;
-
     auto getActionName = [](const IR::ActionList * al, size_t id)->cstring {
         auto mce = al->actionList.at(id)->expression->to<IR::MethodCallExpression>();
         BUG_CHECK(mce != nullptr, "%1%: expected an action call", mce);
@@ -59,11 +56,15 @@ void EBPFTableImplementationPSA::verifyTableActionList(const EBPFTablePSA * inst
         return pe->path->name.originalName;
     };
 
-    for (size_t i = 0; i < actionList->size(); ++i) {
-        auto left = getActionName(instance->actionList, i);
-        auto right = getActionName(actionList, i);
-        if (left != right)
-            printError = true;
+    if (instance->actionList->size() != actionList->size())
+        printError = true;
+    else {
+        for (size_t i = 0; i < actionList->size(); ++i) {
+            auto left = getActionName(instance->actionList, i);
+            auto right = getActionName(actionList, i);
+            if (left != right)
+                printError = true;
+        }
     }
 
     if (printError) {
@@ -114,22 +115,26 @@ void EBPFTableImplementationPSA::verifyTableNoEntries(const EBPFTablePSA * insta
     }
 }
 
+unsigned EBPFTableImplementationPSA::getUintFromExpression(const IR::Expression * expr,
+                                                           unsigned defaultValue) {
+    if (!expr->is<IR::Constant>()) {
+        ::error(ErrorType::ERR_UNSUPPORTED, "Must be constant value: %1%", expr);
+        return defaultValue;
+    }
+    auto c = expr->to<IR::Constant>();
+    if (!c->fitsUint()) {
+        ::error(ErrorType::ERR_OVERLIMIT, "%1%: size too large", c);
+        return defaultValue;
+    }
+    return c->asUnsigned();
+}
+
 // ===============================ActionProfile===============================
 
 EBPFActionProfilePSA::EBPFActionProfilePSA(const EBPFProgram* program, CodeGenInspector* codeGen,
                                            const IR::Declaration_Instance* decl) :
         EBPFTableImplementationPSA(program, codeGen, decl) {
-    auto sizeType = decl->arguments->at(0)->expression;
-    if (!sizeType->is<IR::Constant>()) {
-        ::error(ErrorType::ERR_UNSUPPORTED, "Must be constant value: %1%", sizeType);
-        return;
-    }
-    auto declaredSize = sizeType->to<IR::Constant>();
-    if (!declaredSize->fitsUint()) {
-        ::error(ErrorType::ERR_OVERLIMIT, "%1%: size too large", declaredSize);
-        return;
-    }
-    size = declaredSize->asUnsigned();
+    size = getUintFromExpression(decl->arguments->at(0)->expression, 1);
 }
 
 void EBPFActionProfilePSA::emitInstance(CodeBuilder *builder) {
@@ -192,6 +197,169 @@ void EBPFActionProfilePSA::applyImplementation(CodeBuilder* builder, cstring tab
 
     msg = Util::printf_format("ActionProfile: %s applied", name.c_str());
     builder->target->emitTraceMessage(builder, msg.c_str());
+}
+
+// ===============================ActionSelector===============================
+
+EBPFActionSelectorPSA::EBPFActionSelectorPSA(const EBPFProgram* program, CodeGenInspector* codeGen,
+                                             const IR::Declaration_Instance* decl) :
+        EBPFTableImplementationPSA(program, codeGen, decl), emptyGroupAction(nullptr) {
+    hashEngine = EBPFHashAlgorithmTypeFactoryPSA::instance()->create(
+            (int) getUintFromExpression(decl->arguments->at(0)->expression, 0),
+            program, name + "_hash", nullptr);
+    if (hashEngine == nullptr) {
+        ::error(ErrorType::ERR_UNSUPPORTED,
+                "Algorithm not yet implemented: %1%", decl->arguments->at(0));
+    }
+
+    size = getUintFromExpression(decl->arguments->at(1)->expression, 1);
+}
+
+void EBPFActionSelectorPSA::emitInstance(CodeBuilder *builder) {
+    (void) builder;
+}
+
+void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring tableValueName,
+                         cstring actionRunVariable) {
+    (void) builder;
+    (void) tableValueName;
+    (void) actionRunVariable;
+}
+
+EBPFActionSelectorPSA::selectorsListType
+EBPFActionSelectorPSA::getSelectorsFromTable(const EBPFTablePSA * instance) {
+    selectorsListType ret;
+
+    for (auto k : instance->keyGenerator->keyElements) {
+        auto mkdecl = program->refMap->getDeclaration(k->matchType->path, true);
+        auto matchType = mkdecl->getNode()->to<IR::Declaration_ID>();
+
+        if (matchType->name.name == "selector")
+            ret.emplace_back(k);
+    }
+
+    return ret;
+}
+
+void EBPFActionSelectorPSA::registerTable(const EBPFTablePSA * instance) {
+    if (table == nullptr) {
+        selectors = getSelectorsFromTable(instance);
+        emptyGroupAction =
+            instance->table->container->properties->getProperty("psa_empty_group_action");
+        verifyEmptyGroupAction();
+    } else {
+        verifyTableSelectorKeySet(instance);
+        verifyTableEmptyGroupAction(instance);
+    }
+
+    EBPFTableImplementationPSA::registerTable(instance);
+}
+
+void EBPFActionSelectorPSA::verifyTableSelectorKeySet(const EBPFTablePSA * instance) {
+    bool printError = false;
+    auto is = getSelectorsFromTable(instance);
+
+    if (selectors.size() != is.size())
+        printError = true;
+    else {
+        for (size_t i = 0; i < selectors.size(); ++i) {
+            auto left = is.at(i)->expression->toString();
+            auto right = selectors.at(i)->expression->toString();
+            if (left != right)
+                printError = true;
+        }
+    }
+
+    if (printError) {
+        ::error(ErrorType::ERR_EXPECTED,
+                "%1%: selector type keys list differs from previous %2% "
+                "(tables use the same implementation %3%)",
+                instance->table->container, table->container, declaration);
+    }
+}
+
+void EBPFActionSelectorPSA::verifyTableEmptyGroupAction(const EBPFTablePSA * instance) {
+    auto iega = instance->table->container->properties->getProperty("psa_empty_group_action");
+
+    if (emptyGroupAction == nullptr && iega == nullptr)
+        return;  // nothing to do here
+    if (emptyGroupAction == nullptr && iega != nullptr) {
+        ::error(ErrorType::ERR_UNEXPECTED,
+                "%1%: property not specified in previous table %2% "
+                "(tables use the same implementation %3%)",
+                iega, table->container, declaration);
+        return;
+    }
+    if (emptyGroupAction != nullptr && iega == nullptr) {
+        ::error(ErrorType::ERR_EXPECTED,
+                "%1%: missing property %2%, defined in previous table %3% "
+                "(tables use the same implementation %4%)", instance->table->container,
+                emptyGroupAction, table->container->toString(), declaration);
+        return;
+    }
+
+    bool same = true;
+    cstring additionalNote;
+
+    if (emptyGroupAction->isConstant != iega->isConstant) {
+        same = false;
+        additionalNote = "; note: const qualifiers also must be the same";
+    }
+
+    // compare action and arguments
+    auto rev = iega->value->to<IR::ExpressionValue>()->expression;
+    auto lev = emptyGroupAction->value->to<IR::ExpressionValue>()->expression;
+    auto rpe = rev->to<IR::PathExpression>();
+    auto lpe = lev->to<IR::PathExpression>();
+    auto rmce = rev->to<IR::MethodCallExpression>();
+    auto lmce = lev->to<IR::MethodCallExpression>();
+
+    if (lpe != nullptr && rpe != nullptr) {
+        if (lpe->toString() != rpe->toString())
+            same = false;
+    } else if (lmce != nullptr && rmce != nullptr) {
+        if (lmce->method->to<IR::PathExpression>()->path->name.originalName !=
+            rmce->method->to<IR::PathExpression>()->path->name.originalName)
+            same = false;
+        else if (lmce->arguments->size() != rmce->arguments->size()) {
+            same = false;
+        } else {
+            for (size_t i = 0; i < lmce->arguments->size(); ++i) {
+                if (lmce->arguments->at(i)->expression->toString() !=
+                    rmce->arguments->at(i)->expression->toString()) {
+                    same = false;
+                    additionalNote = "; note: action arguments must be the same for both tables";
+                }
+            }
+        }
+    } else {
+        same = false;
+        additionalNote = "; note: action name can\'t be mixed with "
+                         "action call expression (compiler backend limitation)";
+    }
+
+    if (!same) {
+        ::error(ErrorType::ERR_EXPECTED,
+                "%1%: defined property value is different from %2%, defined in "
+                "previous table %3% (tables use the same implementation %4%)%5%",
+                rev, lev, table->container->toString(), declaration, additionalNote);
+    }
+}
+
+void EBPFActionSelectorPSA::verifyEmptyGroupAction() {
+    auto ev = emptyGroupAction->value->to<IR::ExpressionValue>()->expression;
+
+    if (auto pe = ev->to<IR::PathExpression>()) {
+        auto decl = program->refMap->getDeclaration(pe->path, true);
+        auto action = decl->to<IR::P4Action>();
+        BUG_CHECK(action != nullptr, "%1%: not an action", ev);
+
+        if (!action->getParameters()->empty()) {
+            ::error(ErrorType::ERR_UNINITIALIZED,
+                    "%1%: missing value for action parameters: %2%",
+                    ev, action->getParameters());
+        }
+    }
 }
 
 }  // namespace EBPF

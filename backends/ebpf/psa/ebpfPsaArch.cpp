@@ -501,7 +501,8 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
             if (matchType->name.name != P4::P4CoreLibrary::instance.exactMatch.name &&
                 matchType->name.name != P4::P4CoreLibrary::instance.lpmMatch.name &&
-                matchType->name.name != P4::P4CoreLibrary::instance.ternaryMatch.name)
+                matchType->name.name != P4::P4CoreLibrary::instance.ternaryMatch.name &&
+                matchType->name.name != "selector")
                 ::error(ErrorType::ERR_UNSUPPORTED,
                         "Match of type %1% not supported", it->matchType);
 
@@ -562,39 +563,35 @@ bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Variable* decl) {
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
-    if (instance->type->getName().name == "ActionProfile") {
-        if (instance->node->is<IR::Declaration_Instance>()) {
-            auto di = instance->node->to<IR::Declaration_Instance>();
-            auto ap = new EBPFActionProfilePSA(program, control->codeGen, di);
-            control->tables.emplace(di->name.name, ap);
-        }
-    } else if (instance->type->getName().name == "Counter") {
-        if (instance->node->is<IR::Declaration_Instance>()) {
-            auto di = instance->node->to<IR::Declaration_Instance>();
-            cstring name = EBPFObject::externalName(di);
-            auto ctr = new EBPFCounterPSA(program, di, name, control->codeGen);
-            control->counters.emplace(name, ctr);
-        }
-    } else if (instance->type->getName().name == "DirectCounter") {
+    auto di = instance->node->to<IR::Declaration_Instance>();
+    if (di == nullptr)
         return false;
-    } else if (instance->type->getName().name == "Hash") {
-        if (instance->node->is<IR::Declaration_Instance>()) {
-            auto di = instance->node->to<IR::Declaration_Instance>();
-            cstring name = EBPFObject::externalName(di);
-            auto hash = new EBPFHashPSA(program, di, name, control->codeGen);
-            control->hashes.emplace(name, hash);
-        }
-    } else if (instance->type->getName().name == "Register") {
-        auto di = instance->node->to<IR::Declaration_Instance>();
-        cstring name = EBPFObject::externalName(di);
+    cstring name = EBPFObject::externalName(di);
+    cstring typeName = instance->type->getName().name;
+
+    if (typeName == "ActionProfile") {
+        auto ap = new EBPFActionProfilePSA(program, control->codeGen, di);
+        control->tables.emplace(di->name.name, ap);
+    } else if (typeName == "ActionSelector") {
+        auto ap = new EBPFActionSelectorPSA(program, control->codeGen, di);
+        control->tables.emplace(di->name.name, ap);
+    } else if (typeName == "Counter") {
+        auto ctr = new EBPFCounterPSA(program, di, name, control->codeGen);
+        control->counters.emplace(name, ctr);
+    } else if (typeName == "DirectCounter") {
+        return false;
+    } else if (typeName == "Hash") {
+        auto hash = new EBPFHashPSA(program, di, name, control->codeGen);
+        control->hashes.emplace(name, hash);
+    } else if (typeName == "Register") {
         auto reg = new EBPFRegisterPSA(program, name, di, control->codeGen);
         control->registers.emplace(name, reg);
     } else {
         ::error(ErrorType::ERR_UNEXPECTED, "Unexpected block %s nested within control",
                 instance->toString());
-        return false;
     }
-    return true;
+
+    return false;
 }
 
 // =====================EBPFDeparser=============================

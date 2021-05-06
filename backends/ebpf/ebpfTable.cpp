@@ -110,14 +110,32 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
 
         unsigned fieldNumber = 0;
         for (auto c : keyGenerator->keyElements) {
+            auto mtdecl = program->refMap->getDeclaration(c->matchType->path, true);
+            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
             auto type = program->typeMap->getType(c->expression);
             auto ebpfType = EBPFTypeFactory::instance->create(type);
             cstring fieldName = cstring("field") + Util::toString(fieldNumber);
+
             if (!ebpfType->is<IHasWidth>()) {
                 ::error(ErrorType::ERR_TYPE_ERROR,
                         "%1%: illegal type %2% for key field", c, type);
                 return;
             }
+
+            if (!isMatchTypeSupported(matchType)) {
+                ::error(ErrorType::ERR_UNSUPPORTED,
+                        "Match of type %1% not supported", c->matchType);
+            }
+
+            if (matchType->name.name == "selector") {
+                builder->emitIndent();
+                builder->append("/* ");
+                c->expression->apply(commentGen);
+                builder->append(" : selector */");
+                builder->newline();
+                continue;
+            }
+
             keyTypes.emplace(c, ebpfType);
             keyFieldNames.emplace(c, fieldName);
             fieldNumber++;
@@ -128,13 +146,6 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
             c->expression->apply(commentGen);
             builder->append(" */");
             builder->newline();
-
-            auto mtdecl = program->refMap->getDeclaration(c->matchType->path, true);
-            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
-            if (!isMatchTypeSupported(matchType)) {
-                ::error(ErrorType::ERR_UNSUPPORTED,
-                        "Match of type %1% not supported", c->matchType);
-            }
         }
     }
 
@@ -329,7 +340,8 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
     for (auto c : keyGenerator->keyElements) {
         auto ebpfType = ::get(keyTypes, c);
         cstring fieldName = ::get(keyFieldNames, c);
-        CHECK_NULL(fieldName);
+        if (fieldName == nullptr || ebpfType == nullptr)
+            continue;
         bool memcpy = false;
         EBPFScalarType* scalar = nullptr;
         unsigned width = 0;

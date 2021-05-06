@@ -83,6 +83,11 @@ class EBPFTablePSA : public EBPFTable {
             return result->second;
         return nullptr;
     }
+
+    bool isMatchTypeSupported(const IR::Declaration_ID* matchType) override {
+        return EBPFTable::isMatchTypeSupported(matchType) ||
+               matchType->name.name == "selector";
+    }
 };
 
 class EBPFTernaryTablePSA : public EBPFTablePSA {

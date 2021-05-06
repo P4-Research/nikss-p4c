@@ -100,15 +100,19 @@ void EBPFTablePSA::initDirectMeters() {
 }
 
 void EBPFTablePSA::initImplementations() {
-    auto impl = [this](const IR::PathExpression * pe) {
+    bool hasActionSelector = false;
+    auto impl = [this, &hasActionSelector](const IR::PathExpression * pe) {
         CHECK_NULL(pe);
         auto decl = program->refMap->getDeclaration(pe->path, true);
         auto di = decl->to<IR::Declaration_Instance>();
         CHECK_NULL(di);
         EBPFTableImplementationPSA * implementation = nullptr;
-        if (di->type->toString() == "ActionProfile") {
+        cstring type = di->type->toString();
+        if (type == "ActionProfile" || type == "ActionSelector") {
             auto ap = program->control->getTable(di->name.name);
             implementation = ap->to<EBPFTableImplementationPSA>();
+            if (type == "ActionSelector")
+                hasActionSelector = true;
         }
 
         if (implementation != nullptr) {
@@ -119,8 +123,37 @@ void EBPFTablePSA::initImplementations() {
                     "%1%: unknown table implementation %2%", pe, decl);
         }
     };
-
     forEachPropertyEntry("psa_implementation", impl);
+
+    // check if we have also selector key
+    const IR::KeyElement * selectorKey = nullptr;
+    if (keyGenerator != nullptr) {
+        for (auto k : keyGenerator->keyElements) {
+            auto mkdecl = program->refMap->getDeclaration(k->matchType->path, true);
+            auto matchType = mkdecl->getNode()->to<IR::Declaration_ID>();
+            if (matchType->name.name == "selector") {
+                selectorKey = k;
+                break;
+            }
+        }
+    }
+
+    if (hasActionSelector && selectorKey == nullptr) {
+        ::error(ErrorType::ERR_NOT_FOUND,
+                "%1%: ActionSelector provided but there is no selector key",
+                table->container);
+    }
+    if (!hasActionSelector && selectorKey != nullptr) {
+        ::error(ErrorType::ERR_NOT_FOUND,
+                "%1%: implementation not found, ActionSelector is required",
+                selectorKey->matchType);
+    }
+    auto emptyGroupAction = table->container->properties->getProperty("psa_empty_group_action");
+    if (!hasActionSelector && emptyGroupAction != nullptr) {
+        ::warning(ErrorType::WARN_UNUSED,
+                  "%1%: unused property (ActionSelector not provided)",
+                  emptyGroupAction);
+    }
 }
 
 bool EBPFTablePSA::hasImplementation() const {
