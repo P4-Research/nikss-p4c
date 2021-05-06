@@ -79,7 +79,7 @@ ebpf:
 	$(CLANG) $(ARGS) $(CFLAGS) $(INCLUDES) -emit-llvm -c -o  $(BPFNAME).bc $(CFILE)
 	$(LLC) -march=bpf -mcpu=probe -filetype=obj -o $(BPFNAME).o $(BPFNAME).bc
 
-# Code generated in a one stage compilation C -> bpf is more familiar to eBPF verifier.
+# Code generated in a one stage compilation C -> bpf is more friendly to eBPF verifier.
 # PTF tests do not pass when two stage compilation C -> bpf defined above is used. The
 # problem is with the code generated for bounded loops
 .PHONY: psa

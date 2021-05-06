@@ -92,7 +92,7 @@ class EbpfTest(BaseTest):
         self.interfaces = testutils.test_param_get("interfaces").split(",")
         logger.info("Using interfaces: %s", str(self.interfaces))
 
-        self.exec_ns_cmd("load-prog {}".format(self.test_prog_image), "Can\'t load programs into eBPF subsystem")
+        self.exec_ns_cmd("load-prog {}".format(self.test_prog_image), "Can't load programs into eBPF subsystem")
 
         for intf in self.interfaces:
             self.add_port(dev=intf)
