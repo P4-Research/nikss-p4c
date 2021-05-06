@@ -4,6 +4,7 @@
 #include "ebpfPsaControl.h"
 #include "ebpfPsaControlTranslators.h"
 #include "xdpProgram.h"
+#include "externs/ebpfPsaTableImplementation.h"
 #include "externs/ebpfPsaCounter.h"
 #include "externs/ebpfPsaHashAlgorithm.h"
 #include "externs/ebpfPsaRegister.h"
@@ -460,6 +461,8 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     control = new EBPFControlPSA(program,
                                  ctrl,
                                  parserHeaders);
+    program->control = control;
+    program->to<EBPFPipeline>()->control = control;
     control->hitVariable = refmap->newName("hit");
     auto pl = ctrl->container->type->applyParams;
     auto it = pl->parameters.begin();
@@ -559,7 +562,13 @@ bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Variable* decl) {
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
-    if (instance->type->getName().name == "Counter") {
+    if (instance->type->getName().name == "ActionProfile") {
+        if (instance->node->is<IR::Declaration_Instance>()) {
+            auto di = instance->node->to<IR::Declaration_Instance>();
+            auto ap = new EBPFActionProfilePSA(program, control->codeGen, di);
+            control->tables.emplace(di->name.name, ap);
+        }
+    } else if (instance->type->getName().name == "Counter") {
         if (instance->node->is<IR::Declaration_Instance>()) {
             auto di = instance->node->to<IR::Declaration_Instance>();
             cstring name = EBPFObject::externalName(di);

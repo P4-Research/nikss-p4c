@@ -2,6 +2,7 @@
 #include "ebpfPsaObjects.h"
 #include "ebpfPipeline.h"
 #include "ebpfPsaControlTranslators.h"
+#include "backends/ebpf/psa/externs/ebpfPsaTableImplementation.h"
 
 namespace EBPF {
 
@@ -62,7 +63,13 @@ EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* tab
                            CodeGenInspector* codeGen, cstring name, size_t size) :
                            EBPFTable(program, table, codeGen), name(name), size(size) {
     initDirectCounters();
+    initDirectMeters();
+
+    initImplementations();
 }
+
+EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name) :
+        EBPFTable(program, codeGen, name), name(name) {}
 
 ActionTranslationVisitor* EBPFTablePSA::createActionTranslationVisitor(
         cstring valueName, const EBPFProgram* program) const {
@@ -70,11 +77,7 @@ ActionTranslationVisitor* EBPFTablePSA::createActionTranslationVisitor(
 }
 
 void EBPFTablePSA::initDirectCounters() {
-    auto counterProperty = table->container->properties->getProperty("psa_direct_counter");
-    if (counterProperty == nullptr)
-        return;
-
-    auto counterAdder = [this](const IR::PathExpression * pe){
+    auto counterAdder = [this](const IR::PathExpression * pe) {
         CHECK_NULL(pe);
         auto decl = program->refMap->getDeclaration(pe->path, true);
         auto di = decl->to<IR::Declaration_Instance>();
@@ -83,23 +86,69 @@ void EBPFTablePSA::initDirectCounters() {
         this->counters.emplace_back(std::make_pair(pe->path->name.name, ctr));
     };
 
-    if (counterProperty->value->is<IR::ExpressionValue>()) {
-        auto ev = counterProperty->value->to<IR::ExpressionValue>();
+    forEachPropertyEntry("psa_direct_counter", counterAdder);
+}
 
-        if (ev->expression->is<IR::PathExpression>()) {
-            counterAdder(ev->expression->to<IR::PathExpression>());
-        } else if (ev->expression->is<IR::ListExpression>()) {
-            auto le = ev->expression->to<IR::ListExpression>();
-            for (auto c : le->components) {
-                counterAdder(c->to<IR::PathExpression>());
-            }
+void EBPFTablePSA::initDirectMeters() {
+    auto meterAdder = [this](const IR::PathExpression * pe) {
+        CHECK_NULL(pe);
+        auto decl = program->refMap->getDeclaration(pe->path, true);
+        this->meters.emplace_back(EBPFObject::externalName(decl));
+    };
+
+    forEachPropertyEntry("psa_direct_meter", meterAdder);
+}
+
+void EBPFTablePSA::initImplementations() {
+    auto impl = [this](const IR::PathExpression * pe) {
+        CHECK_NULL(pe);
+        auto decl = program->refMap->getDeclaration(pe->path, true);
+        auto di = decl->to<IR::Declaration_Instance>();
+        CHECK_NULL(di);
+        EBPFTableImplementationPSA * implementation = nullptr;
+        if (di->type->toString() == "ActionProfile") {
+            auto ap = program->control->getTable(di->name.name);
+            implementation = ap->to<EBPFTableImplementationPSA>();
+        }
+
+        if (implementation != nullptr) {
+            implementation->registerTable(this);
+            implementations.emplace_back(implementation);
         } else {
-            ::error(ErrorType::ERR_UNSUPPORTED,
-                    "Unsupported list type: %1%", counterProperty->value);
+            ::error(ErrorType::ERR_UNKNOWN,
+                    "%1%: unknown table implementation %2%", pe, decl);
+        }
+    };
+
+    forEachPropertyEntry("psa_implementation", impl);
+}
+
+bool EBPFTablePSA::hasImplementation() const {
+    return !implementations.empty();
+}
+
+void EBPFTablePSA::emitValueActionIDNames(CodeBuilder* builder) {
+    // For action_run method we preserve these ID names for actions.
+    // Values are the same as for implementation, because the same action
+    // set is enforced.
+    if (singleActionRun()) {
+        EBPFTable::emitValueActionIDNames(builder);
+    }
+}
+
+void EBPFTablePSA::emitValueStructStructure(CodeBuilder* builder) {
+    if (hasImplementation()) {
+        if (isTernaryTable()) {
+            builder->emitIndent();
+            builder->append("__u32 priority;");
+            builder->newline();
+        }
+
+        for (auto impl : implementations) {
+            impl->emitReferenceEntry(builder);
         }
     } else {
-        ::error(ErrorType::ERR_UNKNOWN,
-                "Unknown property expression type: %1%", counterProperty->value);
+        EBPFTable::emitValueStructStructure(builder);
     }
 }
 
@@ -108,9 +157,13 @@ void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
     builder->target->emitTableDecl(builder, name, kind,
                                    cstring("struct ") + keyTypeName,
                                    cstring("struct ") + valueTypeName, size);
-    builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
-                                   program->arrayIndexType,
-                                   cstring("struct ") + valueTypeName, 1);
+
+    if (!hasImplementation()) {
+        // Default action is up to implementation
+        builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
+                                       program->arrayIndexType,
+                                       cstring("struct ") + valueTypeName, 1);
+    }
 }
 
 void EBPFTablePSA::emitDirectTypes(CodeBuilder* builder) {
@@ -119,9 +172,22 @@ void EBPFTablePSA::emitDirectTypes(CodeBuilder* builder) {
     }
 }
 
+void EBPFTablePSA::emitAction(CodeBuilder* builder, cstring valueName, cstring actionRunVariable) {
+    if (hasImplementation()) {
+        for (auto impl : implementations) {
+            impl->applyImplementation(builder, valueName, actionRunVariable);
+        }
+    } else {
+        EBPFTable::emitAction(builder, valueName, actionRunVariable);
+    }
+}
+
 void EBPFTablePSA::emitInitializer(CodeBuilder *builder) {
-    this->emitDefaultActionInitializer(builder);
-    this->emitConstEntriesInitializer(builder);
+    // Do not emit initializer when table implementation(s) is provided
+    if (!hasImplementation()) {
+        this->emitDefaultActionInitializer(builder);
+        this->emitConstEntriesInitializer(builder);
+    }
 }
 
 void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
@@ -275,6 +341,26 @@ void EBPFTablePSA::emitTableValue(CodeBuilder* builder, const IR::MethodCallExpr
     builder->endOfStatement(true);
 }
 
+void EBPFTablePSA::emitLookupDefault(CodeBuilder* builder, cstring key, cstring value) {
+    if (hasImplementation()) {
+        builder->appendLine("/* table with implementation has no default action */");
+        builder->target->emitTraceMessage(builder,
+            "Control: skipping default action due to implementation");
+    } else {
+        EBPFTable::emitLookupDefault(builder, key, value);
+    }
+}
+
+bool EBPFTablePSA::dropOnNoMatchingEntryFound() const {
+    if (hasImplementation())
+        return false;
+    return EBPFTable::dropOnNoMatchingEntryFound();
+}
+
+bool EBPFTablePSA::singleActionRun() const {
+    return implementations.size() <= 1;
+}
+
 // =====================EBPFTernaryTablePSA=============================
 void EBPFTernaryTablePSA::emitInstance(CodeBuilder *builder) {
     builder->target->emitTableDecl(builder, name + "_prefixes", TableHash,
@@ -284,9 +370,11 @@ void EBPFTernaryTablePSA::emitInstance(CodeBuilder *builder) {
                                       TableHash, "struct " + keyTypeName,
                                       "struct " + valueTypeName, size,
                                       name + "_tuples_map", TableArray, "__u32", size);
-    builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
-                                   program->arrayIndexType,
-                                   cstring("struct ") + valueTypeName, 1);
+    if (!hasImplementation()) {
+        builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
+                                       program->arrayIndexType,
+                                       cstring("struct ") + valueTypeName, 1);
+    }
 }
 
 void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
@@ -377,6 +465,27 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
     builder->blockEnd(false);
     builder->appendFormat(" __attribute__((aligned(%d)))", structAlignment);
     builder->endOfStatement(true);
+}
+
+void EBPFTernaryTablePSA::emitValueType(CodeBuilder* builder) {
+    EBPFTable::emitValueType(builder);
+
+    if (isTernaryTable()) {
+        // emit ternary mask value
+        builder->emitIndent();
+        builder->appendFormat("struct %s_mask ", valueTypeName.c_str());
+        builder->blockStart();
+
+        builder->emitIndent();
+        builder->appendLine("__u32 tuple_id;");
+        builder->emitIndent();
+        builder->appendFormat("struct %s_mask next_tuple_mask;", keyTypeName.c_str());
+        builder->newline();
+        builder->emitIndent();
+        builder->appendLine("__u8 has_next;");
+        builder->blockEnd(false);
+        builder->endOfStatement(true);
+    }
 }
 
 void EBPFTernaryTablePSA::emitLookup(CodeBuilder *builder, cstring key, cstring value) {

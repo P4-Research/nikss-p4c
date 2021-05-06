@@ -289,8 +289,13 @@ void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
     if (!saveAction.empty()) {
         actionVariableName = saveAction.at(saveAction.size() - 1);
         if (!actionVariableName.isNullOrEmpty()) {
-            builder->appendFormat("unsigned int %s;\n", actionVariableName.c_str());
+            builder->appendFormat("unsigned int %s = 0;\n", actionVariableName.c_str());
             builder->emitIndent();
+            if (!table->singleActionRun()) {
+                ::error(ErrorType::ERR_UNSUPPORTED,
+                    "%1%: action_run statement is not supported here due to an implementation "
+                    "that can call multiple actions", method->expr);
+            }
         }
     }
     builder->blockStart();
@@ -332,9 +337,7 @@ void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
     builder->endOfStatement(true);
 
     builder->emitIndent();
-    builder->target->emitTableLookup(builder, table->defaultActionMapName,
-                                     control->program->zeroKey, valueName);
-    builder->endOfStatement(true);
+    table->emitLookupDefault(builder, control->program->zeroKey, valueName);
     builder->blockEnd(false);
     builder->append(" else ");
     builder->blockStart();
@@ -348,22 +351,21 @@ void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
     builder->blockStart();
     builder->emitIndent();
     builder->appendLine("/* run action */");
-    table->emitAction(builder, valueName);
-    if (!actionVariableName.isNullOrEmpty()) {
-        builder->emitIndent();
-        builder->appendFormat("%s = %s->action",
-                              actionVariableName.c_str(), valueName.c_str());
-        builder->endOfStatement(true);
-    }
+    table->emitAction(builder, valueName, actionVariableName);
     toDereference.clear();
 
     builder->blockEnd(false);
     builder->appendFormat(" else ");
     builder->blockStart();
-    builder->target->emitTraceMessage(builder, "Control: Entry not found, aborting");
-    builder->emitIndent();
-    builder->appendFormat("return %s", builder->target->abortReturnCode().c_str());
-    builder->endOfStatement(true);
+    if (table->dropOnNoMatchingEntryFound()) {
+        builder->target->emitTraceMessage(builder, "Control: Entry not found, aborting");
+        builder->emitIndent();
+        builder->appendFormat("return %s", builder->target->abortReturnCode().c_str());
+        builder->endOfStatement(true);
+    } else {
+        builder->target->emitTraceMessage(builder,
+            "Control: Entry not found, executing implicit NoAction");
+    }
     builder->blockEnd(true);
 
     builder->blockEnd(true);

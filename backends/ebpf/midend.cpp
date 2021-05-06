@@ -110,7 +110,8 @@ const IR::ToplevelBlock* MidEnd::run(EbpfOptions& options,
         if (options.arch == "psa") {
             midEnd.addPasses({
                 new P4::ValidateTableProperties({ "size",
-                                                  "psa_direct_counter" })
+                                                  "psa_direct_counter",
+                                                  "psa_implementation" })
             });
         } else {
             midEnd.addPasses({
