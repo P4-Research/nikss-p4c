@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import ptf.testutils as testutils
 from common import *
 
 PORT0 = 0

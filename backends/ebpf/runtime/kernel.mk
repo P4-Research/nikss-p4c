@@ -21,6 +21,8 @@ P4C=p4c-ebpf
 TARGET=kernel
 # Extra arguments for the compiler
 ARGS=
+# Extra arguments for the P4 compiler
+P4ARGS=
 
 # If needed, bpf target files can be hardcoded here
 # This can be any file of type ".c", ".bc" or, ".o"
@@ -62,7 +64,7 @@ $(BPFNAME).c: $(P4FILE)
 		echo "*** ERROR: Cannot find p4c-ebpf"; \
 		exit 1;\
 	fi;
-	$(P4C) --Werror $(P4INCLUDE) --target $(TARGET) -o $@ $< $(P4ARGS);
+	$(P4C) --Werror $(P4INCLUDE) --target $(TARGET) -o $@ $< $(P4ARGS) $(P4ARGS_TARGET);
 
 # Compile the C code with the clang llvm compiler
 $(BPFNAME).bc: %.bc : %.c
@@ -76,6 +78,14 @@ $(BPFNAME).o: %.o : %.bc
 ebpf:
 	$(CLANG) $(ARGS) $(CFLAGS) $(INCLUDES) -emit-llvm -c -o  $(BPFNAME).bc $(CFILE)
 	$(LLC) -march=bpf -mcpu=probe -filetype=obj -o $(BPFNAME).o $(BPFNAME).bc
+
+# Code generated in a one stage compilation C -> bpf is more friendly to eBPF verifier.
+# PTF tests do not pass when two stage compilation C -> bpf defined above is used. The
+# problem is with the code generated for bounded loops
+.PHONY: psa
+psa: P4ARGS_TARGET= --arch psa
+psa: $(BPFNAME).c
+	$(CLANG) -target bpf -DBTF $(ARGS) $(CFLAGS) $(INCLUDES) -c -o $(BPFNAME).o $(BPFNAME).c
 
 clean:
 	rm -f *.o *.bc $(BPFNAME).c $(BPFNAME).h

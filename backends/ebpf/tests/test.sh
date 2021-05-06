@@ -31,6 +31,11 @@ function cleanup() {
 cleanup
 trap cleanup EXIT
 
+# Remove any temporary files from previous run. It might be useful to
+# preserve these files after test run for inspection
+rm -rf ptf_out/*
+echo "Removed old temporary files from previous tests"
+
 # Trace all command from this point
 set -x
 
