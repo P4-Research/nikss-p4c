@@ -1,9 +1,7 @@
 #!/usr/bin/env python
-import copy
-
-import ptf.testutils as testutils
 from common import *
 
+import copy
 import ctypes as c
 import struct
 
@@ -551,3 +549,4 @@ class VerifyPSATest(P4EbpfTest):
         pkt[Ether].type = 0xFF00
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_other_packets(self)
+

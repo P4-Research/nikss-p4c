@@ -11,22 +11,21 @@ USER_SRC = ${USER_TARGETS:=.c}
 USER_OBJ = ${USER_SRC:.c=.o}
 
 
-LIBBPF_DIR ?= ./p4-libbpf
+LIBBPF_DIR ?= ../../runtime/contrib/libbpf
 
-OBJECT_LIBBPF = $(LIBBPF_DIR)/libbpf.a
+OBJECT_LIBBPF = $(LIBBPF_DIR)/src/libbpf.a
 
 KERNEL_DIR ?= /lib/modules/$(shell uname -r)/source
 
 CFLAGS ?= -I$(KERNEL_DIR)/
-CFLAGS += -I$(LIBBPF_DIR)/include/ -I$(LIBBPF_DIR)/src/ -g
+CFLAGS += -I$(LIBBPF_DIR)/include/uapi/
 
-BPF_FLAGS ?= -I$(KERNEL_DIR) -I$(LIBBPF_DIR)/include/ -I$(LIBBPF_DIR)/src/ -I../../runtime/
+BPF_FLAGS ?= -I$(KERNEL_DIR) -I$(LIBBPF_DIR)/src -I../../runtime/
+BPF_FLAGS += -I$(LIBBPF_DIR)/include/uapi/
 
 LDFLAGS ?= -L$(LIBBPF_DIR)/src
 
 LIBS = -l:libbpf.a -lelf -lz
-
-#EXTRA_DEPS +=
 
 all: $(USER_TARGETS) $(KERN_OBJ)
 

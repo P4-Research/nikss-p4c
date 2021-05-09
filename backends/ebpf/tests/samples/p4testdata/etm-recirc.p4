@@ -1,5 +1,5 @@
 #include <core.p4>
-#include "psa.p4"
+#include <psa.p4>
 
 // TODO: use recirculate_metadata_t
 // TODO: use PSA_PORT_RECIRCULATE instead of direct number of port

@@ -94,7 +94,6 @@ const IR::ToplevelBlock* MidEnd::run(EbpfOptions& options,
             new P4::StrengthReduction(&refMap, &typeMap),
             new P4::SimplifyComparisons(&refMap, &typeMap),
             new P4::EliminateTuples(&refMap, &typeMap),
-            new P4::LocalCopyPropagation(&refMap, &typeMap),
             new P4::SimplifySelectList(&refMap, &typeMap),
             new P4::MoveDeclarations(),  // more may have been introduced
             new P4::RemoveSelectBooleans(&refMap, &typeMap),
@@ -111,7 +110,8 @@ const IR::ToplevelBlock* MidEnd::run(EbpfOptions& options,
         if (options.arch == "psa") {
             midEnd.addPasses({
                 new P4::ValidateTableProperties({ "size",
-                                                  "psa_direct_counter" })
+                                                  "psa_direct_counter",
+                                                  "psa_implementation" })
             });
         } else {
             midEnd.addPasses({

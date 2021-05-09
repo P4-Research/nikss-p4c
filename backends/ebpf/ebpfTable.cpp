@@ -23,22 +23,30 @@ limitations under the License.
 namespace EBPF {
 
 bool ActionTranslationVisitor::preorder(const IR::PathExpression* expression) {
-    auto decl = program->refMap->getDeclaration(expression->path, true);
-    if (decl->is<IR::Parameter>()) {
-        auto param = decl->to<IR::Parameter>();
-        bool isParam = action->parameters->getParameter(param->name) == param;
-        if (isParam) {
-            builder->append(valueName);
-            builder->append("->u.");
-            cstring name = EBPFObject::externalName(action);
-            builder->append(name);
-            builder->append(".");
-            builder->append(expression->path->toString());  // original name
-            return false;
-        }
+    if (isActionParameter(expression)) {
+        cstring paramStr = getActionParamStr(expression);
+        builder->append(paramStr.c_str());
+        return false;
     }
     visit(expression->path);
     return false;
+}
+
+bool ActionTranslationVisitor::isActionParameter(const IR::PathExpression *expression) const {
+    auto decl = program->refMap->getDeclaration(expression->path, true);
+    if (decl->is<IR::Parameter>()) {
+        auto param = decl->to<IR::Parameter>();
+        return action->parameters->getParameter(param->name) == param;
+    }
+    return false;
+}
+
+cstring ActionTranslationVisitor::getActionParamStr(const IR::Expression *expression) const {
+    cstring actionName = EBPFObject::externalName(action);
+    auto paramStr = Util::printf_format("%s->u.%s.%s",
+                                        valueName, actionName,
+                                        expression->toString());
+    return paramStr;
 }
 
 bool ActionTranslationVisitor::preorder(const IR::P4Action* act) {
@@ -61,6 +69,11 @@ EBPFTable::EBPFTable(const EBPFProgram* program, const IR::TableBlock* table,
     keyGenerator = table->container->getKey();
     actionList = table->container->getActionList();
     validateKeys(program);
+}
+
+EBPFTable::EBPFTable(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name) :
+        EBPFTableBase(program, name, codeGen),
+        keyGenerator(nullptr), actionList(nullptr), table(nullptr) {
 }
 
 void EBPFTable::validateKeys(const EBPFProgram *program) const {
@@ -150,6 +163,21 @@ void EBPFTable::emitActionArguments(CodeBuilder* builder,
 }
 
 void EBPFTable::emitValueType(CodeBuilder* builder) {
+    emitValueActionIDNames(builder);
+
+    // a type-safe union: a struct with a tag and an union
+    builder->emitIndent();
+    builder->appendFormat("struct %s ", valueTypeName.c_str());
+    builder->blockStart();
+
+    emitValueStructStructure(builder);
+    emitDirectTypes(builder);
+
+    builder->blockEnd(false);
+    builder->endOfStatement(true);
+}
+
+void EBPFTable::emitValueActionIDNames(CodeBuilder* builder) {
     // create type definition for action
     builder->emitIndent();
     unsigned int action_idx = 1;  // 0 is reserved for NoAction
@@ -166,12 +194,9 @@ void EBPFTable::emitValueType(CodeBuilder* builder) {
         action_idx++;
     }
     builder->emitIndent();
+}
 
-    // a type-safe union: a struct with a tag and an union
-    builder->emitIndent();
-    builder->appendFormat("struct %s ", valueTypeName.c_str());
-    builder->blockStart();
-
+void EBPFTable::emitValueStructStructure(CodeBuilder* builder) {
     builder->emitIndent();
     builder->append("unsigned int action;");
     builder->newline();
@@ -196,28 +221,6 @@ void EBPFTable::emitValueType(CodeBuilder* builder) {
     builder->blockEnd(false);
     builder->spc();
     builder->appendLine("u;");
-
-    emitDirectTypes(builder);
-
-    builder->blockEnd(false);
-    builder->endOfStatement(true);
-
-    if (isTernaryTable()) {
-        // emit ternary mask value
-        builder->emitIndent();
-        builder->appendFormat("struct %s_mask ", valueTypeName.c_str());
-        builder->blockStart();
-
-        builder->emitIndent();
-        builder->appendLine("__u32 tuple_id;");
-        builder->emitIndent();
-        builder->appendFormat("struct %s_mask next_tuple_mask;", keyTypeName.c_str());
-        builder->newline();
-        builder->emitIndent();
-        builder->appendLine("__u8 has_next;");
-        builder->blockEnd(false);
-        builder->endOfStatement(true);
-    }
 }
 
 void EBPFTable::emitTypes(CodeBuilder* builder) {
@@ -409,7 +412,7 @@ cstring EBPFTable::getByteSwapMethod(unsigned int width) const {
     return swap;
 }
 
-void EBPFTable::emitAction(CodeBuilder* builder, cstring valueName) {
+void EBPFTable::emitAction(CodeBuilder* builder, cstring valueName, cstring actionRunVariable) {
     builder->emitIndent();
     builder->appendFormat("switch (%s->action) ", valueName.c_str());
     builder->blockStart();
@@ -471,6 +474,13 @@ void EBPFTable::emitAction(CodeBuilder* builder, cstring valueName) {
     builder->decreaseIndent();
 
     builder->blockEnd(true);
+
+    if (!actionRunVariable.isNullOrEmpty()) {
+        builder->emitIndent();
+        builder->appendFormat("%s = %s->action",
+                              actionRunVariable.c_str(), valueName.c_str());
+        builder->endOfStatement(true);
+    }
 }
 
 void EBPFTable::emitInitializer(CodeBuilder* builder) {

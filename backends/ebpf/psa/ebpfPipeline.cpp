@@ -456,9 +456,7 @@ void XDPIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->appendFormat("if (%s != 0) ", mcast_grp.c_str());
     builder->blockStart();
     builder->emitIndent();
-    builder->appendFormat("bpf_printk(\"[INGRESS PRS] Warning: XDP does\'nt"
-                            " support Multicast. Operation ignored.\\n\")");
-    builder->endOfStatement(true);
+    builder->appendFormat("return %s;\n", builder->target->abortReturnCode().c_str());
     builder->blockEnd(true);
 
     builder->emitIndent();
@@ -548,21 +546,9 @@ void XDPEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     outputMdVar = control->outputStandardMetadata->name.name;
     inputMdVar = control->inputStandardMetadata->name.name;
 
-    // clone support
-    builder->emitIndent();
-    builder->appendFormat("if (%s.clone) ", outputMdVar.c_str());
-    builder->blockStart();
-
-    builder->emitIndent();
-    builder->appendLine("bpf_printk(\"[EGRESS DPRS] Warning: XDP does\'nt"
-                            " support cloning. Operation ignored.\\n\");");
-    builder->blockEnd(true);
-
     builder->newline();
-
-    // drop support
     builder->emitIndent();
-    builder->appendFormat("if (%s.drop) ", outputMdVar.c_str());
+    builder->appendFormat("if (%s.clone || %s.drop) ", outputMdVar.c_str(), outputMdVar.c_str());
     builder->blockStart();
     builder->target->emitTraceMessage(builder,
                                     "EgressTM: Packet dropped due to metadata");
@@ -579,7 +565,6 @@ void XDPEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
                                         "EgressTM: output packet to port %d",
                                       1, varStr.c_str());
     builder->emitIndent();
-    
     builder->appendFormat("return %s", builder->target->forwardReturnCode());
     builder->endOfStatement(true);
 }

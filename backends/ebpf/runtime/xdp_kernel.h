@@ -38,23 +38,6 @@
 // This file contains the definitions of all the kernel bpf essentials
 #include "bpf_helpers.h"
 
-
-struct timestamp_t {
-    unsigned start;
-    unsigned end;
-};
-
-/* 
- * TODO (El-Fadel): Keep in the orginal file???
- */
-struct bpf_devmap_val {
-    __u32 ifindex;   /* device index */
-    union {
-        int   fd;  /* prog fd on map write */
-        __u32 id;  /* prog id on map read */
-    } bpf_prog;
-};
-
 /* simple descriptor which replaces the kernel sk_buff structure */
 #define SK_BUFF struct __sk_buff
 

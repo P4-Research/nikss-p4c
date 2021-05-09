@@ -86,7 +86,7 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     builder->appendFormat("int %s = 0", this->returnCode.c_str());
     builder->endOfStatement(true);
     builder->emitIndent();
-    emitResizeHead(builder, pipelineProgram->contextVar.c_str());
+    emitResizeHead(builder);
 
     builder->emitIndent();
     builder->appendFormat("if (%s) ", this->returnCode.c_str());
@@ -334,6 +334,14 @@ void EBPFDeparserPSA::emitDeclaration(CodeBuilder* builder, const IR::Declaratio
     EBPFControlPSA::emitDeclaration(builder, decl);
 }
 
+void TCDeparserPSA::emitResizeHead(CodeBuilder *builder) {
+    builder->appendFormat("%s = bpf_skb_adjust_room(%s, %s, 1, 0)",
+                          this->returnCode.c_str(),
+                          program->model.CPacketName.str(),
+                          this->outerHdrOffsetVar.c_str());
+    builder->endOfStatement(true);
+}
+
 // =====================TCIngressDeparserPSA=============================
 bool TCIngressDeparserPSA::build() {
     auto pl = controlBlock->container->type->applyParams;
@@ -402,15 +410,6 @@ void TCIngressDeparserPSA::emitSharedMetadataInitializer(CodeBuilder *builder) {
     builder->endOfStatement(true);
 }
 
-void TCIngressDeparserPSA::emitResizeHead(CodeBuilder *builder,
-                                            const cstring context_var) {
-    builder->appendFormat("%s = bpf_skb_adjust_room(%s, %s, 1, 0)",
-                          this->returnCode.c_str(),
-                          context_var,
-                          this->outerHdrOffsetVar.c_str());
-    builder->endOfStatement(true);
-}
-
 // =====================TCEgressDeparserPSA=============================
 bool TCEgressDeparserPSA::build() {
     auto pl = controlBlock->container->type->applyParams;
@@ -427,11 +426,10 @@ bool TCEgressDeparserPSA::build() {
     return true;
 }
 
-void TCEgressDeparserPSA::emitResizeHead(CodeBuilder *builder,
-                                            const cstring context_var) {
-    builder->appendFormat("%s = bpf_skb_adjust_room(%s, %s, 1, 0)",
+void XDPDeparserPSA::emitResizeHead(CodeBuilder *builder) {
+    builder->appendFormat("%s = bpf_xdp_adjust_head(%s, %s)",
                           this->returnCode.c_str(),
-                          context_var,
+                          program->model.CPacketName.str(),
                           this->outerHdrOffsetVar.c_str());
     builder->endOfStatement(true);
 }
@@ -455,50 +453,17 @@ bool XDPIngressDeparserPSA::build() {
     return true;
 }
 
-void XDPIngressDeparserPSA::emitResizeHead(CodeBuilder *builder,
-                                            const cstring context_var) {
-    builder->appendFormat("%s = bpf_xdp_adjust_head(%s, %s)",
-                          this->returnCode.c_str(),
-                          context_var,
-                          this->outerHdrOffsetVar.c_str());
-    builder->endOfStatement(true);
-}
-
 /*
  * 
  */
 void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->emitIndent();
-
-    builder->newline();
-    builder->emitIndent();
-
-    // clone support
-    builder->appendFormat("if (%s.clone) ", istd->name.name);
-    builder->blockStart();
-    builder->emitIndent();
-    builder->appendLine("bpf_printk(\"[INGRESS DPRS] Warning: XDP does\'nt "
-                        "support cloning. Operation ignored.\\n\");");
-    builder->blockEnd(true);
-
-    // early drop
-    builder->emitIndent();
-    builder->appendFormat("if (%s.drop) ", istd->name.name);
+    builder->appendFormat("if (%s.clone || %s.drop || %s.resubmit) ",
+                           istd->name.name, istd->name.name, istd->name.name);
     builder->blockStart();
     builder->target->emitTraceMessage(builder, "PreDeparser: dropping packet..");
     builder->emitIndent();
     builder->appendFormat("return %s;\n", builder->target->abortReturnCode().c_str());
-    builder->blockEnd(true);
-
-    // if packet should be resubmitted, we skip deparser
-    builder->emitIndent();
-    builder->appendFormat("if (%s.resubmit) ", istd->name.name);
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder, "PreDeparser: resubmitting packet, "
-                                               "skipping deparser..");
-    builder->emitIndent();
-    builder->appendLine("bpf_printk(\"[INGRESS DPRS] Warning: XDP does\'nt "
-                        "support cloning. Operation ignored.\\n\");");
     builder->blockEnd(true);
 }
 
@@ -522,15 +487,6 @@ bool XDPEgressDeparserPSA::build() {
     headerType = EBPFTypeFactory::instance->create(ht);
 
     return true;
-}
-
-void XDPEgressDeparserPSA::emitResizeHead(CodeBuilder *builder,
-                                           const cstring context_var) {
-    builder->appendFormat("%s = bpf_xdp_adjust_head(%s, %s)",
-                          this->returnCode.c_str(),
-                          context_var,
-                          this->outerHdrOffsetVar.c_str());
-    builder->endOfStatement(true);
 }
 
 }  // namespace EBPF

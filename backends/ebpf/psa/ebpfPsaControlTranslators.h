@@ -17,9 +17,12 @@ class ControlBodyTranslatorPSA : public ControlBodyTranslator {
     explicit ControlBodyTranslatorPSA(const EBPFControlPSA* control);
 
     bool preorder(const IR::Member* expression) override;
-    bool preorder(const IR::AssignmentStatement* s) override;
+    bool preorder(const IR::AssignmentStatement* a) override;
 
     void processMethod(const P4::ExternMethod* method) override;
+
+    virtual cstring getIndexActionParam(const IR::PathExpression *indexExpr);
+    virtual cstring getValueActionParam(const IR::PathExpression *valueExpr);
 };
 
 class ActionTranslationVisitorPSA : public ActionTranslationVisitor,
@@ -35,6 +38,9 @@ class ActionTranslationVisitorPSA : public ActionTranslationVisitor,
 
     void processMethod(const P4::ExternMethod* method) override;
     void processApply(const P4::ApplyMethod* method) override;
+
+    cstring getIndexActionParam(const IR::PathExpression *indexExpr) override;
+    cstring getValueActionParam(const IR::PathExpression *valueExpr) override;
 };
 
 }  // namespace EBPF

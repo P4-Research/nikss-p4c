@@ -14,7 +14,7 @@ sudo ip link set dev veth1 up
 sudo ip netns exec ns0 ip addr add "10.0.2.2/24" dev eth1
 sudo ip netns exec ns0 ip link set dev eth1 up
 
-# create Recirc IFACE
+#create Recirc IFACE
 sudo ip link add name psa_recirc type dummy
 sudo ip link set dev psa_recirc up
 
@@ -23,19 +23,20 @@ declare -a ARGS="-DPSA_PORT_RECIRCULATE=$RECIRC_PORT_ID -DBTF"
 
 # compile tc progs
 make -f ../../runtime/kernel.mk BPFOBJ=out-tc.o \
-	P4FILE=../scenarios/basic/p4/l2fwd/l2fwd.p4 ARGS="$ARGS" P4C="p4c-ebpf --arch psa"
+	P4FILE=../scenarios/basic/p4/l2fwd/l2fwd.p4 ARGS="$ARGS" psa
+
+
+sudo bpftool prog loadall out-tc.o /sys/fs/bpf/prog
 
 sudo nsenter --net=/var/run/netns/ns0 \
-	sudo ip link set dev eth0 xdpgeneric obj out-tc.o sec xdp/xdp-ingress
+	ip link set dev eth0 xdpgeneric obj out-tc.o sec xdp/xdp-ingress
 
 sudo nsenter --net=/var/run/netns/ns0 \
-	sudo tc qdisc add dev eth0 clsact
+	tc qdisc add dev eth0 clsact
+sudo nsenter --net=/var/run/netns/ns0 \
+	tc filter add dev eth0 ingress bpf da fd /sys/fs/bpf/prog/classifier_tc-ingress
 
 sudo nsenter --net=/var/run/netns/ns0 \
-	sudo tc filter add dev eth0 ingress bpf da obj out-tc.o sec classifier/tc-ingress
-
+	tc qdisc add dev eth1 clsact
 sudo nsenter --net=/var/run/netns/ns0 \
-	sudo tc qdisc add dev eth1 clsact
-
-sudo nsenter --net=/var/run/netns/ns0 \
-	sudo tc filter add dev eth1 egress bpf da obj out-tc.o sec classifier/tc-egress
+	tc filter add dev eth1 egress bpf da fd /sys/fs/bpf/prog/classifier_tc-egress

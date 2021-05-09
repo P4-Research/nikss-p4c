@@ -4,9 +4,6 @@ import random
 
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import IP, UDP
-from scapy.packet import raw
-
-import ptf.testutils as testutils
 
 PORT0 = 0
 PORT1 = 1

@@ -38,6 +38,8 @@ class ActionTranslationVisitor : public virtual CodeGenInspector {
     bool preorder(const IR::PathExpression* expression);
 
     bool preorder(const IR::P4Action* act);
+    cstring getActionParamStr(const IR::Expression *expression) const;
+    bool isActionParameter(const IR::PathExpression *expression) const;
 };  // ActionTranslationVisitor
 
 // Also used to represent counters
@@ -85,17 +87,24 @@ class EBPFTable : public EBPFTableBase {
     std::map<const IR::KeyElement*, EBPFType*> keyTypes;
 
     EBPFTable(const EBPFProgram* program, const IR::TableBlock* table, CodeGenInspector* codeGen);
+    EBPFTable(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name);
     virtual void emitTypes(CodeBuilder* builder);
     virtual void emitInstance(CodeBuilder* builder);
     void emitActionArguments(CodeBuilder* builder, const IR::P4Action* action, cstring name);
     virtual void emitKeyType(CodeBuilder* builder);
-    void emitValueType(CodeBuilder* builder);
+    virtual void emitValueType(CodeBuilder* builder);
+    virtual void emitValueActionIDNames(CodeBuilder* builder);
+    virtual void emitValueStructStructure(CodeBuilder* builder);
     void emitKey(CodeBuilder* builder, cstring keyName);
-    void emitAction(CodeBuilder* builder, cstring valueName);
+    virtual void emitAction(CodeBuilder* builder, cstring valueName, cstring actionRunVariable);
     virtual void emitInitializer(CodeBuilder* builder);
     virtual void emitLookup(CodeBuilder* builder, cstring key, cstring value) {
-            builder->target->emitTableLookup(builder, dataMapName, key, value);
-            builder->endOfStatement(true);
+        builder->target->emitTableLookup(builder, dataMapName, key, value);
+        builder->endOfStatement(true);
+    }
+    virtual void emitLookupDefault(CodeBuilder* builder, cstring key, cstring value) {
+        builder->target->emitTableLookup(builder, defaultActionMapName, key, value);
+        builder->endOfStatement(true);
     }
     virtual bool isMatchTypeSupported(const IR::Declaration_ID* matchType) {
         return matchType->name.name == P4::P4CoreLibrary::instance.exactMatch.name ||
@@ -104,6 +113,8 @@ class EBPFTable : public EBPFTableBase {
     virtual void emitDirectTypes(CodeBuilder* builder) { (void) builder; }
     cstring actionToActionIDName(const IR::P4Action * action) const;
     cstring getByteSwapMethod(unsigned int width) const;
+    virtual bool dropOnNoMatchingEntryFound() const { return true; }
+    virtual bool singleActionRun() const { return true; }
 
  private:
     void declareTmpLpmKey(CodeBuilder *builder, const IR::KeyElement *c, std::string &tmpVar);

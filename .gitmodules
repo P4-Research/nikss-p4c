@@ -9,6 +9,3 @@
 	path = backends/ebpf/runtime/contrib/libbpf
 	url = https://github.com/libbpf/libbpf
 	ignore = dirty
-[submodule "backends/ebpf/evaluation/test_xdp/p4-libbpf"]
-	path = backends/ebpf/evaluation/test_xdp/p4-libbpf
-	url = https://github.com/elfadel/p4-libbpf.git

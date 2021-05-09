@@ -4,8 +4,10 @@
 #include "ebpfPsaControl.h"
 #include "ebpfPsaControlTranslators.h"
 #include "xdpHelpProgram.h"
+#include "externs/ebpfPsaTableImplementation.h"
 #include "externs/ebpfPsaCounter.h"
 #include "externs/ebpfPsaHashAlgorithm.h"
+#include "externs/ebpfPsaRegister.h"
 
 namespace EBPF {
 
@@ -19,6 +21,7 @@ void PSAArch::emitCommonPreamble(CodeBuilder *builder) const {
     builder->appendLine("#define write_byte(base, offset, v) do { "
                         "*(u8*)((base) + (offset)) = (v); "
                         "} while (0)");
+    builder->target->emitPreamble(builder);
 }
 
 void PSAArch::emitPSAIncludes(CodeBuilder *builder) const {
@@ -79,7 +82,6 @@ void PSAArch::emit2TC(CodeBuilder *builder) const {
      * 6. BPF map initialization
      */
     emitInitializer2TC(builder);
-    
     builder->newline();
 
     /*
@@ -248,9 +250,6 @@ void PSAArch::emitPreamble2TC(CodeBuilder *builder) const {
         "#endif");
     builder->appendLine("#define P4C_PSA_PORT_RECIRCULATE 0xfffffffa");
     builder->newline();
-
-    // target-specific "preamble"
-    builder->target->emitPreamble(builder);
 }
 
 void PSAArch::emitInstances2TC(CodeBuilder *builder) const {
@@ -308,11 +307,8 @@ void PSAArch::emit2XDP(CodeBuilder *builder) const {
     emitInstances2XDP(builder);
 
     emitInitializer2XDP(builder);
-    
     xdpIngress->emit(builder);
-
     xdpEgress->emit(builder);
-
     builder->newline();
 
     emitDummy2XDP(builder);
@@ -323,8 +319,6 @@ void PSAArch::emit2XDP(CodeBuilder *builder) const {
 void PSAArch::emitPreamble2XDP(CodeBuilder *builder) const {
     emitCommonPreamble(builder);
 
-    // target-specific "preamble"
-    builder->target->emitPreamble(builder);
     builder->newline();
 }
 
@@ -430,19 +424,30 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
         }
     }
 
+    /*
+    * INGRESS
+    */
+    auto ingress = tlb->getMain()->getParameterValue("ingress")->to<IR::PackageBlock>();
+    auto ingressParser = ingress->getParameterValue("ip");
+    BUG_CHECK(ingressParser != nullptr, "No ingress parser block found");
+    auto ingressControl = ingress->getParameterValue("ig");
+    BUG_CHECK(ingressControl != nullptr, "No ingress control block found");
+    auto ingressDeparser = ingress->getParameterValue("id");
+    BUG_CHECK(ingressDeparser != nullptr, "No ingress deparser block found");
+
+    /*
+    * EGRESS
+    */
+    auto egress = tlb->getMain()->getParameterValue("egress")->to<IR::PackageBlock>();
+    auto egressParser = egress->getParameterValue("ep");
+    BUG_CHECK(egressParser != nullptr, "No egress parser block found");
+    auto egressControl = egress->getParameterValue("eg");
+    BUG_CHECK(egressControl != nullptr, "No egress control block found");
+    auto egressDeparser = egress->getParameterValue("ed");
+    BUG_CHECK(egressDeparser != nullptr, "No egress deparser block found");
+
     if (!options.generateToXDP) {
         auto xdp = new XDPHelpProgram(options);
-
-        /*
-        * TC INGRESS
-        */
-        auto ingress = tlb->getMain()->getParameterValue("ingress")->to<IR::PackageBlock>();
-        auto ingressParser = ingress->getParameterValue("ip");
-        BUG_CHECK(ingressParser != nullptr, "No ingress parser block found");
-        auto ingressControl = ingress->getParameterValue("ig");
-        BUG_CHECK(ingressControl != nullptr, "No ingress control block found");
-        auto ingressDeparser = ingress->getParameterValue("id");
-        BUG_CHECK(ingressDeparser != nullptr, "No ingress deparser block found");
 
         auto ingress_pipeline_converter =
             new ConvertToEbpfPipeline("tc-ingress", INGRESS, options,
@@ -453,17 +458,6 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
         ingress->apply(*ingress_pipeline_converter);
         tlb->getProgram()->apply(*ingress_pipeline_converter);
         auto tcIngress = ingress_pipeline_converter->getEbpfPipeline();
-
-        /*
-         * TC EGRESS
-         */
-        auto egress = tlb->getMain()->getParameterValue("egress")->to<IR::PackageBlock>();
-        auto egressParser = egress->getParameterValue("ep");
-        BUG_CHECK(egressParser != nullptr, "No egress parser block found");
-        auto egressControl = egress->getParameterValue("eg");
-        BUG_CHECK(egressControl != nullptr, "No egress control block found");
-        auto egressDeparser = egress->getParameterValue("ed");
-        BUG_CHECK(egressDeparser != nullptr, "No egress deparser block found");
 
         auto egress_pipeline_converter =
             new ConvertToEbpfPipeline("tc-egress", EGRESS, options,
@@ -477,17 +471,6 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
 
         return new PSAArch(ebpfTypes, xdp, tcIngress, tcEgress);
     } else {
-        /*
-         * XDP INGRESS
-         */
-        auto ingress = tlb->getMain()->getParameterValue("ingress")->to<IR::PackageBlock>();
-        auto ingressParser = ingress->getParameterValue("ip");
-        BUG_CHECK(ingressParser != nullptr, "No ingress parser block found");
-        auto ingressControl = ingress->getParameterValue("ig");
-        BUG_CHECK(ingressControl != nullptr, "No ingress control block found");
-        auto ingressDeparser = ingress->getParameterValue("id");
-        BUG_CHECK(ingressDeparser != nullptr, "No ingress deparser block found");
-
         auto ingress_pipeline_converter =
             new ConvertToEbpfPipeline("xdp-ingress", INGRESS, options,
                 ingressParser->to<IR::ParserBlock>(),
@@ -498,17 +481,6 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
         tlb->getProgram()->apply(*ingress_pipeline_converter);
         auto xdpIngress = ingress_pipeline_converter->getEbpfPipeline();
         BUG_CHECK(xdpIngress != nullptr, "Cannot create xdpIngress block.");
-
-        /*
-         * XDP EGRESS
-         */
-        auto egress = tlb->getMain()->getParameterValue("egress")->to<IR::PackageBlock>();
-        auto egressParser = egress->getParameterValue("ep");
-        BUG_CHECK(egressParser != nullptr, "No egress parser block found");
-        auto egressControl = egress->getParameterValue("eg");
-        BUG_CHECK(egressControl != nullptr, "No egress control block found");
-        auto egressDeparser = egress->getParameterValue("ed");
-        BUG_CHECK(egressDeparser != nullptr, "No egress deparser block found");
 
         auto egress_pipeline_converter =
             new ConvertToEbpfPipeline("xdp-egress", EGRESS, options,
@@ -626,6 +598,8 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     control = new EBPFControlPSA(program,
                                  ctrl,
                                  parserHeaders);
+    program->control = control;
+    program->to<EBPFPipeline>()->control = control;
     control->hitVariable = refmap->newName("hit");
     auto pl = ctrl->container->type->applyParams;
     auto it = pl->parameters.begin();
@@ -725,7 +699,13 @@ bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Variable* decl) {
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
-    if (instance->type->getName().name == "Counter") {
+    if (instance->type->getName().name == "ActionProfile") {
+        if (instance->node->is<IR::Declaration_Instance>()) {
+            auto di = instance->node->to<IR::Declaration_Instance>();
+            auto ap = new EBPFActionProfilePSA(program, control->codeGen, di);
+            control->tables.emplace(di->name.name, ap);
+        }
+    } else if (instance->type->getName().name == "Counter") {
         if (instance->node->is<IR::Declaration_Instance>()) {
             auto di = instance->node->to<IR::Declaration_Instance>();
             cstring name = EBPFObject::externalName(di);
@@ -741,6 +721,11 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
             auto hash = new EBPFHashPSA(program, di, name, control->codeGen);
             control->hashes.emplace(name, hash);
         }
+    } else if (instance->type->getName().name == "Register") {
+        auto di = instance->node->to<IR::Declaration_Instance>();
+        cstring name = EBPFObject::externalName(di);
+        auto reg = new EBPFRegisterPSA(program, name, di, control->codeGen);
+        control->registers.emplace(name, reg);
     } else {
         ::error(ErrorType::ERR_UNEXPECTED, "Unexpected block %s nested within control",
                 instance->toString());

@@ -17,22 +17,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include "bpf_util.h"
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
-
-/* DEVMAP map-value layout
- *
- * The struct data-layout of map-value is a configuration interface.
- * New members can only be added to the end of this structure.
- */
-struct bpf_devmap_val {
-	__u32 ifindex;   /* device index */
-	union {
-		int   fd;  /* prog fd on map write */
-		__u32 id;  /* prog id on map read */
-	} bpf_prog;
-};
 
 /* 
  * extract map from the xdp prog and pinned 
