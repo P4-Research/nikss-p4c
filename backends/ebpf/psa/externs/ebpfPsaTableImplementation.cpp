@@ -56,15 +56,15 @@ void EBPFTableImplementationPSA::verifyTableActionList(const EBPFTablePSA * inst
         return pe->path->name.originalName;
     };
 
-    if (instance->actionList->size() != actionList->size())
-        printError = true;
-    else {
+    if (instance->actionList->size() == actionList->size()) {
         for (size_t i = 0; i < actionList->size(); ++i) {
             auto left = getActionName(instance->actionList, i);
             auto right = getActionName(actionList, i);
             if (left != right)
                 printError = true;
         }
+    } else {
+        printError = true;
     }
 
     if (printError) {
@@ -205,7 +205,7 @@ EBPFActionSelectorPSA::EBPFActionSelectorPSA(const EBPFProgram* program, CodeGen
                                              const IR::Declaration_Instance* decl) :
         EBPFTableImplementationPSA(program, codeGen, decl), emptyGroupAction(nullptr) {
     hashEngine = EBPFHashAlgorithmTypeFactoryPSA::instance()->create(
-            (int) getUintFromExpression(decl->arguments->at(0)->expression, 0),
+            getUintFromExpression(decl->arguments->at(0)->expression, 0),
             program, name + "_hash");
     if (hashEngine == nullptr) {
         ::error(ErrorType::ERR_UNSUPPORTED,
@@ -213,6 +213,8 @@ EBPFActionSelectorPSA::EBPFActionSelectorPSA(const EBPFProgram* program, CodeGen
     }
 
     size = getUintFromExpression(decl->arguments->at(1)->expression, 1);
+
+    // TODO: output width (arg #3)
 }
 
 void EBPFActionSelectorPSA::emitInstance(CodeBuilder *builder) {
@@ -259,15 +261,15 @@ void EBPFActionSelectorPSA::verifyTableSelectorKeySet(const EBPFTablePSA * insta
     bool printError = false;
     auto is = getSelectorsFromTable(instance);
 
-    if (selectors.size() != is.size())
-        printError = true;
-    else {
+    if (selectors.size() == is.size()) {
         for (size_t i = 0; i < selectors.size(); ++i) {
             auto left = is.at(i)->expression->toString();
             auto right = selectors.at(i)->expression->toString();
             if (left != right)
                 printError = true;
         }
+    } else {
+        printError = true;
     }
 
     if (printError) {
@@ -319,11 +321,9 @@ void EBPFActionSelectorPSA::verifyTableEmptyGroupAction(const EBPFTablePSA * ins
             same = false;
     } else if (lmce != nullptr && rmce != nullptr) {
         if (lmce->method->to<IR::PathExpression>()->path->name.originalName !=
-            rmce->method->to<IR::PathExpression>()->path->name.originalName)
+            rmce->method->to<IR::PathExpression>()->path->name.originalName) {
             same = false;
-        else if (lmce->arguments->size() != rmce->arguments->size()) {
-            same = false;
-        } else {
+        } else if (lmce->arguments->size() == rmce->arguments->size()) {
             for (size_t i = 0; i < lmce->arguments->size(); ++i) {
                 if (lmce->arguments->at(i)->expression->toString() !=
                     rmce->arguments->at(i)->expression->toString()) {
@@ -331,6 +331,8 @@ void EBPFActionSelectorPSA::verifyTableEmptyGroupAction(const EBPFTablePSA * ins
                     additionalNote = "; note: action arguments must be the same for both tables";
                 }
             }
+        } else {
+            same = false;
         }
     } else {
         same = false;
