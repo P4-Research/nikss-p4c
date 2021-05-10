@@ -107,7 +107,7 @@ void PsaStateTranslationVisitor::processMethod(const P4::ExternMethod* ext) {
     if (externName == "InternetChecksum" || externName == "Checksum") {
         auto instance = ext->object->getName().name;
         auto method = ext->method->getName().name;
-        parser->getChecksum(instance)->processMethod(builder, method, ext->expr);
+        parser->getChecksum(instance)->processMethod(builder, method, ext->expr, this);
         return;
     }
 
@@ -192,7 +192,7 @@ void EBPFPsaParser::emitDeclaration(CodeBuilder* builder, const IR::Declaration*
         cstring name = di->name.name;
 
         if (type != nullptr && type->path->name.name == "InternetChecksum") {
-            auto instance = new EBPFInternetChecksumPSA(program, di, name, this->visitor);
+            auto instance = new EBPFInternetChecksumPSA(program, di, name);
             checksums.emplace(name, instance);
             instance->emitVariables(builder);
             return;
@@ -200,7 +200,7 @@ void EBPFPsaParser::emitDeclaration(CodeBuilder* builder, const IR::Declaration*
 
         if (typeSpec != nullptr &&
                 typeSpec->baseType->to<IR::Type_Name>()->path->name.name == "Checksum") {
-            auto instance = new EBPFChecksumPSA(program, di, name, this->visitor);
+            auto instance = new EBPFChecksumPSA(program, di, name);
             checksums.emplace(name, instance);
             instance->emitVariables(builder);
             return;

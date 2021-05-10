@@ -581,7 +581,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
     } else if (typeName == "DirectCounter") {
         return false;
     } else if (typeName == "Hash") {
-        auto hash = new EBPFHashPSA(program, di, name, control->codeGen);
+        auto hash = new EBPFHashPSA(program, di, name);
         control->hashes.emplace(name, hash);
     } else if (typeName == "Register") {
         auto reg = new EBPFRegisterPSA(program, name, di, control->codeGen);

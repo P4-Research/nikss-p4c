@@ -206,7 +206,7 @@ EBPFActionSelectorPSA::EBPFActionSelectorPSA(const EBPFProgram* program, CodeGen
         EBPFTableImplementationPSA(program, codeGen, decl), emptyGroupAction(nullptr) {
     hashEngine = EBPFHashAlgorithmTypeFactoryPSA::instance()->create(
             (int) getUintFromExpression(decl->arguments->at(0)->expression, 0),
-            program, name + "_hash", nullptr);
+            program, name + "_hash");
     if (hashEngine == nullptr) {
         ::error(ErrorType::ERR_UNSUPPORTED,
                 "Algorithm not yet implemented: %1%", decl->arguments->at(0));

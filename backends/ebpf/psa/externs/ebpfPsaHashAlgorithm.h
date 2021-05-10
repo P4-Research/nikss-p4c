@@ -28,8 +28,11 @@ class EBPFHashAlgorithmPSA : public EBPFObject {
         TARGET_DEFAULT
     };
 
-    EBPFHashAlgorithmPSA(const EBPFProgram* program, cstring name, Visitor * visitor)
-        : baseName(name), program(program), visitor(visitor) {}
+    EBPFHashAlgorithmPSA(const EBPFProgram* program, cstring name)
+        : baseName(name), program(program), visitor(nullptr) {}
+
+    void setVisitor(Visitor * instance)
+    { this->visitor = instance; }
 
     virtual void emitVariables(CodeBuilder* builder, const IR::Declaration_Instance* decl);
 
@@ -54,8 +57,8 @@ class InternetChecksumAlgorithm : public EBPFHashAlgorithmPSA {
                         const IR::MethodCallExpression * expr, bool addData);
 
  public:
-    InternetChecksumAlgorithm(const EBPFProgram* program, cstring name, Visitor * visitor)
-        : EBPFHashAlgorithmPSA(program, name, visitor) {}
+    InternetChecksumAlgorithm(const EBPFProgram* program, cstring name)
+        : EBPFHashAlgorithmPSA(program, name) {}
 
     static void emitGlobals(CodeBuilder* builder);
 
@@ -86,8 +89,8 @@ class CRCChecksumAlgorithm : public EBPFHashAlgorithmPSA {
     cstring reflect(cstring str);
 
  public:
-    CRCChecksumAlgorithm(const EBPFProgram* program, cstring name, Visitor * visitor, int width)
-            : EBPFHashAlgorithmPSA(program, name, visitor), crcWidth(width) {}
+    CRCChecksumAlgorithm(const EBPFProgram* program, cstring name, int width)
+            : EBPFHashAlgorithmPSA(program, name), crcWidth(width) {}
 
     static void emitUpdateMethod(CodeBuilder* builder, int crcWidth);
 
@@ -108,8 +111,8 @@ class CRCChecksumAlgorithm : public EBPFHashAlgorithmPSA {
 
 class CRC16ChecksumAlgorithm : public CRCChecksumAlgorithm {
  public:
-    CRC16ChecksumAlgorithm(const EBPFProgram* program, cstring name, Visitor * visitor)
-            : CRCChecksumAlgorithm(program, name, visitor, 16) {
+    CRC16ChecksumAlgorithm(const EBPFProgram* program, cstring name)
+            : CRCChecksumAlgorithm(program, name, 16) {
         initialValue = "0";
         polynomial = reflect("0x8005");
         updateMethod = "crc16_update";
@@ -121,8 +124,8 @@ class CRC16ChecksumAlgorithm : public CRCChecksumAlgorithm {
 
 class CRC32ChecksumAlgorithm : public CRCChecksumAlgorithm {
  public:
-    CRC32ChecksumAlgorithm(const EBPFProgram* program, cstring name, Visitor * visitor)
-            : CRCChecksumAlgorithm(program, name, visitor, 32) {
+    CRC32ChecksumAlgorithm(const EBPFProgram* program, cstring name)
+            : CRCChecksumAlgorithm(program, name, 32) {
         initialValue = "0xffffffff";
         polynomial = reflect("0x04c11db7");
         updateMethod = "crc32_update";
@@ -139,15 +142,14 @@ class EBPFHashAlgorithmTypeFactoryPSA {
         return &factory;
     }
 
-    EBPFHashAlgorithmPSA * create(int type, const EBPFProgram* program, cstring name,
-                                  Visitor * visitor) {
+    EBPFHashAlgorithmPSA * create(int type, const EBPFProgram* program, cstring name) {
         if (type == EBPFHashAlgorithmPSA::HashAlgorithm::CRC32)
-            return new CRC32ChecksumAlgorithm(program, name, visitor);
+            return new CRC32ChecksumAlgorithm(program, name);
         else if (type == EBPFHashAlgorithmPSA::HashAlgorithm::CRC16)
-            return new CRC16ChecksumAlgorithm(program, name, visitor);
+            return new CRC16ChecksumAlgorithm(program, name);
         else if (type == EBPFHashAlgorithmPSA::HashAlgorithm::ONES_COMPLEMENT16 ||
                 type == EBPFHashAlgorithmPSA::HashAlgorithm::TARGET_DEFAULT)
-            return new InternetChecksumAlgorithm(program, name, visitor);
+            return new InternetChecksumAlgorithm(program, name);
 
         return nullptr;
     }

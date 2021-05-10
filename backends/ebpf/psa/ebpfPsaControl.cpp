@@ -30,7 +30,7 @@ bool ControlBodyTranslatorPSA::preorder(const IR::AssignmentStatement* a) {
             if (ext->originalExternType->name.name == "Hash") {
                 cstring name = EBPFObject::externalName(ext->object);
                 auto hash = control->to<EBPFControlPSA>()->getHash(name);
-                hash->processMethod(builder, "update", ext->expr);
+                hash->processMethod(builder, "update", ext->expr, this);
                 builder->emitIndent();
             } else if (ext->originalExternType->name.name == "Register" &&
                     ext->method->type->name == "read") {
@@ -57,7 +57,7 @@ void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
         return;
     } else if (declType->name.name == "Hash") {
         auto hash = control->to<EBPFControlPSA>()->getHash(name);
-        hash->processMethod(builder, method->method->name.name, method->expr);
+        hash->processMethod(builder, method->method->name.name, method->expr, this);
         return;
     } else if (declType->name.name == "Register") {
         if (method->method->type->name == "write") {
