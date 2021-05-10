@@ -48,6 +48,7 @@ class EBPFActionSelectorPSA : public EBPFTableImplementationPSA {
     EBPFActionSelectorPSA(const EBPFProgram* program, CodeGenInspector* codeGen,
                           const IR::Declaration_Instance* decl);
 
+    void emitInitializer(CodeBuilder *builder) override;
     void emitInstance(CodeBuilder *builder) override;
 
     void applyImplementation(CodeBuilder* builder, cstring tableValueName,
@@ -61,6 +62,10 @@ class EBPFActionSelectorPSA : public EBPFTableImplementationPSA {
     const IR::Property * emptyGroupAction;
     EBPFHashAlgorithmPSA * hashEngine;
     selectorsListType selectors;
+    cstring actionsMapName;
+    cstring groupsMapName;
+    cstring emptyGroupActionMapName;
+    size_t groupsMapSize;
 
     selectorsListType getSelectorsFromTable(const EBPFTablePSA * instance);
 

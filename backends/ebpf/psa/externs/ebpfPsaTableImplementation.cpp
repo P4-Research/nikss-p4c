@@ -207,7 +207,9 @@ EBPFActionSelectorPSA::EBPFActionSelectorPSA(const EBPFProgram* program, CodeGen
     hashEngine = EBPFHashAlgorithmTypeFactoryPSA::instance()->create(
             getUintFromExpression(decl->arguments->at(0)->expression, 0),
             program, name + "_hash");
-    if (hashEngine == nullptr) {
+    if (hashEngine != nullptr) {
+        hashEngine->setVisitor(codeGen);
+    } else {
         ::error(ErrorType::ERR_UNSUPPORTED,
                 "Algorithm not yet implemented: %1%", decl->arguments->at(0));
     }
@@ -215,17 +217,101 @@ EBPFActionSelectorPSA::EBPFActionSelectorPSA(const EBPFProgram* program, CodeGen
     size = getUintFromExpression(decl->arguments->at(1)->expression, 1);
 
     // TODO: output width (arg #3)
+
+    // map names
+    actionsMapName = name + "_actions";
+    groupsMapName = name + "_groups";
+    emptyGroupActionMapName = name + "_defaultActionGroup";
+
+    groupsMapSize = 0;
+}
+
+void EBPFActionSelectorPSA::emitInitializer(CodeBuilder *builder) {
+    if (emptyGroupAction == nullptr)
+        return;  // no entry to initialize
+
+    // TODO: initialize empty group action
 }
 
 void EBPFActionSelectorPSA::emitInstance(CodeBuilder *builder) {
-    (void) builder;
+    if (table == nullptr)  // no table(s)
+        return;
+
+    // group map (ref -> {actions})
+    // TODO: here
+
+    // action map (ref -> action)
+    builder->target->emitTableDecl(builder, actionsMapName, TableHash, "u32",
+                                   cstring("struct ") + valueTypeName, size);
+
+    // default empty group action (0 -> action)
+    builder->target->emitTableDecl(builder, emptyGroupActionMapName, TableArray,
+                                   program->arrayIndexType,
+                                   cstring("struct ") + valueTypeName, 1);
 }
 
 void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring tableValueName,
                          cstring actionRunVariable) {
-    (void) builder;
-    (void) tableValueName;
-    (void) actionRunVariable;
+    cstring msg = Util::printf_format("ActionSelector: applying %s", name.c_str());
+    builder->target->emitTraceMessage(builder, msg.c_str());
+
+    cstring asValueName = program->refMap->newName("as_value");
+    builder->emitIndent();
+    builder->appendFormat("struct %s * %s = NULL", valueTypeName.c_str(), asValueName.c_str());
+    builder->endOfStatement(true);
+
+    cstring effectiveActionRefName = program->refMap->newName("action_ref");
+    builder->emitIndent();
+    builder->appendFormat("u32 %s = %s->%s", effectiveActionRefName.c_str(),
+                          tableValueName.c_str(), referenceName.c_str());
+    builder->endOfStatement(true);
+
+    // Detect if reference is group or member. For now groups are marked with MSB
+    builder->emitIndent();
+    builder->appendFormat("if ((%s & (1u << 31)) != 0) ", effectiveActionRefName.c_str());
+    builder->blockStart();
+
+    builder->target->emitTraceMessage(builder, "ActionSelector: group reference %u",
+                                      1, effectiveActionRefName.c_str());
+
+    // TODO: find member reference
+
+    builder->blockEnd(true);
+
+    builder->target->emitTraceMessage(builder, "ActionSelector: member reference %u",
+                                      1, effectiveActionRefName.c_str());
+
+    builder->emitIndent();
+    builder->target->emitTableLookup(builder, actionsMapName, effectiveActionRefName, asValueName);
+    builder->endOfStatement(true);
+
+    // normal action execution
+    builder->emitIndent();
+    builder->appendFormat("if (%s != NULL) ", asValueName.c_str());
+    builder->blockStart();
+
+    emitAction(builder, asValueName, cstring::empty);
+
+    if (!actionRunVariable.isNullOrEmpty()) {
+        builder->emitIndent();
+        builder->appendFormat("%s = %s->action",
+                              actionRunVariable.c_str(), asValueName.c_str());
+        builder->endOfStatement(true);
+    }
+
+    builder->blockEnd(false);
+    builder->append(" else ");
+
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder,
+        "ActionSelector: member not found, executing implicit NoAction");
+    builder->emitIndent();
+    builder->appendFormat("%s = 0", program->control->hitVariable.c_str());
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
+
+    msg = Util::printf_format("ActionSelector: %s applied", name.c_str());
+    builder->target->emitTraceMessage(builder, msg.c_str());
 }
 
 EBPFActionSelectorPSA::selectorsListType
@@ -248,10 +334,19 @@ void EBPFActionSelectorPSA::registerTable(const EBPFTablePSA * instance) {
         selectors = getSelectorsFromTable(instance);
         emptyGroupAction =
             instance->table->container->properties->getProperty("psa_empty_group_action");
+        groupsMapSize = instance->size;
+
         verifyEmptyGroupAction();
     } else {
         verifyTableSelectorKeySet(instance);
         verifyTableEmptyGroupAction(instance);
+
+        // Documentation says: The number of groups may be at most the size of the table
+        //     that is implemented by the selector.
+        // So, when we take the max from both tables, this value will not be conformant
+        // with specification because for one table there will be available more groups
+        // than possible entries. We have to use min.
+        groupsMapSize = std::min(groupsMapSize, instance->size);
     }
 
     EBPFTableImplementationPSA::registerTable(instance);
