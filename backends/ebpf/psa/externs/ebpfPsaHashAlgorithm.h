@@ -8,12 +8,14 @@ namespace EBPF {
 class EBPFProgram;
 
 class EBPFHashAlgorithmPSA : public EBPFObject {
+ public:
+    typedef std::vector<const IR::Expression *> argumentsList;
+
  protected:
     cstring baseName;
     const EBPFProgram* program;
     Visitor * visitor;
 
-    typedef std::vector<const IR::Expression *> argumentsList;
     argumentsList unpackArguments(const IR::MethodCallExpression * expr, int dataPos);
 
  public:
@@ -34,15 +36,18 @@ class EBPFHashAlgorithmPSA : public EBPFObject {
     void setVisitor(Visitor * instance)
     { this->visitor = instance; }
 
+    // decl might be a null pointer
     virtual void emitVariables(CodeBuilder* builder, const IR::Declaration_Instance* decl);
 
     virtual void emitClear(CodeBuilder* builder);
     virtual void emitAddData(CodeBuilder* builder, int dataPos,
                              const IR::MethodCallExpression * expr);
+    virtual void emitAddData(CodeBuilder* builder, const argumentsList & arguments);
     virtual void emitGet(CodeBuilder* builder);
 
     virtual void emitSubtractData(CodeBuilder* builder, int dataPos,
                                   const IR::MethodCallExpression * expr);
+    virtual void emitSubtractData(CodeBuilder* builder, const argumentsList & arguments);
 
     virtual void emitGetInternalState(CodeBuilder* builder);
     virtual void emitSetInternalState(CodeBuilder* builder,
@@ -53,8 +58,7 @@ class InternetChecksumAlgorithm : public EBPFHashAlgorithmPSA {
  protected:
     cstring stateVar;
 
-    void updateChecksum(CodeBuilder* builder, int dataPos,
-                        const IR::MethodCallExpression * expr, bool addData);
+    void updateChecksum(CodeBuilder* builder, const argumentsList & arguments, bool addData);
 
  public:
     InternetChecksumAlgorithm(const EBPFProgram* program, cstring name)
@@ -65,12 +69,10 @@ class InternetChecksumAlgorithm : public EBPFHashAlgorithmPSA {
     void emitVariables(CodeBuilder* builder, const IR::Declaration_Instance* decl) override;
 
     void emitClear(CodeBuilder* builder) override;
-    void emitAddData(CodeBuilder* builder, int dataPos,
-                     const IR::MethodCallExpression * expr) override;
+    void emitAddData(CodeBuilder* builder, const argumentsList & arguments) override;
     void emitGet(CodeBuilder* builder) override;
 
-    void emitSubtractData(CodeBuilder* builder, int dataPos,
-                          const IR::MethodCallExpression * expr) override;
+    void emitSubtractData(CodeBuilder* builder, const argumentsList & arguments) override;
 
     void emitGetInternalState(CodeBuilder* builder) override;
     void emitSetInternalState(CodeBuilder* builder,
@@ -97,12 +99,10 @@ class CRCChecksumAlgorithm : public EBPFHashAlgorithmPSA {
     void emitVariables(CodeBuilder* builder, const IR::Declaration_Instance* decl) override;
 
     void emitClear(CodeBuilder* builder) override;
-    void emitAddData(CodeBuilder* builder, int dataPos,
-                     const IR::MethodCallExpression * expr) override;
+    void emitAddData(CodeBuilder* builder, const argumentsList & arguments) override;
     void emitGet(CodeBuilder* builder) override;
 
-    void emitSubtractData(CodeBuilder* builder, int dataPos,
-                          const IR::MethodCallExpression * expr) override;
+    void emitSubtractData(CodeBuilder* builder, const argumentsList & arguments) override;
 
     void emitGetInternalState(CodeBuilder* builder) override;
     void emitSetInternalState(CodeBuilder* builder,
