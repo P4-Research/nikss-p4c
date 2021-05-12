@@ -212,6 +212,64 @@ void PSAArch::emitHelperFunctions2TC(CodeBuilder *builder) const {
 
     builder->appendLine(pktClonesFunc);
     builder->newline();
+
+    cstring meter_execute = "static __always_inline\n"
+                            "int fits_bucket(u32 *packet_len, u32 bs, u32 bs_left, u32 ir, u64 delta_t) {\n"
+                            "\n"
+                            "    u32 tokens = bs_left + delta_t * ir;\n"
+                            "    if (tokens > bs) {\n"
+                            "        tokens = bs;\n"
+                            "    }\n"
+                            "\n"
+                            "    if (*packet_len > tokens) {\n"
+                            "        return 0; // No fits\n"
+                            "    }\n"
+                            "\n"
+                            "    return 1; // Fits\n"
+                            "}\n"
+                            "\n"
+                            "static __always_inline\n"
+                            "enum PSA_MeterColor_t meter_execute(void *map, u32 *packet_len, void *key) {\n"
+                            "    u64 time_ns = bpf_ktime_get_ns();\n"
+                            "\n"
+                            "    ingress_meter1_value *value = BPF_MAP_LOOKUP_ELEM(*map, key);\n"
+                            "    if (value != NULL) {\n"
+                            "        u64 delta_t = time_ns - value->timestamp;\n"
+                            "\n"
+                            "        if (fits_bucket(packet_len, value->pbs, value->pbs_left, value->pir, delta_t)) {\n"
+                            "            if (fits_bucket(packet_len, value->cbs, value->cbs_left, value->cir, delta_t)) {\n"
+                            "                value->timestamp = value->timestamp + delta_t;\n"
+                            "                value->pbs_left = value->pbs_left - *packet_len;\n"
+                            "                value->cbs_left = value->cbs_left - *packet_len;\n"
+                            "                int ret = BPF_MAP_UPDATE_ELEM(*map, key, value, BPF_ANY);\n"
+                            "                if (ret) {\n"
+                            "                    bpf_trace_message(\"GREEN not ok\\n\", ret);\n"
+                            "                } else {\n"
+                            "                    bpf_trace_message(\"GREEN ok\\n\");\n"
+                            "                }\n"
+                            "                return GREEN;\n"
+                            "            } else {\n"
+                            "                value->timestamp = value->timestamp + delta_t;\n"
+                            "                value->pbs_left = value->pbs_left - *packet_len;\n"
+                            "                int ret = BPF_MAP_UPDATE_ELEM(*map, key, value, BPF_ANY);\n"
+                            "                if (ret) {\n"
+                            "                    bpf_trace_message(\"YELLOW not ok\\n\", ret);\n"
+                            "                } else {\n"
+                            "                    bpf_trace_message(\"YELLOW ok\\n\");\n"
+                            "                }\n"
+                            "                return YELLOW;\n"
+                            "            }\n"
+                            "        } else {\n"
+                            "            bpf_trace_message(\"RED\\n\");\n"
+                            "            return RED;\n"
+                            "        }\n"
+                            "    } else {\n"
+                            "        return RED;\n"
+                            "    }\n"
+                            "}";
+
+    builder->appendLine("");
+    builder->newline();
 }
 
 void PSAArch::emitInternalStructures2TC(CodeBuilder *pBuilder) const {
@@ -733,6 +791,11 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
     } else if (typeName == "Register") {
         auto reg = new EBPFRegisterPSA(program, name, di, control->codeGen);
         control->registers.emplace(name, reg);
+    } else if (instance->type->getName().name == "Meter") {
+        auto di = instance->node->to<IR::Declaration_Instance>();
+        cstring name = EBPFObject::externalName(di);
+        auto met = new EBPFMeterPSA(program, name, di, control->codeGen);
+        control->meters.emplace(name, met);
     } else {
         ::error(ErrorType::ERR_UNEXPECTED, "Unexpected block %s nested within control",
                 instance->toString());

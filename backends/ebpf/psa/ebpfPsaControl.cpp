@@ -71,6 +71,12 @@ void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
             reg->emitRegisterWrite(builder, method, this);
             return;
         }
+    } else if (declType->name.name == "Meter") {
+        auto di = decl->to<IR::Declaration_Instance>();
+        name = EBPFObject::externalName(di);
+        auto meter = control->to<EBPFControlPSA>()->getMeter(name);
+        meter->emitExecute(builder);
+        return;
     }
 
     ControlBodyTranslator::processMethod(method);
@@ -121,6 +127,13 @@ void EBPFControlPSA::emitTableTypes(CodeBuilder *builder) {
 
     for (auto it : registers)
         it.second->emitTypes(builder);
+    for (auto it : meters)
+        it.second->emitKeyType(builder);
+
+    //  Value type for meters is the same
+    if (meters.size() > 0) {
+        meters.begin()->second->emitValueType(builder);
+    }
 }
 
 void EBPFControlPSA::emitTableInstances(CodeBuilder* builder) {
@@ -129,6 +142,8 @@ void EBPFControlPSA::emitTableInstances(CodeBuilder* builder) {
     for (auto it : counters)
         it.second->emitInstance(builder);
     for (auto it : registers)
+        it.second->emitInstance(builder);
+    for (auto it : meters)
         it.second->emitInstance(builder);
 }
 
