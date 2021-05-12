@@ -233,7 +233,45 @@ void EBPFActionSelectorPSA::emitInitializer(CodeBuilder *builder) {
     if (emptyGroupAction == nullptr)
         return;  // no entry to initialize
 
-    // TODO: initialize empty group action
+    auto ev = emptyGroupAction->value->to<IR::ExpressionValue>()->expression;
+    cstring value = program->refMap->newName("value");
+
+    if (auto pe = ev->to<IR::PathExpression>()) {
+        auto decl = program->refMap->getDeclaration(pe->path, true);
+        auto action = decl->to<IR::P4Action>();
+        BUG_CHECK(action != nullptr, "%1%: not an action", ev);
+
+        if (!action->getParameters()->empty()) {
+            ::error(ErrorType::ERR_UNINITIALIZED,
+                    "%1%: missing value for action parameters: %2%",
+                    ev, action->getParameters());
+            return;
+        }
+
+        builder->emitIndent();
+        builder->appendFormat("struct %s %s = ", valueTypeName.c_str(), value.c_str());
+        builder->blockStart();
+        builder->emitIndent();
+        if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
+            builder->append(".action = 0,");
+        } else {
+            builder->appendFormat(".action = %s,", actionToActionIDName(action));
+        }
+        builder->newline();
+        builder->blockEnd(false);
+        builder->endOfStatement(true);
+    } else if (auto mce = ev->to<IR::MethodCallExpression>()) {
+        emitTableValue(builder, mce, value);
+    }
+
+    cstring ret = program->refMap->newName("ret");
+    builder->emitIndent();
+    builder->appendFormat("int %s = ", ret.c_str());
+    builder->target->emitTableUpdate(builder, emptyGroupActionMapName,
+                                     program->zeroKey, value);
+    builder->newline();
+
+    emitMapUpdateTraceMsg(builder, emptyGroupActionMapName, ret);
 }
 
 void EBPFActionSelectorPSA::emitInstance(CodeBuilder *builder) {
@@ -241,9 +279,9 @@ void EBPFActionSelectorPSA::emitInstance(CodeBuilder *builder) {
         return;
 
     // group map (group ref -> {action refs})
-    // TODO: group size (inner size) is assumed to be 1024. Make more logic for this.
+    // TODO: group size (inner size) is assumed to be 128. Make more logic for this.
     builder->target->emitMapInMapDecl(builder, groupsMapName + "_inner", TableArray,
-                                      "u32", "u32", 1024,
+                                      "u32", "u32", 128,
                                       groupsMapName, TableHash,
                                       "u32", groupsMapSize);
 
@@ -442,8 +480,6 @@ void EBPFActionSelectorPSA::registerTable(const EBPFTablePSA * instance) {
         emptyGroupAction =
             instance->table->container->properties->getProperty("psa_empty_group_action");
         groupsMapSize = instance->size;
-
-        verifyEmptyGroupAction();
     } else {
         verifyTableSelectorKeySet(instance);
         verifyTableEmptyGroupAction(instance);
@@ -547,22 +583,6 @@ void EBPFActionSelectorPSA::verifyTableEmptyGroupAction(const EBPFTablePSA * ins
                 "%1%: defined property value is different from %2%, defined in "
                 "previous table %3% (tables use the same implementation %4%)%5%",
                 rev, lev, table->container->toString(), declaration, additionalNote);
-    }
-}
-
-void EBPFActionSelectorPSA::verifyEmptyGroupAction() {
-    auto ev = emptyGroupAction->value->to<IR::ExpressionValue>()->expression;
-    // TODO: move this into initializer
-    if (auto pe = ev->to<IR::PathExpression>()) {
-        auto decl = program->refMap->getDeclaration(pe->path, true);
-        auto action = decl->to<IR::P4Action>();
-        BUG_CHECK(action != nullptr, "%1%: not an action", ev);
-
-        if (!action->getParameters()->empty()) {
-            ::error(ErrorType::ERR_UNINITIALIZED,
-                    "%1%: missing value for action parameters: %2%",
-                    ev, action->getParameters());
-        }
     }
 }
 

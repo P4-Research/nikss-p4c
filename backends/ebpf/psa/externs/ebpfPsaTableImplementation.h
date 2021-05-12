@@ -73,7 +73,6 @@ class EBPFActionSelectorPSA : public EBPFTableImplementationPSA {
 
     void verifyTableSelectorKeySet(const EBPFTablePSA * instance);
     void verifyTableEmptyGroupAction(const EBPFTablePSA * instance);
-    void verifyEmptyGroupAction();
 };
 
 }  // namespace EBPF

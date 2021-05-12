@@ -44,7 +44,6 @@ class EBPFTablePSA : public EBPFTable {
 
     bool hasImplementation() const;
 
- private:
     void emitTableValue(CodeBuilder* builder, const IR::MethodCallExpression* actionMce,
                         cstring valueName);
     void emitDefaultActionInitializer(CodeBuilder *builder);
