@@ -66,7 +66,9 @@ class EBPFActionSelectorPSA : public EBPFTableImplementationPSA {
     cstring groupsMapName;
     cstring emptyGroupActionMapName;
     size_t groupsMapSize;
+    cstring outputHashMask;
 
+    EBPFHashAlgorithmPSA::argumentsList unpackSelectors();
     selectorsListType getSelectorsFromTable(const EBPFTablePSA * instance);
 
     void verifyTableSelectorKeySet(const EBPFTablePSA * instance);

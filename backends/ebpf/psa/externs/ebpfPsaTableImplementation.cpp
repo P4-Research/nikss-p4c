@@ -175,14 +175,7 @@ void EBPFActionProfilePSA::applyImplementation(CodeBuilder* builder, cstring tab
     // Do not set hit variable here, because other instance before
     // may it already set to 0 (no match).
 
-    emitAction(builder, apValueName, cstring::empty);
-
-    if (!actionRunVariable.isNullOrEmpty()) {
-        builder->emitIndent();
-        builder->appendFormat("%s = %s->action",
-                              actionRunVariable.c_str(), apValueName.c_str());
-        builder->endOfStatement(true);
-    }
+    emitAction(builder, apValueName, actionRunVariable);
 
     builder->blockEnd(false);
     builder->append(" else ");
@@ -212,11 +205,21 @@ EBPFActionSelectorPSA::EBPFActionSelectorPSA(const EBPFProgram* program, CodeGen
     } else {
         ::error(ErrorType::ERR_UNSUPPORTED,
                 "Algorithm not yet implemented: %1%", decl->arguments->at(0));
+        hashEngine = new EBPFHashAlgorithmPSA(program, name + "_hash");
     }
 
     size = getUintFromExpression(decl->arguments->at(1)->expression, 1);
 
-    // TODO: output width (arg #3)
+    unsigned outputHashWidth = getUintFromExpression(decl->arguments->at(2)->expression, 0);
+    if (outputHashWidth > hashEngine->getOutputWidth()) {
+        ::error(ErrorType::ERR_INVALID, "%1%: more bits requested than hash provides (%2%)",
+                decl->arguments->at(2)->expression, hashEngine->getOutputWidth());
+    }
+    if (outputHashWidth > 64) {
+        ::error(ErrorType::ERR_UNSUPPORTED, "%1%: supported up to 64 bits",
+                decl->arguments->at(2)->expression);
+    }
+    outputHashMask = Util::printf_format("0x%llx", (1ull << outputHashWidth) - 1);
 
     // map names
     actionsMapName = name + "_actions";
@@ -237,67 +240,163 @@ void EBPFActionSelectorPSA::emitInstance(CodeBuilder *builder) {
     if (table == nullptr)  // no table(s)
         return;
 
-    // group map (ref -> {actions})
-    // TODO: here
-
-    // action map (ref -> action)
-    builder->target->emitTableDecl(builder, actionsMapName, TableHash, "u32",
-                                   cstring("struct ") + valueTypeName, size);
+    // group map (group ref -> {action refs})
+    // TODO: group size (inner size) is assumed to be 1024. Make more logic for this.
+    builder->target->emitMapInMapDecl(builder, groupsMapName + "_inner", TableArray,
+                                      "u32", "u32", 1024,
+                                      groupsMapName, TableHash,
+                                      "u32", groupsMapSize);
 
     // default empty group action (0 -> action)
     builder->target->emitTableDecl(builder, emptyGroupActionMapName, TableArray,
                                    program->arrayIndexType,
                                    cstring("struct ") + valueTypeName, 1);
+
+    // action map (ref -> action)
+    builder->target->emitTableDecl(builder, actionsMapName, TableHash, "u32",
+                                   cstring("struct ") + valueTypeName, size);
 }
 
 void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring tableValueName,
-                         cstring actionRunVariable) {
+                                                cstring actionRunVariable) {
     cstring msg = Util::printf_format("ActionSelector: applying %s", name.c_str());
     builder->target->emitTraceMessage(builder, msg.c_str());
 
+    // 1. Declare variables.
+
     cstring asValueName = program->refMap->newName("as_value");
+    cstring effectiveActionRefName = program->refMap->newName("as_action_ref");
+    cstring groupStateName = program->refMap->newName("as_group_state");
+    cstring innerGroupName = program->refMap->newName("as_group_map");
+    // these can be hardcoded because they are declared inside of a block
+    cstring checksumValName = "as_checksum_val";
+    cstring mapEntryName = "as_map_entry";
+
     builder->emitIndent();
     builder->appendFormat("struct %s * %s = NULL", valueTypeName.c_str(), asValueName.c_str());
     builder->endOfStatement(true);
-
-    cstring effectiveActionRefName = program->refMap->newName("action_ref");
     builder->emitIndent();
     builder->appendFormat("u32 %s = %s->%s", effectiveActionRefName.c_str(),
                           tableValueName.c_str(), referenceName.c_str());
     builder->endOfStatement(true);
-
-    // Detect if reference is group or member. For now groups are marked with MSB
     builder->emitIndent();
-    builder->appendFormat("if ((%s & (1u << 31)) != 0) ", effectiveActionRefName.c_str());
-    builder->blockStart();
+    builder->appendFormat("u8 %s = 0", groupStateName.c_str());
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->append("void * ");
+    builder->target->emitTableLookup(builder, groupsMapName, effectiveActionRefName,
+                                     innerGroupName);
+    builder->endOfStatement(true);
 
+    // 2. Check if we have got group reference.
+
+    builder->emitIndent();
+    builder->appendFormat("if (%s != NULL) ", innerGroupName.c_str());
+    builder->blockStart();
     builder->target->emitTraceMessage(builder, "ActionSelector: group reference %u",
                                       1, effectiveActionRefName.c_str());
 
-    // TODO: find member reference
+    // 3. Calculate hash of selector keys and use some least significant bits.
 
+    hashEngine->emitVariables(builder, nullptr);
+    hashEngine->emitAddData(builder, unpackSelectors());
+
+    builder->emitIndent();
+    builder->appendFormat("u64 %s = ", checksumValName.c_str());
+    hashEngine->emitGet(builder);
+    builder->appendFormat(" & %s", outputHashMask.c_str());
+    builder->endOfStatement(true);
+
+    // 4. Find member reference.
+    // First entry in inner map contains number of valid elements in the map
+
+    builder->emitIndent();
+    builder->append("u32 * ");
+    builder->target->emitTableLookup(builder, innerGroupName, program->zeroKey, mapEntryName);
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->appendFormat("if (%s != NULL) ", mapEntryName.c_str());
+    builder->blockStart();
+
+    builder->emitIndent();
+    builder->appendFormat("if (*%s != 0) ", mapEntryName.c_str());
+    builder->blockStart();
+
+    builder->emitIndent();
+    builder->appendFormat("%s = 1 + (%s %% (*%s))", effectiveActionRefName.c_str(),
+                          checksumValName.c_str(), mapEntryName.c_str());
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->target->emitTableLookup(builder, innerGroupName, effectiveActionRefName,
+                                     mapEntryName);
+    builder->endOfStatement(true);
+
+    builder->emitIndent();
+    builder->appendFormat("if (%s != NULL) ", mapEntryName.c_str());
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendFormat("%s = *%s", effectiveActionRefName.c_str(), mapEntryName.c_str());
+    builder->endOfStatement(true);
+    builder->blockEnd(false);
+    builder->append(" else ");
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendLine("/* Entry with action reference was not found, going to NoAction */");
+    builder->emitIndent();
+    builder->appendFormat("%s = 2", groupStateName.c_str());
+    builder->endOfStatement(true);
     builder->blockEnd(true);
 
+    builder->blockEnd(false);  // elements != 0
+    builder->append(" else ");
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder,
+        "ActionSelector: empty group, going to default action");
+    builder->emitIndent();
+    builder->appendFormat("%s = 1", groupStateName.c_str());
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
+
+    builder->blockEnd(false);  // found number of elements
+    builder->append(" else ");
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder,
+        "ActionSelector: entry with number of elements not found, going to default action");
+    builder->emitIndent();
+    builder->appendFormat("%s = 1", groupStateName.c_str());
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
+
+    builder->blockEnd(true);  // is group reference
+
+    // 5. Use group state and action ref to get an action data.
+
+    builder->emitIndent();
+    builder->appendFormat("if (%s == 0) ", groupStateName.c_str());
+    builder->blockStart();
     builder->target->emitTraceMessage(builder, "ActionSelector: member reference %u",
                                       1, effectiveActionRefName.c_str());
-
     builder->emitIndent();
     builder->target->emitTableLookup(builder, actionsMapName, effectiveActionRefName, asValueName);
     builder->endOfStatement(true);
+    builder->blockEnd(false);
+    builder->appendFormat(" else if (%s == 1) ", groupStateName.c_str());
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder,
+        "ActionSelector: empty group, executing default group action");
+    builder->emitIndent();
+    builder->target->emitTableLookup(builder, emptyGroupActionMapName,
+                                     program->zeroKey, asValueName);
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
 
-    // normal action execution
+    // 6. Execute action.
+
     builder->emitIndent();
     builder->appendFormat("if (%s != NULL) ", asValueName.c_str());
     builder->blockStart();
 
-    emitAction(builder, asValueName, cstring::empty);
-
-    if (!actionRunVariable.isNullOrEmpty()) {
-        builder->emitIndent();
-        builder->appendFormat("%s = %s->action",
-                              actionRunVariable.c_str(), asValueName.c_str());
-        builder->endOfStatement(true);
-    }
+    emitAction(builder, asValueName, actionRunVariable);
 
     builder->blockEnd(false);
     builder->append(" else ");
@@ -312,6 +411,14 @@ void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring ta
 
     msg = Util::printf_format("ActionSelector: %s applied", name.c_str());
     builder->target->emitTraceMessage(builder, msg.c_str());
+}
+
+EBPFHashAlgorithmPSA::argumentsList EBPFActionSelectorPSA::unpackSelectors() {
+    EBPFHashAlgorithmPSA::argumentsList result;
+    for (auto s : selectors) {
+        result.emplace_back(s->expression);
+    }
+    return result;
 }
 
 EBPFActionSelectorPSA::selectorsListType
@@ -445,7 +552,7 @@ void EBPFActionSelectorPSA::verifyTableEmptyGroupAction(const EBPFTablePSA * ins
 
 void EBPFActionSelectorPSA::verifyEmptyGroupAction() {
     auto ev = emptyGroupAction->value->to<IR::ExpressionValue>()->expression;
-
+    // TODO: move this into initializer
     if (auto pe = ev->to<IR::PathExpression>()) {
         auto decl = program->refMap->getDeclaration(pe->path, true);
         auto action = decl->to<IR::P4Action>();

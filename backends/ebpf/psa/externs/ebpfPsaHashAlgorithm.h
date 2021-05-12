@@ -36,6 +36,9 @@ class EBPFHashAlgorithmPSA : public EBPFObject {
     void setVisitor(Visitor * instance)
     { this->visitor = instance; }
 
+    virtual unsigned getOutputWidth() const
+    { return 0; }
+
     // decl might be a null pointer
     virtual void emitVariables(CodeBuilder* builder, const IR::Declaration_Instance* decl);
 
@@ -63,6 +66,9 @@ class InternetChecksumAlgorithm : public EBPFHashAlgorithmPSA {
  public:
     InternetChecksumAlgorithm(const EBPFProgram* program, cstring name)
         : EBPFHashAlgorithmPSA(program, name) {}
+
+    unsigned getOutputWidth() const override
+    { return 16; }
 
     static void emitGlobals(CodeBuilder* builder);
 
@@ -93,6 +99,9 @@ class CRCChecksumAlgorithm : public EBPFHashAlgorithmPSA {
  public:
     CRCChecksumAlgorithm(const EBPFProgram* program, cstring name, int width)
             : EBPFHashAlgorithmPSA(program, name), crcWidth(width) {}
+
+    unsigned getOutputWidth() const override
+    { return crcWidth; }
 
     static void emitUpdateMethod(CodeBuilder* builder, int crcWidth);
 
