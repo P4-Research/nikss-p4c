@@ -320,11 +320,29 @@ class ActionSelectorActionRunPSATest(ActionSelectorTest):
     p4_file_path = "samples/p4testdata/action-selector-action-run.p4"
 
     def runTest(self):
-        pass
+        self.update_map(name="MyIC_as_actions", key="2 0 0 0", value="1 0 0 0  5 0 0 0")
+        self.update_map(name="MyIC_as_actions", key="3 0 0 0", value="0 0 0 0  0 0 0 0")
+        self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 2  0 0", value="2 0 0 0")
+        self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 3  0 0", value="3 0 0 0")
+
+        pkt = testutils.simple_ip_packet(eth_src="02:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
+
+        pkt[Ether].src = "03:22:33:44:55:66"
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_no_other_packets(self)
 
 
 class ActionSelectorHitPSATest(ActionSelectorTest):
     p4_file_path = "samples/p4testdata/action-selector-hit.p4"
 
     def runTest(self):
-        pass
+        pkt = testutils.simple_ip_packet(eth_src="07:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_no_other_packets(self)
+
+        self.create_default_rule_set(table="MyIC_tbl", selector="MyIC_as")
+
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
