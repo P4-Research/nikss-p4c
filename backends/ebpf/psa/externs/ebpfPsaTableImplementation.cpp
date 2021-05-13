@@ -349,8 +349,8 @@ void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring ta
     // First entry in inner map contains number of valid elements in the map
 
     builder->emitIndent();
-    builder->append("u32 * ");
-    builder->target->emitTableLookup(builder, innerGroupName, program->zeroKey, mapEntryName);
+    builder->appendFormat("u32 * %s = bpf_map_lookup_elem(%s, &%s)", mapEntryName.c_str(),
+                          innerGroupName.c_str(), program->zeroKey.c_str());
     builder->endOfStatement(true);
     builder->emitIndent();
     builder->appendFormat("if (%s != NULL) ", mapEntryName.c_str());
@@ -364,9 +364,11 @@ void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring ta
     builder->appendFormat("%s = 1 + (%s %% (*%s))", effectiveActionRefName.c_str(),
                           checksumValName.c_str(), mapEntryName.c_str());
     builder->endOfStatement(true);
+    builder->target->emitTraceMessage(builder, "ActionSelector: selected action %u from group",
+                                      1, effectiveActionRefName.c_str());
     builder->emitIndent();
-    builder->target->emitTableLookup(builder, innerGroupName, effectiveActionRefName,
-                                     mapEntryName);
+    builder->appendFormat("%s = bpf_map_lookup_elem(%s, &%s)", mapEntryName.c_str(),
+                          innerGroupName.c_str(), effectiveActionRefName.c_str());
     builder->endOfStatement(true);
 
     builder->emitIndent();
