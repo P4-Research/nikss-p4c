@@ -426,6 +426,11 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
         std::vector<std::pair<size_t, const IR::KeyElement*>> ordered;
         unsigned fieldNumber = 0;
         for (auto c : keyGenerator->keyElements) {
+            auto mtdecl = program->refMap->getDeclaration(c->matchType->path, true);
+            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
+            if (matchType->name.name == "selector")
+                continue;  // this match type is intended for ActionSelector, not table itself
+
             auto type = program->typeMap->getType(c->expression);
             auto ebpfType = EBPFTypeFactory::instance->create(type);
             cstring fieldName = cstring("field") + Util::toString(fieldNumber);
@@ -439,8 +444,6 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
                 structAlignment = 8;
             }
 
-            auto mtdecl = program->refMap->getDeclaration(c->matchType->path, true);
-            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
             if (matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name) {
                 lengthOfTernaryFields += width;
             } else if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {

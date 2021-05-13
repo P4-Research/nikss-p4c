@@ -281,7 +281,7 @@ void EBPFActionSelectorPSA::emitInstance(CodeBuilder *builder) {
     // group map (group ref -> {action refs})
     // TODO: group size (inner size) is assumed to be 128. Make more logic for this.
     builder->target->emitMapInMapDecl(builder, groupsMapName + "_inner", TableArray,
-                                      "u32", "u32", 128,
+                                      "u32", "u32", 128 + 1,
                                       groupsMapName, TableHash,
                                       "u32", groupsMapSize);
 
