@@ -278,15 +278,34 @@ class ActionSelectorDefaultEmptyGroupActionPSATest(ActionSelectorTest):
 
 class ActionSelectorMultipleSelectorsPSATest(ActionSelectorTest):
     """
-    Tests if multiple selectors are allowed.
+    Tests if multiple selectors are allowed and used.
     """
     p4_file_path = "samples/p4testdata/action-selector4.p4"
 
     def runTest(self):
         self.create_default_rule_set(table="MyIC_tbl", selector="MyIC_as")
+        self.update_map(name="MyIC_tbl", key="hex 67 55 44 33 22 7  0 0", value="7 0 0 0")
+
+        allowed_ports = self.default_group_ports
         pkt = testutils.simple_ip_packet(eth_src="07:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
         testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_packet_any_port(self, pkt, self.default_group_ports)
+        (port, _) = testutils.verify_packet_any_port(self, pkt, allowed_ports)
+        allowed_ports.pop(port)
+
+        # change separately every selector key and test if output port has been changed
+        pkt[Ether].src = "07:22:33:44:55:67"
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet_any_port(self, pkt, allowed_ports)
+        pkt[Ether].src = "07:22:33:44:55:66"
+
+        pkt[Ether].dst = "22:33:44:55:66:78"
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet_any_port(self, pkt, allowed_ports)
+        pkt[Ether].dst = "22:33:44:55:66:77"
+
+        pkt[Ether].type = 0x801
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet_any_port(self, pkt, allowed_ports)
 
 
 class ActionSelectorMultipleSelectorsTwoTablesPSATest(ActionSelectorTest):
