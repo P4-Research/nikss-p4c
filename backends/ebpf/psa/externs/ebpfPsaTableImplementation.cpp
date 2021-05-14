@@ -383,7 +383,9 @@ void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring ta
     builder->append(" else ");
     builder->blockStart();
     builder->emitIndent();
-    builder->appendLine("/* Entry with action reference was not found, going to NoAction */");
+    builder->appendLine("/* Not found, probably bug. Skip further execution of the extern. */");
+    builder->target->emitTraceMessage(builder,
+        "ActionSelector: Entry with action reference was not found. Bug?");
     builder->emitIndent();
     builder->appendFormat("%s = 2", groupStateName.c_str());
     builder->endOfStatement(true);

@@ -224,7 +224,7 @@ class SimpleActionSelectorPSATest(ActionSelectorTest):
         output_ports = self.default_group_ports
         pkt = testutils.simple_ip_packet(eth_src="07:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
         testutils.send_packet(self, PORT0, pkt)
-        (port, recv_pkt) = testutils.verify_packet_any_port(self, pkt, output_ports)
+        (port, _) = testutils.verify_packet_any_port(self, pkt, output_ports)
         # send again, output port should be the same
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, output_ports[port])
