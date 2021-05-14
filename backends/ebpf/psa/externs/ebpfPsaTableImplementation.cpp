@@ -334,19 +334,8 @@ void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring ta
     builder->target->emitTraceMessage(builder, "ActionSelector: group reference %u",
                                       1, effectiveActionRefName.c_str());
 
-    // 3. Calculate hash of selector keys and use some least significant bits.
-
-    hashEngine->emitVariables(builder, nullptr);
-    hashEngine->emitAddData(builder, unpackSelectors());
-
-    builder->emitIndent();
-    builder->appendFormat("u64 %s = ", checksumValName.c_str());
-    hashEngine->emitGet(builder);
-    builder->appendFormat(" & %s", outputHashMask.c_str());
-    builder->endOfStatement(true);
-
-    // 4. Find member reference.
-    // First entry in inner map contains number of valid elements in the map
+    // 3. Find member reference.
+    // 3.1. First entry in inner map contains number of valid elements in the map
 
     builder->emitIndent();
     builder->appendFormat("u32 * %s = bpf_map_lookup_elem(%s, &%s)", mapEntryName.c_str(),
@@ -359,6 +348,19 @@ void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring ta
     builder->emitIndent();
     builder->appendFormat("if (*%s != 0) ", mapEntryName.c_str());
     builder->blockStart();
+
+    // 3.2. Calculate hash of selector keys and use some least significant bits.
+
+    hashEngine->emitVariables(builder, nullptr);
+    hashEngine->emitAddData(builder, unpackSelectors());
+
+    builder->emitIndent();
+    builder->appendFormat("u64 %s = ", checksumValName.c_str());
+    hashEngine->emitGet(builder);
+    builder->appendFormat(" & %s", outputHashMask.c_str());
+    builder->endOfStatement(true);
+
+    // 3.3. Continue finding member reference
 
     builder->emitIndent();
     builder->appendFormat("%s = 1 + (%s %% (*%s))", effectiveActionRefName.c_str(),
@@ -409,7 +411,7 @@ void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring ta
 
     builder->blockEnd(true);  // is group reference
 
-    // 5. Use group state and action ref to get an action data.
+    // 4. Use group state and action ref to get an action data.
 
     builder->emitIndent();
     builder->appendFormat("if (%s == 0) ", groupStateName.c_str());
@@ -430,7 +432,7 @@ void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring ta
     builder->endOfStatement(true);
     builder->blockEnd(true);
 
-    // 6. Execute action.
+    // 5. Execute action.
 
     builder->emitIndent();
     builder->appendFormat("if (%s != NULL) ", asValueName.c_str());
