@@ -236,6 +236,11 @@ class SimpleActionSelectorPSATest(ActionSelectorTest):
 
 
 class ActionSelectorTwoTablesSameInstancePSATest(ActionSelectorTest):
+    """
+    Two tables has different match keys and share the same ActionSelector (one selector key).
+    Tests basic sharing of ActionSelector instance. For test purpose tables has also defined
+    default empty group action "psa_empty_group_action" (not used).
+    """
     p4_file_path = "samples/p4testdata/action-selector2.p4"
 
     def runTest(self):
@@ -253,6 +258,9 @@ class ActionSelectorTwoTablesSameInstancePSATest(ActionSelectorTest):
 
 
 class ActionSelectorDefaultEmptyGroupActionPSATest(ActionSelectorTest):
+    """
+    Tests behaviour of default empty group action, aka table property "psa_empty_group_action".
+    """
     p4_file_path = "samples/p4testdata/action-selector3.p4"
 
     def runTest(self):
@@ -269,6 +277,9 @@ class ActionSelectorDefaultEmptyGroupActionPSATest(ActionSelectorTest):
 
 
 class ActionSelectorMultipleSelectorsPSATest(ActionSelectorTest):
+    """
+    Tests if multiple selectors are allowed.
+    """
     p4_file_path = "samples/p4testdata/action-selector4.p4"
 
     def runTest(self):
@@ -278,7 +289,30 @@ class ActionSelectorMultipleSelectorsPSATest(ActionSelectorTest):
         testutils.verify_packet_any_port(self, pkt, self.default_group_ports)
 
 
+class ActionSelectorMultipleSelectorsTwoTablesPSATest(ActionSelectorTest):
+    """
+    Similar to ActionSelectorTwoTablesSameInstancePSATest, but tables has two selectors
+    and the same match key. Tests order of selectors in both tables.
+    """
+    p4_file_path = "samples/p4testdata/action-selector5.p4"
+
+    def runTest(self):
+        self.create_default_rule_set(table="MyIC_tbl", selector="MyIC_as")
+        self.update_map(name="MyIC_tbl2", key="hex ff ee dd cc bb aa  0 0", value="7 0 0 0")
+
+        pkt = testutils.simple_ip_packet(eth_src="07:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
+        testutils.send_packet(self, PORT0, pkt)
+        (port, _) = testutils.verify_packet_any_port(self, pkt, self.default_group_ports)
+        # Match second table, same selectors set, so output port should be the same
+        pkt[Ether].src = "AA:BB:CC:DD:EE:FF"
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, self.default_group_ports[port])
+
+
 class ActionSelectorLPMTablePSATest(ActionSelectorTest):
+    """
+    Tests table with LPM match key.
+    """
     p4_file_path = "samples/p4testdata/action-selector-lpm.p4"
 
     def runTest(self):
@@ -298,6 +332,9 @@ class ActionSelectorLPMTablePSATest(ActionSelectorTest):
 
 
 class ActionSelectorTernaryTablePSATest(ActionSelectorTest):
+    """
+    Tests table with ternary match key.
+    """
     p4_file_path = "samples/p4testdata/action-selector-ternary.p4"
 
     def runTest(self):
@@ -317,6 +354,9 @@ class ActionSelectorTernaryTablePSATest(ActionSelectorTest):
 
 
 class ActionSelectorActionRunPSATest(ActionSelectorTest):
+    """
+    Tests action_run statement on table apply().
+    """
     p4_file_path = "samples/p4testdata/action-selector-action-run.p4"
 
     def runTest(self):
@@ -335,6 +375,9 @@ class ActionSelectorActionRunPSATest(ActionSelectorTest):
 
 
 class ActionSelectorHitPSATest(ActionSelectorTest):
+    """
+    Tests hit statement on table apply().
+    """
     p4_file_path = "samples/p4testdata/action-selector-hit.p4"
 
     def runTest(self):
