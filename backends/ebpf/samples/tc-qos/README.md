@@ -92,6 +92,9 @@ that `skb->priority` is not overwritten in the TC Egress.
 
 > *I'm not sure if the PSA specification allows to overwrite class_of_service in the P4 Egress pipeline. 
 
+As the outcome of this demo, the architecture has been modified to take into account the fact that TC qdisc is executed
+after the TC Egress hookpoint.
+
 ## References 
 
 https://www.linux.com/training-tutorials/qos-linux-tc-and-filters/ 
