@@ -10,7 +10,8 @@ struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __type(key, int);
     __type(value, int);
-    __uint(max_entries, 10200);
+    __uint(max_entries, 100);
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
 } routing SEC(".maps");
 
 SEC("classifier/tc-ingress")
@@ -19,25 +20,30 @@ int tc_l2fwd(struct __sk_buff *ctx)
     void *data_end = (void *)(long)ctx->data_end;
     void *data = (void *)(long)ctx->data;
     struct ethhdr *eth = data;
-    __u64 nh_off;
 
-    nh_off = sizeof(*eth);
-    if (data + nh_off > data_end)
+    if (eth + 1 > data_end) {
+        //bpf_printk("ifindex=%d, dropping due to eth", ctx->ifindex);
         return TC_ACT_SHOT;
+    }
 
-    struct iphdr *iph = data + nh_off;
-    nh_off = sizeof(*iph);
-    if (iph + nh_off > data_end)
+    struct iphdr *iph = data + sizeof(*eth);
+    if (iph + 1 > data_end) {
+        //bpf_printk("ifindex=%d, dropping due to iph", ctx->ifindex);
         return TC_ACT_SHOT;
+    }
 
     __be32 dst_ip = iph->daddr;
     __u8 ipproto = iph->protocol;
+
+    //bpf_printk("Ifindex = %d, Destination IP addr = %llx", ctx->ifindex, dst_ip);
 
     int *out_port;
     out_port = bpf_map_lookup_elem(&routing, &dst_ip);
     if (!out_port) {
         return TC_ACT_SHOT;
     }
+
+    //bpf_printk("IP protocol = %d", ipproto);
 
     if (ipproto == 0x1) {  // ICMP
         ctx->priority = 100;
@@ -51,7 +57,7 @@ int tc_l2fwd(struct __sk_buff *ctx)
 SEC("classifier/tc-egress")
 int tc_l2fwd_egress(struct __sk_buff *ctx)
 {
-    bpf_printk("skb->priority = %d", ctx->priority);
+    //bpf_printk("ifindex=%d, skb->priority = %d", ctx->ifindex, ctx->priority);
     return TC_ACT_OK;
 }
 
