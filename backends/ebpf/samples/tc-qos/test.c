@@ -14,6 +14,20 @@ struct {
     __uint(pinning, LIBBPF_PIN_BY_NAME);
 } routing SEC(".maps");
 
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __type(key, __u32);  // IP protocol
+    __type(value, __u32);  // priority
+    __uint(max_entries, 10000);
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
+} classifier SEC(".maps");
+
+static __always_inline
+void set_class_of_service(struct __sk_buff *ctx, __u32 class_of_service)
+{
+    ctx->priority = class_of_service;
+}
+
 SEC("classifier/tc-ingress")
 int tc_l2fwd(struct __sk_buff *ctx)
 {
@@ -22,20 +36,16 @@ int tc_l2fwd(struct __sk_buff *ctx)
     struct ethhdr *eth = data;
 
     if (eth + 1 > data_end) {
-        //bpf_printk("ifindex=%d, dropping due to eth", ctx->ifindex);
         return TC_ACT_SHOT;
     }
 
     struct iphdr *iph = data + sizeof(*eth);
     if (iph + 1 > data_end) {
-        //bpf_printk("ifindex=%d, dropping due to iph", ctx->ifindex);
         return TC_ACT_SHOT;
     }
 
     __be32 dst_ip = iph->daddr;
-    __u8 ipproto = iph->protocol;
-
-    //bpf_printk("Ifindex = %d, Destination IP addr = %llx", ctx->ifindex, dst_ip);
+    __u32 ipproto = iph->protocol;
 
     int *out_port;
     out_port = bpf_map_lookup_elem(&routing, &dst_ip);
@@ -43,12 +53,10 @@ int tc_l2fwd(struct __sk_buff *ctx)
         return TC_ACT_SHOT;
     }
 
-    //bpf_printk("IP protocol = %d", ipproto);
-
-    if (ipproto == 0x1) {  // ICMP
-        ctx->priority = 100;
-    } else if (ipproto == 0x6) {  // TCP
-        ctx->priority = 10; // lower prio
+    int *priority;
+    priority = bpf_map_lookup_elem(&classifier, &ipproto);
+    if (priority) {
+        set_class_of_service(ctx, *priority);
     }
 
     return bpf_redirect(*out_port, 0);
@@ -57,7 +65,10 @@ int tc_l2fwd(struct __sk_buff *ctx)
 SEC("classifier/tc-egress")
 int tc_l2fwd_egress(struct __sk_buff *ctx)
 {
-    //bpf_printk("ifindex=%d, skb->priority = %d", ctx->ifindex, ctx->priority);
+    bpf_printk("ifindex=%d, skb->priority = %d", ctx->ifindex, ctx->priority);
+    /* NOTE! If the line below is uncommented the skb->priority from Ingress is reset
+     * and traffic prioritization is not enforced !!! */
+    // ctx->priority = 0;
     return TC_ACT_OK;
 }
 
