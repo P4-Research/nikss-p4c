@@ -198,8 +198,8 @@ class ActionSelectorTest(P4EbpfTest):
         self.default_group_ports = [PORT3, PORT4, PORT5]
 
         if table:
-            self.update_map(name=table, key="hex 66 55 44 33 22 2  0 0", value="2 0 0 0")
-            self.update_map(name=table, key="hex 66 55 44 33 22 7  0 0", value="7 0 0 0")
+            self.update_map(name=table, key="hex 66 55 44 33 22 2  0 0", value="2 0 0 0  0 0 0 0")
+            self.update_map(name=table, key="hex 66 55 44 33 22 7  0 0", value="7 0 0 0  1 0 0 0")
 
 
 class SimpleActionSelectorPSATest(ActionSelectorTest):
@@ -245,7 +245,7 @@ class ActionSelectorTwoTablesSameInstancePSATest(ActionSelectorTest):
 
     def runTest(self):
         self.create_default_rule_set(table="MyIC_tbl", selector="MyIC_as")
-        self.update_map(name="MyIC_tbl2", key="hex 22 11 0 0", value="3 0 0 0")
+        self.update_map(name="MyIC_tbl2", key="hex 22 11 0 0", value="3 0 0 0  0 0 0 0")
 
         pkt = testutils.simple_ip_packet(eth_src="02:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
         testutils.send_packet(self, PORT0, pkt)
@@ -270,7 +270,7 @@ class ActionSelectorDefaultEmptyGroupActionPSATest(ActionSelectorTest):
         testutils.verify_no_other_packets(self)
 
         self.create_empty_group(selector="MyIC_as", name="MyIC_as_group_g8", gid=8)
-        self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 8  0 0", value="8 0 0 0")
+        self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 8  0 0", value="8 0 0 0  1 0 0 0")
 
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
@@ -284,7 +284,7 @@ class ActionSelectorMultipleSelectorsPSATest(ActionSelectorTest):
 
     def runTest(self):
         self.create_default_rule_set(table="MyIC_tbl", selector="MyIC_as")
-        self.update_map(name="MyIC_tbl", key="hex 67 55 44 33 22 7  0 0", value="7 0 0 0")
+        self.update_map(name="MyIC_tbl", key="hex 67 55 44 33 22 7  0 0", value="7 0 0 0  1 0 0 0")
 
         allowed_ports = self.default_group_ports
         pkt = testutils.simple_ip_packet(eth_src="07:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
@@ -317,7 +317,7 @@ class ActionSelectorMultipleSelectorsTwoTablesPSATest(ActionSelectorTest):
 
     def runTest(self):
         self.create_default_rule_set(table="MyIC_tbl", selector="MyIC_as")
-        self.update_map(name="MyIC_tbl2", key="hex ff ee dd cc bb aa  0 0", value="7 0 0 0")
+        self.update_map(name="MyIC_tbl2", key="hex ff ee dd cc bb aa  0 0", value="7 0 0 0  1 0 0 0")
 
         pkt = testutils.simple_ip_packet(eth_src="07:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
         testutils.send_packet(self, PORT0, pkt)
@@ -337,9 +337,9 @@ class ActionSelectorLPMTablePSATest(ActionSelectorTest):
     def runTest(self):
         self.create_default_rule_set(table=None, selector="MyIC_as")
         # Match all xx:xx:02:44:55:xx MAC addresses into action ref 2
-        self.update_map(name="MyIC_tbl", key="hex 18 0 0 0  02 44 55 0", value="2 0 0 0")
+        self.update_map(name="MyIC_tbl", key="hex 18 0 0 0  02 44 55 0", value="2 0 0 0  0 0 0 0")
         # Match all xx:xx:07:44:55:xx MAC addresses into group g7
-        self.update_map(name="MyIC_tbl", key="hex 18 0 0 0  07 44 55 0", value="7 0 0 0")
+        self.update_map(name="MyIC_tbl", key="hex 18 0 0 0  07 44 55 0", value="7 0 0 0  1 0 0 0")
 
         pkt = testutils.simple_ip_packet(eth_src="00:22:07:44:55:66", eth_dst="22:33:44:55:66:77")
         testutils.send_packet(self, PORT0, pkt)
@@ -363,8 +363,8 @@ class ActionSelectorTernaryTablePSATest(ActionSelectorTest):
                         value="hex 1 0 0 0  0 0 0 0   0 ff ff ff 0 0  0 0   1 0 0 0  0 0 0 0")
         self.update_map(name="MyIC_tbl_prefixes", key="hex 0 ff ff ff 0 0  0 0",
                         value="hex 1 0 0 0  0 0 0 0   0 0 0 0 0 0  0 0   0 0 0 0  0 0 0 0")
-        self.create_map(name="MyIC_tbl_tuple_1", type="hash", key_size=8, value_size=8, max_entries=1024)
-        self.update_map(name="MyIC_tbl_tuple_1", key="hex 0 55 44 7 0 0  0 0", value="hex 0 0 0 0  7 0 0 0")
+        self.create_map(name="MyIC_tbl_tuple_1", type="hash", key_size=8, value_size=12, max_entries=1024)
+        self.update_map(name="MyIC_tbl_tuple_1", key="hex 0 55 44 7 0 0  0 0", value="hex 0 0 0 0  7 0 0 0  1 0 0 0")
         self.update_map(name="MyIC_tbl_tuples_map", key="1 0 0 0", value="MyIC_tbl_tuple_1", map_in_map=True)
 
         pkt = testutils.simple_ip_packet(eth_src="00:22:07:44:55:66", eth_dst="22:33:44:55:66:77")
@@ -381,8 +381,8 @@ class ActionSelectorActionRunPSATest(ActionSelectorTest):
     def runTest(self):
         self.update_map(name="MyIC_as_actions", key="2 0 0 0", value="1 0 0 0  5 0 0 0")
         self.update_map(name="MyIC_as_actions", key="3 0 0 0", value="0 0 0 0  0 0 0 0")
-        self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 2  0 0", value="2 0 0 0")
-        self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 3  0 0", value="3 0 0 0")
+        self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 2  0 0", value="2 0 0 0  0 0 0 0")
+        self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 3  0 0", value="3 0 0 0  0 0 0 0")
 
         pkt = testutils.simple_ip_packet(eth_src="02:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
         testutils.send_packet(self, PORT0, pkt)

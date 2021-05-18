@@ -226,6 +226,10 @@ EBPFActionSelectorPSA::EBPFActionSelectorPSA(const EBPFProgram* program, CodeGen
     groupsMapName = name + "_groups";
     emptyGroupActionMapName = name + "_defaultActionGroup";
 
+    // fields added to a table
+    referenceName = name + "_ref";
+    isGroupEntryName = name + "_is_group_ref";
+
     groupsMapSize = 0;
 }
 
@@ -295,6 +299,13 @@ void EBPFActionSelectorPSA::emitInstance(CodeBuilder *builder) {
                                    cstring("struct ") + valueTypeName, size);
 }
 
+void EBPFActionSelectorPSA::emitReferenceEntry(CodeBuilder *builder) {
+    EBPFTableImplementationPSA::emitReferenceEntry(builder);
+    builder->emitIndent();
+    builder->appendFormat("u32 %s", isGroupEntryName.c_str());
+    builder->endOfStatement(true);
+}
+
 void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring tableValueName,
                                                 cstring actionRunVariable) {
     cstring msg = Util::printf_format("ActionSelector: applying %s", name.c_str());
@@ -320,19 +331,23 @@ void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring ta
     builder->emitIndent();
     builder->appendFormat("u8 %s = 0", groupStateName.c_str());
     builder->endOfStatement(true);
+
+    // 2. Check if we have got group reference.
+
+    builder->emitIndent();
+    builder->appendFormat("if (%s->%s != 0) ", tableValueName.c_str(), isGroupEntryName.c_str());
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder, "ActionSelector: group reference %u",
+                                      1, effectiveActionRefName.c_str());
+
     builder->emitIndent();
     builder->append("void * ");
     builder->target->emitTableLookup(builder, groupsMapName, effectiveActionRefName,
                                      innerGroupName);
     builder->endOfStatement(true);
-
-    // 2. Check if we have got group reference.
-
     builder->emitIndent();
     builder->appendFormat("if (%s != NULL) ", innerGroupName.c_str());
     builder->blockStart();
-    builder->target->emitTraceMessage(builder, "ActionSelector: group reference %u",
-                                      1, effectiveActionRefName.c_str());
 
     // 3. Find member reference.
     // 3.1. First entry in inner map contains number of valid elements in the map
@@ -406,6 +421,16 @@ void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring ta
     builder->blockStart();
     builder->target->emitTraceMessage(builder,
         "ActionSelector: entry with number of elements not found, dropping packet. Bug?");
+    builder->emitIndent();
+    builder->appendFormat("return %s", builder->target->abortReturnCode().c_str());
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
+
+    builder->blockEnd(false);  // group found
+    builder->append(" else ");
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder,
+        "ActionSelector: group map was not found, dropping packet. Bug?");
     builder->emitIndent();
     builder->appendFormat("return %s", builder->target->abortReturnCode().c_str());
     builder->endOfStatement(true);

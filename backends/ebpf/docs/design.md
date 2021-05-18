@@ -204,39 +204,44 @@ which has implementation `ActionSelector`:
 
 ```c
 struct ingress_as_value * as_value = NULL;  // pointer to an action data
-u32 as_action_ref = value->ingress_as_key;  // value->ingress_as_key is entry from table (reference)
-u8 as_group_state = 0;                      // whether error occurred or from which map to read action data
-void * as_group_map = BPF_MAP_LOOKUP_ELEM(ingress_as_groups, &as_action_ref);  // (1)
-if (as_group_map != NULL) {
+u32 as_action_ref = value->ingress_as_ref;  // value->ingress_as_key is entry from table (reference)
+u8 as_group_state = 0;                      // from which map read action data
+if (value->ingress_as_is_group_ref != 0) {  // (1)
     bpf_trace_message("ActionSelector: group reference %u\n", as_action_ref);
-    u32 * num_of_members = bpf_map_lookup_elem(as_group_map, &ebpf_zero);      // (2)
-    if (num_of_members != NULL) {
-        if (*num_of_members != 0) {
-            u32 ingress_as_hash_reg = 0xffffffff;  // start calculation of hash
-            {
-                u8 ingress_as_hash_tmp = 0;
-                crc32_update(&ingress_as_hash_reg, (u8 *) &(hdr->ethernet.etherType), 2, 3988292384);
-                bpf_trace_message("CRC: checksum state: %llx\n", (u64) ingress_as_hash_reg);
-                bpf_trace_message("CRC: final checksum: %llx\n", (u64) crc32_finalize(ingress_as_hash_reg, 3988292384));
-            }
-            u64 as_checksum_val = crc32_finalize(ingress_as_hash_reg, 3988292384) & 0xffff;  // (3)
-            as_action_ref = 1 + (as_checksum_val % (*num_of_members));                       // (4)
-            bpf_trace_message("ActionSelector: selected action %u from group\n", as_action_ref);
-            u32 * as_map_entry = bpf_map_lookup_elem(as_group_map, &as_action_ref);          // (5)
-            if (as_map_entry != NULL) {
-                as_action_ref = *as_map_entry;
+    void * as_group_map = BPF_MAP_LOOKUP_ELEM(ingress_as_groups, &as_action_ref);
+    if (as_group_map != NULL) {
+        u32 * num_of_members = bpf_map_lookup_elem(as_group_map, &ebpf_zero);      // (2)
+        if (num_of_members != NULL) {
+            if (*num_of_members != 0) {
+                u32 ingress_as_hash_reg = 0xffffffff;  // start calculation of hash
+                {
+                    u8 ingress_as_hash_tmp = 0;
+                    crc32_update(&ingress_as_hash_reg, (u8 *) &(hdr->ethernet.etherType), 2, 3988292384);
+                    bpf_trace_message("CRC: checksum state: %llx\n", (u64) ingress_as_hash_reg);
+                    bpf_trace_message("CRC: final checksum: %llx\n", (u64) crc32_finalize(ingress_as_hash_reg, 3988292384));
+                }
+                u64 as_checksum_val = crc32_finalize(ingress_as_hash_reg, 3988292384) & 0xffff;  // (3)
+                as_action_ref = 1 + (as_checksum_val % (*num_of_members));                       // (4)
+                bpf_trace_message("ActionSelector: selected action %u from group\n", as_action_ref);
+                u32 * as_map_entry = bpf_map_lookup_elem(as_group_map, &as_action_ref);          // (5)
+                if (as_map_entry != NULL) {
+                    as_action_ref = *as_map_entry;
+                } else {
+                    /* Not found, probably bug. Skip further execution of the extern. */
+                    bpf_trace_message("ActionSelector: Entry with action reference was not found, dropping packet. Bug?\n");
+                    return TC_ACT_SHOT;
+                }
             } else {
-                /* Not found, probably bug. Skip further execution of the extern. */
-                bpf_trace_message("ActionSelector: Entry with action reference was not found. Bug?\n");
-                as_group_state = 2;
+                bpf_trace_message("ActionSelector: empty group, going to default action\n");
+                as_group_state = 1;
             }
         } else {
-            bpf_trace_message("ActionSelector: empty group, going to default action\n");
-            as_group_state = 1;
+            bpf_trace_message("ActionSelector: entry with number of elements not found, dropping packet. Bug?\n");
+            return TC_ACT_SHOT;
         }
     } else {
-        bpf_trace_message("ActionSelector: entry with number of elements not found, going to default action\n");
-        as_group_state = 1;
+        bpf_trace_message("ActionSelector: group map was not found, dropping packet. Bug?\n");
+        return TC_ACT_SHOT;
     }
 }
 if (as_group_state == 0) {
@@ -249,8 +254,8 @@ if (as_group_state == 0) {
 ```
 
 Description of marked lines:
-1. Lookup into `_groups` map is intended to distinguish member reference and group reference. When inner map is found,
-   reference is assumed to be a group reference.
+1. Detect if reference is group reference. When field `_is_group_ref` is non-zero, reference is assumed to be a group
+   reference. 
 2. Read first entry in a group. This gives number of members in a group.
 3. From calculated hash some least significant bits are taken into account. Number of this bits are equal to last
    parameter of constructor of `ActionSelector`.

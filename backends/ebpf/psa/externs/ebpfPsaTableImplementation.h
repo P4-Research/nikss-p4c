@@ -14,7 +14,7 @@ class EBPFTableImplementationPSA : public EBPFTablePSA {
 
     void emitTypes(CodeBuilder* builder) override;
     void emitInitializer(CodeBuilder *builder) override;
-    void emitReferenceEntry(CodeBuilder *builder);
+    virtual void emitReferenceEntry(CodeBuilder *builder);
 
     virtual void registerTable(const EBPFTablePSA * instance);
 
@@ -50,6 +50,7 @@ class EBPFActionSelectorPSA : public EBPFTableImplementationPSA {
 
     void emitInitializer(CodeBuilder *builder) override;
     void emitInstance(CodeBuilder *builder) override;
+    void emitReferenceEntry(CodeBuilder *builder) override;
 
     void applyImplementation(CodeBuilder* builder, cstring tableValueName,
                              cstring actionRunVariable) override;
@@ -67,6 +68,7 @@ class EBPFActionSelectorPSA : public EBPFTableImplementationPSA {
     cstring emptyGroupActionMapName;
     size_t groupsMapSize;
     cstring outputHashMask;
+    cstring isGroupEntryName;
 
     EBPFHashAlgorithmPSA::argumentsList unpackSelectors();
     selectorsListType getSelectorsFromTable(const EBPFTablePSA * instance);
