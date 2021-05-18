@@ -209,9 +209,9 @@ u8 as_group_state = 0;                      // whether error occurred or from wh
 void * as_group_map = BPF_MAP_LOOKUP_ELEM(ingress_as_groups, &as_action_ref);  // (1)
 if (as_group_map != NULL) {
     bpf_trace_message("ActionSelector: group reference %u\n", as_action_ref);
-    u32 * as_map_entry = bpf_map_lookup_elem(as_group_map, &ebpf_zero);        // (2)
-    if (as_map_entry != NULL) {
-        if (*as_map_entry != 0) {
+    u32 * num_of_members = bpf_map_lookup_elem(as_group_map, &ebpf_zero);      // (2)
+    if (num_of_members != NULL) {
+        if (*num_of_members != 0) {
             u32 ingress_as_hash_reg = 0xffffffff;  // start calculation of hash
             {
                 u8 ingress_as_hash_tmp = 0;
@@ -220,9 +220,9 @@ if (as_group_map != NULL) {
                 bpf_trace_message("CRC: final checksum: %llx\n", (u64) crc32_finalize(ingress_as_hash_reg, 3988292384));
             }
             u64 as_checksum_val = crc32_finalize(ingress_as_hash_reg, 3988292384) & 0xffff;  // (3)
-            as_action_ref = 1 + (as_checksum_val % (*as_map_entry));                         // (4)
+            as_action_ref = 1 + (as_checksum_val % (*num_of_members));                       // (4)
             bpf_trace_message("ActionSelector: selected action %u from group\n", as_action_ref);
-            as_map_entry = bpf_map_lookup_elem(as_group_map, &as_action_ref);                // (5)
+            u32 * as_map_entry = bpf_map_lookup_elem(as_group_map, &as_action_ref);          // (5)
             if (as_map_entry != NULL) {
                 as_action_ref = *as_map_entry;
             } else {

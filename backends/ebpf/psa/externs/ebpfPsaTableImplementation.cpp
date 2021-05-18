@@ -385,9 +385,9 @@ void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring ta
     builder->emitIndent();
     builder->appendLine("/* Not found, probably bug. Skip further execution of the extern. */");
     builder->target->emitTraceMessage(builder,
-        "ActionSelector: Entry with action reference was not found. Bug?");
+        "ActionSelector: Entry with action reference was not found, dropping packet. Bug?");
     builder->emitIndent();
-    builder->appendFormat("%s = 2", groupStateName.c_str());
+    builder->appendFormat("return %s", builder->target->abortReturnCode().c_str());
     builder->endOfStatement(true);
     builder->blockEnd(true);
 
@@ -405,9 +405,9 @@ void EBPFActionSelectorPSA::applyImplementation(CodeBuilder* builder, cstring ta
     builder->append(" else ");
     builder->blockStart();
     builder->target->emitTraceMessage(builder,
-        "ActionSelector: entry with number of elements not found, going to default action");
+        "ActionSelector: entry with number of elements not found, dropping packet. Bug?");
     builder->emitIndent();
-    builder->appendFormat("%s = 1", groupStateName.c_str());
+    builder->appendFormat("return %s", builder->target->abortReturnCode().c_str());
     builder->endOfStatement(true);
     builder->blockEnd(true);
 
