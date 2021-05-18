@@ -204,11 +204,11 @@ which has implementation `ActionSelector`:
 
 ```c
 struct ingress_as_value * as_value = NULL;  // pointer to an action data
-u32 as_action_ref = value->ingress_as_ref;  // value->ingress_as_key is entry from table (reference)
+u32 as_action_ref = value->ingress_as_ref;  // value->ingress_as_ref is entry from table (reference)
 u8 as_group_state = 0;                      // from which map read action data
 if (value->ingress_as_is_group_ref != 0) {  // (1)
     bpf_trace_message("ActionSelector: group reference %u\n", as_action_ref);
-    void * as_group_map = BPF_MAP_LOOKUP_ELEM(ingress_as_groups, &as_action_ref);
+    void * as_group_map = BPF_MAP_LOOKUP_ELEM(ingress_as_groups, &as_action_ref);  // get group map
     if (as_group_map != NULL) {
         u32 * num_of_members = bpf_map_lookup_elem(as_group_map, &ebpf_zero);      // (2)
         if (num_of_members != NULL) {
@@ -270,15 +270,12 @@ Description of marked lines:
 
 In order to add member reference as a table entry:
 1. Create entry with fresh member reference in a `_actions` table or obtain existing one from there.
-2. Add this member reference as a value in a table.
+2. Add this member reference as a value (field `_ref`) in a table (field `_is_group_ref` set to `0`).
 
 In order to add group reference as a table entry:
 1. Create entries with fresh member reference in a `_actions` table or obtain existing ones from there.
 2. Create new `Array` map.
 3. In this new map at indexes staring from 1, add member references. In an entry at index 0 write number of members.
 4. Add this map into `_groups` map using fresh group reference.
-5. Add this group reference as a value in a table.
-
-**Note!** Reference for entry in both maps, `_actions` and `_groups`, must be unique, because member reference and
-group reference use the same space of references.
+5. Add this group reference as a value (field `_ref`) in a table (field `_is_group_ref` set to something other than `0`).
 
