@@ -4,6 +4,7 @@
 #include "ebpfPsaObjects.h"
 #include "backends/ebpf/ebpfControl.h"
 #include "backends/ebpf/psa/externs/ebpfPsaChecksum.h"
+#include "backends/ebpf/psa/externs/ebpfPsaRandom.h"
 #include "backends/ebpf/psa/externs/ebpfPsaRegister.h"
 
 namespace EBPF {
@@ -19,6 +20,7 @@ class EBPFControlPSA : public EBPFControl {
     const IR::Parameter* outputStandardMetadata;
 
     std::map<cstring, EBPFHashPSA*> hashes;
+    std::map<cstring, EBPFRandomPSA*> randGenerators;
     std::map<cstring, EBPFRegisterPSA*>  registers;
 
     EBPFControlPSA(const EBPFProgram* program, const IR::ControlBlock* control,
@@ -39,8 +41,12 @@ class EBPFControlPSA : public EBPFControl {
     EBPFRegisterPSA* getRegister(cstring name) const {
         auto result = ::get(registers, name);
         BUG_CHECK(result != nullptr, "No register named %1%", name);
-        return result;
-    }
+        return result; }
+
+    EBPFRandomPSA* getRandGenerator(cstring name) const {
+        auto result = ::get(randGenerators, name);
+        BUG_CHECK(result != nullptr, "No random generator named %1%", name);
+        return result; }
 };
 
 }  // namespace EBPF
