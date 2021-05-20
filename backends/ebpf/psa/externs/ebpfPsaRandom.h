@@ -13,7 +13,7 @@ class EBPFRandomPSA : public EBPFObject {
 
     void emitRead(CodeBuilder* builder) const;
 
- protected:
+ private:
     uint32_t minValue;
     uint32_t maxValue;
     uint64_t range;

@@ -39,8 +39,7 @@ EBPFRandomPSA::EBPFRandomPSA(const IR::Declaration_Instance* di) :
     }
     minValue = tmp[0];
     maxValue = tmp[1];
-    range = maxValue - minValue;
-    range = range + 1;
+    range = (uint64_t) maxValue - minValue + 1;
 
     // verify constructor parameters
     if (minValue > maxValue) {
@@ -72,7 +71,7 @@ void EBPFRandomPSA::emitRead(CodeBuilder* builder) const {
     if (minValue != 0)
         builder->appendFormat("(%uu + ", minValue);
 
-    builder->appendFormat("(bpf_get_prandom_u32() ", minValue);
+    builder->append("(bpf_get_prandom_u32() ");
     if (rangeIsPowerOf2) {
         builder->appendFormat("& 0x%llxu", range - 1);
     } else {
