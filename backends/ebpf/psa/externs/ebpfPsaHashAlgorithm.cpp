@@ -33,7 +33,11 @@ void EBPFHashAlgorithmPSA::emitClear(CodeBuilder *builder) {
 
 void EBPFHashAlgorithmPSA::emitAddData(CodeBuilder *builder, int dataPos,
                                        const IR::MethodCallExpression *expr) {
-    (void) builder; (void) dataPos; (void) expr;
+    emitAddData(builder, unpackArguments(expr, dataPos));
+}
+
+void EBPFHashAlgorithmPSA::emitAddData(CodeBuilder* builder, const argumentsList & arguments) {
+    (void) builder; (void) arguments;
 }
 
 void EBPFHashAlgorithmPSA::emitGet(CodeBuilder *builder) {
@@ -42,7 +46,12 @@ void EBPFHashAlgorithmPSA::emitGet(CodeBuilder *builder) {
 
 void EBPFHashAlgorithmPSA::emitSubtractData(CodeBuilder *builder, int dataPos,
                                             const IR::MethodCallExpression *expr) {
-    (void) builder; (void) dataPos; (void) expr;
+    emitSubtractData(builder, unpackArguments(expr, dataPos));
+}
+
+void EBPFHashAlgorithmPSA::emitSubtractData(CodeBuilder *builder,
+                                            const argumentsList & arguments) {
+    (void) builder; (void) arguments;
 }
 
 void EBPFHashAlgorithmPSA::emitGetInternalState(CodeBuilder *builder) {
@@ -56,8 +65,8 @@ void EBPFHashAlgorithmPSA::emitSetInternalState(CodeBuilder *builder,
 
 // ===========================InternetChecksumAlgorithm===========================
 
-void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder, int dataPos,
-                                               const IR::MethodCallExpression * expr,
+void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder,
+                                               const argumentsList & arguments,
                                                bool addData) {
     cstring tmpVar = program->refMap->newName(baseName + "_tmp");
 
@@ -67,8 +76,6 @@ void InternetChecksumAlgorithm::updateChecksum(CodeBuilder* builder, int dataPos
     builder->emitIndent();
     builder->appendFormat("u16 %s = 0", tmpVar.c_str());
     builder->endOfStatement(true);
-
-    auto arguments = unpackArguments(expr, dataPos);
 
     int remainingBits = 16, bitsToRead;
     for (auto field : arguments) {
@@ -162,18 +169,18 @@ void InternetChecksumAlgorithm::emitClear(CodeBuilder* builder) {
     builder->endOfStatement(true);
 }
 
-void InternetChecksumAlgorithm::emitAddData(CodeBuilder* builder, int dataPos,
-                                            const IR::MethodCallExpression * expr) {
-    updateChecksum(builder, dataPos, expr, true);
+void InternetChecksumAlgorithm::emitAddData(CodeBuilder* builder,
+                                            const argumentsList & arguments) {
+    updateChecksum(builder, arguments, true);
 }
 
 void InternetChecksumAlgorithm::emitGet(CodeBuilder* builder) {
     builder->appendFormat("((u16) (~%s))", stateVar.c_str());
 }
 
-void InternetChecksumAlgorithm::emitSubtractData(CodeBuilder* builder, int dataPos,
-                                                 const IR::MethodCallExpression * expr) {
-    updateChecksum(builder, dataPos, expr, false);
+void InternetChecksumAlgorithm::emitSubtractData(CodeBuilder* builder,
+                                                 const argumentsList & arguments) {
+    updateChecksum(builder, arguments, false);
 }
 
 void InternetChecksumAlgorithm::emitGetInternalState(CodeBuilder* builder) {
@@ -197,7 +204,7 @@ void InternetChecksumAlgorithm::emitSetInternalState(CodeBuilder* builder,
 
 cstring CRCChecksumAlgorithm::reflect(cstring str) {
     BUG_CHECK(crcWidth <= 64, "CRC checksum width up to 64 bits is supported");
-    unsigned long long poly = std::stoull(str.c_str(), 0, 16);
+    unsigned long long poly = std::stoull(str.c_str(), nullptr, 16);
     unsigned long long result, i, j;
 
     result = 0;
@@ -236,24 +243,34 @@ void CRCChecksumAlgorithm::emitVariables(CodeBuilder* builder,
                                          const IR::Declaration_Instance* decl) {
     registerVar = program->refMap->newName(baseName + "_reg");
 
-    BUG_CHECK(decl->type->is<IR::Type_Specialized>(), "Must be a specialized type %1%", decl);
-    auto ts = decl->type->to<IR::Type_Specialized>();
-    BUG_CHECK(ts->arguments->size() == 1, "Expected 1 specialized type %1%", decl);
-
-    auto otype = ts->arguments->at(0);
-    if (!otype->is<IR::Type_Bits>()) {
-        ::error(ErrorType::ERR_UNSUPPORTED, "Must be bit or int type: %1%", ts);
-        return;
-    }
-    if (otype->width_bits() != crcWidth) {
-        ::error(ErrorType::ERR_TYPE_ERROR, "Must be %1%-bits width: %2%", crcWidth, ts);
-        return;
-    }
-
-    auto registerType = EBPFTypeFactory::instance->create(otype);
-
     builder->emitIndent();
-    registerType->emit(builder);
+
+    if (decl != nullptr) {
+        BUG_CHECK(decl->type->is<IR::Type_Specialized>(), "Must be a specialized type %1%", decl);
+        auto ts = decl->type->to<IR::Type_Specialized>();
+        BUG_CHECK(ts->arguments->size() == 1, "Expected 1 specialized type %1%", decl);
+
+        auto otype = ts->arguments->at(0);
+        if (!otype->is<IR::Type_Bits>()) {
+            ::error(ErrorType::ERR_UNSUPPORTED, "Must be bit or int type: %1%", ts);
+            return;
+        }
+        if (otype->width_bits() != crcWidth) {
+            ::error(ErrorType::ERR_TYPE_ERROR, "Must be %1%-bits width: %2%", crcWidth, ts);
+            return;
+        }
+
+        auto registerType = EBPFTypeFactory::instance->create(otype);
+        registerType->emit(builder);
+    } else {
+        if (crcWidth == 16)
+            builder->append("u16");
+        else if (crcWidth == 32)
+            builder->append("u32");
+        else
+            BUG("Unsupported CRC width %1%", crcWidth);
+    }
+
     builder->appendFormat(" %s = %s", registerVar.c_str(), initialValue.c_str());
     builder->endOfStatement(true);
 }
@@ -264,10 +281,9 @@ void CRCChecksumAlgorithm::emitClear(CodeBuilder* builder) {
     builder->endOfStatement(true);
 }
 
-void CRCChecksumAlgorithm::emitAddData(CodeBuilder* builder, int dataPos,
-                                       const IR::MethodCallExpression * expr) {
+void CRCChecksumAlgorithm::emitAddData(CodeBuilder* builder,
+                                       const argumentsList & arguments) {
     cstring tmpVar = program->refMap->newName(baseName + "_tmp");
-    auto arguments = unpackArguments(expr, dataPos);
 
     builder->emitIndent();
     builder->blockStart();
@@ -345,9 +361,9 @@ void CRCChecksumAlgorithm::emitGet(CodeBuilder* builder) {
                           registerVar.c_str(), polynomial.c_str());
 }
 
-void CRCChecksumAlgorithm::emitSubtractData(CodeBuilder* builder, int dataPos,
-                                            const IR::MethodCallExpression * expr) {
-    (void) builder; (void) expr; (void) dataPos;
+void CRCChecksumAlgorithm::emitSubtractData(CodeBuilder* builder,
+                                            const argumentsList & arguments) {
+    (void) builder; (void) arguments;
     BUG("Not implementable");
 }
 

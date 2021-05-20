@@ -21,7 +21,7 @@ void DeparserBodyTranslator::processMethod(const P4::ExternMethod *method) {
     if (externName == "InternetChecksum" || externName == "Checksum") {
         auto instance = method->object->getName().name;
         auto methodName = method->method->getName().name;
-        deparser->getChecksum(instance)->processMethod(builder, methodName, method->expr);
+        deparser->getChecksum(instance)->processMethod(builder, methodName, method->expr, this);
         return;
     } else if (method->method->name.name == "emit") {
         // do not use visitor to generate emit() methods
@@ -320,7 +320,7 @@ void EBPFDeparserPSA::emitDeclaration(CodeBuilder* builder, const IR::Declaratio
         cstring name = di->name.name;
 
         if (type != nullptr && type->path->name.name == "InternetChecksum") {
-            auto instance = new EBPFInternetChecksumPSA(program, di, name, this->codeGen);
+            auto instance = new EBPFInternetChecksumPSA(program, di, name);
             checksums.emplace(name, instance);
             instance->emitVariables(builder);
             return;
@@ -328,7 +328,7 @@ void EBPFDeparserPSA::emitDeclaration(CodeBuilder* builder, const IR::Declaratio
 
         if (typeSpec != nullptr &&
                 typeSpec->baseType->to<IR::Type_Name>()->path->name.name == "Checksum") {
-            auto instance = new EBPFChecksumPSA(program, di, name, this->codeGen);
+            auto instance = new EBPFChecksumPSA(program, di, name);
             checksums.emplace(name, instance);
             instance->emitVariables(builder);
             return;

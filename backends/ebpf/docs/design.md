@@ -171,4 +171,111 @@ we decided to set maximum number of prefixes to `MAX_MASKS = 256`. If this limit
 will not be allowed to insert new rules. However, we expect it will be rather rare situation as so huge number of 
 prefixes/masks is not frequently observed, even in production deployments.
 
+## ActionSelector
+
+**Note!** Before reading this section, please read the [PSA specification](https://p4.org/p4-spec/docs/PSA-v1.1.0.html#sec-action-selector)
+about `ActionSelector` extern.
+
+`ActionSelector` is a table implementation that must be used with table as a `psa_implementation` property. Table with
+implementation has changed algorithm for action execution, which does some additional operation. Table with such
+implementation will not contain action data.
+
+Quick dictionary:
+- `member reference` - number which unambiguously points to an action and its data.
+- `group reference` - number which unambiguously points to a group of member references. 
+- `action data` - action and its value of parameters.
+
+There are created some maps for every instance of `ActionSelector` extern with following suffixes:
+- `_actions` - contains member reference as a key and action data as a value. Size is equal to second argument passed to
+  the constructor of the `ActionSelector` extern. Map type: `BPF_MAP_TYPE_HASH`.
+- `_groups` - contains group reference as a key and an inner map as value. Size is minimal size of all tables
+  implemented by given instance of `ActionSelector` extern. Map type: `BPF_MAP_TYPE_HASH_OF_MAPS`.
+- `_defaultActionGroup` - contains action data as value for an empty group (without action references). Size is equal
+  to 1. Map type: `BPF_MAP_TYPE_ARRAY`.
+
+Map with suffix `_groups` is a map of maps. Inner map for this map is a group map. First entry in this inner map
+contains number of members in a group, other entries are member references (action data is not stored here). Size is
+assumed to be 129 (128 possible members and number of members). Used map type is `BPF_MAP_TYPE_ARRAY`.
+
+### Algorithm of operation
+
+Before action execution, following source code will be generated (and some additional comments to it) for table lookup,
+which has implementation `ActionSelector`:
+
+```c
+struct ingress_as_value * as_value = NULL;  // pointer to an action data
+u32 as_action_ref = value->ingress_as_ref;  // value->ingress_as_ref is entry from table (reference)
+u8 as_group_state = 0;                      // from which map read action data
+if (value->ingress_as_is_group_ref != 0) {  // (1)
+    bpf_trace_message("ActionSelector: group reference %u\n", as_action_ref);
+    void * as_group_map = BPF_MAP_LOOKUP_ELEM(ingress_as_groups, &as_action_ref);  // get group map
+    if (as_group_map != NULL) {
+        u32 * num_of_members = bpf_map_lookup_elem(as_group_map, &ebpf_zero);      // (2)
+        if (num_of_members != NULL) {
+            if (*num_of_members != 0) {
+                u32 ingress_as_hash_reg = 0xffffffff;  // start calculation of hash
+                {
+                    u8 ingress_as_hash_tmp = 0;
+                    crc32_update(&ingress_as_hash_reg, (u8 *) &(hdr->ethernet.etherType), 2, 3988292384);
+                    bpf_trace_message("CRC: checksum state: %llx\n", (u64) ingress_as_hash_reg);
+                    bpf_trace_message("CRC: final checksum: %llx\n", (u64) crc32_finalize(ingress_as_hash_reg, 3988292384));
+                }
+                u64 as_checksum_val = crc32_finalize(ingress_as_hash_reg, 3988292384) & 0xffff;  // (3)
+                as_action_ref = 1 + (as_checksum_val % (*num_of_members));                       // (4)
+                bpf_trace_message("ActionSelector: selected action %u from group\n", as_action_ref);
+                u32 * as_map_entry = bpf_map_lookup_elem(as_group_map, &as_action_ref);          // (5)
+                if (as_map_entry != NULL) {
+                    as_action_ref = *as_map_entry;
+                } else {
+                    /* Not found, probably bug. Skip further execution of the extern. */
+                    bpf_trace_message("ActionSelector: Entry with action reference was not found, dropping packet. Bug?\n");
+                    return TC_ACT_SHOT;
+                }
+            } else {
+                bpf_trace_message("ActionSelector: empty group, going to default action\n");
+                as_group_state = 1;
+            }
+        } else {
+            bpf_trace_message("ActionSelector: entry with number of elements not found, dropping packet. Bug?\n");
+            return TC_ACT_SHOT;
+        }
+    } else {
+        bpf_trace_message("ActionSelector: group map was not found, dropping packet. Bug?\n");
+        return TC_ACT_SHOT;
+    }
+}
+if (as_group_state == 0) {
+    bpf_trace_message("ActionSelector: member reference %u\n", as_action_ref);
+    as_value = BPF_MAP_LOOKUP_ELEM(ingress_as_actions, &as_action_ref);         // (6)
+} else if (as_group_state == 1) {
+    bpf_trace_message("ActionSelector: empty group, executing default group action\n");
+    as_value = BPF_MAP_LOOKUP_ELEM(ingress_as_defaultActionGroup, &ebpf_zero);  // (7)
+}
+```
+
+Description of marked lines:
+1. Detect if reference is group reference. When field `_is_group_ref` is non-zero, reference is assumed to be a group
+   reference. 
+2. Read first entry in a group. This gives number of members in a group.
+3. From calculated hash some least significant bits are taken into account. Number of this bits are equal to last
+   parameter of constructor of `ActionSelector`.
+4. Number of members in a group is known (first entry in a table) and one of them must be chosen. Based on hash value,
+   result is an action id in a group. Valid value of action id in a group is in the set {1, 2, ... number of members}
+5. This lookup is necessary to translate action id in a group into member reference.
+6. When member reference is found (for a group; when member reference was read from table, it is used here) action data
+   is read from `_actions` map.
+7. For an empty group (without members) action data is read from `_defaultActionGroup` table. 
+
+### Adding entry to table
+
+In order to add member reference as a table entry:
+1. Create entry with fresh member reference in a `_actions` table or obtain existing one from there.
+2. Add this member reference as a value (field `_ref`) in a table (field `_is_group_ref` set to `0`).
+
+In order to add group reference as a table entry:
+1. Create entries with fresh member reference in a `_actions` table or obtain existing ones from there.
+2. Create new `Array` map.
+3. In this new map at indexes staring from 1, add member references. In an entry at index 0 write number of members.
+4. Add this map into `_groups` map using fresh group reference.
+5. Add this group reference as a value (field `_ref`) in a table (field `_is_group_ref` set to something other than `0`).
 

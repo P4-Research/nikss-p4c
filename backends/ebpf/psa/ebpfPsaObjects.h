@@ -44,7 +44,6 @@ class EBPFTablePSA : public EBPFTable {
 
     bool hasImplementation() const;
 
- private:
     void emitTableValue(CodeBuilder* builder, const IR::MethodCallExpression* actionMce,
                         cstring valueName);
     void emitDefaultActionInitializer(CodeBuilder *builder);
@@ -82,6 +81,11 @@ class EBPFTablePSA : public EBPFTable {
         if (result != counters.end())
             return result->second;
         return nullptr;
+    }
+
+    bool isMatchTypeSupported(const IR::Declaration_ID* matchType) override {
+        return EBPFTable::isMatchTypeSupported(matchType) ||
+               matchType->name.name == "selector";
     }
 };
 

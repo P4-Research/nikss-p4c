@@ -4,18 +4,18 @@
 namespace EBPF {
 
 void EBPFChecksumPSA::init(const EBPFProgram* program, cstring name, int type) {
-    engine = EBPFHashAlgorithmTypeFactoryPSA::instance()->create(type, program, name, visitor);
+    engine = EBPFHashAlgorithmTypeFactoryPSA::instance()->create(type, program, name);
 
     if (engine == nullptr) {
         ::error(ErrorType::ERR_UNSUPPORTED, "Hash algorithm not yet implemented: %1%",
                 declaration->arguments->at(0));
-        engine = new EBPFHashAlgorithmPSA(program, name, visitor);
+        engine = new EBPFHashAlgorithmPSA(program, name);
     }
 }
 
 EBPFChecksumPSA::EBPFChecksumPSA(const EBPFProgram* program, const IR::Declaration_Instance* block,
-                                 cstring name, Visitor * visitor) :
-         engine(nullptr), visitor(visitor), declaration(block) {
+                                 cstring name) :
+         engine(nullptr), declaration(block) {
     auto di = block->to<IR::Declaration_Instance>();
     if (di->arguments->size() != 1) {
         ::error(ErrorType::ERR_UNEXPECTED, "Expected exactly 1 argument %1%", block);
@@ -26,13 +26,15 @@ EBPFChecksumPSA::EBPFChecksumPSA(const EBPFProgram* program, const IR::Declarati
 }
 
 EBPFChecksumPSA::EBPFChecksumPSA(const EBPFProgram* program, const IR::Declaration_Instance* block,
-                cstring name, Visitor * visitor, int type) :
-        engine(nullptr), visitor(visitor), declaration(block) {
+                cstring name, int type) :
+        engine(nullptr), declaration(block) {
     init(program, name, type);
 }
 
 void EBPFChecksumPSA::processMethod(CodeBuilder* builder, cstring method,
-                                    const IR::MethodCallExpression * expr) {
+                                    const IR::MethodCallExpression * expr, Visitor * visitor) {
+    engine->setVisitor(visitor);
+
     if (method == "clear") {
         engine->emitClear(builder);
     } else if (method == "update") {
@@ -45,7 +47,10 @@ void EBPFChecksumPSA::processMethod(CodeBuilder* builder, cstring method,
 }
 
 void EBPFInternetChecksumPSA::processMethod(CodeBuilder* builder, cstring method,
-                                            const IR::MethodCallExpression * expr) {
+                                            const IR::MethodCallExpression * expr,
+                                            Visitor * visitor) {
+    engine->setVisitor(visitor);
+
     if (method == "add") {
         engine->emitAddData(builder, 0, expr);
     } else if (method == "subtract") {
@@ -55,13 +60,15 @@ void EBPFInternetChecksumPSA::processMethod(CodeBuilder* builder, cstring method
     } else if (method == "set_state") {
         engine->emitSetInternalState(builder, expr);
     } else {
-        EBPFChecksumPSA::processMethod(builder, method, expr);
+        EBPFChecksumPSA::processMethod(builder, method, expr, visitor);
     }
 }
 
 
 void EBPFHashPSA::processMethod(CodeBuilder* builder, cstring method,
-                                const IR::MethodCallExpression * expr) {
+                                const IR::MethodCallExpression * expr, Visitor * visitor) {
+    engine->setVisitor(visitor);
+
     // Note: "Hash" extern has only one method "get_hash". Method "update" were introduced
     // in order to be able to calculate hash and then assign it to a destination.
     if (method == "update") {
@@ -71,13 +78,14 @@ void EBPFHashPSA::processMethod(CodeBuilder* builder, cstring method,
         engine->emitClear(builder);
         engine->emitAddData(builder, expr->arguments->size() == 3 ? 1 : 0, expr);
     } else if (method == "get_hash") {
-        emitGetMethod(builder, expr);
+        emitGetMethod(builder, expr, visitor);
     } else {
         ::error(ErrorType::ERR_UNEXPECTED, "Unexpected method call %1%", expr);
     }
 }
 
-void EBPFHashPSA::emitGetMethod(CodeBuilder* builder, const IR::MethodCallExpression * expr) {
+void EBPFHashPSA::emitGetMethod(CodeBuilder* builder, const IR::MethodCallExpression * expr,
+                                Visitor * visitor) {
     BUG_CHECK(expr->arguments->size() == 1 || expr->arguments->size() == 3,
               "Expected 1 or 3 arguments: %1%", expr);
 

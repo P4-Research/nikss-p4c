@@ -9,47 +9,46 @@ namespace EBPF {
 class EBPFChecksumPSA : public EBPFObject {
  protected:
     EBPFHashAlgorithmPSA * engine;
-    Visitor * visitor;
     const IR::Declaration_Instance * declaration;
 
     void init(const EBPFProgram* program, cstring name, int type);
 
  public:
     EBPFChecksumPSA(const EBPFProgram* program, const IR::Declaration_Instance* block,
-                    cstring name, Visitor * visitor);
+                    cstring name);
 
     EBPFChecksumPSA(const EBPFProgram* program, const IR::Declaration_Instance* block,
-                    cstring name, Visitor * visitor, int type);
+                    cstring name, int type);
 
     void emitVariables(CodeBuilder* builder) {
         engine->emitVariables(builder, declaration);
     }
 
     virtual void processMethod(CodeBuilder* builder, cstring method,
-                               const IR::MethodCallExpression * expr);
+                               const IR::MethodCallExpression * expr, Visitor * visitor);
 };
 
 class EBPFInternetChecksumPSA : public EBPFChecksumPSA {
  public:
     EBPFInternetChecksumPSA(const EBPFProgram* program, const IR::Declaration_Instance* block,
-                            cstring name, Visitor * visitor)
-    : EBPFChecksumPSA(program, block, name, visitor,
+                            cstring name)
+    : EBPFChecksumPSA(program, block, name,
                       EBPFHashAlgorithmPSA::HashAlgorithm::ONES_COMPLEMENT16) {}
 
     void processMethod(CodeBuilder* builder, cstring method,
-                       const IR::MethodCallExpression * expr) override;
+                       const IR::MethodCallExpression * expr, Visitor * visitor) override;
 };
 
 class EBPFHashPSA : public EBPFChecksumPSA {
  public:
     EBPFHashPSA(const EBPFProgram* program, const IR::Declaration_Instance* block,
-                            cstring name, Visitor * visitor)
-    : EBPFChecksumPSA(program, block, name, visitor) {}
+                cstring name) : EBPFChecksumPSA(program, block, name) {}
 
     void processMethod(CodeBuilder* builder, cstring method,
-                       const IR::MethodCallExpression * expr) override;
+                       const IR::MethodCallExpression * expr, Visitor * visitor) override;
 
-    void emitGetMethod(CodeBuilder* builder, const IR::MethodCallExpression * expr);
+    void emitGetMethod(CodeBuilder* builder, const IR::MethodCallExpression * expr,
+                       Visitor * visitor);
 };
 
 }  // namespace EBPF
