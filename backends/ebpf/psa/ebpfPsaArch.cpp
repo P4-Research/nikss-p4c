@@ -7,6 +7,7 @@
 #include "externs/ebpfPsaTableImplementation.h"
 #include "externs/ebpfPsaCounter.h"
 #include "externs/ebpfPsaHashAlgorithm.h"
+#include "externs/ebpfPsaRandom.h"
 #include "externs/ebpfPsaRegister.h"
 
 namespace EBPF {
@@ -583,6 +584,9 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
     } else if (typeName == "Hash") {
         auto hash = new EBPFHashPSA(program, di, name);
         control->hashes.emplace(name, hash);
+    } else if (instance->type->getName().name == "Random") {
+        auto rand = new EBPFRandomPSA(di);
+        control->randGenerators.emplace(name, rand);
     } else if (typeName == "Register") {
         auto reg = new EBPFRegisterPSA(program, name, di, control->codeGen);
         control->registers.emplace(name, reg);
