@@ -268,7 +268,7 @@ void PSAArch::emitHelperFunctions2TC(CodeBuilder *builder) const {
                             "    }\n"
                             "}";
 
-    builder->appendLine("");
+    builder->appendLine(meter_execute);
     builder->newline();
 }
 

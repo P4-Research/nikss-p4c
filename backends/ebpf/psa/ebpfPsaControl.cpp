@@ -75,7 +75,7 @@ void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
         auto di = decl->to<IR::Declaration_Instance>();
         name = EBPFObject::externalName(di);
         auto meter = control->to<EBPFControlPSA>()->getMeter(name);
-        meter->emitExecute(builder);
+        meter->emitExecute(builder, method);
         return;
     }
 

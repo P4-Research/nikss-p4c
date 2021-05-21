@@ -69,8 +69,10 @@ void EBPFMeterPSA::emitInstance(CodeBuilder *builder) {
                                    this->valueTypeName, size);
 }
 
-void EBPFMeterPSA::emitExecute(CodeBuilder* builder) {
-    builder->appendLine("/*Execute*/");
+void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* method) {
+    auto indexArgExpr = method->expr->arguments->at(0)->expression->to<IR::PathExpression>();
+    builder->appendFormat("meter_execute(&%s, &%s, &%s)", instanceName, "skb->len", indexArgExpr->path->name.name);
+//    builder->endOfStatement(true);
 }
 
 }  // namespace EBPF
