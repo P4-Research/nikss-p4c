@@ -266,8 +266,12 @@ void EBPFIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->endOfStatement(true);
     builder->blockEnd(true);
 
+    builder->emitIndent();
+    builder->appendLine("skb->priority = ostd.class_of_service;");
+
     builder->target->emitTraceMessage(builder,
-            "IngressTM: Sending packet out of port %d", 1, "ostd.egress_port");
+            "IngressTM: Sending packet out of port %d with priority %d", 2, "ostd.egress_port",
+            "ostd.class_of_service");
     builder->emitIndent();
     builder->appendLine("return bpf_redirect(ostd.egress_port, 0);");
 }
@@ -280,7 +284,7 @@ void EBPFEgressPipeline::emitPSAControlDataTypes(CodeBuilder* builder) {
 
     builder->emitIndent();
     builder->appendFormat("struct psa_egress_input_metadata_t %s = {\n"
-                          "        .class_of_service = meta->class_of_service,\n"
+                          "        .class_of_service = skb->priority,\n"
                           "        .egress_port = skb->ifindex,\n"
                           "        .packet_path = meta->packet_path,\n"
                           "        .instance = meta->instance,\n"
