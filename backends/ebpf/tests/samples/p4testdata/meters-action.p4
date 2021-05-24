@@ -91,19 +91,32 @@ control ingress(inout headers hdr,
     bit<7> idx;
     PSA_MeterColor_t color1;
 
-    apply {
-         idx = (bit<7>) 0;
-         if (idx < METER1_SIZE) {
-             color1 = meter1.execute(idx);
-         } else {
-             color1 = PSA_MeterColor_t.RED;
-         }
+    action do_forward(PortId_t egress_port) {
+        idx = (bit<7>) 0;
+        if (idx < METER1_SIZE) {
+            color1 = meter1.execute(idx);
+        } else {
+            color1 = PSA_MeterColor_t.RED;
+        }
 
-         if (color1 != PSA_MeterColor_t.RED) {
-             send_to_port(ostd, (PortId_t) 5);
-         } else {
-             ingress_drop(ostd);
-         }
+        if (color1 != PSA_MeterColor_t.RED) {
+            send_to_port(ostd, egress_port);
+        } else {
+            ingress_drop(ostd);
+        }
+    }
+
+    table tbl_fwd {
+        key = {
+            istd.ingress_port : exact;
+        }
+        actions = { do_forward; NoAction; }
+        default_action = do_forward((PortId_t) 6);
+        size = 100;
+    }
+
+    apply {
+         tbl_fwd.apply();
     }
 }
 

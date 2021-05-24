@@ -279,3 +279,26 @@ In order to add group reference as a table entry:
 4. Add this map into `_groups` map using fresh group reference.
 5. Add this group reference as a value (field `_ref`) in a table (field `_is_group_ref` set to something other than `0`).
 
+# Direct Meter
+Metering mechanism implements Dual Token Bucket algorithm. Meters are translated to `BPF_MAP_TYPE_ARRAY` with unchanging value type.
+
+```c
+typedef struct meter_value {
+    u32 pir;
+    u32 cir;
+    u32 pbs;
+    u32 cbs;
+    u64 timestamp;
+    u32 pbs_left;
+    u32 cbs_left;
+};
+```
+
+To configure meter you have to create an entry filing up following fields:
+- pir (Peak Information Rate) in kbits/s
+- cir (Committed Information Rate) in kbits/s
+- pbs (Peak Burst Size) in bytes
+- cbs (Committed Burst Size) in bytes
+- timestamp with zero value
+- pbs_left (PBS left) in bytes
+- cbs_left (CBS left) in bytes

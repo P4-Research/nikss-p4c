@@ -78,6 +78,9 @@ void EBPFMeterPSA::emitInstance(CodeBuilder *builder) {
 }
 
 void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* method) {
+    if (method->expr->arguments->size() == 2) {
+        ::warning("Color-Aware mode is not supported");
+    }
     auto indexArgExpr = method->expr->arguments->at(0)->expression->to<IR::PathExpression>();
     // TODO check skb->len
     if (type == BYTES) {
