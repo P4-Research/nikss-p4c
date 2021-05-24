@@ -326,8 +326,10 @@ void PSAArch::emitHelperFunctions2TC(CodeBuilder *builder) const {
                                                     "");
     }
 
-    builder->appendLine(meterExecuteFunc);
-    builder->newline();
+    if (!tcIngress->control->meters.empty()) {
+        builder->appendLine(meterExecuteFunc);
+        builder->newline();
+    }
 }
 
 void PSAArch::emitInternalStructures2TC(CodeBuilder *pBuilder) const {

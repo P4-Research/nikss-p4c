@@ -131,7 +131,7 @@ void EBPFControlPSA::emitTableTypes(CodeBuilder *builder) {
         it.second->emitKeyType(builder);
 
     //  Value type for meters is the same
-    if (meters.size() > 0) {
+    if (!meters.empty()) {
         meters.begin()->second->emitValueType(builder);
     }
 }
