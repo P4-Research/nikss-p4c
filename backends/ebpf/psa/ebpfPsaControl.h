@@ -48,7 +48,6 @@ class EBPFControlPSA : public EBPFControl {
     EBPFRandomPSA* getRandGenerator(cstring name) const {
         auto result = ::get(randGenerators, name);
         BUG_CHECK(result != nullptr, "No random generator named %1%", name);
-        return result; }
         return result;
     }
 

@@ -213,8 +213,9 @@ void PSAArch::emitHelperFunctions2TC(CodeBuilder *builder) const {
     builder->appendLine(pktClonesFunc);
     builder->newline();
 
-    cstring meter_execute = "static __always_inline\n"
-                            "int enough_tokens(u32 *tokens, u32 *packet_len, u32 *bs, u32 *bs_left, u32 *ir, u64 *delta_t) {\n"
+    cstring meterExecuteFunc = "static __always_inline\n"
+                            "int enough_tokens(u32 *tokens, u32 *packet_len, "
+                            "u32 *bs, u32 *bs_left, u32 *ir, u64 *delta_t) {\n"
                             "\n"
                             "    *tokens = *bs_left + (*delta_t * *ir) / 8000000;\n"
                             "\n"
@@ -223,49 +224,53 @@ void PSAArch::emitHelperFunctions2TC(CodeBuilder *builder) const {
                             "    }\n"
                             "\n"
                             "    if (*packet_len > *tokens) {\n"
-                            "        bpf_trace_message(\"Meter: No enough tokens\\n\");\n"
+                                     "%trace_msg_no_enough_tokens%"
                             "        return 0; // No\n"
                             "    }\n"
                             "\n"
-                            "    bpf_trace_message(\"Meter: Enough tokens\\n\");\n"
+                                 "%trace_msg_enough_tokens%"
                             "    return 1; // Yes, enough tokens\n"
                             "}\n"
                             "\n"
                             "static __always_inline\n"
-                            "enum PSA_MeterColor_t meter_execute(void *map, u32 *packet_len, void *key) {\n"
-                            "    bpf_trace_message(\"Meter: execute\\n\");\n"
+                            "enum PSA_MeterColor_t meter_execute(void *map, "
+                            "u32 *packet_len, void *key) {\n"
+                                 "%trace_msg_meter_execute%"
                             "    u64 time_ns = bpf_ktime_get_ns();\n"
                             "\n"
                             "    meter_value *value = BPF_MAP_LOOKUP_ELEM(*map, key);\n"
                             "    if (value != NULL) {\n"
                             "        u64 delta_t = time_ns - value->timestamp;\n"
                             "        u32 tokens_pbs = 0;\n"
-                            "        if (enough_tokens(&tokens_pbs, packet_len, &value->pbs, &value->pbs_left, &value->pir, &delta_t)) {\n"
+                            "        if (enough_tokens(&tokens_pbs, packet_len, "
+                            "&value->pbs, &value->pbs_left, &value->pir, &delta_t)) {\n"
                             "            u32 tokens_cbs = 0;\n"
-                            "            if (enough_tokens(&tokens_cbs, packet_len, &value->cbs, &value->cbs_left, &value->cir, &delta_t)) {\n"
+                            "            if (enough_tokens(&tokens_cbs, packet_len, "
+                            "&value->cbs, &value->cbs_left, &value->cir, &delta_t)) {\n"
                             "                value->timestamp = value->timestamp + delta_t;\n"
                             "                value->pbs_left = tokens_pbs - *packet_len;\n"
                             "                value->cbs_left = tokens_cbs - *packet_len;\n"
-                            "                bpf_trace_message(\"Meter: GREEN\\n\");\n"
+                                             "%trace_msg_meter_green%"
                             "                return GREEN;\n"
                             "            } else {\n"
                             "                value->timestamp = value->timestamp + delta_t;\n"
                             "                value->pbs_left = tokens_pbs - *packet_len;\n"
-                            "                bpf_trace_message(\"Meter: YELLOW\\n\");\n"
+                                             "%trace_msg_meter_yellow%"
                             "                return YELLOW;\n"
                             "            }\n"
                             "        } else {\n"
-                            "            bpf_trace_message(\"Meter: RED\\n\");\n"
+                                         "%trace_msg_meter_red%"
                             "            return RED;\n"
                             "        }\n"
                             "    } else {\n"
-                            "        bpf_trace_message(\"Meter: No meter value!\\n\");\n"
+                                     "%trace_msg_meter_no_value%"
                             "        return RED;\n"
                             "    }\n"
                             "}\n"
                             "\n"
                             "static __always_inline\n"
-                            "enum PSA_MeterColor_t meter_execute_bytes(void *map, u32 *packet_len, void *key) {\n"
+                            "enum PSA_MeterColor_t meter_execute_bytes(void *map, "
+                            "u32 *packet_len, void *key) {\n"
                             "    return meter_execute(map, packet_len, key);\n"
                             "}\n"
                             "\n"
@@ -275,7 +280,39 @@ void PSAArch::emitHelperFunctions2TC(CodeBuilder *builder) const {
                             "    return meter_execute(map, &len, key);\n"
                             "}";
 
-    builder->appendLine(meter_execute);
+    if (tcIngress->options.emitTraceMessages) {
+        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_no_enough_tokens%"),
+                                              "        bpf_trace_message(\"Meter: No enough tokens\");\n");
+        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_enough_tokens%"),
+                                                    "        bpf_trace_message(\"Meter: Enough tokens\");\n");
+        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_execute%"),
+                                              "    bpf_trace_message(\"Meter: execute\");\n");
+        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_green%"),
+                                                    "                bpf_trace_message(\"Meter: GREEN\");\n");
+        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_yellow%"),
+                                                    "                bpf_trace_message(\"Meter: YELLOW\");\n");
+        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_red%"),
+                                                    "        bpf_trace_message(\"Meter: RED\");\n");
+        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_no_value%"),
+                                                    "        bpf_trace_message(\"Meter: No meter value!\");\n");
+    } else {
+        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_no_enough_tokens%"),
+                                                    "");
+        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_enough_tokens%"),
+                                                    "");
+        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_execute%"),
+                                                    "");
+        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_green%"),
+                                                    "");
+        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_yellow%"),
+                                                    "");
+        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_red%"),
+                                                    "");
+        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_no_value%"),
+                                                    "");
+    }
+
+    builder->appendLine(meterExecuteFunc);
     builder->newline();
 }
 

@@ -93,7 +93,7 @@ control ingress(inout headers hdr,
 
     action do_forward(PortId_t egress_port) {
         idx = (bit<7>) 0;
-        if (idx < METER1_SIZE) {
+        if (idx < 1) {
             color1 = meter1.execute(idx);
         } else {
             color1 = PSA_MeterColor_t.RED;

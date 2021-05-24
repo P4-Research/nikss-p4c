@@ -84,9 +84,11 @@ void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* met
     auto indexArgExpr = method->expr->arguments->at(0)->expression->to<IR::PathExpression>();
     // TODO check skb->len
     if (type == BYTES) {
-        builder->appendFormat("meter_execute_bytes(&%s, &%s, &%s)", instanceName, "skb->len", indexArgExpr->path->name.name);
+        builder->appendFormat("meter_execute_bytes(&%s, &%s, &%s)", instanceName, "skb->len",
+                              indexArgExpr->path->name.name);
     } else {
-        builder->appendFormat("meter_execute_packets(&%s, &%s)", instanceName, indexArgExpr->path->name.name);
+        builder->appendFormat("meter_execute_packets(&%s, &%s)", instanceName,
+                              indexArgExpr->path->name.name);
     }
 }
 
