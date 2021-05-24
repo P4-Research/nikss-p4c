@@ -798,9 +798,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
     } else if (typeName == "Register") {
         auto reg = new EBPFRegisterPSA(program, name, di, control->codeGen);
         control->registers.emplace(name, reg);
-    } else if (instance->type->getName().name == "Meter") {
-        auto di = instance->node->to<IR::Declaration_Instance>();
-        cstring name = EBPFObject::externalName(di);
+    } else if (typeName == "Meter") {
         auto met = new EBPFMeterPSA(program, name, di, control->codeGen);
         control->meters.emplace(name, met);
     } else {
