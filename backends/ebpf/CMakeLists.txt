@@ -256,6 +256,7 @@ if (LIBBPF)
           runtime/psabpf/lib/psabpf.c
           runtime/psabpf/CLI/common.c
           runtime/psabpf/CLI/clone_session.c
+          runtime/psabpf/CLI/pipeline.c
           runtime/psabpf/main.c)
   add_executable(psabpf-ctl ${PSABPFCTL_SRCS})
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/runtime/usr/include)

@@ -15,11 +15,6 @@
 #include "clone_session.h"
 
 /**
- * When PIN_GLOBAL_NS is used, this is deafult global namespace that is loaded.
- */
-static const char *BPF_FS = "/sys/fs/bpf";
-
-/**
  * The name of the BPF MAP variable in packet-cloning.c
  */
 static const char *CLONE_SESSION_TABLE = "clone_session_tbl";
