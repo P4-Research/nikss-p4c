@@ -19,8 +19,6 @@ EBPFMeterPSA::EBPFMeterPSA(const EBPFProgram *program,
     this->keyArg = ts->arguments->at(0);
     this->keyType = EBPFTypeFactory::instance->create(keyArg);
 
-//    this->valueType = EBPFTypeFactory::instance-> create(valueArg);
-
     this->valueTypeName = "meter_value";
     this->valueType = createValueType();
 
@@ -31,6 +29,18 @@ EBPFMeterPSA::EBPFMeterPSA(const EBPFProgram *program,
     }
     size = declaredSize->asUnsigned();
 
+    auto typeExpr = di->arguments->at(1)->expression->to<IR::Constant>();
+    this->type = toType(typeExpr->asInt());
+}
+
+EBPFMeterPSA::MeterType EBPFMeterPSA::toType(const int typeCode) {
+    if (typeCode == 0) {
+        return PACKETS;
+    } else if (typeCode == 1) {
+        return BYTES;
+    } else {
+        BUG("Unknown meter type %1%", typeCode);
+    }
 }
 
 EBPFType *EBPFMeterPSA::createValueType() {
@@ -59,8 +69,6 @@ void EBPFMeterPSA::emitValueType(CodeBuilder* builder) {
     builder->emitIndent();
     builder->append("typedef ");
     this->valueType->emit(builder);
-//    this->valueType->declare(builder, valueTypeName, false);
-//    builder->endOfStatement(true);
 }
 
 void EBPFMeterPSA::emitInstance(CodeBuilder *builder) {
@@ -71,8 +79,12 @@ void EBPFMeterPSA::emitInstance(CodeBuilder *builder) {
 
 void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* method) {
     auto indexArgExpr = method->expr->arguments->at(0)->expression->to<IR::PathExpression>();
-    builder->appendFormat("meter_execute(&%s, &%s, &%s)", instanceName, "skb->len", indexArgExpr->path->name.name);
-//    builder->endOfStatement(true);
+    // TODO check skb->len
+    if (type == BYTES) {
+        builder->appendFormat("meter_execute_bytes(&%s, &%s, &%s)", instanceName, "skb->len", indexArgExpr->path->name.name);
+    } else {
+        builder->appendFormat("meter_execute_packets(&%s, &%s)", instanceName, indexArgExpr->path->name.name);
+    }
 }
 
 }  // namespace EBPF

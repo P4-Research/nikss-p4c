@@ -7,16 +7,13 @@ namespace EBPF {
 
 class EBPFMeterPSA : public EBPFTablePSA {
  private:
-    EBPFType *createValueType() ;
+    EBPFType *createValueType();
 
  protected:
     size_t size{};
-    const IR::Constant *initialValue = nullptr;
     const IR::Type *keyArg{};
-    const IR::Type *valueArg{};
     EBPFType *keyType{};
     EBPFType *valueType{};
-    bool arrayMapBased = false;
 
  public:
     enum MeterType {
@@ -29,11 +26,11 @@ class EBPFMeterPSA : public EBPFTablePSA {
                  const IR::Declaration_Instance* di,
                  CodeGenInspector* codeGen);
 
-    void emitKeyType(CodeBuilder* builder);
-    void emitValueType(CodeBuilder* builder);
+    static MeterType toType(const int typeCode);
 
-    void emitInstance(CodeBuilder* builder);
-
+    void emitKeyType(CodeBuilder* builder) override;
+    void emitValueType(CodeBuilder* builder) override;
+    void emitInstance(CodeBuilder* builder) override;
     void emitExecute(CodeBuilder* builder, const P4::ExternMethod* method);
 };
 
