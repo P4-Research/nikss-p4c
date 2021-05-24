@@ -601,3 +601,22 @@ class RandomPSATest(P4EbpfTest):
         logger.info("f1 sequence: {}".format(sequence[0]))
         logger.info("f2 sequence: {}".format(sequence[1]))
         logger.info("f3 sequence: {}".format(sequence[2]))
+
+
+class QoSPSATest(P4EbpfTest):
+
+    p4_file_path = "samples/p4testdata/cos-psa.p4"
+
+    def runTest(self):
+        ip_pkt = testutils.simple_ip_packet()
+        exp_ip_pkt = ip_pkt.copy()
+        exp_ip_pkt[Ether].dst = "00:00:00:00:00:10"
+        arp_pkt = testutils.simple_arp_packet()
+        exp_arp_pkt = arp_pkt.copy()
+        exp_arp_pkt[Ether].dst = "00:00:00:00:00:11"
+
+        testutils.send_packet(self, PORT0, ip_pkt)
+        testutils.verify_packet(self, exp_ip_pkt, PORT1)
+
+        testutils.send_packet(self, PORT0, arp_pkt)
+        testutils.verify_packet(self, exp_arp_pkt, PORT1)
