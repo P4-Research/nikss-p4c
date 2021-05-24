@@ -281,20 +281,34 @@ void PSAArch::emitHelperFunctions2TC(CodeBuilder *builder) const {
                             "}";
 
     if (tcIngress->options.emitTraceMessages) {
-        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_no_enough_tokens%"),
-                                              "        bpf_trace_message(\"Meter: No enough tokens\");\n");
-        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_enough_tokens%"),
-                                                    "        bpf_trace_message(\"Meter: Enough tokens\");\n");
-        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_execute%"),
-                                              "    bpf_trace_message(\"Meter: execute\");\n");
-        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_green%"),
-                                                    "                bpf_trace_message(\"Meter: GREEN\");\n");
-        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_yellow%"),
-                                                    "                bpf_trace_message(\"Meter: YELLOW\");\n");
-        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_red%"),
-                                                    "        bpf_trace_message(\"Meter: RED\");\n");
-        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_no_value%"),
-                                                    "        bpf_trace_message(\"Meter: No meter value!\");\n");
+        meterExecuteFunc = meterExecuteFunc
+                .replace(cstring("%trace_msg_no_enough_tokens%"),
+                                              "        bpf_trace_message(\""
+                                              "Meter: No enough tokens\");\n");
+        meterExecuteFunc = meterExecuteFunc
+                .replace(cstring("%trace_msg_enough_tokens%"),
+                                                    "        bpf_trace_message(\""
+                                                    "Meter: Enough tokens\");\n");
+        meterExecuteFunc = meterExecuteFunc
+                .replace(cstring("%trace_msg_meter_execute%"),
+                                              "    bpf_trace_message(\""
+                                              "Meter: execute\");\n");
+        meterExecuteFunc = meterExecuteFunc
+                .replace(cstring("%trace_msg_meter_green%"),
+                                                    "                bpf_trace_message(\""
+                                                    "Meter: GREEN\");\n");
+        meterExecuteFunc = meterExecuteFunc
+                .replace(cstring("%trace_msg_meter_yellow%"),
+                                                    "                bpf_trace_message(\""
+                                                    "Meter: YELLOW\");\n");
+        meterExecuteFunc = meterExecuteFunc
+                .replace(cstring("%trace_msg_meter_red%"),
+                                                    "        bpf_trace_message(\""
+                                                    "Meter: RED\");\n");
+        meterExecuteFunc = meterExecuteFunc
+                .replace(cstring("%trace_msg_meter_no_value%"),
+                                                    "        bpf_trace_message(\""
+                                                    "Meter: No meter value!\");\n");
     } else {
         meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_no_enough_tokens%"),
                                                     "");
