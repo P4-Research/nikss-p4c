@@ -67,8 +67,10 @@ void EBPFMeterPSA::emitKeyType(CodeBuilder* builder) {
 
 void EBPFMeterPSA::emitValueType(CodeBuilder* builder) {
     builder->emitIndent();
-    builder->append("typedef ");
     this->valueType->emit(builder);
+    builder->append("typedef ");
+    this->valueType->declare(builder, valueTypeName, false);
+    builder->endOfStatement(true);
 }
 
 void EBPFMeterPSA::emitInstance(CodeBuilder *builder) {
