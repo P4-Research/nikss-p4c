@@ -54,7 +54,8 @@ EBPFType *EBPFMeterPSA::createValueType() {
     vec.push_back(new IR::StructField(IR::ID("timestamp"), bits_64));
     vec.push_back(new IR::StructField(IR::ID("pbs_left"), bits_32));
     vec.push_back(new IR::StructField(IR::ID("cbs_left"), bits_32));
-    auto valueStructType = new IR::Type_Struct(IR::ID(this->valueTypeName), vec);
+    auto valueMeterName = program->refMap->newName("value_meter");
+    auto valueStructType = new IR::Type_Struct(IR::ID(valueMeterName), vec);
     return EBPFTypeFactory::instance->create(valueStructType);
 }
 
@@ -74,7 +75,7 @@ void EBPFMeterPSA::emitValueType(CodeBuilder* builder) {
 }
 
 void EBPFMeterPSA::emitInstance(CodeBuilder *builder) {
-    builder->target->emitTableDecl(builder, instanceName, TableArray,
+    builder->target->emitTableDecl(builder, instanceName, TableHash,
                                    this->keyTypeName,
                                    this->valueTypeName, size);
 }

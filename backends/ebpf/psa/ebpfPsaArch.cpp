@@ -279,7 +279,7 @@ void PSAArch::emitHelperFunctions2TC(CodeBuilder *builder) const {
                                "    u32 len = 1;\n"
                                "    u32 factor = 1000000000;\n"
                                "    if (value != NULL) {\n"
-                               "        return meter_execute(value, len, &factor);\n"
+                               "        return meter_execute(value, &len, &factor);\n"
                                "    } else {\n"
                                         "%trace_msg_meter_no_value%"
                                "        return RED;\n"
