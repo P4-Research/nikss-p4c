@@ -49,6 +49,7 @@ class EBPFDeparserPSA : public EBPFControlPSA {
     // It is useful in case of resubmit or clone operation, as these operations
     // require to have an original packet.
     virtual void emitPreDeparser(CodeBuilder *builder) {}
+    virtual void emitResizeHead(CodeBuilder *builder) {}
     void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                     cstring &headerExpression) const;
     void emitField(CodeBuilder* builder, cstring headerExpression,
@@ -62,23 +63,60 @@ class EBPFDeparserPSA : public EBPFControlPSA {
         return result; }
 };
 
-class EBPFIngressDeparserPSA : public EBPFDeparserPSA {
+class TCDeparserPSA : public EBPFDeparserPSA {
  public:
-    const IR::Parameter* resubmit_meta;
-    EBPFIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
+    TCDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
                            const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
            EBPFDeparserPSA(program, control, parserHeaders, istd) {}
+    void emitResizeHead(CodeBuilder *builder) override;
+};
+
+class TCIngressDeparserPSA : public TCDeparserPSA {
+ public:
+    const IR::Parameter* resubmit_meta;
+    TCIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
+                           const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
+           TCDeparserPSA(program, control, parserHeaders, istd) {}
 
     bool build() override;
     void emitPreDeparser(CodeBuilder *builder) override;
     void emitSharedMetadataInitializer(CodeBuilder* builder);
 };
 
-class EBPFEgressDeparserPSA : public EBPFDeparserPSA {
+class TCEgressDeparserPSA : public TCDeparserPSA {
  public:
-    EBPFEgressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
+    TCEgressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
                           const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
-            EBPFDeparserPSA(program, control, parserHeaders, istd) { }
+            TCDeparserPSA(program, control, parserHeaders, istd) { }
+
+    bool build() override;
+};
+
+class XDPDeparserPSA : public EBPFDeparserPSA {
+ public:
+    XDPDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
+                          const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
+                EBPFDeparserPSA(program, control, parserHeaders, istd) { }
+    void emitResizeHead(CodeBuilder *builder) override;
+};
+
+class XDPIngressDeparserPSA : public XDPDeparserPSA {
+ public:
+    const IR::Parameter* resubmit_meta;
+    XDPIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
+                          const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
+                XDPDeparserPSA(program, control, parserHeaders, istd) { }
+
+    bool build() override;
+    void emitPreDeparser(CodeBuilder *builder) override;
+    void emitSharedMetadataInitializer(CodeBuilder *builder);
+};
+
+class XDPEgressDeparserPSA : public XDPDeparserPSA {
+ public:
+    XDPEgressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
+                          const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
+            XDPDeparserPSA(program, control, parserHeaders, istd) { }
 
     bool build() override;
 };

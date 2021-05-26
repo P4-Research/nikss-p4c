@@ -25,6 +25,7 @@ limitations under the License.
 #include "ebpfProgram.h"
 
 #include "psa/ebpfPsaArch.h"
+#include "psa/xdpTarget.h"
 
 namespace EBPF {
 
@@ -101,11 +102,14 @@ void emitPSAModel(const EbpfOptions& options, Target* target, const IR::Toplevel
     CodeBuilder c(target);
     auto psaArchForEbpf = convertToEbpfPSA->getPSAArchForEBPF();
     // instead of generating two files, put all the code in a single file
-    psaArchForEbpf->emit(&c);
+    if (!options.generateToXDP) {
+        psaArchForEbpf->emit2TC(&c);
+    } else {
+        psaArchForEbpf->emit2XDP(&c);
+    }
     *cstream << c.toString();
     cstream->flush();
 }
-
 
 void run_ebpf_backend(const EbpfOptions& options, const IR::ToplevelBlock* toplevel,
                       P4::ReferenceMap* refMap, P4::TypeMap* typeMap) {
@@ -122,7 +126,10 @@ void run_ebpf_backend(const EbpfOptions& options, const IR::ToplevelBlock* tople
 
     Target* target;
     if (options.target.isNullOrEmpty() || options.target == "kernel") {
-        target = new KernelSamplesTarget(options.emitTraceMessages);
+        if (!options.generateToXDP)
+            target = new KernelSamplesTarget(options.emitTraceMessages);
+        else
+            target = new XdpTarget(options.emitTraceMessages);
     } else if (options.target == "bcc") {
         target = new BccTarget();
     } else if (options.target == "test") {
