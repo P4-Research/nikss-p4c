@@ -295,6 +295,8 @@ typedef struct meter_value {
 ```
 
 To configure meter you have to create an entry filing up following fields:
+For BYTES meter:
+
 - pir (Peak Information Rate) in kbits/s
 - cir (Committed Information Rate) in kbits/s
 - pbs (Peak Burst Size) in bytes
@@ -302,3 +304,13 @@ To configure meter you have to create an entry filing up following fields:
 - timestamp with zero value
 - pbs_left (PBS left) in bytes
 - cbs_left (CBS left) in bytes
+
+For PACKETS meter:
+
+- pir (Peak Information Rate) in packets/s
+- cir (Committed Information Rate) in packets/s
+- pbs (Peak Burst Size) in packets
+- cbs (Committed Burst Size) in packets
+- timestamp with zero value
+- pbs_left (PBS left) in packets
+- cbs_left (CBS left) in packets

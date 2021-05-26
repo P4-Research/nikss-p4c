@@ -37,7 +37,7 @@ class InDirectMeterActionPSATest(P4EbpfTest):
     Send 100 B packet and verify if there is 100 tokens less left.
     """
 
-    p4_file_path = "samples/p4testdata/meters.p4"
+    p4_file_path = "samples/p4testdata/meters-action.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
