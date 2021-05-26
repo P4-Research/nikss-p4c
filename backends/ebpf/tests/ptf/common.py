@@ -85,8 +85,8 @@ class EbpfTest(BaseTest):
     def verify_map_entry(self, name, key, expected_value, mask):
         value = self.read_map(name, key)
         if mask:
-            expected_value = expected_value & mask
-            value = value & mask
+            expected_value = int(expected_value) & mask
+            value = int(value) & mask
         if expected_value != value:
             self.fail("Map {} key {} does not have correct value. Expected {}; got {}"
                       .format(name, key, expected_value, value))
