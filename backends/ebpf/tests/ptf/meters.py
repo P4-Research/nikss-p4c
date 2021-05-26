@@ -24,7 +24,8 @@ class InDirectMeterPSATest(P4EbpfTest):
         testutils.verify_packet(self, pkt, PORT1)
         # Expecting pbs_left, cbs_left 6400 B - 100 B = 6300 B
         self.verify_map_entry(name="ingress_meter1", key="hex 00",
-                              expected_value="hex 00 02 00 00 00 02 00 00 00 19 00 00 00 19 00 00 00 00 00 00 00 00 00 00 9c 18 00 00 9c 18 00 00")
+                              expected_value="hex 00 02 00 00 00 02 00 00 00 19 00 00 00 19 00 00 00 00 00 00 00 00 00 00 9c 18 00 00 9c 18 00 00",
+                              mask=0xff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_00_00_00_00_00_00_00_00_ff_ff_ff_ff_ff_ff_ff_ff)
 
     def tearDown(self):
         self.remove_maps(["ingress_meter1"])
@@ -51,7 +52,8 @@ class InDirectMeterActionPSATest(P4EbpfTest):
         testutils.verify_packet(self, pkt, PORT1)
         # Expecting pbs_left, cbs_left 25600 B - 100 B = 25500 B
         self.verify_map_entry(name="ingress_meter1", key="hex 00",
-                              expected_value="hex 00 02 00 00 00 02 00 00 00 19 00 00 00 19 00 00 00 00 00 00 00 00 00 00 9c 63 00 00 9c 63 00 00")
+                              expected_value="hex 00 02 00 00 00 02 00 00 00 19 00 00 00 19 00 00 00 00 00 00 00 00 00 00 9c 63 00 00 9c 63 00 00",
+                              mask=0xff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_00_00_00_00_00_00_00_00_ff_ff_ff_ff_ff_ff_ff_ff)
 
     def tearDown(self):
         self.remove_maps(["ingress_meter1"])
