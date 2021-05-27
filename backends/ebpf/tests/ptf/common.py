@@ -89,7 +89,7 @@ class EbpfTest(BaseTest):
         expected_value = expected_value.replace("hex ", "0x")
         expected_value = expected_value.replace(" ", "")
 
-        value = value.replace("hex ", "0x")
+        value = "0x" + value
         value = value.replace(" ", "")
 
         logger.info(value)
