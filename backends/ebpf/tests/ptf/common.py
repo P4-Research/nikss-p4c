@@ -82,18 +82,18 @@ class EbpfTest(BaseTest):
         value = [format(int(v, 0), '02x') for v in json.loads(stdout)['value']]
         return ' '.join(value)
 
-    def verify_map_entry(self, name, key, expected_value, mask):
+    def verify_map_entry(self, name, key, expected_value, mask=None):
         value = self.read_map(name, key)
-        print(value)
-        print(expected_value)
+        logger.info(value)
+        logger.info(expected_value)
         expected_value = expected_value.replace("hex ", "0x")
         expected_value = expected_value.replace(" ", "")
 
         value = value.replace("hex ", "0x")
         value = value.replace(" ", "")
 
-        print(value)
-        print(expected_value)
+        logger.info(value)
+        logger.info(expected_value)
         if mask:
             expected_value = int(expected_value, 0) & mask
             value = int(value, 0) & mask
