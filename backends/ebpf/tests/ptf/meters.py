@@ -9,7 +9,7 @@ ALL_PORTS = [PORT0, PORT1, PORT2]
 
 class InDirectMeterPSATest(P4EbpfTest):
     """
-    Test Direct Meter used in control block.
+    Test Direct Meter used in control block. Type BYTES.
     Send 100 B packet and verify if there is 100 tokens less left.
     """
 
@@ -34,7 +34,7 @@ class InDirectMeterPSATest(P4EbpfTest):
 
 class InDirectMeterActionPSATest(P4EbpfTest):
     """
-    Test Direct Meter used in action.
+    Test Direct Meter used in action. Type BYTES.
     Send 100 B packet and verify if there is 100 tokens less left.
     """
 
@@ -58,3 +58,28 @@ class InDirectMeterActionPSATest(P4EbpfTest):
     def tearDown(self):
         self.remove_maps(["ingress_meter1"])
         super(InDirectMeterActionPSATest, self).tearDown()
+
+
+class InDirectMeterPacketsPSATest(P4EbpfTest):
+    """
+    Test Direct Meter used in control block. Type PACKETS.
+    Send 100 B packet and verify if there is 100 tokens less left.
+    """
+
+    p4_file_path = "samples/p4testdata/meters-packets.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+        # cir, pir -> 100 packets/s, cbs, pbs -> 10 packets
+        self.update_map(name="ingress_meter1", key="hex 00",
+                        value="hex 64 00 00 00 64 00 00 00 0a 00 00 00 0a 00 00 00 00 00 00 00 00 00 00 00 0a 00 00 00 0a 00 00 00")
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
+        # Expecting pbs_left, cbs_left 6400 B - 100 B = 6300 B
+        self.verify_map_entry(name="ingress_meter1", key="hex 00",
+                              expected_value="hex 64 00 00 00 64 00 00 00 0a 00 00 00 0a 00 00 00 00 00 00 00 00 00 00 00 09 00 00 00 09 00 00 00",
+                              mask=0xff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_00_00_00_00_00_00_00_00_ff_ff_ff_ff_ff_ff_ff_ff)
+
+    def tearDown(self):
+        self.remove_maps(["ingress_meter1"])
+        super(InDirectMeterPacketsPSATest, self).tearDown()

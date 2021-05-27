@@ -84,19 +84,15 @@ class EbpfTest(BaseTest):
 
     def verify_map_entry(self, name, key, expected_value, mask=None):
         value = self.read_map(name, key)
-        logger.info(value)
-        logger.info(expected_value)
-        expected_value = expected_value.replace("hex ", "0x")
-        expected_value = expected_value.replace(" ", "")
 
-        value = "0x" + value
-        value = value.replace(" ", "")
-
-        logger.info(value)
-        logger.info(expected_value)
         if mask:
+            expected_value = expected_value.replace("hex ", "0x")
+            expected_value = expected_value.replace(" ", "")
+            value = "0x" + value
+            value = value.replace(" ", "")
             expected_value = int(expected_value, 0) & mask
             value = int(value, 0) & mask
+
         if expected_value != value:
             self.fail("Map {} key {} does not have correct value. Expected {}; got {}"
                       .format(name, key, expected_value, value))
