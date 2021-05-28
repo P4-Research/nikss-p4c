@@ -13,4 +13,6 @@ struct cmd {
 
 bool is_keyword(const char *word, const char *str);
 
+extern const char *program_name;
+
 #endif //P4C_COMMON_H

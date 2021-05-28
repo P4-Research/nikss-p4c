@@ -259,10 +259,11 @@ if (LIBBPF)
           runtime/psabpf/CLI/common.c
           runtime/psabpf/CLI/clone_session.c
           runtime/psabpf/CLI/pipeline.c
+          runtime/psabpf/CLI/table.c
           runtime/psabpf/main.c)
   add_executable(psabpf-ctl ${PSABPFCTL_SRCS})
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/runtime/usr/include)
-  target_link_libraries (psabpf-ctl z elf ${LIBBPF})
+  target_link_libraries (psabpf-ctl z elf ${LIBBPF} gmp)
   install (TARGETS psabpf-ctl
           RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
 endif()

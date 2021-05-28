@@ -378,3 +378,18 @@ int do_del_member(int argc, char **argv)
 
     return clone_session_del_member(id, egress_port, instance);
 }
+
+int do_clone_session_help(int argc, char **argv)
+{
+    fprintf(stderr,
+    "Usage: %s clone-session create SESSION\n"
+    "       %s clone-session delete SESSION\n"
+    "       %s clone-session add-member SESSION egress-port OUTPUT_PORT instance INSTANCE_ID\n"
+    "       %s clone-session del-member SESSION egress-port OUTPUT_PORT instance INSTANCE_ID\n"
+    "\n"
+    "       SESSION := id SESSION_ID\n"
+    "",
+    program_name, program_name, program_name, program_name);
+
+    return 0;
+}
