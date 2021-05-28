@@ -83,10 +83,17 @@ void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* met
     if (method->expr->arguments->size() == 2) {
         ::warning("Color-Aware mode is not supported");
     }
+    auto pipeline = dynamic_cast<const EBPFPipeline *>(program);
+    if (pipeline == nullptr) {
+        ::error(ErrorType::ERR_INVALID, "Meter used outside of pipeline %1%", method->expr);
+        return;
+    }
+
     auto indexArgExpr = method->expr->arguments->at(0)->expression->to<IR::PathExpression>();
-    // TODO check skb->len
+    // TODO packet len at XDP
     if (type == BYTES) {
-        builder->appendFormat("meter_execute_bytes(&%s, &%s, &%s)", instanceName, "skb->len",
+        auto packetLen = Util::printf_format("%s->len", pipeline->contextVar.c_str());
+        builder->appendFormat("meter_execute_bytes(&%s, &%s, &%s)", instanceName, packetLen,
                               indexArgExpr->path->name.name);
     } else {
         builder->appendFormat("meter_execute_packets(&%s, &%s)", instanceName,
