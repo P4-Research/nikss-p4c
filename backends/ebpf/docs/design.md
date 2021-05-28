@@ -302,8 +302,8 @@ For BYTES meter:
 - pbs (Peak Burst Size) in bytes
 - cbs (Committed Burst Size) in bytes
 - timestamp with zero value
-- pbs_left (PBS left) in bytes
-- cbs_left (CBS left) in bytes
+- pbs_left (PBS left) same value as pbs
+- cbs_left (CBS left) same value as cbs
 
 For PACKETS meter:
 
@@ -312,5 +312,7 @@ For PACKETS meter:
 - pbs (Peak Burst Size) in packets
 - cbs (Committed Burst Size) in packets
 - timestamp with zero value
-- pbs_left (PBS left) in packets
-- cbs_left (CBS left) in packets
+- pbs_left (PBS left) same value as pbs
+- cbs_left (CBS left) same value as cbs
+
+RFC 2698 explicitly says that buckets are initially full so values pbs_left and cbs_left must have buckets size.
