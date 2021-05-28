@@ -9,6 +9,7 @@
 #include "externs/ebpfPsaHashAlgorithm.h"
 #include "externs/ebpfPsaRandom.h"
 #include "externs/ebpfPsaRegister.h"
+#include "externs/ebpfPsaMeter.h"
 
 namespace EBPF {
 
@@ -213,138 +214,7 @@ void PSAArch::emitHelperFunctions2TC(CodeBuilder *builder) const {
     builder->appendLine(pktClonesFunc);
     builder->newline();
 
-    cstring meterExecuteFunc = "static __always_inline\n"
-                               "int enough_tokens(u32 *tokens, u32 *packet_len, u32 *bs, "
-                               "u32 *bs_left, u32 *ir, u64 *delta_t, u32 *factor) {\n"
-                               "\n"
-                               "    *tokens = *bs_left + (*delta_t * *ir) / *factor;\n"
-                               "\n"
-                               "    if (*tokens > *bs) {\n"
-                               "        *tokens = *bs;\n"
-                               "    }\n"
-                               "\n"
-                               "    if (*packet_len > *tokens) {\n"
-                                        "%trace_msg_no_enough_tokens%"
-                               "        return 0; // No\n"
-                               "    }\n"
-                               "\n"
-                                    "%trace_msg_enough_tokens%"
-                               "    return 1; // Yes, enough tokens\n"
-                               "}\n"
-                               "\n"
-                               "static __always_inline\n"
-                               "enum PSA_MeterColor_t meter_execute(meter_value *value, "
-                               "u32 *packet_len, u32 *factor) {\n"
-                                    "%trace_msg_meter_execute%"
-                               "    u64 time_ns = bpf_ktime_get_ns();\n"
-                               "    u64 delta_t = time_ns - value->timestamp;\n"
-                               "    u32 tokens_pbs = 0;\n"
-                               "    if (enough_tokens(&tokens_pbs, packet_len, &value->pbs, "
-                               "&value->pbs_left, &value->pir, &delta_t, factor)) {\n"
-                               "        u32 tokens_cbs = 0;\n"
-                               "        if (enough_tokens(&tokens_cbs, packet_len, &value->cbs, "
-                               "&value->cbs_left, &value->cir, &delta_t, factor)) {\n"
-                               "            value->timestamp = value->timestamp + delta_t;\n"
-                               "            value->pbs_left = tokens_pbs - *packet_len;\n"
-                               "            value->cbs_left = tokens_cbs - *packet_len;\n"
-                                            "%trace_msg_meter_green%"
-                               "            return GREEN;\n"
-                               "        } else {\n"
-                               "            value->timestamp = value->timestamp + delta_t;\n"
-                               "            value->pbs_left = tokens_pbs - *packet_len;\n"
-                                            "%trace_msg_meter_yellow%"
-                               "            return YELLOW;\n"
-                               "        }\n"
-                               "    } else {\n"
-                                        "%trace_msg_meter_red%"
-                               "        return RED;\n"
-                               "    }\n"
-                               "}\n"
-                               "\n"
-                               "static __always_inline\n"
-                               "enum PSA_MeterColor_t meter_execute_bytes_value(meter_value *value,"
-                               "u32 *packet_len) {\n"
-                               "    u32 factor = 8000000;\n"
-                               "    if (value != NULL) {\n"
-                               "        return meter_execute(value, packet_len, &factor);\n"
-                               "    } else {\n"
-                                        "%trace_msg_meter_no_value%"
-                               "        return RED;\n"
-                               "    }\n"
-                               "}\n"
-                               "\n"
-                               "static __always_inline\n"
-                               "enum PSA_MeterColor_t meter_execute_bytes(void *map, "
-                               "u32 *packet_len, void *key) {\n"
-                               "    meter_value *value = BPF_MAP_LOOKUP_ELEM(*map, key);\n"
-                               "    return meter_execute_bytes_value(value, packet_len);\n"
-                               "}\n"
-                               "\n"
-                               "static __always_inline\n"
-                               "enum PSA_MeterColor_t meter_execute_packets_value("
-                               "meter_value *value) {\n"
-                               "    u32 len = 1;\n"
-                               "    u32 factor = 1000000000;\n"
-                               "    if (value != NULL) {\n"
-                               "        return meter_execute(value, &len, &factor);\n"
-                               "    } else {\n"
-                                        "%trace_msg_meter_no_value%"
-                               "        return RED;\n"
-                               "    }\n"
-                               "}\n"
-                               "\n"
-                               "static __always_inline\n"
-                               "enum PSA_MeterColor_t meter_execute_packets(void *map, "
-                               "void *key) {\n"
-                               "    meter_value *value = BPF_MAP_LOOKUP_ELEM(*map, key);\n"
-                               "    return meter_execute_packets_value(value);\n"
-                               "}";
-
-    if (tcIngress->options.emitTraceMessages) {
-        meterExecuteFunc = meterExecuteFunc
-                .replace(cstring("%trace_msg_no_enough_tokens%"),
-                                              "        bpf_trace_message(\""
-                                              "Meter: No enough tokens\");\n");
-        meterExecuteFunc = meterExecuteFunc
-                .replace(cstring("%trace_msg_enough_tokens%"),
-                                                    "        bpf_trace_message(\""
-                                                    "Meter: Enough tokens\");\n");
-        meterExecuteFunc = meterExecuteFunc
-                .replace(cstring("%trace_msg_meter_execute%"),
-                                              "    bpf_trace_message(\""
-                                              "Meter: execute\");\n");
-        meterExecuteFunc = meterExecuteFunc
-                .replace(cstring("%trace_msg_meter_green%"),
-                                                    "                bpf_trace_message(\""
-                                                    "Meter: GREEN\");\n");
-        meterExecuteFunc = meterExecuteFunc
-                .replace(cstring("%trace_msg_meter_yellow%"),
-                                                    "                bpf_trace_message(\""
-                                                    "Meter: YELLOW\");\n");
-        meterExecuteFunc = meterExecuteFunc
-                .replace(cstring("%trace_msg_meter_red%"),
-                                                    "        bpf_trace_message(\""
-                                                    "Meter: RED\");\n");
-        meterExecuteFunc = meterExecuteFunc
-                .replace(cstring("%trace_msg_meter_no_value%"),
-                                                    "        bpf_trace_message(\""
-                                                    "Meter: No meter value!\");\n");
-    } else {
-        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_no_enough_tokens%"),
-                                                    "");
-        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_enough_tokens%"),
-                                                    "");
-        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_execute%"),
-                                                    "");
-        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_green%"),
-                                                    "");
-        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_yellow%"),
-                                                    "");
-        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_red%"),
-                                                    "");
-        meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_no_value%"),
-                                                    "");
-    }
+    cstring meterExecuteFunc = EBPFMeterPSA::meterExecuteFunc(tcIngress->options.emitTraceMessages);
 
     if (!tcIngress->control->meters.empty()) {
         builder->appendLine(meterExecuteFunc);
@@ -865,15 +735,15 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
     } else if (typeName == "Hash") {
         auto hash = new EBPFHashPSA(program, di, name);
         control->hashes.emplace(name, hash);
+    } else if (typeName == "Meter") {
+        auto met = new EBPFMeterPSA(program, name, di, control->codeGen);
+        control->meters.emplace(name, met);
     } else if (instance->type->getName().name == "Random") {
         auto rand = new EBPFRandomPSA(di);
         control->randGenerators.emplace(name, rand);
     } else if (typeName == "Register") {
         auto reg = new EBPFRegisterPSA(program, name, di, control->codeGen);
         control->registers.emplace(name, reg);
-    } else if (typeName == "Meter") {
-        auto met = new EBPFMeterPSA(program, name, di, control->codeGen);
-        control->meters.emplace(name, met);
     } else {
         ::error(ErrorType::ERR_UNEXPECTED, "Unexpected block %s nested within control",
                 instance->toString());

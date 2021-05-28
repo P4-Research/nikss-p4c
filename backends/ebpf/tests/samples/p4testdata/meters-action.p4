@@ -90,6 +90,7 @@ control ingress(inout headers hdr,
     Meter<bit<7>>(1, PSA_MeterType_t.BYTES) meter1;
     bit<7> idx;
     PSA_MeterColor_t color1;
+    PortId_t port;
 
     action do_forward(PortId_t egress_port) {
         idx = (bit<7>) 0;
@@ -98,12 +99,7 @@ control ingress(inout headers hdr,
         } else {
             color1 = PSA_MeterColor_t.RED;
         }
-
-        if (color1 != PSA_MeterColor_t.RED) {
-            send_to_port(ostd, egress_port);
-        } else {
-            ingress_drop(ostd);
-        }
+        port = egress_port;
     }
 
     table tbl_fwd {
@@ -117,6 +113,12 @@ control ingress(inout headers hdr,
 
     apply {
          tbl_fwd.apply();
+
+         if (color1 != PSA_MeterColor_t.RED) {
+             send_to_port(ostd, port);
+         } else {
+             ingress_drop(ostd);
+         }
     }
 }
 

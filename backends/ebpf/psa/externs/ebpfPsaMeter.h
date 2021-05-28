@@ -32,6 +32,8 @@ class EBPFMeterPSA : public EBPFTablePSA {
     void emitValueType(CodeBuilder* builder) override;
     void emitInstance(CodeBuilder* builder) override;
     void emitExecute(CodeBuilder* builder, const P4::ExternMethod* method);
+
+    static cstring meterExecuteFunc(bool trace);
 };
 
 }  // namespace EBPF

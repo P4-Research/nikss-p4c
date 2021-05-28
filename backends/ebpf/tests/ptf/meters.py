@@ -7,9 +7,9 @@ PORT2 = 2
 ALL_PORTS = [PORT0, PORT1, PORT2]
 
 
-class InDirectMeterPSATest(P4EbpfTest):
+class MeterPSATest(P4EbpfTest):
     """
-    Test Direct Meter used in control block. Type BYTES.
+    Test Meter used in control block. Type BYTES.
     Send 100 B packet and verify if there is 100 tokens less left.
     """
 
@@ -29,12 +29,12 @@ class InDirectMeterPSATest(P4EbpfTest):
 
     def tearDown(self):
         self.remove_maps(["ingress_meter1"])
-        super(InDirectMeterPSATest, self).tearDown()
+        super(MeterPSATest, self).tearDown()
 
 
-class InDirectMeterActionPSATest(P4EbpfTest):
+class MeterActionPSATest(P4EbpfTest):
     """
-    Test Direct Meter used in action. Type BYTES.
+    Test Meter used in action. Type BYTES.
     Send 100 B packet and verify if there is 100 tokens less left.
     """
 
@@ -57,13 +57,13 @@ class InDirectMeterActionPSATest(P4EbpfTest):
 
     def tearDown(self):
         self.remove_maps(["ingress_meter1"])
-        super(InDirectMeterActionPSATest, self).tearDown()
+        super(MeterActionPSATest, self).tearDown()
 
 
-class InDirectMeterPacketsPSATest(P4EbpfTest):
+class MeterPacketsPSATest(P4EbpfTest):
     """
-    Test Direct Meter used in control block. Type PACKETS.
-    Send 100 B packet and verify if there is 100 tokens less left.
+    Test Meter used in control block. Type PACKETS.
+    Send 1 packet and verify if there is 9 tokens left.
     """
 
     p4_file_path = "samples/p4testdata/meters-packets.p4"
@@ -75,11 +75,11 @@ class InDirectMeterPacketsPSATest(P4EbpfTest):
                         value="hex 64 00 00 00 64 00 00 00 0a 00 00 00 0a 00 00 00 00 00 00 00 00 00 00 00 0a 00 00 00 0a 00 00 00")
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)
-        # Expecting pbs_left, cbs_left 6400 B - 100 B = 6300 B
+        # Expecting pbs_left, cbs_left 10 - 1 = 9
         self.verify_map_entry(name="ingress_meter1", key="hex 00",
                               expected_value="hex 64 00 00 00 64 00 00 00 0a 00 00 00 0a 00 00 00 00 00 00 00 00 00 00 00 09 00 00 00 09 00 00 00",
                               mask=0xff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_00_00_00_00_00_00_00_00_ff_ff_ff_ff_ff_ff_ff_ff)
 
     def tearDown(self):
         self.remove_maps(["ingress_meter1"])
-        super(InDirectMeterPacketsPSATest, self).tearDown()
+        super(MeterPacketsPSATest, self).tearDown()
