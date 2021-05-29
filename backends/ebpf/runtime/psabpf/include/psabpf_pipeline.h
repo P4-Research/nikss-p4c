@@ -18,3 +18,5 @@ void psabpf_pipeline_setobj(psabpf_pipeline_t *pipeline, char *obj);
 bool psabpf_pipeline_exists(psabpf_pipeline_t *pipeline);
 int psabpf_pipeline_load(psabpf_pipeline_t *pipeline);
 int psabpf_pipeline_unload(psabpf_pipeline_t *pipeline);
+int psabpf_pipeline_add_port(psabpf_pipeline_t *pipeline, char *intf);
+int psabpf_pipeline_del_port(psabpf_pipeline_t *pipeline, char *intf);
