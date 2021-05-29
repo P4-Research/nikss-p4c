@@ -1,14 +1,13 @@
 #include <linux/bpf.h>
 #include <bpf/libbpf.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "../include/psabpf.h"
+#include "../include/psabpf_pipeline.h"
 #include "common.h"
 
-static int init_defaults()
-{
-
-}
 
 int do_load(int argc, char **argv)
 {
@@ -17,39 +16,50 @@ int do_load(int argc, char **argv)
         return -1;
     }
 
-    const char *file = *argv;
+    int id = 0;
+    char *file = *argv;
 
-    __u32 duration, retval, size;
-    struct bpf_object *obj;
-    char in[128], out[128];
-    int ret, prog_fd;
-    char pinned_file[256];
-    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", BPF_FS,
-             "prog");  // FIXME: come up with a more sophisticated naming convention
+    psabpf_pipeline_t pipeline;
+    psabpf_pipeline_init(&pipeline);
+    psabpf_pipeline_setid(&pipeline, id);
 
-    ret = bpf_prog_load(file, BPF_PROG_TYPE_UNSPEC, &obj, &prog_fd);
-    if (ret < 0) {
-        fprintf(stderr, "cannot load the BPF program, code = %d\n", ret);
+    if (psabpf_pipeline_exists(&pipeline)) {
+        psabpf_pipeline_free(&pipeline);
+        return EEXIST;
+    }
+
+    psabpf_pipeline_setobj(&pipeline, file);
+
+    if (psabpf_pipeline_load(&pipeline)) {
+        psabpf_pipeline_free(&pipeline);
         return -1;
     }
 
-    ret = bpf_prog_test_run(prog_fd, 1, &in[0], 128,
-                            out, &size, &retval, &duration);
-    if (ret < 0) {
-        fprintf(stderr, "could not initialize default map entries, code: %d\n", ret);
-        return -1;
-    }
-
-    // TODO: add mount bpffs
-    int err = bpf_object__pin_programs(obj, pinned_file);
-    if (err) {
-        return -1;
-    }
-
+    psabpf_pipeline_free(&pipeline);
     return 0;
 }
 
 int do_unload(int argc, char **argv)
 {
+    if (!is_keyword(*argv, "id")) {
+        fprintf(stderr, "expected 'id', got: %s\n", *argv);
+        return -1;
+    }
+    NEXT_ARG();
+    char *endptr;
+    __u32 id = strtoul(*argv, &endptr, 0);
+    if (*endptr) {
+        fprintf(stderr, "can't parse '%s'\n", *argv);
+        return -1;
+    }
+
+    psabpf_pipeline_t pipeline;
+    psabpf_pipeline_init(&pipeline);
+    psabpf_pipeline_setid(&pipeline, id);
+    if (psabpf_pipeline_unload(&pipeline)) {
+        psabpf_pipeline_free(&pipeline);
+        return -1;
+    }
+    psabpf_pipeline_free(&pipeline);
     return 0;
 }

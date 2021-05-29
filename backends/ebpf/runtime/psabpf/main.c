@@ -1,5 +1,6 @@
 #include <getopt.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "CLI/common.h"
 #include "CLI/clone_session.h"
@@ -91,6 +92,9 @@ int main(int argc, char **argv)
     argv += optind;
 
     ret = cmd_select(cmds, argc, argv, do_help);
+    if (ret < 0) {
+        fprintf(stderr, "failed to run command: %s\n", strerror(ret));
+    }
 
     return ret;
 }

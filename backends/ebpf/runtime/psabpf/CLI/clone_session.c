@@ -11,13 +11,9 @@
 
 #include "backends/ebpf/runtime/psa.h"
 
-#include "../include/psabpf.h"
 #include "clone_session.h"
-
-/**
- * The name of the BPF MAP variable in packet-cloning.c
- */
-static const char *CLONE_SESSION_TABLE = "clone_session_tbl";
+#include "../include/psabpf.h"
+#include "../include/psabpf_clone_session.h"
 
 struct list_key_t {
     __u32 port;
@@ -234,6 +230,7 @@ int do_add_member(int argc, char **argv)
     return clone_session_add_member(id, egress_port, instance, cos, truncate, plen_bytes);
 }
 
+// TODO: use psabpf library
 int clone_session_del_member(__u32 clone_session_id, __u32 egress_port, __u16 instance)
 {
     if (egress_port == 0 || instance == 0) {

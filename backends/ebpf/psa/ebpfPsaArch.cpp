@@ -283,7 +283,7 @@ void PSAArch::emitInstances2TC(CodeBuilder *builder) const {
 void PSAArch::emitInitializer2TC(CodeBuilder *builder) const {
     builder->appendLine("SEC(\"classifier/map-initializer\")");
     builder->appendFormat("int %s()",
-                          "map_initialize");
+                          "map_initializer");
     builder->spc();
     builder->blockStart();
     builder->emitIndent();

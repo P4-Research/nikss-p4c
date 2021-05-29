@@ -43,10 +43,10 @@ class EbpfTest(BaseTest):
         return process.returncode, stdout_data, stderr_data
 
     def add_port(self, dev):
-        self.exec_ns_cmd("bpftool net attach xdp pinned /sys/fs/bpf/prog/xdp_xdp-ingress dev {} overwrite".format(dev))
+        self.exec_ns_cmd("bpftool net attach xdp pinned /sys/fs/bpf/pipeline0/xdp_xdp-ingress dev {} overwrite".format(dev))
         self.exec_ns_cmd("tc qdisc add dev {} clsact".format(dev))
-        self.exec_ns_cmd("tc filter add dev {} ingress bpf da fd /sys/fs/bpf/prog/classifier_tc-ingress".format(dev))
-        self.exec_ns_cmd("tc filter add dev {} egress bpf da fd /sys/fs/bpf/prog/classifier_tc-egress".format(dev))
+        self.exec_ns_cmd("tc filter add dev {} ingress bpf da fd /sys/fs/bpf/pipeline0/classifier_tc-ingress".format(dev))
+        self.exec_ns_cmd("tc filter add dev {} egress bpf da fd /sys/fs/bpf/pipeline0/classifier_tc-egress".format(dev))
 
     def del_port(self, dev):
         self.exec_ns_cmd("ip link set dev {} xdp off".format(dev))
@@ -92,7 +92,7 @@ class EbpfTest(BaseTest):
         self.interfaces = testutils.test_param_get("interfaces").split(",")
         logger.info("Using interfaces: %s", str(self.interfaces))
 
-        self.exec_ns_cmd("load-prog {}".format(self.test_prog_image), "Can't load programs into eBPF subsystem")
+        self.exec_ns_cmd("psabpf-ctl pipeline load {}".format(self.test_prog_image), "Can't load programs into eBPF subsystem")
 
         for intf in self.interfaces:
             self.add_port(dev=intf)
@@ -109,7 +109,7 @@ class EbpfTest(BaseTest):
     def tearDown(self):
         for intf in self.interfaces:
             self.del_port(intf)
-        self.exec_ns_cmd("rm -rf /sys/fs/bpf/prog")
+        self.exec_ns_cmd("rm -rf /sys/fs/bpf/pipeline0")
         for filename in os.listdir("/sys/fs/bpf"):
             if not os.path.isdir(filename):
                 self.remove_map(filename)
