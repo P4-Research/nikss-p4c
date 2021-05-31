@@ -36,6 +36,7 @@ int do_load(int argc, char **argv)
     psabpf_pipeline_setid(&pipeline, id);
 
     if (psabpf_pipeline_exists(&pipeline)) {
+        fprintf(stderr, "pipeline id %d already exists\n", id);
         psabpf_pipeline_free(&pipeline);
         return EEXIST;
     }
@@ -47,6 +48,7 @@ int do_load(int argc, char **argv)
         return -1;
     }
 
+    fprintf(stdout, "Pipeline id %d successfully loaded!\n", id);
     psabpf_pipeline_free(&pipeline);
     return 0;
 }
@@ -68,6 +70,13 @@ int do_unload(int argc, char **argv)
     psabpf_pipeline_t pipeline;
     psabpf_pipeline_init(&pipeline);
     psabpf_pipeline_setid(&pipeline, id);
+
+    if (!psabpf_pipeline_exists(&pipeline)) {
+        fprintf(stderr, "pipeline with given id %d does not exist\n", id);
+        psabpf_pipeline_free(&pipeline);
+        return EINVAL;
+    }
+
     if (psabpf_pipeline_unload(&pipeline)) {
         psabpf_pipeline_free(&pipeline);
         return -1;
@@ -101,7 +110,7 @@ int do_port_add(int argc, char **argv)
     psabpf_pipeline_init(&pipeline);
     psabpf_pipeline_setid(&pipeline, id);
 
-    if (psabpf_pipeline_exists(&pipeline)) {
+    if (!psabpf_pipeline_exists(&pipeline)) {
         psabpf_pipeline_free(&pipeline);
         return EEXIST;
     }
