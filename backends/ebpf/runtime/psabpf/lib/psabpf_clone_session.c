@@ -37,21 +37,22 @@ void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_sessi
 }
 
 // TODO: implement
-int psabpf_clone_session_exists(psabpf_clone_session_ctx_t *ctx)
+int psabpf_clone_session_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
 {
     return 0;
 }
 
-int psabpf_clone_session_create(psabpf_clone_session_ctx_t *ctx)
+int psabpf_clone_session_create(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
 {
     int error;
 
-    if (ctx->id == 0) {
+    if (session->id == 0) {
         // it means that ID was not initialized
         return EINVAL;
     }
 
-    psabpf_clone_session_id_t clone_session_id = ctx->id;
+    psabpf_pipeline_id_t pipeline_id = ctx->pipeline_id;
+    psabpf_clone_session_id_t clone_session_id = session->id;
 
     struct bpf_create_map_attr attr = { NULL, };
     attr.map_type = BPF_MAP_TYPE_HASH;
@@ -72,7 +73,7 @@ int psabpf_clone_session_create(psabpf_clone_session_ctx_t *ctx)
     }
 
     char path[256];
-    snprintf(path, sizeof(path), "%s/clone_session_%d", BPF_FS, clone_session_id);
+    snprintf(path, sizeof(path), "%s/pipeline%d/maps/clone_session_%d", BPF_FS, pipeline_id, clone_session_id);
     error = bpf_obj_pin(inner_map_fd, path);
     if (error < 0) {
         printf("failed to pin new clone session to a file [%s]\n", strerror(errno));
@@ -93,8 +94,8 @@ int psabpf_clone_session_create(psabpf_clone_session_ctx_t *ctx)
     }
 
     char pinned_file[256];
-    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", BPF_FS,
-             CLONE_SESSION_TABLE);
+    snprintf(pinned_file, sizeof(pinned_file), "%s/pipeline%d/maps/%s", BPF_FS,
+             pipeline_id, CLONE_SESSION_TABLE);
 
     long outer_map_fd = bpf_obj_get(pinned_file);
     if (outer_map_fd < 0) {
@@ -168,7 +169,7 @@ int psabpf_clone_session_entry_truncate_disable(psabpf_clone_session_entry_t *en
     entry->packet_length_bytes = 0;
 }
 
-int psabpf_clone_session_entry_update(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry)
+int psabpf_clone_session_entry_update(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry)
 {
     int error = 0;
 
@@ -178,11 +179,11 @@ int psabpf_clone_session_entry_update(psabpf_clone_session_ctx_t *ctx, psabpf_cl
 
     printf("egress port %u", entry->egress_port);
 
-    psabpf_clone_session_id_t clone_session_id = ctx->id;
+    psabpf_clone_session_id_t clone_session_id = session->id;
 
     char pinned_file[256];
-    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", BPF_FS,
-             CLONE_SESSION_TABLE);
+    snprintf(pinned_file, sizeof(pinned_file), "%s/pipeline%d/maps/%s", BPF_FS,
+             ctx->pipeline_id, CLONE_SESSION_TABLE);
 
     long outer_map_fd = bpf_obj_get(pinned_file);
     if (outer_map_fd < 0) {
@@ -244,22 +245,22 @@ int psabpf_clone_session_entry_update(psabpf_clone_session_ctx_t *ctx, psabpf_cl
     return error;
 }
 
-int psabpf_clone_session_delete(psabpf_clone_session_ctx_t *ctx)
+int psabpf_clone_session_delete(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
 {
     int error = 0;
 
-    if ( ctx == NULL || ctx->id == 0 )
+    if ( session == NULL || session->id == 0 )
         return EINVAL;
 
-    psabpf_clone_session_id_t clone_session_id = ctx->id;
+    psabpf_clone_session_id_t clone_session_id = session->id;
 
     char session_map_path[256];
-    snprintf(session_map_path, sizeof(session_map_path), "%s/clone_session_%d", BPF_FS,
-             clone_session_id);
+    snprintf(session_map_path, sizeof(session_map_path), "%s/pipeline%d/maps/clone_session_%d", BPF_FS,
+             ctx->pipeline_id, clone_session_id);
 
     char pinned_file[256];
-    snprintf(pinned_file, sizeof(pinned_file), "%s/%s", BPF_FS,
-             CLONE_SESSION_TABLE);
+    snprintf(pinned_file, sizeof(pinned_file), "%s/pipeline%d/maps/%s", BPF_FS,
+             ctx->pipeline_id, CLONE_SESSION_TABLE);
     long outer_map_fd = bpf_obj_get(pinned_file);
     if (outer_map_fd < 0) {
         fprintf(stderr, "could not find map %s [%s].\n",

@@ -39,9 +39,9 @@ void psabpf_clone_session_context_free(psabpf_clone_session_ctx_t *ctx);
 void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_id_t id);
 
 // TODO: add function to get all identifiers of clone sessions, which are created.
-int psabpf_clone_session_create(psabpf_clone_session_ctx_t *ctx);
-int psabpf_clone_session_exists(psabpf_clone_session_ctx_t *ctx);
-int psabpf_clone_session_delete(psabpf_clone_session_ctx_t *ctx);
+int psabpf_clone_session_create(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session);
+int psabpf_clone_session_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session);
+int psabpf_clone_session_delete(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session);
 
 void psabpf_clone_session_entry_init(psabpf_clone_session_entry_t *entry);
 void psabpf_clone_session_entry_free(psabpf_clone_session_entry_t *entry);
@@ -53,10 +53,10 @@ int psabpf_clone_session_entry_truncate_enable(psabpf_clone_session_entry_t *ent
 // The function to set 'truncate' to false.
 int psabpf_clone_session_entry_truncate_disable(psabpf_clone_session_entry_t *entry);
 
-int psabpf_clone_session_entry_update(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
-int psabpf_clone_session_entry_delete(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
-int psabpf_clone_session_entry_exists(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
-int psabpf_clone_session_entry_get(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
+int psabpf_clone_session_entry_update(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry);
+int psabpf_clone_session_entry_delete(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry);
+int psabpf_clone_session_entry_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry);
+int psabpf_clone_session_entry_get(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry);
 
 /*
  * Example:

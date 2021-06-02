@@ -12,6 +12,9 @@ logger = logging.getLogger('eBPFTest')
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler())
 
+TEST_PIPELINE_ID = 999
+TEST_PIPELINE_MOUNT_PATH = "/sys/fs/bpf/pipeline{}".format(TEST_PIPELINE_ID)
+PIPELINE_MAPS_MOUNT_PATH = "{}/maps".format(TEST_PIPELINE_MOUNT_PATH)
 
 class EbpfTest(BaseTest):
     switch_ns = 'test'
@@ -43,34 +46,36 @@ class EbpfTest(BaseTest):
         return process.returncode, stdout_data, stderr_data
 
     def add_port(self, dev):
-        self.exec_ns_cmd("bpftool net attach xdp pinned /sys/fs/bpf/pipeline0/xdp_xdp-ingress dev {} overwrite".format(dev))
+        self.exec_ns_cmd("bpftool net attach xdp pinned /sys/fs/bpf/pipeline999/xdp_xdp-ingress dev {} overwrite".format(dev))
         self.exec_ns_cmd("tc qdisc add dev {} clsact".format(dev))
-        self.exec_ns_cmd("tc filter add dev {} ingress bpf da fd /sys/fs/bpf/pipeline0/classifier_tc-ingress".format(dev))
-        self.exec_ns_cmd("tc filter add dev {} egress bpf da fd /sys/fs/bpf/pipeline0/classifier_tc-egress".format(dev))
+        self.exec_ns_cmd("tc filter add dev {} ingress bpf da fd /sys/fs/bpf/pipeline999/classifier_tc-ingress".format(dev))
+        self.exec_ns_cmd("tc filter add dev {} egress bpf da fd /sys/fs/bpf/pipeline999/classifier_tc-egress".format(dev))
+        # self.exec_ns_cmd("psabpf-ctl pipeline add-port id {} {}".format(TEST_PIPELINE_ID, dev))
 
     def del_port(self, dev):
         self.exec_ns_cmd("ip link set dev {} xdp off".format(dev))
         self.exec_ns_cmd("tc qdisc del dev {} clsact".format(dev))
 
     def remove_map(self, name):
-        self.exec_ns_cmd("rm /sys/fs/bpf/{}".format(name))
+        self.exec_ns_cmd("rm {}/maps/{}".format(TEST_PIPELINE_MOUNT_PATH, name))
 
     def remove_maps(self, maps):
         for map in maps:
             self.remove_map(map)
 
     def create_map(self, name, type, key_size, value_size, max_entries):
-        self.exec_ns_cmd("bpftool map create /sys/fs/bpf/{} type "
+        self.exec_ns_cmd("bpftool map create {}/{} type "
                          "{} key {} value {} entries {} name {}".format(
-            name, type, key_size, value_size, max_entries, name))
+            PIPELINE_MAPS_MOUNT_PATH, name, type, key_size, value_size, max_entries, name))
 
     def update_map(self, name, key, value, map_in_map=False):
         if map_in_map:
-            value = "pinned /sys/fs/bpf/{} any".format(value)
-        self.exec_ns_cmd("bpftool map update pinned /sys/fs/bpf/{} key {} value {}".format(name, key, value))
+            value = "pinned {}/{} any".format(PIPELINE_MAPS_MOUNT_PATH, value)
+        self.exec_ns_cmd("bpftool map update pinned {}/{} key {} value {}".format(
+            PIPELINE_MAPS_MOUNT_PATH, name, key, value))
 
     def read_map(self, name, key):
-        cmd = "bpftool -j map lookup pinned /sys/fs/bpf/{} key {}".format(name, key)
+        cmd = "bpftool -j map lookup pinned {}/{} key {}".format(PIPELINE_MAPS_MOUNT_PATH, name, key)
         _, stdout, _ = self.exec_ns_cmd(cmd, "Failed to read map {}".format(name))
         value = [format(int(v, 0), '02x') for v in json.loads(stdout)['value']]
         return ' '.join(value)
@@ -92,7 +97,7 @@ class EbpfTest(BaseTest):
         self.interfaces = testutils.test_param_get("interfaces").split(",")
         logger.info("Using interfaces: %s", str(self.interfaces))
 
-        self.exec_ns_cmd("psabpf-ctl pipeline load {}".format(self.test_prog_image), "Can't load programs into eBPF subsystem")
+        self.exec_ns_cmd("psabpf-ctl pipeline load id {} {}".format(TEST_PIPELINE_ID, self.test_prog_image), "Can't load programs into eBPF subsystem")
 
         for intf in self.interfaces:
             self.add_port(dev=intf)
@@ -109,10 +114,10 @@ class EbpfTest(BaseTest):
     def tearDown(self):
         for intf in self.interfaces:
             self.del_port(intf)
-        self.exec_ns_cmd("rm -rf /sys/fs/bpf/pipeline0")
-        for filename in os.listdir("/sys/fs/bpf"):
+        for filename in os.listdir("{}".format(PIPELINE_MAPS_MOUNT_PATH)):
             if not os.path.isdir(filename):
                 self.remove_map(filename)
+        self.exec_ns_cmd("rm -rf {}".format(TEST_PIPELINE_MOUNT_PATH))
         super(EbpfTest, self).tearDown()
 
 
@@ -147,3 +152,13 @@ class P4EbpfTest(EbpfTest):
         self.remove_map("clone_session_tbl")
         self.remove_map("multicast_grp_tbl")
         super(P4EbpfTest, self).tearDown()
+
+    def clone_session_create(self, id):
+        self.exec_ns_cmd("psabpf-ctl clone-session create pipe {} id {}".format(TEST_PIPELINE_ID, id))\
+
+    def clone_session_add_member(self, clone_session, egress_port, instance=1, cos=0):
+        self.exec_ns_cmd("psabpf-ctl clone-session add-member pipe {} id {} egress-port {} instance {} cos {}".format(
+            TEST_PIPELINE_ID, clone_session, egress_port, instance, cos))
+
+    def clone_session_delete(self, id):
+        self.exec_ns_cmd("psabpf-ctl clone-session delete pipe {} id {}".format(TEST_PIPELINE_ID, id))

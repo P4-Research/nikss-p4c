@@ -8,11 +8,13 @@
  */
 static const char *BPF_FS = "/sys/fs/bpf";
 
+typedef uint32_t psabpf_pipeline_id_t;
+
 /**
  * \brief          Global PSABPF context. Should be maintained between calls to the PSABPF API.
  */
 typedef struct psabpf_context {
-
+    psabpf_pipeline_id_t pipeline_id;
 } psabpf_context_t;
 
 /**
@@ -20,14 +22,21 @@ typedef struct psabpf_context {
  *
  * @param ctx
  */
-void psabpf_init(psabpf_context_t *ctx);
+void psabpf_context_init(psabpf_context_t *ctx);
 
 /**
  * Clear the PSABPF context.
  *
  * @param ctx
  */
-void psabpf_free(psabpf_context_t *ctx);
+void psabpf_context_free(psabpf_context_t *ctx);
+
+/**
+ * The PSABPF context is pipeline-scoped.
+ * This functions allow to set/get pipeline object to control.
+ */
+void psabpf_context_set_pipeline(psabpf_context_t *ctx, psabpf_pipeline_id_t pipeline_id);
+void psabpf_context_get_pipeline(psabpf_context_t *ctx);
 
 
 /*

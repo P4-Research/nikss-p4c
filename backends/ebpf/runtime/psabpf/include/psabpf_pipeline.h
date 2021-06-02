@@ -2,10 +2,8 @@
 
 ////// ForwardingConfig
 typedef struct psabpf_pipeline {
+    psabpf_pipeline_id_t id;
     const char *obj;
-
-    // TODO: consider to move it to the global context
-    int id;
 } psabpf_pipeline_t;
 
 void psabpf_pipeline_init(psabpf_pipeline_t *pipeline);

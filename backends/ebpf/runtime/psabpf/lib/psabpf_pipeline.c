@@ -121,6 +121,9 @@ static int tc_port_add(__u32 pipeline_id, char *intf)
 {
     /* FIXME: using bash command only for the PoC purpose */
     char cmd[256];
+    sprintf(cmd, "bpftool net attach xdp pinned %s/%s%d/%s dev {} overwrite",
+            BPF_FS, PIPELINE_PREFIX, pipeline_id, XDP_INGRESS_PROG, intf);
+    system(cmd);
     sprintf(cmd, "tc qdisc add dev %s clsact", intf);
     system(cmd);
     memset(cmd, 0, sizeof(cmd));
@@ -230,7 +233,6 @@ err_close_obj:
 
 int psabpf_pipeline_unload(psabpf_pipeline_t *pipeline)
 {
-
     return 0;
 }
 
@@ -252,4 +254,9 @@ int psabpf_pipeline_add_port(psabpf_pipeline_t *pipeline, char *intf)
     isXDP = access(pinned_file, F_OK) != 0;
 
     return isXDP ? xdp_port_add(pipeline->id, ifindex) : tc_port_add(pipeline->id, intf);
+}
+
+int psabpf_pipeline_del_port(psabpf_pipeline_t *pipeline, char *intf)
+{
+    
 }
