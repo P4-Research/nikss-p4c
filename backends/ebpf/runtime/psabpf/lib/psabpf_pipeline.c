@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <net/if.h>
 #include <unistd.h>
 #include "bpf/bpf.h"
 #include "bpf/libbpf.h"
@@ -64,7 +65,7 @@ static char *__bpf_program__pin_name(struct bpf_program *prog)
 {
     char *name, *p;
 
-    name = p = strdup(bpf_program__title(prog, false));
+    name = p = strdup(bpf_program__section_name(prog));
     while ((p = strchr(p, '/')))
         *p = '_';
 
@@ -86,7 +87,6 @@ static int xdp_port_add(__u32 pipeline_id, __u32 ifindex)
     int ret;
     int ig_prog_fd, eg_prog_fd, devmap_fd;
 
-    memset(pinned_file, 0, sizeof(pinned_file));
     snprintf(pinned_file, sizeof(pinned_file), "%s/%s%d/%s", BPF_FS,
              PIPELINE_PREFIX, pipeline_id, XDP_INGRESS_PROG);
     ig_prog_fd = bpf_obj_get(pinned_file);
@@ -191,7 +191,7 @@ int psabpf_pipeline_load(psabpf_pipeline_t *pipeline)
     }
 
     bpf_object__for_each_program(pos, obj) {
-        const char *sec_name = bpf_program__title(pos, false);
+        const char *sec_name = bpf_program__section_name(pos);
         int prog_fd = bpf_program__fd(pos);
         if (!strcmp(sec_name, TC_INIT_PROG) || !strcmp(sec_name, XDP_INIT_PROG)) {
             ret = do_initialize_maps(prog_fd);
@@ -239,7 +239,11 @@ err_close_obj:
 
 int psabpf_pipeline_unload(psabpf_pipeline_t *pipeline)
 {
-    return 0;
+    // FIXME: temporary solution [PoC-only].
+    char cmd[256];
+    sprintf(cmd, "rm -rf %s/%s%d",
+            BPF_FS, PIPELINE_PREFIX, pipeline->id);
+    return system(cmd);
 }
 
 int psabpf_pipeline_add_port(psabpf_pipeline_t *pipeline, char *intf)

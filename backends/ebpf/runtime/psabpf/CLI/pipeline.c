@@ -56,6 +56,7 @@ int do_load(int argc, char **argv)
 
 int do_unload(int argc, char **argv)
 {
+    int error;
     if (!is_keyword(*argv, "id")) {
         fprintf(stderr, "expected 'id', got: %s\n", *argv);
         return -1;
@@ -74,16 +75,19 @@ int do_unload(int argc, char **argv)
 
     if (!psabpf_pipeline_exists(&pipeline)) {
         fprintf(stderr, "pipeline with given id %d does not exist\n", id);
-        psabpf_pipeline_free(&pipeline);
-        return EINVAL;
+        error = EINVAL;
+        goto err;
     }
 
     if (psabpf_pipeline_unload(&pipeline)) {
-        psabpf_pipeline_free(&pipeline);
-        return -1;
+        error = -1;
+        goto err;
     }
+
+    fprintf(stdout, "Pipeline id %d successfully unloaded!\n", id);
+err:
     psabpf_pipeline_free(&pipeline);
-    return 0;
+    return error;
 }
 
 int do_port_add(int argc, char **argv)
