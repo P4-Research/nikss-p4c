@@ -46,11 +46,7 @@ class EbpfTest(BaseTest):
         return process.returncode, stdout_data, stderr_data
 
     def add_port(self, dev):
-        self.exec_ns_cmd("bpftool net attach xdp pinned /sys/fs/bpf/pipeline999/xdp_xdp-ingress dev {} overwrite".format(dev))
-        self.exec_ns_cmd("tc qdisc add dev {} clsact".format(dev))
-        self.exec_ns_cmd("tc filter add dev {} ingress bpf da fd /sys/fs/bpf/pipeline999/classifier_tc-ingress".format(dev))
-        self.exec_ns_cmd("tc filter add dev {} egress bpf da fd /sys/fs/bpf/pipeline999/classifier_tc-egress".format(dev))
-        # self.exec_ns_cmd("psabpf-ctl pipeline add-port id {} {}".format(TEST_PIPELINE_ID, dev))
+        self.exec_ns_cmd("psabpf-ctl pipeline add-port id {} {}".format(TEST_PIPELINE_ID, dev))
 
     def del_port(self, dev):
         self.exec_ns_cmd("ip link set dev {} xdp off".format(dev))

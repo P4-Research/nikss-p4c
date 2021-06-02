@@ -26,17 +26,6 @@ make -f ../../runtime/kernel.mk BPFOBJ=out-tc.o \
 	P4FILE=../scenarios/basic/p4/l2fwd/l2fwd.p4 ARGS="$ARGS" psa
 
 
-sudo bpftool prog loadall out-tc.o /sys/fs/bpf/prog
-
-sudo nsenter --net=/var/run/netns/ns0 \
-	ip link set dev eth0 xdpgeneric obj out-tc.o sec xdp/xdp-ingress
-
-sudo nsenter --net=/var/run/netns/ns0 \
-	tc qdisc add dev eth0 clsact
-sudo nsenter --net=/var/run/netns/ns0 \
-	tc filter add dev eth0 ingress bpf da fd /sys/fs/bpf/prog/classifier_tc-ingress
-
-sudo nsenter --net=/var/run/netns/ns0 \
-	tc qdisc add dev eth1 clsact
-sudo nsenter --net=/var/run/netns/ns0 \
-	tc filter add dev eth1 egress bpf da fd /sys/fs/bpf/prog/classifier_tc-egress
+sudo psabpf-ctl pipeline load id 1 out-tc.o
+sudo psabpf-ctl pipeline add-port id 1 eth0
+sudo psabpf-ctl pipeline add-port id 1 eth1

@@ -41,6 +41,11 @@ static const char *TC_INGRESS_PROG = "classifier_tc-ingress";
 static const char *TC_EGRESS_PROG = "classifier_tc-egress";
 
 /**
+ * The name of XDP helper program.
+ */
+static const char *XDP_HELPER_PROG = "xdp_xdp-ingress";
+
+/**
  * The name of XDP ingress program.
  */
 static const char *XDP_INGRESS_PROG = "xdp_ingress_xdp-ingress";
@@ -122,8 +127,8 @@ static int tc_port_add(__u32 pipeline_id, char *intf)
 {
     /* FIXME: using bash command only for the PoC purpose */
     char cmd[256];
-    sprintf(cmd, "bpftool net attach xdp pinned %s/%s%d/%s dev {} overwrite",
-            BPF_FS, PIPELINE_PREFIX, pipeline_id, XDP_INGRESS_PROG, intf);
+    sprintf(cmd, "bpftool net attach xdp pinned %s/%s%d/%s dev %s overwrite",
+            BPF_FS, PIPELINE_PREFIX, pipeline_id, XDP_HELPER_PROG, intf);
     system(cmd);
     sprintf(cmd, "tc qdisc add dev %s clsact", intf);
     system(cmd);
