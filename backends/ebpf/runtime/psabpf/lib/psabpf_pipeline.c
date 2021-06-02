@@ -2,12 +2,13 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
-#include <linux/if_link.h>
 #include "bpf/bpf.h"
 #include "bpf/libbpf.h"
 #include <string.h>
 
 #include "../include/psabpf_pipeline.h"
+
+#define XDP_FLAGS_DRV_MODE		(1U << 2)
 
 #define bpf_object__for_each_program(pos, obj)		\
 	for ((pos) = bpf_program__next(NULL, (obj));	\
