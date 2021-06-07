@@ -9,6 +9,7 @@
 #include <linux/btf.h>
 
 #include "../include/psabpf.h"
+#include "btf.h"
 
 void psabpf_context_init(psabpf_context_t *ctx)
 {
@@ -112,7 +113,7 @@ void psabpf_table_entry_ctx_tblname(psabpf_table_entry_ctx_t *ctx, const char *n
     }
     printf("Prog fd: %d\nBTF id: %u\n", ctx->associated_prog, prog_info.btf_id);
 
-    error = btf__get_from_id(prog_info.btf_id, &(ctx->btf));
+    error = btf__get_from_id(prog_info.btf_id, (struct btf **) &(ctx->btf));
     if (ctx->btf == NULL)
         error = -ENOENT;
     if (error != 0){
@@ -123,21 +124,9 @@ void psabpf_table_entry_ctx_tblname(psabpf_table_entry_ctx_t *ctx, const char *n
 
     // Find entry in BTF for our table
     char table_type_name[256];
-    unsigned nodes = btf__get_nr_types(ctx->btf);
     snprintf(table_type_name, sizeof(table_type_name), "____btf_map_%s", name);
-    for (unsigned i = 1; i <= nodes; i++) {
-        const struct btf_type *key_type = btf__type_by_id(ctx->btf, i);
-        if (!key_type->name_off)
-            continue;
-        const char * type_name = btf__name_by_offset(ctx->btf, key_type->name_off);
-        if (type_name == NULL)
-            continue;
-        if (strcmp(table_type_name, type_name) == 0) {
-            ctx->btf_type_id = i;
-            printf("found btf type id: %u\n", ctx->btf_type_id);
-            break;
-        }
-    }
+    ctx->btf_type_id = psabtf_get_type_id_by_name(ctx->btf, table_type_name);
+    printf("key btf type id: %u\n", ctx->btf_type_id);
 }
 
 void psabpf_table_entry_init(psabpf_table_entry_t *entry)
@@ -331,6 +320,25 @@ void dump_table_ctx(psabpf_table_entry_ctx_t *ctx)
     printf("map value:\n\tsize %u\n", ctx->value_size);
 }
 
+void dump_btf_type(struct btf *btf, const struct btf_type *key_type, unsigned id)
+{
+    const char * name = NULL;
+    if (!key_type->name_off) {
+        name = "(anon)";
+    } else {
+        name = btf__name_by_offset(btf, key_type->name_off);
+        if (name == NULL)
+            name = "(invalid)";
+    }
+
+    printf("\tType #%u:\n", id);
+    printf("\t\tname_off: %u\n", key_type->name_off);
+    printf("\t\tname: %s\n", name);
+    printf("\t\tinfo: %u\n", key_type->info);
+    printf("\t\tsize: %u\n", key_type->size);
+    printf("\t\ttype: %u\n", key_type->type);
+}
+
 int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     size_t bytes_to_write = ctx->key_size;
@@ -354,70 +362,53 @@ int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
     return 0;
 }
 
-void dump_btf_type(struct btf *btf, const struct btf_type *key_type, unsigned id)
-{
-    const char * name = NULL;
-    if (!key_type->name_off) {
-        name = "(anon)";
-    } else {
-        name = btf__name_by_offset(btf, key_type->name_off);
-        if (name == NULL)
-            name = "(invalid)";
-    }
-
-    printf("\tType #%u:\n", id);
-    printf("\t\tname_off: %u\n", key_type->name_off);
-    printf("\t\tname: %s\n", name);
-    printf("\t\tinfo: %u\n", key_type->info);
-    printf("\t\tsize: %u\n", key_type->size);
-    printf("\t\ttype: %u\n", key_type->type);
-}
-
 int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
-    const struct btf_type *map_type = btf__type_by_id(ctx->btf, ctx->btf_type_id);
-    const struct btf_type *key_type = NULL;
-    if (map_type == NULL)
+    uint32_t key_type_id = psabtf_get_member_type_id_by_name(ctx->btf, ctx->btf_type_id, "key");
+    if (key_type_id == 0)
         return -EAGAIN;
-    if (btf_kind(map_type) != BTF_KIND_STRUCT)
-        return -EAGAIN;
-
-    dump_btf_type(ctx->btf, map_type, 0);
-
-    int map_type_entries = BTF_INFO_VLEN(map_type->info);
-    const struct btf_member *type_member = (const void *)(map_type + 1);
-    for (int i = 0; i < map_type_entries; i++, type_member++) {
-        const char *name = btf__name_by_offset(ctx->btf, type_member->name_off);
-        if (name == NULL)
-            continue;
-        if (strcmp(name, "key") == 0) {
-            printf("Fount key type: %u\n", type_member->type);
-            key_type = btf__type_by_id(ctx->btf, type_member->type);
-            break;
-        }
-    }
+    const struct btf_type *key_type = psabtf_get_type_by_id(ctx->btf, key_type_id);
     if (key_type == NULL)
         return -EAGAIN;
-    dump_btf_type(ctx->btf, key_type, 1);
 
-    // follow typedefs
-    if (btf_kind(key_type) == BTF_KIND_TYPEDEF)
-        key_type = btf__type_by_id(ctx->btf, key_type->type);
-
-    dump_btf_type(ctx->btf, key_type, 2);
+    printf("key type:\n");
+    dump_btf_type(ctx->btf, key_type, key_type_id);
 
     if (btf_kind(key_type) == BTF_KIND_INT) {
         if (entry->n_keys != 1) {
-            fprintf(stderr, "expected 1 key");
+            fprintf(stderr, "expected 1 key\n");
             return -1;
         }
-        if (key_type->size != entry->match_keys[0]->key_size) {
-            fprintf(stderr, "bad key size");
+        if (entry->match_keys[0]->key_size > ctx->key_size) {
+            fprintf(stderr, "too much data in key\n");
             return -1;
         }
-        memcpy(buffer, entry->match_keys[0]->data, key_type->size);
+        memcpy(buffer, entry->match_keys[0]->data, entry->match_keys[0]->key_size);
     } else if (btf_kind(key_type) == BTF_KIND_STRUCT) {
-        // TODO
+        const struct btf_member *member = (const void *)(key_type + 1);
+        int entries = BTF_INFO_VLEN(key_type->info);
+        if (entry->n_keys != entries) {
+            fprintf(stderr, "expected %d keys, got %zu\n", entries, entry->n_keys);
+            return -1;
+        }
+        for (int i = 0; i < entries; i++, member++) {
+            size_t size = psabtf_get_type_size_by_id(ctx->btf, member->type);
+            unsigned offset;
+            if (BTF_INFO_KFLAG(member->offset))
+                offset = BTF_MEMBER_BIT_OFFSET(member->offset);
+            else
+                offset = member->offset;
+            offset = offset / 8;
+            printf("writing %zu bytes at offset %u\n", size, offset);
+            if (offset + size > ctx->key_size || entry->match_keys[i]->key_size > size){
+                fprintf(stderr, "too much data in key\n");
+                return -1;
+            }
+            memcpy(buffer + offset, entry->match_keys[i]->data, entry->match_keys[i]->key_size);
+        }
+    } else {
+        fprintf(stderr, "unexpected BTF type\n");
+        return -EAGAIN;
     }
 
     return 0;
@@ -455,11 +446,13 @@ int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
     memset(key_buffer, 0, ctx->key_size);
     memset(value_buffer, 0, ctx->value_size);
 
-    // fill-in map key, TODO: maybe should be fallback from BTF mode to byte by byte
+    // fill-in map key, fallback to byte by byte mode when btf mode returns -EAGAIN
+    return_code = -EAGAIN;
     if (ctx->btf != NULL && ctx->btf_type_id != 0) {
         printf("Key construction mode: BTF info\n");
         return_code = fill_key_btf_info(key_buffer, ctx, entry);
-    } else {
+    }
+    if (return_code == -EAGAIN) {
         printf("Key construction mode: byte by byte\n");
         return_code = fill_key_byte_by_byte(key_buffer, ctx, entry);
     }

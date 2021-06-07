@@ -85,7 +85,7 @@ enum psabpf_matchkind_t {
 typedef struct psabpf_match_key {
     enum psabpf_matchkind_t type;
     void *data;
-    size_t data_len;  // TODO: effective and real data size
+    // size_t data_len; TODO: effective and real data size
     size_t key_size;  // key_size determines size of val and mask
     union {
         struct {
@@ -113,7 +113,7 @@ typedef struct psabpf_action {
     uint32_t action_id;
 
     size_t n_params;
-    psabpf_action_param_t *params;
+    psabpf_action_param_t **params;
 } psabpf_action_t;
 
 typedef struct psabpf_table_entry {
@@ -139,7 +139,7 @@ typedef struct psabpf_table_entry_context {
 
     // BTF metadata are associated with eBPF program, eBPF map do not has own BTF
     int associated_prog;
-    struct btf * btf;
+    void * btf;
     uint32_t btf_type_id;
 
     // below fields might be useful when iterating

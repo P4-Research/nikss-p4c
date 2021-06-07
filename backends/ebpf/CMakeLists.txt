@@ -253,6 +253,7 @@ endif()
 
 if (LIBBPF)
   set (PSABPFCTL_SRCS
+          runtime/psabpf/lib/btf.c
           runtime/psabpf/lib/psabpf.c
           runtime/psabpf/lib/psabpf_clone_session.c
           runtime/psabpf/lib/psabpf_pipeline.c
