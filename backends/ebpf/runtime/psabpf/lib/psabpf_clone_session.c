@@ -171,8 +171,6 @@ int psabpf_clone_session_entry_truncate_disable(psabpf_clone_session_entry_t *en
 
 int psabpf_clone_session_entry_update(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry)
 {
-    int error = 0;
-
     if ( entry == NULL || ( entry->instance == 0 && entry->egress_port == 0 ) ) {
         return EINVAL;
     }
@@ -242,7 +240,7 @@ int psabpf_clone_session_entry_update(psabpf_context_t *ctx, psabpf_clone_sessio
     fprintf(stdout, "New member of clone session %d added successfully\n",
             clone_session_id);
 
-    return error;
+    return 0;
 }
 
 int psabpf_clone_session_delete(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)

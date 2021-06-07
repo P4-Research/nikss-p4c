@@ -25,7 +25,6 @@ declare -a ARGS="-DPSA_PORT_RECIRCULATE=$RECIRC_PORT_ID -DBTF"
 make -f ../../runtime/kernel.mk BPFOBJ=out-tc.o \
 	P4FILE=../scenarios/basic/p4/l2fwd/l2fwd.p4 ARGS="$ARGS" psa
 
-
-sudo psabpf-ctl pipeline load id 1 out-tc.o
-sudo psabpf-ctl pipeline add-port id 1 eth0
-sudo psabpf-ctl pipeline add-port id 1 eth1
+sudo nsenter --net=/var/run/netns/ns0 psabpf-ctl pipeline load id 1 out-tc.o
+sudo nsenter --net=/var/run/netns/ns0 psabpf-ctl pipeline add-port id 1 eth0
+sudo nsenter --net=/var/run/netns/ns0 psabpf-ctl pipeline add-port id 1 eth1

@@ -30,9 +30,6 @@ typedef struct psabpf_clone_session_ctx {
 } psabpf_clone_session_ctx_t;
 
 
-/*
- * We do we need clone session context? It is mainly useful for iteration over clone session members.
- */
 void psabpf_clone_session_context_init(psabpf_clone_session_ctx_t *ctx);
 void psabpf_clone_session_context_free(psabpf_clone_session_ctx_t *ctx);
 

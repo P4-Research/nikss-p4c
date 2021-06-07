@@ -49,8 +49,7 @@ class EbpfTest(BaseTest):
         self.exec_ns_cmd("psabpf-ctl pipeline add-port id {} {}".format(TEST_PIPELINE_ID, dev))
 
     def del_port(self, dev):
-        self.exec_ns_cmd("ip link set dev {} xdp off".format(dev))
-        self.exec_ns_cmd("tc qdisc del dev {} clsact".format(dev))
+        self.exec_ns_cmd("psabpf-ctl pipeline del-port id {} {}".format(TEST_PIPELINE_ID, dev))
 
     def remove_map(self, name):
         self.exec_ns_cmd("rm {}/maps/{}".format(TEST_PIPELINE_MOUNT_PATH, name))

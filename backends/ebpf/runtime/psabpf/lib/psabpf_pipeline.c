@@ -268,5 +268,25 @@ int psabpf_pipeline_add_port(psabpf_pipeline_t *pipeline, char *intf)
 
 int psabpf_pipeline_del_port(psabpf_pipeline_t *pipeline, char *intf)
 {
-    
+    char cmd[256];
+    __u32 flags = 0;
+    int ifindex;
+
+    ifindex = if_nametoindex(intf);
+    if (!ifindex)
+        return EINVAL;
+
+    int ret = bpf_set_link_xdp_fd(ifindex, -1, flags);
+    if (ret) {
+        return ret;
+    }
+
+    // FIXME: temporary solution [PoC-only].
+    sprintf(cmd, "tc qdisc del dev %s clsact", intf);
+    ret = system(cmd);
+    if (ret) {
+        return ret;
+    }
+
+    return 0;
 }
