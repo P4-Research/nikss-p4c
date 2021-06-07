@@ -4,7 +4,6 @@
 #include <errno.h>
 #include <bpf/bpf.h>
 #include <bpf/btf.h>
-#include <bpf/libbpf.h>
 #include <linux/bpf.h>
 #include <linux/btf.h>
 
@@ -124,9 +123,9 @@ void psabpf_table_entry_ctx_tblname(psabpf_table_entry_ctx_t *ctx, const char *n
 
     // Find entry in BTF for our table
     char table_type_name[256];
-    snprintf(table_type_name, sizeof(table_type_name), "____btf_map_%s", name);
+    snprintf(table_type_name, sizeof(table_type_name), ".maps.%s", name);
     ctx->btf_type_id = psabtf_get_type_id_by_name(ctx->btf, table_type_name);
-    printf("key btf type id: %u\n", ctx->btf_type_id);
+    printf("map btf type id: %u\n", ctx->btf_type_id);
 }
 
 void psabpf_table_entry_init(psabpf_table_entry_t *entry)

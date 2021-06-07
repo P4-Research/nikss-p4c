@@ -63,6 +63,7 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
                               kind.c_str(), keyType.c_str(),
                               valueType.c_str(), size, "BPF_F_NO_PREALLOC");
         builder->newline();
+        annotateTableWithBTF(builder, tblName, keyType, valueType);
         return;
     } else {
         BUG("%1%: unsupported table kind", tableKind);
@@ -71,6 +72,7 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
                           kind.c_str(), keyType.c_str(),
                           valueType.c_str(), size);
     builder->newline();
+    annotateTableWithBTF(builder, tblName, keyType, valueType);
 }
 
 void
@@ -95,6 +97,8 @@ KernelSamplesTarget::emitMapInMapDecl(Util::SourceCodeBuilder *builder, cstring 
                           kind, innerKeyType, innerValueType,
                           innerSize, innerMapIndex, innerMapIndex);
     builder->newline();
+    annotateTableWithBTF(builder, innerName, innerKeyType, innerValueType);
+
     kind = getBPFMapType(outerTableKind);
     cstring keyType = outerTableKind == TableArray ? "__u32" : outerKeyType;
     builder->appendFormat(registerOuterTable, outerName,
@@ -102,6 +106,7 @@ KernelSamplesTarget::emitMapInMapDecl(Util::SourceCodeBuilder *builder, cstring 
                           "__u32", outerSize, innerMapIndex,
                           innerName);
     builder->newline();
+    annotateTableWithBTF(builder, outerName, keyType, "__u32");
 }
 
 void KernelSamplesTarget::emitLicense(Util::SourceCodeBuilder* builder, cstring license) const {
@@ -160,6 +165,14 @@ void KernelSamplesTarget::emitTraceMessage(Util::SourceCodeBuilder* builder, con
 
     builder->emitIndent();
     builder->appendFormat("bpf_trace_message(%s);", msg);
+    builder->newline();
+}
+
+void KernelSamplesTarget::annotateTableWithBTF(Util::SourceCodeBuilder* builder, cstring name,
+                                               cstring keyType, cstring valueType) const
+{
+    builder->appendFormat("BPF_ANNOTATE_KV_PAIR(%s, %s, %s)",
+                          name.c_str(), keyType.c_str(), valueType.c_str());
     builder->newline();
 }
 
