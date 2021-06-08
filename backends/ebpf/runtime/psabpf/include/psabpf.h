@@ -105,15 +105,15 @@ typedef struct psabpf_match_key {
 } psabpf_match_key_t;
 
 typedef struct psabpf_action_param {
-    const char *data;
-    const size_t len;
+    char *data;
+    size_t len;
 } psabpf_action_param_t;
 
 typedef struct psabpf_action {
     uint32_t action_id;
 
     size_t n_params;
-    psabpf_action_param_t **params;
+    psabpf_action_param_t *params;
 } psabpf_action_t;
 
 typedef struct psabpf_table_entry {
@@ -177,11 +177,13 @@ int psabpf_matchkey_start(psabpf_match_key_t *mk, uint64_t start);
 int psabpf_matchkey_end(psabpf_match_key_t *mk, uint64_t end);
 
 int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, size_t size);
+// should be called when psabpf_action_param() is not called after psabpf_action_param_create()
+void psabpf_action_param_free(psabpf_action_param_t *param);
 
 void psabpf_action_init(psabpf_action_t *action);
 void psabpf_action_free(psabpf_action_t *action);
 void psabpf_action_set_id(psabpf_action_t *action, uint32_t action_id);
-void psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param);
+int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param);
 
 int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 int psabpf_table_entry_update(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);

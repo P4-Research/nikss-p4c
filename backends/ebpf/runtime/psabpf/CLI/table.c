@@ -12,7 +12,12 @@
 #endif
 #define NEXT_ARG()	({ argc--; argv++; if (argc < 1) { fprintf(stderr, "too few parameters\n"); exit(1); }})
 
-int translate_data_to_bytes(psabpf_match_key_t *mk, const char *data)
+enum destination_ctx_type_t {
+    CTX_MATCH_KEY,
+    CTX_ACTION_DATA
+};
+
+int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_type_t ctx_type)
 {
     // converts any precision number to stream of bytes
     mpz_t number;
@@ -79,7 +84,12 @@ int translate_data_to_bytes(psabpf_match_key_t *mk, const char *data)
 
 //    for (int i = 0; i < len; i++)
 //        printf("byte %d: 0x%x\n", i, buffer[i] & 0xff);
-    error_code = psabpf_matchkey_data(mk, buffer, len);
+    if (ctx_type == CTX_MATCH_KEY)
+        error_code = psabpf_matchkey_data(ctx, buffer, len);
+    else if (ctx_type == CTX_ACTION_DATA)
+        error_code = psabpf_action_param_create(ctx, buffer, len);
+    else
+        error_code = -1;
 
     free(buffer);
 free_gmp:
@@ -121,11 +131,11 @@ int do_table_add(int argc, char **argv)
             goto clean_up;
     }
 
-    error_code = -1;
     NEXT_ARG();
 
     // 2. Get action
 
+    error_code = -1;
     if (is_keyword(*argv, "id")) {
         NEXT_ARG();
         char *ptr;
@@ -138,7 +148,6 @@ int do_table_add(int argc, char **argv)
         fprintf(stderr, "specify an action by name is not supported yet\n");
         goto clean_up;
     }
-    printf("action id: %u\n", action.action_id);
 
     NEXT_ARG();
 
@@ -175,7 +184,7 @@ int do_table_add(int argc, char **argv)
                 goto clean_up;
             } else {
                 psabpf_matchkey_type(&mk, PSABPF_EXACT);
-                error_code = translate_data_to_bytes(&mk, *argv);
+                error_code = translate_data_to_bytes(*argv, &mk, CTX_MATCH_KEY);
                 if (error_code != 0)
                     goto clean_up;
                 error_code = psabpf_table_entry_matchkey(&entry, &mk);
@@ -189,19 +198,29 @@ int do_table_add(int argc, char **argv)
     }
 
     // 4. Get action parameters
-    error_code = -1;
 
     if (is_keyword(*argv, "data")) {
         do {
             NEXT_ARG();
             if (is_keyword(*argv, "priority"))
                 break;
-            printf("action param: %s\n", *argv);
+
+            psabpf_action_param_t param;
+            error_code = translate_data_to_bytes(*argv, &param, CTX_ACTION_DATA);
+            if (error_code != 0) {
+                psabpf_action_param_free(&param);
+                goto clean_up;
+            }
+            error_code = psabpf_action_param(&action, &param);
+            if (error_code != 0)
+                goto clean_up;
         } while (argc > 1);
     }
+    psabpf_table_entry_action(&entry, &action);
 
     // 5. Get entry priority
 
+    error_code = -1;
     if (is_keyword(*argv, "priority")) {
         NEXT_ARG();
         fprintf(stderr, "Priority not supported\n");

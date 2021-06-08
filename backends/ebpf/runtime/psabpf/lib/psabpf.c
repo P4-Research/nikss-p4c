@@ -112,7 +112,7 @@ int psabpf_table_entry_ctx_tblname(psabpf_table_entry_ctx_t *ctx, const char *na
         fprintf(stderr, "can't get info for program: %s\n", strerror(errno));
         return 0;
     }
-    printf("Prog fd: %d\nBTF id: %u\n", ctx->associated_prog, prog_info.btf_id);
+    printf("BTF id: %u\n", prog_info.btf_id);
 
     error = btf__get_from_id(prog_info.btf_id, (struct btf **) &(ctx->btf));
     if (ctx->btf == NULL)
@@ -151,6 +151,13 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
     if (entry->match_keys)
         free(entry->match_keys);
     entry->match_keys = NULL;
+
+    // free action data
+    if (entry->action != NULL) {
+        psabpf_action_free(entry->action);
+        free(entry->action);
+        entry->action = NULL;
+    }
 }
 
 // can be invoked multiple times
@@ -193,6 +200,20 @@ int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t 
 
 void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act)
 {
+    if (entry == NULL || act == NULL)
+        return;
+
+    if (entry->action != NULL)
+        return;
+
+    entry->action = malloc(sizeof(psabpf_action_t));
+    if (entry->action == NULL)
+        return;
+    memcpy(entry->action, act, sizeof(psabpf_action_t));
+
+    // stole data
+    act->params = NULL;
+    act->n_params = 0;
 }
 
 // only for ternary
@@ -265,7 +286,24 @@ int psabpf_matchkey_end(psabpf_match_key_t *mk, uint64_t end)
 
 int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, size_t size)
 {
+    param->len = size;
+    if (size == 0) {
+        param->data = NULL;
+        return 0;
+    }
+    param->data = malloc(size);
+    if (param->data == NULL)
+        return -ENOMEM;
+    memcpy(param->data, data, size);
+
     return 0;
+}
+
+void psabpf_action_param_free(psabpf_action_param_t *param)
+{
+    if (param->data != NULL)
+        free(param->data);
+    param->data = NULL;
 }
 
 void psabpf_action_init(psabpf_action_t *action)
@@ -279,6 +317,13 @@ void psabpf_action_free(psabpf_action_t *action)
 {
     if (action == NULL)
         return;
+
+    for (int i = 0; i < action->n_params; i++) {
+        psabpf_action_param_free(&(action->params[i]));
+    }
+    if (action->params != NULL)
+        free(action->params);
+    action->params = NULL;
 }
 
 void psabpf_action_set_id(psabpf_action_t *action, uint32_t action_id) {
@@ -287,8 +332,41 @@ void psabpf_action_set_id(psabpf_action_t *action, uint32_t action_id) {
     action->action_id = action_id;
 }
 
-void psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param)
+int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param)
 {
+    if (action == NULL || param == NULL)
+        return -EINVAL;
+    if (param->data == NULL && param->len != 0)
+        return -ENODATA;
+
+    if (param->len == 0)
+        return 0;
+
+    size_t new_size = (action->n_params + 1) * sizeof(psabpf_action_param_t);
+    psabpf_action_param_t * tmp = malloc(new_size);
+
+    if (tmp == NULL) {
+        if (param->data != NULL)
+            free(param->data);
+        param->data = NULL;
+        return -ENOMEM;
+    }
+
+    if (action->n_params != 0) {
+        memcpy(tmp, action->params, (action->n_params) * sizeof(psabpf_action_param_t));
+    }
+    if (action->params != NULL)
+        free(action->params);
+    action->params = tmp;
+
+    memcpy(&(action->params[action->n_params]), param, sizeof(psabpf_action_param_t));
+
+    // stole data
+    param->data = NULL;
+
+    action->n_params += 1;
+
+    return 0;
 }
 
 void dump_buffer(const char * buff, size_t size)
@@ -307,6 +385,18 @@ void dump_entry(psabpf_table_entry_t *entry)
         printf("size: %zu bytes\n\tdata: ", mk->key_size);
         dump_buffer(mk->data, mk->key_size);
     }
+
+    if (entry->action != NULL) {
+        printf("action id: %u; number of params: %zu\n", entry->action->action_id, entry->action->n_params);
+        for (size_t i = 0; i < entry->action->n_params; i++) {
+            psabpf_action_param_t *param = &(entry->action->params[i]);
+            printf("param #%zu:\n\t", i);
+            printf("size: %zu bytes\n\tdata: ", param->len);
+            dump_buffer(param->data, param->len);
+        }
+    } else {
+        printf("action specification not present\n");
+    }
 }
 
 void dump_table_ctx(psabpf_table_entry_ctx_t *ctx)
@@ -318,9 +408,8 @@ void dump_table_ctx(psabpf_table_entry_ctx_t *ctx)
         printf("(hash)\n");
     else
         printf("(unknown)\n");
-    printf("table fd: %d\n", ctx->table_fd);
-    printf("map key:\n\tsize:%u\n", ctx->key_size);
-    printf("map value:\n\tsize %u\n", ctx->value_size);
+    printf("key size: %u\n", ctx->key_size);
+    printf("value size: %u\n", ctx->value_size);
 }
 
 void dump_btf_type(struct btf *btf, const struct btf_type *key_type, unsigned id)
@@ -431,7 +520,6 @@ int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
         goto clean_up;
     }
 
-    printf("Adding entry\n");
     dump_table_ctx(ctx);
     dump_entry(entry);
 
