@@ -324,7 +324,7 @@ class PortCountersTest(L2L3SwitchTest):
             testutils.verify_packet(self, pkt, PORT4)
             ig_bytes += len(pkt)
             eg_bytes += ig_bytes + 4
-            self.verify_map_entry("ingress_in_pkts", "5 0 0 0", "%d 00 00 00 %d 00 00 00".format(ig_bytes, i))
-            self.verify_map_entry("egress_tbl_vlan_egress", "08 00 00 00", "02 00 00 00 01 00 00 00 %d 00 00 00 %d 00 00 00".format(eg_bytes, i))
+            self.verify_map_entry("ingress_in_pkts", "5 0 0 0", "{} 00 00 00 {} 00 00 00".format(ig_bytes, i))
+            self.verify_map_entry("egress_tbl_vlan_egress", "08 00 00 00", "02 00 00 00 01 00 00 00 {} 00 00 00 {} 00 00 00".format(eg_bytes, i))
 
 
