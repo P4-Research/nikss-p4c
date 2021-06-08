@@ -44,11 +44,11 @@ class L2L3SwitchTest(P4EbpfTest):
         if vlan_id is None:
             key = "{} 0 0 0".format(port_id)
             self.update_map(name="ingress_tbl_ingress_vlan", key=key + " 0 0 0 0", value="01 00 00 00")
-            self.update_map(name="egress_tbl_vlan_egress", key=key, value="01 00 00 00 0 0 0 0")
+            self.update_map(name="egress_tbl_vlan_egress", key=key, value="01 00 00 00 0 0 0 0 0 0 0 0 0 0 0 0")
         else:
             key = "{} 0 0 0".format(port_id)
             self.update_map(name="ingress_tbl_ingress_vlan", key=key + " 1 0 0 0", value="00 00 00 00")
-            self.update_map(name="egress_tbl_vlan_egress", key=key, value="02 00 00 00 {} 0 0 0".format(vlan_id))
+            self.update_map(name="egress_tbl_vlan_egress", key=key, value="02 00 00 00 {} 0 0 0 0 0 0 0 0 0 0 0".format(vlan_id))
 
     def setUp(self):
         super(L2L3SwitchTest, self).setUp()
@@ -307,3 +307,24 @@ class ACLTest(L2L3SwitchTest):
         testutils.verify_no_packet(self, udp_pkt_2, PORT5)
         testutils.send_packet(self, PORT0, tcp_pkt_2)
         testutils.verify_no_packet(self, tcp_pkt_2, PORT5)
+
+class PortCountersTest(L2L3SwitchTest):
+
+    def runTest(self):
+        self.update_map(name="ingress_tbl_switching", key="03 00 00 00 00 00 00 00 01 00 00 00 0 0 0 0", value="01 00 00 00 8 00 00 00")
+        pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:00:03")
+        pkt = pkt_add_vlan(pkt, vlan_vid=1)
+
+        # FIXME: bridged_metadata is being counted in the egress pipeline.
+        #  not sure if this is proper behavior, but let's keep it for now.
+        ig_bytes = 0
+        eg_bytes = 0
+        for i in range(0, 2):
+            testutils.send_packet(self, PORT1, pkt)
+            testutils.verify_packet(self, pkt, PORT4)
+            ig_bytes += len(pkt)
+            eg_bytes += ig_bytes + 4
+            self.verify_map_entry("ingress_in_pkts", "5 0 0 0", "%d 00 00 00 %d 00 00 00".format(ig_bytes, i))
+            self.verify_map_entry("egress_tbl_vlan_egress", "08 00 00 00", "02 00 00 00 01 00 00 00 %d 00 00 00 %d 00 00 00".format(eg_bytes, i))
+
+
