@@ -66,19 +66,20 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
     ctx->associated_prog = -1;
 }
 
-void psabpf_table_entry_ctx_tblname(psabpf_table_entry_ctx_t *ctx, const char *name)
+int psabpf_table_entry_ctx_tblname(psabpf_table_entry_ctx_t *ctx, const char *name)
 {
     if (ctx == NULL)
-        return;
+        return -EPERM;
 
     char table_file[256];
     snprintf(table_file, sizeof(table_file), "%s/%s", BPF_FS, name);
-    ctx->table_fd = bpf_obj_get(table_file);
 
+    ctx->table_fd = bpf_obj_get(table_file);
     if (ctx->table_fd < 0) {
+        int errno_val = errno;
         fprintf(stderr, "could not find map %s. It doesn't exists? [%s].\n",
-                table_file, strerror(errno));
-        return;
+                table_file, strerror(errno_val));
+        return errno_val;
     }
 
     // get k/v size
@@ -87,20 +88,21 @@ void psabpf_table_entry_ctx_tblname(psabpf_table_entry_ctx_t *ctx, const char *n
     int error;
     error = bpf_obj_get_info_by_fd(ctx->table_fd, &info, &len);
     if (error) {
-        fprintf(stderr, "can't get info for table: %s\n", strerror(errno));
-        return;
+        int errno_val = errno;
+        fprintf(stderr, "can't get info for table: %s\n", strerror(errno_val));
+        return errno_val;
     }
     ctx->table_type = info.type;
     ctx->key_size = info.key_size;
     ctx->value_size = info.value_size;
 
-    // get the BTF
+    // get the BTF, it is optional so print only warning and return no error
     // TODO: any our program should works, now it is assumed that this program always exists
     ctx->associated_prog = bpf_obj_get("/sys/fs/bpf/prog/classifier_tc-ingress");
     if (ctx->associated_prog < 0) {
         fprintf(stderr, "could not find associated eBPF program. It doesn't exists? [%s].\n",
                 strerror(errno));
-        return;
+        return 0;
     }
 
     struct bpf_prog_info prog_info = {};
@@ -108,7 +110,7 @@ void psabpf_table_entry_ctx_tblname(psabpf_table_entry_ctx_t *ctx, const char *n
     error = bpf_obj_get_info_by_fd(ctx->associated_prog, &prog_info, &len);
     if (error) {
         fprintf(stderr, "can't get info for program: %s\n", strerror(errno));
-        return;
+        return 0;
     }
     printf("Prog fd: %d\nBTF id: %u\n", ctx->associated_prog, prog_info.btf_id);
 
@@ -118,7 +120,7 @@ void psabpf_table_entry_ctx_tblname(psabpf_table_entry_ctx_t *ctx, const char *n
     if (error != 0){
         fprintf(stderr, "Failed to get BTF by id %u: %s\n",
                 prog_info.btf_id, strerror(error));
-        return;
+        return 0;
     }
 
     // Find entry in BTF for our table
@@ -126,6 +128,8 @@ void psabpf_table_entry_ctx_tblname(psabpf_table_entry_ctx_t *ctx, const char *n
     snprintf(table_type_name, sizeof(table_type_name), ".maps.%s", name);
     ctx->btf_type_id = psabtf_get_type_id_by_name(ctx->btf, table_type_name);
     printf("map btf type id: %u\n", ctx->btf_type_id);
+
+    return 0;
 }
 
 void psabpf_table_entry_init(psabpf_table_entry_t *entry)
@@ -376,32 +380,29 @@ int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table
     if (btf_kind(key_type) == BTF_KIND_INT) {
         if (entry->n_keys != 1) {
             fprintf(stderr, "expected 1 key\n");
-            return -1;
+            return -EAGAIN;
         }
         if (entry->match_keys[0]->key_size > ctx->key_size) {
             fprintf(stderr, "too much data in key\n");
-            return -1;
+            return -1;  // byte by byte mode will not fix this
         }
         memcpy(buffer, entry->match_keys[0]->data, entry->match_keys[0]->key_size);
     } else if (btf_kind(key_type) == BTF_KIND_STRUCT) {
-        const struct btf_member *member = (const void *)(key_type + 1);
-        int entries = BTF_INFO_VLEN(key_type->info);
+        const struct btf_member *member = btf_members(key_type);
+        int entries = btf_vlen(key_type);
         if (entry->n_keys != entries) {
             fprintf(stderr, "expected %d keys, got %zu\n", entries, entry->n_keys);
-            return -1;
+            return -EAGAIN;
         }
         for (int i = 0; i < entries; i++, member++) {
             size_t size = psabtf_get_type_size_by_id(ctx->btf, member->type);
-            unsigned offset;
-            if (BTF_INFO_KFLAG(member->offset))
-                offset = BTF_MEMBER_BIT_OFFSET(member->offset);
-            else
-                offset = member->offset;
-            offset = offset / 8;
-            printf("writing %zu bytes at offset %u\n", size, offset);
+            // assume that every field is byte aligned
+            unsigned offset = btf_member_bit_offset(key_type, i) / 8;
+            printf("writing %zu bytes (provided %zu bytes) at offset %u\n",
+                   size, entry->match_keys[i]->key_size, offset);
             if (offset + size > ctx->key_size || entry->match_keys[i]->key_size > size){
                 fprintf(stderr, "too much data in key\n");
-                return -1;
+                return -EAGAIN;
             }
             memcpy(buffer + offset, entry->match_keys[i]->data, entry->match_keys[i]->key_size);
         }

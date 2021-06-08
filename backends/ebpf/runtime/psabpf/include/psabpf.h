@@ -149,7 +149,7 @@ typedef struct psabpf_table_entry_context {
 
 void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx);
 void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx);
-void psabpf_table_entry_ctx_tblname(psabpf_table_entry_ctx_t *ctx, const char *name);
+int psabpf_table_entry_ctx_tblname(psabpf_table_entry_ctx_t *ctx, const char *name);
 
 void psabpf_table_entry_init(psabpf_table_entry_t *entry);
 void psabpf_table_entry_free(psabpf_table_entry_t *entry);

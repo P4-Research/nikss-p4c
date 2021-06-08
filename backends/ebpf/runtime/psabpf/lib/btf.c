@@ -28,9 +28,9 @@ uint32_t follow_data_section_type(struct btf * btf, uint32_t type_id, unsigned e
     if (type == NULL)
         return type_id;
     if (btf_kind(type) == BTF_KIND_DATASEC) {
-        if (BTF_INFO_VLEN(type->info) != 1)
+        if (btf_vlen(type) != 1)
             fprintf(stderr, "too big section, reading first entry\n");
-        const struct btf_var_secinfo * info = (const void *) (type + 1);
+        const struct btf_var_secinfo * info = btf_var_secinfos(type);
         type_id = info->type;
     }
     return type_id;
@@ -91,8 +91,8 @@ uint32_t psabtf_get_member_type_id_by_name(struct btf * btf, uint32_t type_id, c
         btf_kind(type) != BTF_KIND_UNION)
         return 0;
 
-    int type_entries = BTF_INFO_VLEN(type->info);
-    const struct btf_member *type_member = (const void *)(type + 1);
+    int type_entries = btf_vlen(type);
+    const struct btf_member *type_member = btf_members(type);
     uint32_t member_type_id = 0;
     for (int i = 0; i < type_entries; i++, type_member++) {
         const char *name = btf__name_by_offset(btf, type_member->name_off);
@@ -122,7 +122,7 @@ size_t psabtf_get_type_size_by_id(struct btf * btf, uint32_t type_id)
         case BTF_KIND_ARRAY: {
             // Should work with multidimensional arrays, but
             // LLVM collapse them into one-dimensional array.
-            const struct btf_array * array_info = (const void *) (type + 1);
+            const struct btf_array * array_info = btf_array(type);
             // BTF is taken from kernel, so we can trust in it that there is no
             // infinite dimensional array (we do not prevent from stack overflow).
             size_t type_size = psabtf_get_type_size_by_id(btf, array_info->type);

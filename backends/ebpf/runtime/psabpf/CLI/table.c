@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <gmp.h>  // GNU LGPL v3 or GNU GPL v2
+#include <gmp.h>  // GNU LGPL v3 or GNU GPL v2, used only by function translate_data_to_bytes()
 
 #include <bpf/bpf.h>
 
@@ -12,18 +12,46 @@
 #endif
 #define NEXT_ARG()	({ argc--; argv++; if (argc < 1) { fprintf(stderr, "too few parameters\n"); exit(1); }})
 
-void translate_data_to_bytes(psabpf_match_key_t *mk, const char *data)
+int translate_data_to_bytes(psabpf_match_key_t *mk, const char *data)
 {
     // converts any precision number to stream of bytes
     mpz_t number;
-    size_t len;
+    size_t len, forced_len = 0;
     char * buffer;
+    int error_code = -1;
+
+    // try find width specification
+    if (strstr(data, "w") != NULL) {
+        char * end_ptr = NULL;
+        forced_len = strtoul(data, &end_ptr, 0);
+        if (forced_len == 0) {
+            fprintf(stderr, "%s: failed to parse width\n", data);
+            return -1;
+        }
+        if (end_ptr == NULL) {
+            fprintf(stderr, "%s: failed to parse width\n", data);
+            return -1;
+        }
+        if (strlen(end_ptr) <= 1) {
+            fprintf(stderr, "%s: failed to parse width (no data after width)\n", data);
+            return -1;
+        }
+        if (end_ptr[0] != 'w') {
+            fprintf(stderr, "%s: failed to parse width (wrong format)\n", data);
+            return -1;
+        }
+        data = end_ptr + 1;
+        size_t part_byte = forced_len % 8;
+        forced_len = forced_len / 8;
+        if (part_byte != 0)
+            forced_len += 1;
+    }
 
 //    printf("data: %s\n", data);
     mpz_init(number);
     if (mpz_set_str(number, data, 0) != 0) {
-        fprintf(stderr, "Failed to decode %s\n", data);
-        return;
+        fprintf(stderr, "%s: failed to parse number\n", data);
+        goto free_gmp;
     }
 
     len = mpz_sizeinbase(number, 16);
@@ -32,20 +60,32 @@ void translate_data_to_bytes(psabpf_match_key_t *mk, const char *data)
     len /= 2;  // two digits per byte
 //    printf("len: %zu\n", len);
 
+    if (forced_len != 0) {
+        if (len > forced_len) {
+            fprintf(stderr, "%s: do not fits into %zu bytes\n", data, forced_len);
+            goto free_gmp;
+        }
+        len = forced_len;
+    }
+
     buffer = malloc(len);
-    if (buffer == NULL)
+    if (buffer == NULL) {
+        fprintf(stderr, "not enough memory\n");
         goto free_gmp;
+    }
     // when data is "0", gmp may not write any value
     memset(buffer, 0, len);
     mpz_export(buffer, 0, -1, 1, 0, 0, number);
 
 //    for (int i = 0; i < len; i++)
 //        printf("byte %d: 0x%x\n", i, buffer[i] & 0xff);
-    psabpf_matchkey_data(mk, buffer, len);
+    error_code = psabpf_matchkey_data(mk, buffer, len);
 
     free(buffer);
 free_gmp:
     mpz_clear(number);
+
+    return error_code;
 }
 
 int do_table_add(int argc, char **argv)
@@ -53,12 +93,7 @@ int do_table_add(int argc, char **argv)
     psabpf_table_entry_t entry;
     psabpf_table_entry_ctx_t ctx;
     psabpf_action_t action;
-
-    psabpf_table_entry_ctx_init(&ctx);
-    psabpf_table_entry_init(&entry);
-    psabpf_action_init(&action);
-
-    // 1. Get table
+    int error_code = -1;
 
     // no NEXT_ARG before, so this check must be preserved
     if (argc < 1) {
@@ -66,18 +101,27 @@ int do_table_add(int argc, char **argv)
         return -1;
     }
 
+    psabpf_table_entry_ctx_init(&ctx);
+    psabpf_table_entry_init(&entry);
+    psabpf_action_init(&action);
+
+    // 1. Get table
+
     if (is_keyword(*argv, "id")) {
         NEXT_ARG();
         fprintf(stderr, "id: table access not supported\n");
-        return -1;
+        goto clean_up;
     } else if (is_keyword(*argv, "name")) {
         NEXT_ARG();
         fprintf(stderr, "name: table access not supported yet\n");
-        return -1;
+        goto clean_up;
     } else {
-        psabpf_table_entry_ctx_tblname(&ctx, *argv);
+        error_code = psabpf_table_entry_ctx_tblname(&ctx, *argv);
+        if (error_code != 0)
+            goto clean_up;
     }
 
+    error_code = -1;
     NEXT_ARG();
 
     // 2. Get action
@@ -88,11 +132,11 @@ int do_table_add(int argc, char **argv)
         psabpf_action_set_id(&action, strtoul(*argv, &ptr, 0));
         if (*ptr) {
             fprintf(stderr, "%s: unable to parse as an action id\n", *argv);
-            return -1;
+            goto clean_up;
         }
     } else {
         fprintf(stderr, "specify an action by name is not supported yet\n");
-        return -1;
+        goto clean_up;
     }
     printf("action id: %u\n", action.action_id);
 
@@ -104,16 +148,17 @@ int do_table_add(int argc, char **argv)
         bool has_any_key = false;
         do {
             NEXT_ARG();
+            error_code = -1;
             if (is_keyword(*argv, "data") || is_keyword(*argv, "priority"))
                 break;
 
             if (is_keyword(*argv, "none")) {
                 if (!has_any_key) {
                     printf("Support for table with empty key not implemented yet\n");
-                    return -1;
+                    goto clean_up;
                 } else {
                     printf("Unexpected none key\n");
-                    return -1;
+                    goto clean_up;
                 }
             }
 
@@ -121,25 +166,30 @@ int do_table_add(int argc, char **argv)
             psabpf_matchkey_init(&mk);
             if (strstr(*argv, "/") != NULL) {
                 fprintf(stderr, "lpm match key not supported yet\n");
-                return -1;
+                goto clean_up;
             } else if (strstr(*argv, "..") != NULL) {
                 fprintf(stderr, "range match key not supported yet\n");
-                return -1;
+                goto clean_up;
             } else if (strstr(*argv, "%") != NULL) {
                 fprintf(stderr, "ternary match key not supported yet\n");
-                return -1;
+                goto clean_up;
             } else {
                 psabpf_matchkey_type(&mk, PSABPF_EXACT);
-                translate_data_to_bytes(&mk, *argv);
-                psabpf_table_entry_matchkey(&entry, &mk);
+                error_code = translate_data_to_bytes(&mk, *argv);
+                if (error_code != 0)
+                    goto clean_up;
+                error_code = psabpf_table_entry_matchkey(&entry, &mk);
             }
             psabpf_matchkey_free(&mk);
+            if (error_code != 0)
+                goto clean_up;
 
             has_any_key = true;
         } while (argc > 1);
     }
 
     // 4. Get action parameters
+    error_code = -1;
 
     if (is_keyword(*argv, "data")) {
         do {
@@ -156,16 +206,17 @@ int do_table_add(int argc, char **argv)
         NEXT_ARG();
         fprintf(stderr, "Priority not supported\n");
         printf("priority: %s\n", *argv);
-        return -1;
+        goto clean_up;
     }
 
-    psabpf_table_entry_add(&ctx, &entry);
+    error_code = psabpf_table_entry_add(&ctx, &entry);
 
+clean_up:
     psabpf_action_free(&action);
     psabpf_table_entry_free(&entry);
     psabpf_table_entry_ctx_free(&ctx);
 
-    return 0;
+    return error_code;
 }
 
 int do_table_help(int argc, char **argv)
