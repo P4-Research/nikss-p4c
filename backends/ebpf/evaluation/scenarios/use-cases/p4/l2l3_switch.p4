@@ -79,6 +79,7 @@ struct mac_learn_digest_t {
 }
 
 struct local_metadata_t {
+    bit<16>            ecmp_select;
     bool               send_mac_learn_msg;
     mac_learn_digest_t mac_learn_msg;
     bit<16>            l4_sport;
@@ -161,6 +162,7 @@ control packet_deparser(packet_out packet, out empty_metadata_t clone_i2e_meta, 
 control ingress(inout headers_t headers, inout local_metadata_t local_metadata, in psa_ingress_input_metadata_t standard_metadata,
                 inout psa_ingress_output_metadata_t ostd) {
 
+    ActionSelector(PSA_HashAlgorithm_t.CRC32, 32w1024, 32w16) as;
     Counter<bit<32>, bit<32>>(100, PSA_CounterType_t.PACKETS_AND_BYTES) in_pkts;
 
     action push_vlan() {
@@ -215,32 +217,23 @@ control ingress(inout headers_t headers, inout local_metadata_t local_metadata, 
         ingress_drop(ostd);
     }
 
-    action set_nexthop(ethernet_addr_t smac, vlan_id_t vlan_id) {
+    action set_nexthop(ethernet_addr_t smac, ethernet_addr_t dmac, vlan_id_t vlan_id) {
         headers.ipv4.ttl = headers.ipv4.ttl - 1;
         headers.ethernet.src_addr = smac;
+        headers.ethernet.dst_addr = dmac;
         headers.vlan_tag.vlan_id = vlan_id;
     }
 
     table tbl_routing {
         key = {
             headers.ipv4.dst_addr: lpm;
+            headers.ipv4.src_addr: selector;
+            local_metadata.l4_sport: selector;
         }
         actions = {
             set_nexthop;
         }
-    }
-
-    action set_dmac(ethernet_addr_t dmac) {
-        headers.ethernet.dst_addr = dmac;
-    }
-
-    table tbl_out_arp {
-        key = {
-            headers.ipv4.dst_addr: exact;
-        }
-        actions = {
-            set_dmac;
-        }
+        psa_implementation = as;
     }
 
     action forward(PortId_t output_port) {
@@ -292,7 +285,7 @@ control ingress(inout headers_t headers, inout local_metadata_t local_metadata, 
                         drop();
                         exit;
                     }
-                    tbl_out_arp.apply();
+                    //tbl_out_arp.apply();
                 }
             }
         }
