@@ -1,7 +1,7 @@
-#include <linux/bpf.h>
-#include <bpf/libbpf.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -18,7 +18,7 @@ int do_load(int argc, char **argv)
     }
     NEXT_ARG();
     char *endptr;
-    __u32 id = strtoul(*argv, &endptr, 0);
+    uint32_t id = strtoul(*argv, &endptr, 0);
     if (*endptr) {
         fprintf(stderr, "can't parse '%s'\n", *argv);
         return EINVAL;
@@ -63,7 +63,7 @@ int do_unload(int argc, char **argv)
     }
     NEXT_ARG();
     char *endptr;
-    __u32 id = strtoul(*argv, &endptr, 0);
+    uint32_t id = strtoul(*argv, &endptr, 0);
     if (*endptr) {
         fprintf(stderr, "can't parse '%s'\n", *argv);
         return -1;
@@ -98,7 +98,7 @@ int do_port_add(int argc, char **argv)
     }
     NEXT_ARG();
     char *endptr;
-    __u32 id = strtoul(*argv, &endptr, 0);
+    uint32_t id = strtoul(*argv, &endptr, 0);
     if (*endptr) {
         fprintf(stderr, "can't parse '%s'\n", *argv);
         return -1;
@@ -139,7 +139,7 @@ int do_port_del(int argc, char **argv)
     }
     NEXT_ARG();
     char *endptr;
-    __u32 id = strtoul(*argv, &endptr, 0);
+    uint32_t id = strtoul(*argv, &endptr, 0);
     if (*endptr) {
         fprintf(stderr, "can't parse '%s'\n", *argv);
         return -1;
