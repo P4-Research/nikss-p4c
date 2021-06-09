@@ -308,6 +308,7 @@ class ACLTest(L2L3SwitchTest):
         testutils.send_packet(self, PORT0, tcp_pkt_2)
         testutils.verify_no_packet(self, tcp_pkt_2, PORT5)
 
+
 class PortCountersTest(L2L3SwitchTest):
 
     def runTest(self):
@@ -324,7 +325,7 @@ class PortCountersTest(L2L3SwitchTest):
             testutils.verify_packet(self, pkt, PORT4)
             ig_bytes += len(pkt)
             eg_bytes += ig_bytes + 4
-            self.verify_map_entry("ingress_in_pkts", "5 0 0 0", "{} 00 00 00 {} 00 00 00".format(ig_bytes, i))
-            self.verify_map_entry("egress_tbl_vlan_egress", "08 00 00 00", "02 00 00 00 01 00 00 00 {} 00 00 00 {} 00 00 00".format(eg_bytes, i))
+            self.verify_map_entry("ingress_in_pkts", "5 0 0 0", "{} 00 00 00 {} 00 00 00".format(hex(ig_bytes).split('x')[-1], i))
+            self.verify_map_entry("egress_tbl_vlan_egress", "08 00 00 00", "02 00 00 00 01 00 00 00 {} 00 00 00 {} 00 00 00".format(hex(eg_bytes).split('x')[-1], i))
 
 
