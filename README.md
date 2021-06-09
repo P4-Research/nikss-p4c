@@ -104,12 +104,12 @@ $ bpftool help
                       {-m|--mapcompat} | {-n|--nomount} }
 ```
 
-- To run data plane test you may need to install PTF:
+- To run data plane test you may need to install PTF (make sure you have `scapy` installed):
 
 ```bash
 $ git clone https://github.com/p4lang/ptf.git
 $ cd ptf/
-$ sudo python setup.py install
+$ sudo python3 setup.py install
 ```
 
 - You're ready to go! You can compile a P4-16 PSA program for eBPF using:
