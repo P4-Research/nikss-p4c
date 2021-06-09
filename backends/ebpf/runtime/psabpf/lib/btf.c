@@ -78,33 +78,71 @@ uint32_t psabtf_get_type_id_by_name(struct btf * btf, const char * name)
     return follow_typedefs(btf, type_id);
 }
 
-uint32_t psabtf_get_member_type_id_by_name(struct btf * btf, uint32_t type_id, const char * member_name)
+int psabtf_get_member_md_by_name(struct btf * btf, uint32_t type_id,
+        const char * member_name, psabtf_struct_member_md_t * md)
 {
     if (type_id == 0)
-        return 0;
+        return -1;
 
     const struct btf_type *type = btf__type_by_id(btf, type_id);
     if (type == NULL)
-        return 0;
+        return -1;
     // type must be a struct or union
     if (btf_kind(type) != BTF_KIND_STRUCT &&
         btf_kind(type) != BTF_KIND_UNION)
-        return 0;
+        return -1;
 
     int type_entries = btf_vlen(type);
     const struct btf_member *type_member = btf_members(type);
-    uint32_t member_type_id = 0;
     for (int i = 0; i < type_entries; i++, type_member++) {
         const char *name = btf__name_by_offset(btf, type_member->name_off);
         if (name == NULL)
             continue;
         if (strcmp(name, member_name) == 0) {
-            member_type_id = type_member->type;
-            break;
+            md->member = type_member;
+            md->index = i;
+            md->effective_type_id = follow_typedefs(btf, type_member->type);
+            return 0;
         }
     }
 
-    return follow_typedefs(btf, member_type_id);
+    return -1;
+}
+
+int psabtf_get_member_md_by_index(struct btf * btf, uint32_t type_id, uint16_t index,
+                                  psabtf_struct_member_md_t * md)
+{
+    if (type_id == 0)
+        return -1;
+
+    const struct btf_type *type = btf__type_by_id(btf, type_id);
+    if (type == NULL)
+        return -1;
+    // type must be a struct or union
+    if (btf_kind(type) != BTF_KIND_STRUCT &&
+        btf_kind(type) != BTF_KIND_UNION)
+        return -1;
+
+    int type_entries = btf_vlen(type);
+    if (index >= type_entries)
+        return -1;
+
+    const struct btf_member *type_member = btf_members(type);
+    type_member += index;
+    md->member = type_member;
+    md->index = index;
+    md->effective_type_id = follow_typedefs(btf, type_member->type);
+
+    return 0;
+}
+
+uint32_t psabtf_get_member_type_id_by_name(struct btf * btf, uint32_t type_id, const char * member_name)
+{
+    psabtf_struct_member_md_t md = {};
+    if (psabtf_get_member_md_by_name(btf, type_id, member_name, &md) != 0)
+        return 0;
+
+    return md.effective_type_id;
 }
 
 size_t psabtf_get_type_size_by_id(struct btf * btf, uint32_t type_id)
