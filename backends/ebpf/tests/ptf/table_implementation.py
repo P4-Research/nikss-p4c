@@ -25,7 +25,7 @@ class SimpleActionProfilePSATest(P4EbpfTest):
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
-        self.update_map(name="MyIC_ap", key="hex 10 0 0 0", value="hex 2 0 0 0  0 0 0 0  22 11 0 0 0 0 0 0")
+        self.table_add(table="MyIC_ap", keys=[0x10], action=2, data=[0x1122])
         self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 11 0 0", value="hex 10 0 0 0")
 
         testutils.send_packet(self, PORT0, pkt)
@@ -40,8 +40,8 @@ class ActionProfileTwoInstancesPSATest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/action-profile2.p4"
 
     def runTest(self):
-        self.update_map(name="MyIC_ap",  key="hex 11 0 0 0", value="hex 1 0 0 0  0 0 0 0  FF EE DD CC BB AA 0 0")
-        self.update_map(name="MyIC_ap1", key="hex 12 0 0 0", value="hex 2 0 0 0  0 0 0 0  22 11 0 0 0 0 0 0")
+        self.table_add(table="MyIC_ap", keys=[0x11], action=1, data=["0xAABBCCDDEEFF"])
+        self.table_add(table="MyIC_ap1", keys=[0x12], action=2, data=[0x1122])
         self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 11 0 0", value="hex 11 0 0 0 12 0 0 0")
 
         pkt = testutils.simple_ip_packet(eth_src="11:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
@@ -58,7 +58,7 @@ class ActionProfileTwoTablesSameInstancePSATest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/action-profile3.p4"
 
     def runTest(self):
-        self.update_map(name="MyIC_ap", key="hex 10 0 0 0", value="hex 2 0 0 0  0 0 0 0  22 11 0 0 0 0 0 0")
+        self.table_add(table="MyIC_ap", keys=[0x10], action=2, data=[0x1122])
         self.update_map(name="MyIC_tbl",  key="hex 66 55 44 33 22 11 0 0", value="hex 10 0 0 0")
         self.update_map(name="MyIC_tbl2", key="hex FF EE DD CC BB AA 0 0", value="hex 10 0 0 0")
 
@@ -82,7 +82,7 @@ class ActionProfileLPMTablePSATest(P4EbpfTest):
     def runTest(self):
         # Match all xx:xx:33:44:55:xx MAC addresses
         self.update_map(name="MyIC_tbl", key="hex 18 0 0 0  33 44 55 0", value="hex 10 00 00 00")
-        self.update_map(name="MyIC_ap", key="hex 10 0 0 0", value="hex 2 0 0 0  0 0 0 0  22 11 0 0 0 0 0 0")
+        self.table_add(table="MyIC_ap", keys=[0x10], action=2, data=[0x1122])
 
         pkt = testutils.simple_ip_packet(eth_src="AA:BB:CC:DD:EE:FF", eth_dst="22:33:44:55:66:77")
         testutils.send_packet(self, PORT0, pkt)
@@ -101,7 +101,7 @@ class ActionProfileTernaryTablePSATest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/action-profile-ternary.p4"
 
     def runTest(self):
-        self.update_map(name="MyIC_ap", key="hex 10 0 0 0", value="hex 2 0 0 0  0 0 0 0  22 11 0 0 0 0 0 0")
+        self.table_add(table="MyIC_ap", keys=[0x10], action=2, data=[0x1122])
         # Match all xx:xx:33:44:55:xx MAC addresses into group g7
         self.update_map(name="MyIC_tbl_prefixes", key="hex 0 0 0 0 0 0 0 0",
                         value="hex 1 0 0 0  0 0 0 0   0 ff ff ff 0 0  0 0   1 0 0 0  0 0 0 0")
@@ -124,8 +124,8 @@ class ActionProfileActionRunPSATest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/action-profile-action-run.p4"
 
     def runTest(self):
-        self.update_map(name="MyIC_ap", key="hex 10 0 0 0", value="hex 2 0 0 0  0 0 0 0  22 11 0 0 0 0 0 0")
-        self.update_map(name="MyIC_ap", key="hex 20 0 0 0", value="hex 1 0 0 0  0 0 0 0  FF EE DD CC BB AA 0 0")
+        self.table_add(table="MyIC_ap", keys=[0x10], action=2, data=[0x1122])
+        self.table_add(table="MyIC_ap", keys=[0x20], action=1, data=["0xAABBCCDDEEFF"])
         self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 11 0 0", value="hex 10 0 0 0")
         self.update_map(name="MyIC_tbl", key="hex FF EE DD CC BB AA 0 0", value="hex 20 0 0 0")
 
@@ -153,7 +153,7 @@ class ActionProfileHitPSATest(P4EbpfTest):
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_other_packets(self)
 
-        self.update_map(name="MyIC_ap", key="hex 10 0 0 0", value="hex 2 0 0 0  0 0 0 0  22 11 0 0 0 0 0 0")
+        self.table_add(table="MyIC_ap", keys=[0x10], action=2, data=[0x1122])
         self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 11 0 0", value="hex 10 0 0 0")
 
         testutils.send_packet(self, PORT0, pkt)
@@ -171,13 +171,9 @@ class ActionSelectorTest(P4EbpfTest):
 
     def create_actions(self, selector):
         selector = selector + "_actions"
-        # forward actions                  member ref,     action id, output port
-        self.update_map(name=selector, key="1 0 0 0", value="1 0 0 0  4 0 0 0")
-        self.update_map(name=selector, key="2 0 0 0", value="1 0 0 0  5 0 0 0")
-        self.update_map(name=selector, key="3 0 0 0", value="1 0 0 0  6 0 0 0")
-        self.update_map(name=selector, key="4 0 0 0", value="1 0 0 0  7 0 0 0")
-        self.update_map(name=selector, key="5 0 0 0", value="1 0 0 0  8 0 0 0")
-        self.update_map(name=selector, key="6 0 0 0", value="1 0 0 0  9 0 0 0")
+        for i in range(1, 7):
+            # i: member reference; 3+i: output port
+            self.table_add(table=selector, keys=[i], action=1, data=[3+i])
 
     def create_empty_group(self, selector, name, gid):
         self.create_map(name=name, type="array", key_size=4, value_size=4, max_entries=129)
@@ -379,8 +375,8 @@ class ActionSelectorActionRunPSATest(ActionSelectorTest):
     p4_file_path = "samples/p4testdata/action-selector-action-run.p4"
 
     def runTest(self):
-        self.update_map(name="MyIC_as_actions", key="2 0 0 0", value="1 0 0 0  5 0 0 0")
-        self.update_map(name="MyIC_as_actions", key="3 0 0 0", value="0 0 0 0  0 0 0 0")
+        self.table_add(table="MyIC_as_actions", keys=[2], action=1, data=[5])
+        self.table_add(table="MyIC_as_actions", keys=[3], action=0)
         self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 2  0 0", value="2 0 0 0  0 0 0 0")
         self.update_map(name="MyIC_tbl", key="hex 66 55 44 33 22 3  0 0", value="3 0 0 0  0 0 0 0")
 

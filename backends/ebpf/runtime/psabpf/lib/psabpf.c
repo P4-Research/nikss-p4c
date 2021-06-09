@@ -716,14 +716,14 @@ int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
     dump_buffer(value_buffer, ctx->value_size);
 
     // update map
-//    uint64_t flags = BPF_NOEXIST;
-//    if (ctx->table_type == BPF_MAP_TYPE_ARRAY)
-//        flags = BPF_ANY;
-//    return_code = bpf_map_update_elem(ctx->table_fd, key_buffer, value_buffer, flags);
-//    if (return_code != 0) {
-//        return_code = errno;
-//        fprintf(stderr, "failed to add entry: %s\n", strerror(errno));
-//    }
+    uint64_t flags = BPF_NOEXIST;
+    if (ctx->table_type == BPF_MAP_TYPE_ARRAY)
+        flags = BPF_ANY;
+    return_code = bpf_map_update_elem(ctx->table_fd, key_buffer, value_buffer, flags);
+    if (return_code != 0) {
+        return_code = errno;
+        fprintf(stderr, "failed to add entry: %s\n", strerror(errno));
+    }
 
 clean_up:
     if (key_buffer)

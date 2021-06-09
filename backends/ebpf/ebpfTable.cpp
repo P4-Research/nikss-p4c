@@ -222,9 +222,22 @@ void EBPFTable::emitValueStructStructure(CodeBuilder* builder) {
     builder->append("union ");
     builder->blockStart();
 
+    // Declare NoAction data structure at the beginning as it has always id 0
     for (auto a : actionList->actionList) {
         auto adecl = program->refMap->getDeclaration(a->getPath(), true);
         auto action = adecl->getNode()->to<IR::P4Action>();
+        if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
+            cstring name = EBPFObject::externalName(action);
+            emitActionArguments(builder, action, name);
+            break;
+        }
+    }
+
+    for (auto a : actionList->actionList) {
+        auto adecl = program->refMap->getDeclaration(a->getPath(), true);
+        auto action = adecl->getNode()->to<IR::P4Action>();
+        if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name)
+            continue;
         cstring name = EBPFObject::externalName(action);
         emitActionArguments(builder, action, name);
     }

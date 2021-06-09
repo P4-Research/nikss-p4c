@@ -24,9 +24,7 @@ class SimpleForwardingPSATest(P4EbpfTest):
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
-        # initialize default action
-        # TODO: we need to come up with a better solution to initialize default action.
-        self.update_map(name="ingress_tbl_fwd_defaultAction", key="00 00 00 00", value="01 00 00 00 05 00 00 00")
+        # use default action
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)
 
