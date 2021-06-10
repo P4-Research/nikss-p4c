@@ -169,8 +169,7 @@ void KernelSamplesTarget::emitTraceMessage(Util::SourceCodeBuilder* builder, con
 }
 
 void KernelSamplesTarget::annotateTableWithBTF(Util::SourceCodeBuilder* builder, cstring name,
-                                               cstring keyType, cstring valueType) const
-{
+                                               cstring keyType, cstring valueType) const {
     builder->appendFormat("BPF_ANNOTATE_KV_PAIR(%s, %s, %s)",
                           name.c_str(), keyType.c_str(), valueType.c_str());
     builder->newline();

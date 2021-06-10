@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
 #include <gmp.h>  // GNU LGPL v3 or GNU GPL v2, used only by function translate_data_to_bytes()
 
 #include <bpf/bpf.h>
@@ -17,6 +18,16 @@ enum destination_ctx_type_t {
     CTX_ACTION_DATA
 };
 
+int update_context(const char *data, size_t len, void *ctx, enum destination_ctx_type_t ctx_type)
+{
+    if (ctx_type == CTX_MATCH_KEY)
+        return psabpf_matchkey_data(ctx, data, len);
+    else if (ctx_type == CTX_ACTION_DATA)
+        return psabpf_action_param_create(ctx, data, len);
+
+    return -1;
+}
+
 int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_type_t ctx_type)
 {
     // converts any precision number to stream of bytes
@@ -25,15 +36,19 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
     char * buffer;
     int error_code = -1;
 
+    // try parse IPv4
+    struct sockaddr_in sa_buffer;
+    if (inet_pton(AF_INET, data, &(sa_buffer.sin_addr)) == 1) {
+        sa_buffer.sin_addr.s_addr = htonl(sa_buffer.sin_addr.s_addr);
+        update_context((void *) &(sa_buffer.sin_addr), sizeof(sa_buffer.sin_addr), ctx, ctx_type);
+        return 0;
+    }
+
     // try find width specification
     if (strstr(data, "w") != NULL) {
         char * end_ptr = NULL;
         forced_len = strtoul(data, &end_ptr, 0);
-        if (forced_len == 0) {
-            fprintf(stderr, "%s: failed to parse width\n", data);
-            return -1;
-        }
-        if (end_ptr == NULL) {
+        if (forced_len == 0 || end_ptr == NULL) {
             fprintf(stderr, "%s: failed to parse width\n", data);
             return -1;
         }
@@ -52,7 +67,6 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
             forced_len += 1;
     }
 
-//    printf("data: %s\n", data);
     mpz_init(number);
     if (mpz_set_str(number, data, 0) != 0) {
         fprintf(stderr, "%s: failed to parse number\n", data);
@@ -63,7 +77,6 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
     if (len % 2 != 0)
         len += 1;
     len /= 2;  // two digits per byte
-//    printf("len: %zu\n", len);
 
     if (forced_len != 0) {
         if (len > forced_len) {
@@ -82,14 +95,7 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
     memset(buffer, 0, len);
     mpz_export(buffer, 0, -1, 1, 0, 0, number);
 
-//    for (int i = 0; i < len; i++)
-//        printf("byte %d: 0x%x\n", i, buffer[i] & 0xff);
-    if (ctx_type == CTX_MATCH_KEY)
-        error_code = psabpf_matchkey_data(ctx, buffer, len);
-    else if (ctx_type == CTX_ACTION_DATA)
-        error_code = psabpf_action_param_create(ctx, buffer, len);
-    else
-        error_code = -1;
+    error_code = update_context(buffer, len, ctx, ctx_type);
 
     free(buffer);
 free_gmp:

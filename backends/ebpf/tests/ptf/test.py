@@ -273,9 +273,9 @@ class DirectCountersPSATest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/direct-counters.p4"
 
     def runTest(self):
-        self.update_map("ingress_tbl1", "0 0 0 10", "1 0 0 0  0 0 0 0  0 0 0 0")
-        self.update_map("ingress_tbl2", "1 0 0 10", "2 0 0 0  0 0 0 0  0 0 0 0  0 0 0 0")
-        self.update_map("ingress_tbl2", "2 0 0 10", "3 0 0 0  0 0 0 0  0 0 0 0  0 0 0 0")
+        self.table_add(table="ingress_tbl1", keys=["10.0.0.0"], action=1)
+        self.table_add(table="ingress_tbl2", keys=["10.0.0.1"], action=2)
+        self.table_add(table="ingress_tbl2", keys=["10.0.0.2"], action=3)
 
         for i in range(3):
             pkt = testutils.simple_ip_packet(pktlen=100, ip_src='10.0.0.{}'.format(i))

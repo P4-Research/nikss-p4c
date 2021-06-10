@@ -85,7 +85,6 @@ enum psabpf_matchkind_t {
 typedef struct psabpf_match_key {
     enum psabpf_matchkind_t type;
     void *data;
-    // size_t data_len; TODO: effective and real data size
     size_t key_size;  // key_size determines size of val and mask
     union {
         struct {
