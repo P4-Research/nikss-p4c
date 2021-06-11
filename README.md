@@ -133,9 +133,5 @@ $ psabpf-ctl pipeline add-port id <ID> <INTF>
 
 # TODOs / Limitations
 
-<<<<<<< HEAD
-- Multiple pipelines are not supported even though `psabpf-ctl` allows to inject many pipelines.
-- Larget bit fields (e.g. IPv6 addresses) may not work properly
-=======
 - Multiple pipelines may not work properly even though `psabpf-ctl` allows to inject many pipelines.
 - Larget bit fields (e.g. IPv6 addresses) may not work properly
