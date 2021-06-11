@@ -123,8 +123,14 @@ class P4EbpfTest(EbpfTest):
 
     p4_file_path = ""
 
-    def table_add(self, table, keys, action, data=None):
-        cmd = "psabpf-ctl table add {} id {} key ".format(table, action)
+    def table_add(self, table, keys, action=0, data=None, references=None):
+        cmd = "psabpf-ctl table add {} ".format(table)
+        if references:
+            data = references
+            cmd = cmd + "ref "
+        else:
+            cmd = cmd + "id {} ".format(action)
+        cmd = cmd + "key "
         for k in keys:
             cmd = cmd + "{} ".format(k)
         if data:

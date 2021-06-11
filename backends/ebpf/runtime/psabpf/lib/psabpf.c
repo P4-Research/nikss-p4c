@@ -132,6 +132,11 @@ int psabpf_table_entry_ctx_tblname(psabpf_table_entry_ctx_t *ctx, const char *na
     return 0;
 }
 
+void psabpf_table_entry_ctx_mark_indirect(psabpf_table_entry_ctx_t *ctx)
+{
+    ctx->is_indirect = true;
+}
+
 void psabpf_table_entry_init(psabpf_table_entry_t *entry)
 {
     if (entry == NULL)
@@ -286,6 +291,7 @@ int psabpf_matchkey_end(psabpf_match_key_t *mk, uint64_t end)
 
 int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, size_t size)
 {
+    param->is_group_reference = false;
     param->len = size;
     if (size == 0) {
         param->data = NULL;
@@ -304,6 +310,11 @@ void psabpf_action_param_free(psabpf_action_param_t *param)
     if (param->data != NULL)
         free(param->data);
     param->data = NULL;
+}
+
+void psabpf_action_param_mark_group_reference(psabpf_action_param_t *param)
+{
+    param->is_group_reference = true;
 }
 
 void psabpf_action_init(psabpf_action_t *action)
@@ -525,14 +536,16 @@ int fill_value_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf
     size_t bytes_to_write = ctx->value_size;
 
     // write action ID
-    size_t action_id_len = sizeof(entry->action->action_id);
-    if (bytes_to_write > action_id_len) {
-        memcpy(buffer, &(entry->action->action_id), action_id_len);
-        buffer += action_id_len;
-        bytes_to_write -= action_id_len;
-    } else {
-        fprintf(stderr, "action id do not fits into value\n");
-        return -1;
+    if (ctx->is_indirect == false) {
+        size_t action_id_len = sizeof(entry->action->action_id);
+        if (action_id_len <= bytes_to_write) {
+            memcpy(buffer, &(entry->action->action_id), action_id_len);
+            buffer += action_id_len;
+            bytes_to_write -= action_id_len;
+        } else {
+            fprintf(stderr, "action id do not fits into value\n");
+            return -1;
+        }
     }
 
     for (size_t i = 0; i < entry->action->n_params; i++) {
@@ -616,6 +629,74 @@ int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_
     return 0;
 }
 
+int str_ends_with(const char *str, const char *suffix)
+{
+    size_t len_str = strlen(str);
+    size_t len_suffix = strlen(suffix);
+    if (len_suffix >  len_str)
+        return 0;
+    return strncmp(str + len_str - len_suffix, suffix, len_suffix) == 0;
+}
+
+int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+                           uint32_t value_type_id, const struct btf_type *value_type)
+{
+    int entries = btf_vlen(value_type), ret;
+    const struct btf_member *member = btf_members(value_type);
+    size_t used_params = 0, offset;
+    psabpf_action_param_t * current_data = &(entry->action->params[0]);
+    bool entry_ref_used = false;
+
+    for (int i = 0; i < entries; i++, member++) {
+        if (used_params >= entry->action->n_params) {
+            fprintf(stderr, "not enough member/group references\n");
+            return -EAGAIN;
+        }
+        const struct btf_type * member_type = psabtf_get_type_by_id(ctx->btf, member->type);
+        const char * member_name = btf__name_by_offset(ctx->btf, member->name_off);
+
+        // skip errors, non-int members and reserved names
+        if (member_name == NULL || btf_kind(member_type) != BTF_KIND_INT)
+            continue;
+        if (strcmp(member_name, "priority") == 0 || strcmp(member_name, "action") == 0)
+            continue;
+
+        if (str_ends_with(member_name, "_is_group_ref")) {
+            offset = btf_member_bit_offset(value_type, i) / 8;
+            printf("setting up reference type\n");
+            ret = write_buffer(buffer, ctx->value_size, offset, &(current_data->is_group_reference),
+                sizeof(current_data->is_group_reference), ctx, member->type, "reference type");
+            if (ret != 0)
+                return ret;
+            continue;
+        }
+        if (entry_ref_used) {
+            entry_ref_used = false;
+            current_data++; used_params++;
+            if (used_params >= entry->action->n_params) {
+                fprintf(stderr, "not enough member/group references\n");
+                return -EAGAIN;
+            }
+        }
+        // now we can write reference, hurrah!!!
+        offset = btf_member_bit_offset(value_type, i) / 8;
+        ret = write_buffer(buffer, ctx->value_size, offset, current_data->data,
+                           current_data->len, ctx, member->type, "reference");
+        if (ret != 0)
+            return ret;
+        entry_ref_used = true;
+    }
+    if (entry_ref_used)
+        used_params++;
+    printf("used refs: %zu\n", used_params);
+    if (used_params != entry->action->n_params) {
+        fprintf(stderr, "too many member/group references\n");
+        return -EAGAIN;
+    }
+
+    return 0;
+}
+
 int fill_value_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     size_t offset, base_offset;
@@ -633,18 +714,20 @@ int fill_value_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_tab
         return -EAGAIN;
     }
 
-    ret = fill_action_id(buffer, ctx, entry, value_type_id, value_type);
-    if (ret != 0) {
-        return ret;
+    if (ctx->is_indirect == false) {
+        ret = fill_action_id(buffer, ctx, entry, value_type_id, value_type);
+        if (ret != 0) {
+            return -EAGAIN;
+        }
+        ret = fill_action_data(buffer, ctx, entry, value_type_id, value_type);
+        if (ret != 0) {
+            return -EAGAIN;
+        }
+    } else {
+        ret = fill_action_references(buffer, ctx, entry, value_type_id, value_type);
+        if (ret != 0)
+            return -EAGAIN;
     }
-
-    ret = fill_action_data(buffer, ctx, entry, value_type_id, value_type);
-    if (ret != 0) {
-        return ret;
-    }
-
-    // TODO: add support for meters, ActionProfiles and ActionSelectors. For 2 lasts, table
-    //  do not have entries "u" or "action" - in these cases ret value will be -ENOENT
 
     return 0;
 }
@@ -687,6 +770,7 @@ int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
         return_code = fill_key_btf_info(key_buffer, ctx, entry);
     }
     if (return_code == -EAGAIN) {
+        memset(key_buffer, 0, ctx->key_size);
         printf("Key construction mode: byte by byte\n");
         return_code = fill_key_byte_by_byte(key_buffer, ctx, entry);
     }
@@ -702,6 +786,7 @@ int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
         return_code = fill_value_btf_info(value_buffer, ctx, entry);
     }
     if (return_code == -EAGAIN) {
+        memset(value_buffer, 0, ctx->value_size);
         printf("Value construction mode: byte by byte\n");
         return_code = fill_value_byte_by_byte(value_buffer, ctx, entry);
     }

@@ -104,8 +104,9 @@ typedef struct psabpf_match_key {
 } psabpf_match_key_t;
 
 typedef struct psabpf_action_param {
-    char *data;
+    char *data;  /* might be an action data or reference */
     size_t len;
+    bool is_group_reference;
 } psabpf_action_param_t;
 
 typedef struct psabpf_action {
@@ -135,6 +136,7 @@ typedef struct psabpf_table_entry_context {
     uint32_t table_type;
     uint32_t key_size;
     uint32_t value_size;
+    bool is_indirect;
 
     // BTF metadata are associated with eBPF program, eBPF map do not has own BTF
     int associated_prog;
@@ -149,6 +151,7 @@ typedef struct psabpf_table_entry_context {
 void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx);
 void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx);
 int psabpf_table_entry_ctx_tblname(psabpf_table_entry_ctx_t *ctx, const char *name);
+void psabpf_table_entry_ctx_mark_indirect(psabpf_table_entry_ctx_t *ctx);
 
 void psabpf_table_entry_init(psabpf_table_entry_t *entry);
 void psabpf_table_entry_free(psabpf_table_entry_t *entry);
@@ -178,6 +181,8 @@ int psabpf_matchkey_end(psabpf_match_key_t *mk, uint64_t end);
 int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, size_t size);
 // should be called when psabpf_action_param() is not called after psabpf_action_param_create()
 void psabpf_action_param_free(psabpf_action_param_t *param);
+
+void psabpf_action_param_mark_group_reference(psabpf_action_param_t *param);
 
 void psabpf_action_init(psabpf_action_t *action);
 void psabpf_action_free(psabpf_action_t *action);

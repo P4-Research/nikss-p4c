@@ -40,8 +40,7 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
     struct sockaddr_in sa_buffer;
     if (inet_pton(AF_INET, data, &(sa_buffer.sin_addr)) == 1) {
         sa_buffer.sin_addr.s_addr = htonl(sa_buffer.sin_addr.s_addr);
-        update_context((void *) &(sa_buffer.sin_addr), sizeof(sa_buffer.sin_addr), ctx, ctx_type);
-        return 0;
+        return update_context((void *) &(sa_buffer.sin_addr), sizeof(sa_buffer.sin_addr), ctx, ctx_type);
     }
 
     // try find width specification
@@ -110,6 +109,7 @@ int do_table_add(int argc, char **argv)
     psabpf_table_entry_ctx_t ctx;
     psabpf_action_t action;
     int error_code = -1;
+    bool table_is_indirect = false;
 
     // no NEXT_ARG before, so this check must be preserved
     if (argc < 1) {
@@ -150,6 +150,9 @@ int do_table_add(int argc, char **argv)
             fprintf(stderr, "%s: unable to parse as an action id\n", *argv);
             goto clean_up;
         }
+    } else if (is_keyword(*argv, "ref")) {
+        table_is_indirect = true;
+        psabpf_table_entry_ctx_mark_indirect(&ctx);
     } else {
         fprintf(stderr, "specify an action by name is not supported yet\n");
         goto clean_up;
@@ -211,16 +214,30 @@ int do_table_add(int argc, char **argv)
             if (is_keyword(*argv, "priority"))
                 break;
 
+            bool ref_is_group_ref = false;
+            if (table_is_indirect) {
+                if (is_keyword(*argv, "group")) {
+                    ref_is_group_ref = true;
+                    NEXT_ARG();
+                }
+            }
+
             psabpf_action_param_t param;
             error_code = translate_data_to_bytes(*argv, &param, CTX_ACTION_DATA);
             if (error_code != 0) {
                 psabpf_action_param_free(&param);
                 goto clean_up;
             }
+            if (ref_is_group_ref)
+                psabpf_action_param_mark_group_reference(&param);
             error_code = psabpf_action_param(&action, &param);
             if (error_code != 0)
                 goto clean_up;
         } while (argc > 1);
+    } else if (table_is_indirect) {
+        fprintf(stderr, "expected action reference\n");
+        error_code = -1;
+        goto clean_up;
     }
     psabpf_table_entry_action(&entry, &action);
 
@@ -250,17 +267,19 @@ int do_table_help(int argc, char **argv)
 
     fprintf(stderr,
             "Usage: %s table add TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
-            "       %s table update TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
-            "       %s table del TABLE [key MATCH_KEY]\n"
-            "       %s table get TABLE [key MATCH_KEY]\n"
-            "       %s table default TABLE set ACTION [data ACTION_PARAMS]\n"
-            "       %s table default TABLE\n"
+            "       %s table add TABLE ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]\n"
+            "       %s table update TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"  // TODO
+            "       %s table del TABLE [key MATCH_KEY]\n"  // TODO
+            "       %s table get TABLE [key MATCH_KEY]\n"  // TODO
+            "       %s table default TABLE set ACTION [data ACTION_PARAMS]\n"  // TODO
+            "       %s table default TABLE\n"  // TODO
             // for far future
-            "       %s table timeout TABLE set { on TTL | off }\n"
-            "       %s table timeout TABLE\n"
+            "       %s table timeout TABLE set { on TTL | off }\n"  // TODO
+            "       %s table timeout TABLE\n"  // TODO
             "\n"
             "       TABLE := { id TABLE_ID | name FILE | TABLE_FILE }\n"
             "       ACTION := { id ACTION_ID | ACTION_NAME }\n"
+            "       ACTION_REFS := { MEMBER_REF | group GROUP_REF } \n"
             "       MATCH_KEY := { EXACT_KEY | LPM_KEY | RANGE_KEY | TERNARY_KEY | none }\n"
             "       EXACT_KEY := { DATA }\n"
             "       LPM_KEY := { DATA/PREFIX_LEN }\n"
@@ -273,6 +292,6 @@ int do_table_help(int argc, char **argv)
             "       ACTION_PARAMS := { DATA }\n"
             "",
             program_name, program_name, program_name, program_name, program_name, program_name,
-            program_name, program_name);
+            program_name, program_name, program_name);
     return 0;
 }
