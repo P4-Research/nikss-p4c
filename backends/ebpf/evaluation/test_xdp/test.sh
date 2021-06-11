@@ -19,6 +19,6 @@ sudo ip link set dev veth1 up
 sudo ip netns exec ns0 ip addr add "10.0.1.2/24" dev eth1
 sudo ip netns exec ns0 ip link set dev eth1 up
 
-sudo psabpf-ctl pipeline load id 1 out-xdp.o
-sudo psabpf-ctl pipeline add-port id 1 eth0
-sudo psabpf-ctl pipeline add-port id 1 eth1
+sudo nsenter --net=/var/run/netns/ns0 psabpf-ctl pipeline load id 1 out-xdp.o
+sudo nsenter --net=/var/run/netns/ns0 psabpf-ctl pipeline add-port id 1 eth0
+sudo nsenter --net=/var/run/netns/ns0 psabpf-ctl pipeline add-port id 1 eth1

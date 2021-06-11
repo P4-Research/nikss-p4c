@@ -1,7 +1,7 @@
 sudo ip netns exec ns0 sudo ip link set dev eth0 xdp off
 sudo ip netns exec ns0 sudo ip link set dev eth1 xdp off
 
-sudo rm -f /sys/fs/bpf/ingress_tbl_fwd
+sudo nsenter --net=/var/run/netns/ns0 rm -rf /sys/fs/bpf/pipeline1
 
 sudo ip link del dev veth0
 sudo ip link del dev veth1
