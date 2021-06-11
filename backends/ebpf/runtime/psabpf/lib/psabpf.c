@@ -688,7 +688,6 @@ int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_
     }
     if (entry_ref_used)
         used_params++;
-    printf("used refs: %zu\n", used_params);
     if (used_params != entry->action->n_params) {
         fprintf(stderr, "too many member/group references\n");
         return -EAGAIN;

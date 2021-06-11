@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
+#include <ctype.h>
 #include <gmp.h>  // GNU LGPL v3 or GNU GPL v2, used only by function translate_data_to_bytes()
 
 #include <bpf/bpf.h>
@@ -28,6 +29,31 @@ int update_context(const char *data, size_t len, void *ctx, enum destination_ctx
     return -1;
 }
 
+// is there any ready to use function for this purpose?
+int is_valid_MAC_address(const char * data)
+{
+    if (strlen(data) != 2*6+5)  /* 11:22:33:44:55:66 */
+        return 0;
+
+    unsigned digits = 0, separators = 0, pos = 0;
+    unsigned separator_pos[] = {2, 5, 8, 11, 14};
+    while (*data) {
+        if (pos == separator_pos[separators]) {
+            if ((*data != ':') && (*data != '-'))
+                return 0;
+            separators++;
+        } else if (isxdigit(*data)) {
+            digits++;
+        } else {
+            return 0;
+        }
+        if (separators > 5 || digits > 12)
+            return 0;
+        data++; pos++;
+    }
+    return 1;
+}
+
 int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_type_t ctx_type)
 {
     // converts any precision number to stream of bytes
@@ -41,6 +67,20 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
     if (inet_pton(AF_INET, data, &(sa_buffer.sin_addr)) == 1) {
         sa_buffer.sin_addr.s_addr = htonl(sa_buffer.sin_addr.s_addr);
         return update_context((void *) &(sa_buffer.sin_addr), sizeof(sa_buffer.sin_addr), ctx, ctx_type);
+    }
+
+    // TODO: Try parse IPv6 (similar to IPv4)
+
+    // Try parse as MAC address
+    if (is_valid_MAC_address(data) != 0) {
+        int v[6];
+        if (sscanf(data, "%x%*c%x%*c%x%*c%x%*c%x%*c%x",
+                   &(v[0]), &(v[1]), &(v[2]), &(v[3]), &(v[4]), &(v[5])) == 6) {
+            uint8_t bytes[6];
+            for (int i = 0; i < 6; i++)
+                bytes[i] = (uint8_t) v[5-i];
+            return update_context((void *) &(bytes[0]), 6, ctx, ctx_type);
+        }
     }
 
     // try find width specification
