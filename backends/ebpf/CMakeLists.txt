@@ -254,20 +254,16 @@ endif()
 if (LIBBPF)
   set (PSABPFCTL_SRCS
           runtime/psabpf/lib/psabpf.c
+          runtime/psabpf/lib/psabpf_clone_session.c
+          runtime/psabpf/lib/psabpf_pipeline.c
           runtime/psabpf/CLI/common.c
           runtime/psabpf/CLI/clone_session.c
+          runtime/psabpf/CLI/pipeline.c
           runtime/psabpf/main.c)
   add_executable(psabpf-ctl ${PSABPFCTL_SRCS})
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/runtime/usr/include)
   target_link_libraries (psabpf-ctl z elf ${LIBBPF})
   install (TARGETS psabpf-ctl
-          RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
-
-  set (LOAD_PROG_SRCS
-          runtime/load-prog/load_prog.c)
-  add_executable(load-prog ${LOAD_PROG_SRCS})
-  target_link_libraries (load-prog z elf ${LIBBPF})
-  install (TARGETS load-prog
           RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
 endif()
 

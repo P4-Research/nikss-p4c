@@ -3,12 +3,9 @@ CLANG ?= clang
 CC ?= gcc
 
 KERN_TARGETS := out-xdp
-USER_TARGETS := xdp_loader
 
 KERN_SRC = ${KERN_TARGETS:=.c}
 KERN_OBJ = ${KERN_SRC:.c=.o}
-USER_SRC = ${USER_TARGETS:=.c}
-USER_OBJ = ${USER_SRC:.c=.o}
 
 
 LIBBPF_DIR ?= ../../runtime/contrib/libbpf
@@ -27,19 +24,14 @@ LDFLAGS ?= -L$(LIBBPF_DIR)/src
 
 LIBS = -l:libbpf.a -lelf -lz
 
-all: $(USER_TARGETS) $(KERN_OBJ)
+all: $(KERN_OBJ)
 
 .PHONY: clean $(CLANG) $(LLC)
 
 clean:
-	rm -f $(USER_TARGETS)
 	rm -f $(KERN_OBJ)
 	rm -f *.ll
 	rm -f *~
-
-$(USER_TARGETS): %: %.c Makefile #$(EXTRA_DEPS)
-	$(CC) -Wall $(CFLAGS) $(LDFLAGS) -o $@  	\
-	$< $(LIBS)
 
 $(KERN_OBJ): %.o: %.c Makefile #$(EXTRA_DEPS)
 	$(CLANG) -S 					\

@@ -121,13 +121,17 @@ P4FILE=backends/ebpf/tests/samples/p4testdata/simple-fwd.p4 P4C="p4c-ebpf --arch
 
 # Running generated BPF program
 
-We only support loading BPF program only using `bpftool` (based on `libbpf`). 
+We provide the `psabpf-ctl` tool (based on `libbpf`) to manage PSA-eBPF pipelines. Use `psabpf-ctl -h` to get all possible commands.
 For each interface, use the commands below (`out.o` is a BPF object file generated from p4c-ebpf):
 
+> Note! Make sure that the BPF filesystem is mounted under `/sys/fs/bpf`.
+
 ```bash
-$ bpftool prog loadall out.o /sys/bpf/prog
-$ bpftool net attach xdp pinned /sys/fs/bpf/prog/xdp_xdp-ingress dev <INTF>
-$ tc qdisc add dev <INTF> clsact
-$ tc filter add dev <INTF> ingress bpf da fd /sys/fs/bpf/prog/classifier_tc-ingress
-$ tc filter add dev <INTF> egress bpf da /sys/fs/bpf/prog/classifier_tc-egress
-``` 
+$ psabpf-ctl pipeline load id <ID> out.o
+$ psabpf-ctl pipeline add-port id <ID> <INTF>
+```
+
+# TODOs / Limitations
+
+- Multiple pipelines may not work properly even though `psabpf-ctl` allows to inject many pipelines.
+- Larget bit fields (e.g. IPv6 addresses) may not work properly

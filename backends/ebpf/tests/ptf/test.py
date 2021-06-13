@@ -66,11 +66,11 @@ class PSACloneI2E(P4EbpfTest):
 
     def runTest(self):
         # create clone session table
-        self.exec_ns_cmd("psabpf-ctl clone-session create id 8")
+        self.clone_session_create(8)
         # add egress_port=6 (PORT2), instance=1 as clone session member, cos = 0
-        self.exec_ns_cmd("psabpf-ctl clone-session add-member id 8 egress-port 6 instance 1 cos 0")
+        self.clone_session_add_member(clone_session=8, egress_port=6)
         # add egress_port=6 (PORT2), instance=2 as clone session member, cos = 1
-        self.exec_ns_cmd("psabpf-ctl clone-session add-member id 8 egress-port 6 instance 2 cos 1")
+        self.clone_session_add_member(clone_session=8, egress_port=6, instance=2, cos=1)
 
         pkt = testutils.simple_eth_packet(eth_dst='00:00:00:00:00:05')
         testutils.send_packet(self, PORT0, pkt)
@@ -86,7 +86,7 @@ class PSACloneI2E(P4EbpfTest):
         testutils.verify_no_packet(self, pkt, PORT1)
 
     def tearDown(self):
-        self.exec_ns_cmd("psabpf-ctl clone-session delete id 8")
+        self.clone_session_delete(8)
         super(P4EbpfTest, self).tearDown()
 
 
@@ -115,9 +115,9 @@ class EgressTrafficManagerClonePSATest(P4EbpfTest):
 
     def runTest(self):
         # create clone session table
-        self.exec_ns_cmd("psabpf-ctl clone-session create id 8")
+        self.clone_session_create(8)
         # add egress_port=6 (PORT2), instance=1 as clone session member, cos = 0
-        self.exec_ns_cmd("psabpf-ctl clone-session add-member id 8 egress-port 6 instance 1 cos 0")
+        self.clone_session_add_member(clone_session=8, egress_port=6)
 
         pkt = testutils.simple_ip_packet(eth_dst='aa:bb:cc:dd:ee:ff', eth_src='55:44:33:22:11:00')
         testutils.send_packet(self, PORT1, pkt)
@@ -127,7 +127,7 @@ class EgressTrafficManagerClonePSATest(P4EbpfTest):
         testutils.verify_packet(self, pkt, PORT1)
 
     def tearDown(self):
-        self.exec_ns_cmd("psabpf-ctl clone-session delete id 8")
+        self.clone_session_delete(8)
         super(EgressTrafficManagerClonePSATest, self).tearDown()
 
 
