@@ -36,7 +36,7 @@ void psabpf_context_free(psabpf_context_t *ctx);
  * This functions allow to set/get pipeline object to control.
  */
 void psabpf_context_set_pipeline(psabpf_context_t *ctx, psabpf_pipeline_id_t pipeline_id);
-void psabpf_context_get_pipeline(psabpf_context_t *ctx);
+psabpf_pipeline_id_t psabpf_context_get_pipeline(psabpf_context_t *ctx);
 
 
 /*
