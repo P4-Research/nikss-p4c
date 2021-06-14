@@ -14,6 +14,11 @@
 #endif
 #define NEXT_ARG()	({ argc--; argv++; if (argc < 1) { fprintf(stderr, "too few parameters\n"); exit(1); }})
 
+#ifdef NEXT_ARGP
+    #undef NEXT_ARGP
+#endif
+#define NEXT_ARGP()	({ (*argc)--; (*argv)++; if ((*argc) < 1) { fprintf(stderr, "too few parameters\n"); exit(1); }})
+
 enum destination_ctx_type_t {
     CTX_MATCH_KEY,
     CTX_ACTION_DATA
@@ -143,11 +148,33 @@ free_gmp:
     return error_code;
 }
 
+int parse_pipeline_id(int *argc, char ***argv, psabpf_context_t * psabpf_ctx)
+{
+    if (!is_keyword(**argv, "pipe")) {
+        fprintf(stderr, "expected 'pipe' keyword\n");
+        return -1;
+    }
+    NEXT_ARGP();
+
+    char *endptr;
+    psabpf_pipeline_id_t id = strtoul(**argv, &endptr, 0);
+    if (*endptr) {
+        fprintf(stderr, "can't parse '%s'\n", **argv);
+        return -1;
+    }
+    psabpf_context_set_pipeline(psabpf_ctx, id);
+
+    NEXT_ARGP();
+
+    return 0;
+}
+
 int do_table_add(int argc, char **argv)
 {
     psabpf_table_entry_t entry;
     psabpf_table_entry_ctx_t ctx;
     psabpf_action_t action;
+    psabpf_context_t psabpf_ctx;
     int error_code = -1;
     bool table_is_indirect = false;
 
@@ -157,9 +184,14 @@ int do_table_add(int argc, char **argv)
         return -1;
     }
 
+    psabpf_context_init(&psabpf_ctx);
     psabpf_table_entry_ctx_init(&ctx);
     psabpf_table_entry_init(&entry);
     psabpf_action_init(&action);
+
+    // 0. Get the pipeline id
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != 0)
+        goto clean_up;
 
     // 1. Get table
 
@@ -172,7 +204,7 @@ int do_table_add(int argc, char **argv)
         fprintf(stderr, "name: table access not supported yet\n");
         goto clean_up;
     } else {
-        error_code = psabpf_table_entry_ctx_tblname(&ctx, *argv);
+        error_code = psabpf_table_entry_ctx_tblname(&psabpf_ctx, &ctx, *argv);
         if (error_code != 0)
             goto clean_up;
     }
@@ -297,6 +329,7 @@ clean_up:
     psabpf_action_free(&action);
     psabpf_table_entry_free(&entry);
     psabpf_table_entry_ctx_free(&ctx);
+    psabpf_context_free(&psabpf_ctx);
 
     return error_code;
 }
@@ -306,16 +339,16 @@ int do_table_help(int argc, char **argv)
     (void) argc; (void) argv;
 
     fprintf(stderr,
-            "Usage: %s table add TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
-            "       %s table add TABLE ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]\n"
-            "       %s table update TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"  // TODO
-            "       %s table del TABLE [key MATCH_KEY]\n"  // TODO
-            "       %s table get TABLE [key MATCH_KEY]\n"  // TODO
-            "       %s table default TABLE set ACTION [data ACTION_PARAMS]\n"  // TODO
-            "       %s table default TABLE\n"  // TODO
+            "Usage: %s table add pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
+            "       %s table add pipe ID TABLE ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]\n"
+            "       %s table update pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"  // TODO
+            "       %s table del pipe ID TABLE [key MATCH_KEY]\n"  // TODO
+            "       %s table get pipe ID TABLE [key MATCH_KEY]\n"  // TODO
+            "       %s table default pipe ID TABLE set ACTION [data ACTION_PARAMS]\n"  // TODO
+            "       %s table default pipe ID TABLE\n"  // TODO
             // for far future
-            "       %s table timeout TABLE set { on TTL | off }\n"  // TODO
-            "       %s table timeout TABLE\n"  // TODO
+            "       %s table timeout pipe ID TABLE set { on TTL | off }\n"  // TODO
+            "       %s table timeout pipe ID TABLE\n"  // TODO
             "\n"
             "       TABLE := { id TABLE_ID | name FILE | TABLE_FILE }\n"
             "       ACTION := { id ACTION_ID | ACTION_NAME }\n"

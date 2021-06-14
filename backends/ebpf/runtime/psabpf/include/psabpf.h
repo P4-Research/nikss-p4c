@@ -3,11 +3,6 @@
 
 #include <stdint.h>
 
-/**
- * When PIN_GLOBAL_NS is used, this is deafult global namespace that is loaded.
- */
-static const char *BPF_FS = "/sys/fs/bpf";
-
 typedef uint32_t psabpf_pipeline_id_t;
 
 /**
@@ -150,7 +145,7 @@ typedef struct psabpf_table_entry_context {
 
 void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx);
 void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx);
-int psabpf_table_entry_ctx_tblname(psabpf_table_entry_ctx_t *ctx, const char *name);
+int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name);
 void psabpf_table_entry_ctx_mark_indirect(psabpf_table_entry_ctx_t *ctx);
 
 void psabpf_table_entry_init(psabpf_table_entry_t *entry);

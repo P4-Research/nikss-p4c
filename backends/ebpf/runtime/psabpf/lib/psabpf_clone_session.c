@@ -6,6 +6,7 @@
 #include "bpf/libbpf.h"
 
 #include "../include/psabpf_clone_session.h"
+#include "../include/bpf_defs.h"
 
 struct list_key_t {
     __u32 port;
