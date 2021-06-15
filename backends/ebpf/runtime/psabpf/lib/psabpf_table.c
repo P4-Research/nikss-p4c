@@ -458,7 +458,7 @@ int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table
                 return ret;
         }
     } else {
-        fprintf(stderr, "unexpected BTF type\n");
+        fprintf(stderr, "unexpected BTF type for key\n");
         return -EAGAIN;
     }
 
@@ -696,7 +696,7 @@ int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
     key_buffer = malloc(ctx->key_size);
     value_buffer = malloc(ctx->value_size);
     if (key_buffer == NULL || value_buffer == NULL) {
-        fprintf(stderr, "Not enough memory\n");
+        fprintf(stderr, "not enough memory\n");
         return_code = -ENOMEM;
         goto clean_up;
     }
@@ -704,14 +704,14 @@ int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
     return_code = construct_buffer(key_buffer, ctx->key_size, ctx, entry,
                                    fill_key_btf_info, fill_key_byte_by_byte);
     if (return_code != 0) {
-        fprintf(stderr, "Failed to construct key\n");
+        fprintf(stderr, "failed to construct key\n");
         goto clean_up;
     }
 
     return_code = construct_buffer(value_buffer, ctx->value_size, ctx, entry,
                                    fill_value_btf_info, fill_value_byte_by_byte);
     if (return_code != 0) {
-        fprintf(stderr, "Failed to construct value\n");
+        fprintf(stderr, "failed to construct value\n");
         goto clean_up;
     }
 
