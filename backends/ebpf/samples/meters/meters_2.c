@@ -58,7 +58,7 @@ struct rte_meter_trtcm_profile {
     /**< Number of bytes currently available in the peak(P) token bucket */
 };
 
-//typedef struct rte_meter_trtcm_profile meter_value;
+typedef struct rte_meter_trtcm_profile meter_value;
 
 /**
  * Internal data structure storing the trTCM run-time context per metered
@@ -90,7 +90,7 @@ struct value_meter {
     u32 cbs_left;
     struct bpf_spin_lock lock;
 };
-typedef struct value_meter meter_value;
+//typedef struct value_meter meter_value;
 
 //REGISTER_START()
 //REGISTER_TABLE(ingress_meter1, BPF_MAP_TYPE_HASH, sizeof(ingress_meter1_key), sizeof(meter_value), 1)
@@ -107,26 +107,6 @@ struct bpf_map_def SEC("maps") ingress_meter1 = {
 };
 
 BPF_ANNOTATE_KV_PAIR(ingress_meter1, ingress_meter1_key, meter_value);
-
-
-//static __always_inline
-//int enough_tokens(u32 *tokens, u32 *packet_len, u32 *bs, u32 *bs_left, u32 *ir, u64 *delta_t, u32 *factor) {
-//
-//    // B = B + ns * kb/s / 8000000
-//    *tokens = *bs_left + ((*delta_t * *ir) / *factor);
-//
-//    if (*tokens > *bs) {
-//        *tokens = *bs;
-//    }
-//
-//    if (*packet_len > *tokens) {
-//        bpf_trace_message("Meter: No enough tokens");
-//        return 0; // No
-//    }
-//
-//    bpf_trace_message("Meter: Enough tokens");
-//    return 1; // Yes, enough tokens
-//}
 
 static __always_inline
 enum PSA_MeterColor_t rte_meter_trtcm_color_blind_check(
@@ -179,170 +159,17 @@ enum PSA_MeterColor_t rte_meter_trtcm_color_blind_check(
     return GREEN;
 }
 
-//static __always_inline
-//enum PSA_MeterColor_t meter_execute(meter_value *value, u32 *packet_len, u32 *factor) {
-//    bpf_trace_message("Meter: execute");
-//    u64 time_ns = bpf_ktime_get_ns();
-//    u64 delta_t = time_ns - value->timestamp;
-//    u32 tokens_pbs = 0;
-//    __sync_fetch_and_add(&(value->timestamp), delta_t);
-//    if (enough_tokens(&tokens_pbs, packet_len, &value->pbs, &value->pbs_left, &value->pir, &delta_t, factor)) {
-//        u32 tokens_cbs = 0;
-//        if (enough_tokens(&tokens_cbs, packet_len, &value->cbs, &value->cbs_left, &value->cir, &delta_t, factor)) {
-////            value->timestamp = value->timestamp + delta_t;
-////            __sync_fetch_and_add(&(value->timestamp), delta_t);
-//            value->pbs_left = tokens_pbs - *packet_len;
-//            value->cbs_left = tokens_cbs - *packet_len;
-//            bpf_trace_message("Meter: GREEN");
-//            return GREEN;
-//        } else {
-////            value->timestamp = value->timestamp + delta_t;
-////            __sync_fetch_and_add(&(value->timestamp), delta_t);
-//            value->pbs_left = tokens_pbs - *packet_len;
-//            value->cbs_left = tokens_cbs;
-//            bpf_trace_message("Meter: YELLOW");
-//            return YELLOW;
-//        }
-//    } else {
-//        value->pbs_left = tokens_pbs;
-//        value->cbs_left = tokens_cbs;
-//        bpf_trace_message("Meter: RED");
-//        return RED;
-//    }
-//}
-
 static __always_inline
-enum PSA_MeterColor_t meter_execute(meter_value *value, u32 *packet_len, u32 *factor) {
-    bpf_trace_message("Meter: execute");
-    u64 time_ns = bpf_ktime_get_ns();
-    u64 delta_t = time_ns - value->timestamp;
-    u32 tokens_pbs = 0;
-    u32 tokens_cbs = 0;
-//    __sync_fetch_and_add(&(value->timestamp), delta_t);
-    value->timestamp = value->timestamp + delta_t;
-    tokens_pbs = value->pbs_left + ((delta_t * value->pir) / *factor);
-    if (tokens_pbs > value->pbs) {
-        tokens_pbs = value->pbs;
-    }
-    tokens_cbs = value->cbs_left + ((delta_t * value->cir) / *factor);
-    if (tokens_cbs > value->cbs) {
-        tokens_cbs = value->cbs;
-    }
-
-    if (*packet_len > tokens_pbs) {
-        value->pbs_left = tokens_pbs;
-        value->cbs_left = tokens_cbs;
-        bpf_trace_message("Meter: RED");
-        return RED;
-    }
-
-    if (*packet_len > tokens_cbs) {
-        value->pbs_left = tokens_pbs - *packet_len;
-        value->cbs_left = tokens_cbs;
-        bpf_trace_message("Meter: YELLOW");
-        return YELLOW;
-    }
-
-    value->pbs_left = tokens_pbs - *packet_len;
-    value->cbs_left = tokens_cbs - *packet_len;
-    bpf_trace_message("Meter: GREEN");
-    return GREEN;
-}
-
-//static __always_inline
-//enum PSA_MeterColor_t meter_execute(meter_value *value, u32 *packet_len, u32 *factor) {
-//    bpf_trace_message("Meter: execute\n");
-//    u64 time_ns = bpf_ktime_get_ns();
-//
-//    time_ns = time_ns + 2000000;
-//
-//
-//    return rte_meter_trtcm_color_blind_check(value, time_ns, *packet_len);
-//}
-
-static __always_inline
-enum PSA_MeterColor_t meter_execute_bytes_value(meter_value *value, u32 *packet_len) {
-    u32 factor = 8000000;
-    if (value != NULL) {
-        return meter_execute(value, packet_len, &factor);
-    } else {
-        bpf_trace_message("Meter: No meter value!\n");
-        return RED;
-    }
-}
-
-static __always_inline
-enum PSA_MeterColor_t meter_execute_bytes(void *map, u32 *packet_len, void *key) {
+enum PSA_MeterColor_t meter_execute_bytes(void *map, u32 *packet_len, void *key, u64 *time_ns) {
+    bpf_trace_message("Meter: execute\n");
     meter_value *value = BPF_MAP_LOOKUP_ELEM(*map, key);
-    enum PSA_MeterColor_t col;
-    u32 factor = 8000000;
-    u64 time_ns = bpf_ktime_get_ns();
     if (value != NULL) {
-//        bpf_spin_lock(&value->lock);
-//        return meter_execute(value, packet_len, &factor);
-        u64 delta_t = time_ns - value->timestamp;
-        u32 tokens_pbs = 0;
-        u32 tokens_cbs = 0;
-//    __sync_fetch_and_add(&(value->timestamp), delta_t);
-        value->timestamp = value->timestamp + delta_t;
-        tokens_pbs = value->pbs_left + ((delta_t * value->pir) / factor);
-        if (tokens_pbs > value->pbs) {
-            tokens_pbs = value->pbs;
-        }
-        tokens_cbs = value->cbs_left + ((delta_t * value->cir) / factor);
-        if (tokens_cbs > value->cbs) {
-            tokens_cbs = value->cbs;
-        }
-
-        if (*packet_len > tokens_pbs) {
-            value->pbs_left = tokens_pbs;
-            value->cbs_left = tokens_cbs;
-            bpf_trace_message("Meter: RED");
-            col = RED;
-        }
-
-        if (*packet_len > tokens_cbs) {
-            value->pbs_left = tokens_pbs - *packet_len;
-            value->cbs_left = tokens_cbs;
-            bpf_trace_message("Meter: YELLOW");
-            col = YELLOW;
-        }
-
-        value->pbs_left = tokens_pbs - *packet_len;
-        value->cbs_left = tokens_cbs - *packet_len;
-        bpf_trace_message("Meter: GREEN");
-        col = GREEN;
-//        bpf_spin_unlock(&value->lock);
-        return col;
+        return rte_meter_trtcm_color_blind_check(value, *time_ns, *packet_len);
     } else {
-        bpf_trace_message("Meter: No meter value!\n");
-        return RED;
-    }
-//    enum PSA_MeterColor_t col = meter_execute_bytes_value(value, packet_len);
-//
-//    return col;
-}
-
-static __always_inline
-enum PSA_MeterColor_t meter_execute_packets_value(meter_value *value) {
-    u32 len = 1;
-    u32 factor = 1000000000;
-    if (value != NULL) {
-        bpf_spin_lock(&value->lock);
-        enum PSA_MeterColor_t col = meter_execute(value, &len, &factor);
-        bpf_spin_unlock(&value->lock);
-        return col;
-    } else {
-        bpf_trace_message("Meter: No meter value!\n");
         return RED;
     }
 }
 
-static __always_inline
-enum PSA_MeterColor_t meter_execute_packets(void *map, void *key) {
-    meter_value *value = BPF_MAP_LOOKUP_ELEM(*map, key);
-    return meter_execute_packets_value(value);
-}
 
 SEC("classifier/tc-ingress")
 int tc_l2fwd(struct __sk_buff *ctx)
@@ -366,7 +193,7 @@ int tc_l2fwd(struct __sk_buff *ctx)
     u32 idx_0 = 0;
 
     if (ctx->ifindex == 2) {
-        color1_0 = meter_execute_bytes(&ingress_meter1, &ctx->len, &idx_0);
+        color1_0 = meter_execute_bytes(&ingress_meter1, &ctx->len, &idx_0, &ctx->tstamp);
 
         if (color1_0 == 1) {
             return bpf_redirect(3, 0);

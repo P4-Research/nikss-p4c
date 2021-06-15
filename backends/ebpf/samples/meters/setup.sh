@@ -74,7 +74,7 @@ done
 
 # 2000 kb/s -> 07D0
 #bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex D0 07 00 00 D0 07 00 00 00 64 00 00 00 64 00 00 00 00 00 00 00 00 00 00 f8 2a 00 00 f8 2a 00 00
-bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex D0 07 00 00 D0 07 00 00 00 64 00 00 00 64 00 00 00 00 00 00 00 00 00 00 f8 2a 00 00 f8 2a 00 00 00 00 00 00 00 00 00 00
+#bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex D0 07 00 00 D0 07 00 00 00 64 00 00 00 64 00 00 00 00 00 00 00 00 00 00 f8 2a 00 00 f8 2a 00 00 00 00 00 00 00 00 00 00
 # podsumowanie powyzszego 2 -> jak damy cosł koło 2 mbitów to jest 1,2, a jak 4 Mb/s to jest 3,7
 
 
@@ -90,11 +90,22 @@ bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex D0 07 00 00
 #bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex 00 08 00 00 00 08 00 00 00 08 00 00 00 08 00 00 00 00 00 00 00 00 00 00 00 08 00 00 00 08 00 00
 
 # 10 Mb/s and 100 ms burst period
-#bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex 10 27 00 00 10 27 00 00 48 e8 01 00 48 e8 01 00 00 00 00 00 00 00 00 00 48 e8 01 00 48 e8 01 00
+# 125 000 bytes -> 01 E8 48
+#bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex 10 27 00 00 10 27 00 00 48 e8 01 00 48 e8 01 00 00 00 00 00 00 00 00 00 48 e8 01 00 48 e8 01 00 00 00 00 00 00 00 00 00
 
 # 10 Mb/s and 10 ms burst period
+# 10 ms -> 12500 -> 30 D4
 #bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex 10 27 00 00 10 27 00 00 d4 30 00 00 d4 30 00 00 00 00 00 00 00 00 00 00 d4 30 00 00 d4 30 00 00
+
 #bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex 10 27 00 00 10 27 00 00 d4 30 00 00 d4 30 00 00 00 00 00 00 00 00 00 00 d4 30 00 00 d4 30 00 00 00 00 00 00 00 00 00 00
+
+# 50 Mb/s and 10 ms
+# 50 -> C3 50, 50 M * 10 ms / 8 = 62500 B -> F4 24
+#bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex 50 c3 00 00 50 c3 00 00 24 F4 00 00 24 F4 00 00 00 00 00 00 00 00 00 00 24 F4 00 00 24 F4 00 00 00 00 00 00 00 00 00 00
+# bs 31 000 -> 79 18
+#bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex 50 c3 00 00 50 c3 00 00 18 79 00 00 18 79 00 00 00 00 00 00 00 00 00 00 18 79 00 00 18 79 00 00 00 00 00 00 00 00 00 00
+# 10 * MTU - > 15 000 -> 3A 98
+bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex 50 c3 00 00 50 c3 00 00 9a 38 00 00 9a 38 00 00 00 00 00 00 00 00 00 00 9a 38 00 00 9a 38 00 00 00 00 00 00 00 00 00 00
 
 # 1kpackets/s
 #bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex 01 00 00 00 01 00 00 00 0a 00 00 00 0a 00 00 00 00 00 00 00 00 00 00 00 0a 00 00 00 0a 00 00 00
@@ -136,7 +147,7 @@ bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex D0 07 00 00
 # bytes per period 25 -> 19
 #bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex 00 0a 00 00 00 00 00 00 00 0a 00 00 00 00 00 00 64 00 00 00 00 00 00 00 19 00 00 00 00 00 00 00 64 00 00 00 00 00 00 00 19 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0a 00 00 00 00 00 00 00 0a 00 00 00 00 00 00
 # bs -> 1300 -> 05 14 -> bez sensu, bo < 1500 B
-# bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex 14 05 00 00 00 00 00 00 14 05 00 00 00 00 00 00 64 00 00 00 00 00 00 00 19 00 00 00 00 00 00 00 64 00 00 00 00 00 00 00 19 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 14 05 00 00 00 00 00 00 14 05 00 00 00 00 00 00
+#bpftool map update name ingress_meter1 key hex 00 00 00 00 value hex 14 05 00 00 00 00 00 00 14 05 00 00 00 00 00 00 64 00 00 00 00 00 00 00 19 00 00 00 00 00 00 00 64 00 00 00 00 00 00 00 19 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 14 05 00 00 00 00 00 00 14 05 00 00 00 00 00 00
 
 
 # Wlasne
