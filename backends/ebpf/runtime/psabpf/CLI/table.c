@@ -246,7 +246,7 @@ int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
     return 0;
 }
 
-int parse_action_data(int *argc, char ***argv, psabpf_table_entry_t *entry,
+int parse_action_data(int *argc, char ***argv,
                       psabpf_action_t *action, bool indirect_table)
 {
     if (!is_keyword(**argv, "data")) {
@@ -338,11 +338,11 @@ int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
         goto clean_up;
 
     /* 3. Get key */
-    if (parse_table_key(&argc,&argv, &entry) != 0)
+    if (parse_table_key(&argc, &argv, &entry) != 0)
         goto clean_up;
 
     /* 4. Get action parameters */
-    if (parse_action_data(&argc, &argv, &entry, &action, table_is_indirect) != 0)
+    if (parse_action_data(&argc, &argv, &action, table_is_indirect) != 0)
         goto clean_up;
 
     /* 5. Get entry priority */
@@ -375,6 +375,45 @@ int do_table_update(int argc, char **argv)
     return do_table_write(argc, argv, TABLE_UPDATE_EXISTING_ENTRY);
 }
 
+int do_table_delete(int argc, char **argv)
+{
+    psabpf_table_entry_t entry;
+    psabpf_table_entry_ctx_t ctx;
+    psabpf_context_t psabpf_ctx;
+    int error_code = -1;
+
+    /* no NEXT_ARG before, so this check must be preserved */
+    if (argc < 1) {
+        fprintf(stderr, "too few parameters\n");
+        return -1;
+    }
+
+    psabpf_context_init(&psabpf_ctx);
+    psabpf_table_entry_ctx_init(&ctx);
+    psabpf_table_entry_init(&entry);
+
+    /* 0. Get the pipeline id */
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != 0)
+        goto clean_up;
+
+    /* 1. Get table */
+    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx) != 0)
+        goto clean_up;
+
+    /* 2. Get key */
+    if (parse_table_key(&argc, &argv, &entry) != 0)
+        goto clean_up;
+
+    error_code = psabpf_table_entry_del(&ctx, &entry);
+
+clean_up:
+    psabpf_table_entry_free(&entry);
+    psabpf_table_entry_ctx_free(&ctx);
+    psabpf_context_free(&psabpf_ctx);
+
+    return error_code;
+}
+
 int do_table_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
@@ -383,8 +422,8 @@ int do_table_help(int argc, char **argv)
             "Usage: %1$s table add pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
             "       %1$s table add pipe ID TABLE ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]\n"
             "       %1$s table update pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
-            "Unimplemented commands:\n"
             "       %1$s table del pipe ID TABLE [key MATCH_KEY]\n"
+            "Unimplemented commands:\n"
             "       %1$s table get pipe ID TABLE [key MATCH_KEY]\n"
             "       %1$s table default pipe ID TABLE set ACTION [data ACTION_PARAMS]\n"
             "       %1$s table default pipe ID TABLE\n"

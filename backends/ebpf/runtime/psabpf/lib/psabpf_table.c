@@ -744,3 +744,48 @@ int psabpf_table_entry_update(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_
 {
     return psabpf_table_entry_write(ctx, entry, BPF_EXIST);
 }
+
+int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+{
+    char *key_buffer = NULL;
+    int return_code = 0;
+
+    if (ctx->table_fd < 0) {
+        fprintf(stderr, "can't add entry: table not opened\n");
+        return -EBADF;
+    }
+    if (ctx->key_size == 0) {
+        fprintf(stderr, "zero-size key is not supported\n");
+        return -ENOTSUP;
+    }
+
+    /* prepare buffers for map key */
+    key_buffer = malloc(ctx->key_size);
+    if (key_buffer == NULL) {
+        fprintf(stderr, "not enough memory\n");
+        return_code = -ENOMEM;
+        goto clean_up;
+    }
+
+    /* TODO: remove all entries from table */
+
+    return_code = construct_buffer(key_buffer, ctx->key_size, ctx, entry,
+                                   fill_key_btf_info, fill_key_byte_by_byte);
+    if (return_code != 0) {
+        fprintf(stderr, "failed to construct key\n");
+        goto clean_up;
+    }
+
+    /* delete pointed entry */
+    return_code = bpf_map_delete_elem(ctx->table_fd, key_buffer);
+    if (return_code != 0) {
+        return_code = errno;
+        fprintf(stderr, "failed to delete entry: %s\n", strerror(errno));
+    }
+
+clean_up:
+    if (key_buffer)
+        free(key_buffer);
+
+    return return_code;
+}
