@@ -673,7 +673,7 @@ int construct_buffer(char * buffer, size_t buffer_len,
     return return_code;
 }
 
-int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
 {
     char *key_buffer = NULL;
     char *value_buffer = NULL;
@@ -715,14 +715,15 @@ int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
         goto clean_up;
     }
 
+    /* TODO: should we preserve DirectCounters value when updating existing entry? */
+
     /* update map */
-    uint64_t flags = BPF_NOEXIST;
     if (ctx->table_type == BPF_MAP_TYPE_ARRAY)
-        flags = BPF_ANY;
-    return_code = bpf_map_update_elem(ctx->table_fd, key_buffer, value_buffer, flags);
+        bpf_flags = BPF_ANY;
+    return_code = bpf_map_update_elem(ctx->table_fd, key_buffer, value_buffer, bpf_flags);
     if (return_code != 0) {
         return_code = errno;
-        fprintf(stderr, "failed to add entry: %s\n", strerror(errno));
+        fprintf(stderr, "failed to set up entry: %s\n", strerror(errno));
     }
 
 clean_up:
@@ -732,4 +733,14 @@ clean_up:
         free(value_buffer);
 
     return return_code;
+}
+
+int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+{
+    return psabpf_table_entry_write(ctx, entry, BPF_NOEXIST);
+}
+
+int psabpf_table_entry_update(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+{
+    return psabpf_table_entry_write(ctx, entry, BPF_EXIST);
 }

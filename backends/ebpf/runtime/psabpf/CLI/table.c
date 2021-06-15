@@ -300,7 +300,12 @@ int parse_entry_priority(int *argc, char ***argv)
  * Command line table functions
  *****************************************************************************/
 
-int do_table_add(int argc, char **argv)
+enum table_write_type_t {
+    TABLE_ADD_NEW_ENTRY,
+    TABLE_UPDATE_EXISTING_ENTRY
+};
+
+int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
 {
     psabpf_table_entry_t entry;
     psabpf_table_entry_ctx_t ctx;
@@ -346,7 +351,10 @@ int do_table_add(int argc, char **argv)
 
     psabpf_table_entry_action(&entry, &action);
 
-    error_code = psabpf_table_entry_add(&ctx, &entry);
+    if (write_type == TABLE_ADD_NEW_ENTRY)
+        error_code = psabpf_table_entry_add(&ctx, &entry);
+    else if (write_type == TABLE_UPDATE_EXISTING_ENTRY)
+        error_code = psabpf_table_entry_update(&ctx, &entry);
 
 clean_up:
     psabpf_action_free(&action);
@@ -357,6 +365,16 @@ clean_up:
     return error_code;
 }
 
+int do_table_add(int argc, char **argv)
+{
+    return do_table_write(argc, argv, TABLE_ADD_NEW_ENTRY);
+}
+
+int do_table_update(int argc, char **argv)
+{
+    return do_table_write(argc, argv, TABLE_UPDATE_EXISTING_ENTRY);
+}
+
 int do_table_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
@@ -364,8 +382,8 @@ int do_table_help(int argc, char **argv)
     fprintf(stderr,
             "Usage: %1$s table add pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
             "       %1$s table add pipe ID TABLE ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]\n"
-            "Unimplemented commands:\n"
             "       %1$s table update pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
+            "Unimplemented commands:\n"
             "       %1$s table del pipe ID TABLE [key MATCH_KEY]\n"
             "       %1$s table get pipe ID TABLE [key MATCH_KEY]\n"
             "       %1$s table default pipe ID TABLE set ACTION [data ACTION_PARAMS]\n"
