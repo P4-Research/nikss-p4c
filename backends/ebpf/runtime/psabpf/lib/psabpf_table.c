@@ -11,13 +11,22 @@
 #include "../include/bpf_defs.h"
 #include "btf.h"
 
+int str_ends_with(const char *str, const char *suffix)
+{
+    size_t len_str = strlen(str);
+    size_t len_suffix = strlen(suffix);
+    if (len_suffix >  len_str)
+        return 0;
+    return strncmp(str + len_str - len_suffix, suffix, len_suffix) == 0;
+}
+
 void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
 {
     if (ctx == NULL)
         return;
     memset(ctx, 0, sizeof(psabpf_table_entry_ctx_t));
 
-    // 0 is a valid file descriptor
+    /* 0 is a valid file descriptor */
     ctx->table_fd = -1;
     ctx->associated_prog = -1;
 }
@@ -44,26 +53,23 @@ int try_load_btf_for_map_from_program(psabpf_table_entry_ctx_t *ctx,
                                       const char *program_name, const char *table_type_name)
 {
     ctx->associated_prog = bpf_obj_get(program_name);
-    if (ctx->associated_prog < 0) {
+    if (ctx->associated_prog < 0)
         return -ENOENT;
-    }
 
     struct bpf_prog_info prog_info = {};
     unsigned len = sizeof(struct bpf_prog_info);
     int error = bpf_obj_get_info_by_fd(ctx->associated_prog, &prog_info, &len);
     if (error)
         goto free_program;
-    printf("BTF id: %u\n", prog_info.btf_id);
 
     error = btf__get_from_id(prog_info.btf_id, (struct btf **) &(ctx->btf));
     if (ctx->btf == NULL || error != 0)
         goto free_btf;
 
-    // Find entry in BTF for our table
+    /* Find entry in BTF for our table */
     ctx->btf_type_id = psabtf_get_type_id_by_name(ctx->btf, table_type_name);
-    printf("map btf type id: %u\n", ctx->btf_type_id);
     if (ctx->btf_type_id != 0)
-        return 0;  // found
+        return 0;  /* found */
 
 free_btf:
     if (ctx->btf != NULL)
@@ -95,7 +101,7 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
         return errno_val;
     }
 
-    // get key/value size
+    /* get key/value size */
     struct bpf_map_info info = {};
     uint32_t len = sizeof(info);
     int error;
@@ -109,16 +115,16 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
     ctx->key_size = info.key_size;
     ctx->value_size = info.value_size;
 
-    // get the BTF, it is optional so print only warning and return no error
+    /* get the BTF, it is optional so print only warning and return no error */
     char table_type_name[256];
     char program_file_name[256];
-    const char *allowed_programs[] = { TC_INGRESS_PROG, XDP_INGRESS_PROG, TC_EGRESS_PROG };
-    int number_of_programs = sizeof(allowed_programs) / sizeof(allowed_programs[0]);
+    const char *programs_to_search[] = { TC_INGRESS_PROG, XDP_INGRESS_PROG, TC_EGRESS_PROG };
+    int number_of_programs = sizeof(programs_to_search) / sizeof(programs_to_search[0]);
 
     snprintf(table_type_name, sizeof(table_type_name), ".maps.%s", name);
     for (int i = 0; i < number_of_programs; i++) {
         snprintf(program_file_name, sizeof(program_file_name), "%s/%s%u/%s",
-                 BPF_FS, PIPELINE_PREFIX, psabpf_context_get_pipeline(psabpf_ctx), allowed_programs[i]);
+                 BPF_FS, PIPELINE_PREFIX, psabpf_context_get_pipeline(psabpf_ctx), programs_to_search[i]);
 
         if (try_load_btf_for_map_from_program(ctx, program_file_name, table_type_name) == 0)
             break;
@@ -146,7 +152,7 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
     if (entry == NULL)
         return;
 
-    // free match keys
+    /* free match keys */
     for (size_t i = 0; i < entry->n_keys; i++) {
         psabpf_matchkey_free(entry->match_keys[i]);
     }
@@ -154,7 +160,7 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
         free(entry->match_keys);
     entry->match_keys = NULL;
 
-    // free action data
+    /* free action data */
     if (entry->action != NULL) {
         psabpf_action_free(entry->action);
         free(entry->action);
@@ -162,7 +168,7 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
     }
 }
 
-// can be invoked multiple times
+/* can be invoked multiple times */
 int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t *mk)
 {
     if (entry == NULL || mk == NULL)
@@ -192,7 +198,7 @@ int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t 
     memcpy(new_mk, mk, sizeof(psabpf_match_key_t));
     entry->match_keys[entry->n_keys] = new_mk;
 
-    // stole data from mk to new_mk
+    /* stole data from mk to new_mk */
     mk->data = NULL;
 
     entry->n_keys += 1;
@@ -213,12 +219,12 @@ void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act
         return;
     memcpy(entry->action, act, sizeof(psabpf_action_t));
 
-    // stole data
+    /* stole action data */
     act->params = NULL;
     act->n_params = 0;
 }
 
-// only for ternary
+/* only for ternary */
 void psabpf_table_entry_priority(psabpf_table_entry_t *entry, const uint32_t priority)
 {
 }
@@ -263,19 +269,19 @@ int psabpf_matchkey_data(psabpf_match_key_t *mk, const char *data, size_t size)
     return 0;
 }
 
-// only for lpm
+/* only for lpm */
 int psabpf_matchkey_prefix(psabpf_match_key_t *mk, uint32_t prefix)
 {
     return 0;
 }
 
-// only for ternary
+/* only for ternary */
 int psabpf_matchkey_mask(psabpf_match_key_t *mk, const char *mask, size_t size)
 {
     return 0;
 }
 
-// only for 'range' match
+/* only for 'range' match */
 int psabpf_matchkey_start(psabpf_match_key_t *mk, uint64_t start)
 {
     return 0;
@@ -369,7 +375,7 @@ int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param)
 
     memcpy(&(action->params[action->n_params]), param, sizeof(psabpf_action_param_t));
 
-    // stole data
+    /* stole data */
     param->data = NULL;
 
     action->n_params += 1;
@@ -377,85 +383,19 @@ int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param)
     return 0;
 }
 
-void dump_buffer(const char * buff, size_t size)
-{
-    for (size_t i = 0; i < size; i++) {
-        if (i != 0 && i % 16 == 0)
-            printf("\n\t");
-        printf("%02x ", (buff[i]) & 0xff);
-    }
-    printf("\n");
-}
-
-void dump_entry(psabpf_table_entry_t *entry)
-{
-    printf("number of keys: %zu\n", entry->n_keys);
-    for (size_t i = 0; i < entry->n_keys; i++) {
-        psabpf_match_key_t *mk = entry->match_keys[i];
-        printf("key #%zu:\n\t", i);
-        printf("size: %zu bytes\n\tdata: ", mk->key_size);
-        dump_buffer(mk->data, mk->key_size);
-    }
-
-    if (entry->action != NULL) {
-        printf("action id: %u; number of params: %zu\n", entry->action->action_id, entry->action->n_params);
-        for (size_t i = 0; i < entry->action->n_params; i++) {
-            psabpf_action_param_t *param = &(entry->action->params[i]);
-            printf("param #%zu:\n\t", i);
-            printf("size: %zu bytes\n\tdata: ", param->len);
-            dump_buffer(param->data, param->len);
-        }
-    } else {
-        printf("action specification not present\n");
-    }
-}
-
-void dump_table_ctx(psabpf_table_entry_ctx_t *ctx)
-{
-    printf("table type: %u ", ctx->table_type);
-    if (ctx->table_type == BPF_MAP_TYPE_ARRAY)
-        printf("(array)\n");
-    else if (ctx->table_type == BPF_MAP_TYPE_HASH)
-        printf("(hash)\n");
-    else
-        printf("(unknown)\n");
-    printf("key size: %u\n", ctx->key_size);
-    printf("value size: %u\n", ctx->value_size);
-}
-
-void dump_btf_type(struct btf *btf, const struct btf_type *key_type, unsigned id)
-{
-    const char * name = NULL;
-    if (!key_type->name_off) {
-        name = "(anon)";
-    } else {
-        name = btf__name_by_offset(btf, key_type->name_off);
-        if (name == NULL)
-            name = "(invalid)";
-    }
-
-    printf("\tType #%u:\n", id);
-    printf("\t\tname: %s\n", name);
-    printf("\t\tinfo: %u\n", key_type->info);
-    printf("\t\t\tvlen: %u\n", btf_vlen(key_type));
-    printf("\t\t\tkind: %u\n", btf_kind(key_type));
-    printf("\t\tsize/type: %u\n", key_type->size);
-}
-
-int write_buffer(char * buffer, size_t buffer_len, size_t base_offset,
-                 void * data, size_t data_len,
-                 psabpf_table_entry_ctx_t *ctx, uint32_t dst_type_id,
-                 const char *dst_type)
+int write_buffer_btf(char * buffer, size_t buffer_len, size_t offset,
+                     void * data, size_t data_len, psabpf_table_entry_ctx_t *ctx,
+                     uint32_t dst_type_id, const char *dst_type)
 {
     size_t data_type_len = psabtf_get_type_size_by_id(ctx->btf, dst_type_id);
-    printf("writing %zu bytes (provided %zu bytes) at offset %zu\n",
-           data_type_len, data_len, base_offset);
 
-    if (base_offset + data_len > buffer_len || data_len > data_type_len) {
-        fprintf(stderr, "too much data in %s (buffer len: %zu)\n", dst_type, buffer_len);
+    if (offset + data_len > buffer_len || data_len > data_type_len) {
+        fprintf(stderr, "too much data in %s "
+                        "(buffer len: %zu; offset: %zu; data size: %zu; type size: %zu)\n",
+                dst_type, buffer_len, offset, data_len, data_type_len);
         return -EAGAIN;
     }
-    memcpy(buffer + base_offset, data, data_len);
+    memcpy(buffer + offset, data, data_len);
     return 0;
 }
 
@@ -474,7 +414,7 @@ int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
         bytes_to_write -= mk->key_size;
     }
 
-    // TODO: maybe we should ignore this case
+    /* TODO: maybe we should ignore this case */
     if (bytes_to_write > 0) {
         fprintf(stderr, "Provided keys are too short\n");
         return -1;
@@ -491,9 +431,6 @@ int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table
     if (key_type == NULL)
         return -EAGAIN;
 
-    printf("key type:\n");
-    dump_btf_type(ctx->btf, key_type, key_type_id);
-
     if (btf_kind(key_type) == BTF_KIND_INT) {
         if (entry->n_keys != 1) {
             fprintf(stderr, "expected 1 key\n");
@@ -501,7 +438,7 @@ int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table
         }
         if (entry->match_keys[0]->key_size > ctx->key_size) {
             fprintf(stderr, "too much data in key\n");
-            return -1;  // byte by byte mode will not fix this
+            return -1;  /* byte by byte mode will not fix this */
         }
         memcpy(buffer, entry->match_keys[0]->data, entry->match_keys[0]->key_size);
     } else if (btf_kind(key_type) == BTF_KIND_STRUCT) {
@@ -512,11 +449,11 @@ int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table
             return -EAGAIN;
         }
         for (int i = 0; i < entries; i++, member++) {
-            // assume that every field is byte aligned
+            /* assume that every field is byte aligned */
             unsigned offset = btf_member_bit_offset(key_type, i) / 8;
-            int ret = write_buffer(buffer, ctx->key_size, offset,
-                                   entry->match_keys[i]->data, entry->match_keys[i]->key_size,
-                                   ctx, member->type, "key");
+            int ret = write_buffer_btf(buffer, ctx->key_size, offset,
+                                       entry->match_keys[i]->data, entry->match_keys[i]->key_size,
+                                       ctx, member->type, "key");
             if (ret != 0)
                 return ret;
         }
@@ -532,7 +469,7 @@ int fill_value_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf
 {
     size_t bytes_to_write = ctx->value_size;
 
-    // write action ID
+    /* write action ID */
     if (ctx->is_indirect == false) {
         size_t action_id_len = sizeof(entry->action->action_id);
         if (action_id_len <= bytes_to_write) {
@@ -556,7 +493,7 @@ int fill_value_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf
         bytes_to_write -= param->len;
     }
 
-    // TODO: maybe we should ignore this case
+    /* TODO: maybe we should ignore this case */
     if (bytes_to_write > 0) {
         fprintf(stderr, "Provided values are too short\n");
         return -1;
@@ -572,10 +509,10 @@ int fill_action_id(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_en
         fprintf(stderr, "action id entry not found\n");
         return -ENOENT;
     }
-    return write_buffer(buffer, ctx->value_size,
-                        btf_member_bit_offset(value_type, action_md.index) / 8,
-                        &(entry->action->action_id), sizeof(entry->action->action_id),
-                        ctx, action_md.effective_type_id, "action id");
+    return write_buffer_btf(buffer, ctx->value_size,
+                            btf_member_bit_offset(value_type, action_md.index) / 8,
+                            &(entry->action->action_id), sizeof(entry->action->action_id),
+                            ctx, action_md.effective_type_id, "action id");
 }
 
 int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
@@ -584,7 +521,7 @@ int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_
     size_t base_offset, offset;
     int ret;
 
-    // find union with action data
+    /* find union with action data */
     psabtf_struct_member_md_t action_union_md = {};
     if (psabtf_get_member_md_by_name(ctx->btf, value_type_id, "u", &action_union_md) != 0) {
         fprintf(stderr, "actions data structure not found\n");
@@ -593,46 +530,35 @@ int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_
     const struct btf_type * union_type = psabtf_get_type_by_id(ctx->btf, action_union_md.effective_type_id);
     base_offset = btf_member_bit_offset(value_type, action_union_md.index) / 8;
 
-    // find action data structure in the union
+    /* find action data structure in the union */
     psabtf_struct_member_md_t action_data_md = {};
     if (psabtf_get_member_md_by_index(ctx->btf, action_union_md.effective_type_id,
                                       entry->action->action_id, &action_data_md) != 0) {
         fprintf(stderr, "action with id %u does not exist\n", entry->action->action_id);
-        return -EPERM;  // not fixable, invalid action ID
+        return -EPERM;  /* not fixable, invalid action ID */
     }
-    // to be sure of offset, take into account offset of action data structure in the union
+    /* to be sure of offset, take into account offset of action data structure in the union */
     base_offset = base_offset + (btf_member_bit_offset(union_type, action_data_md.index) / 8);
     const struct btf_type * data_type = psabtf_get_type_by_id(ctx->btf, action_data_md.effective_type_id);
 
-    printf("action data type:\n");
-    dump_btf_type(ctx->btf, data_type, action_data_md.effective_type_id);
-
-    // fill action data
+    /* fill action data */
     int entries = btf_vlen(data_type);
     if (entry->action->n_params != entries) {
-        fprintf(stderr, "expected %d action parameters, got %zu\n", entries, entry->action->n_params);
+        fprintf(stderr, "expected %d action parameters, got %zu\n",
+                entries, entry->action->n_params);
         return -EAGAIN;
     }
     const struct btf_member *member = btf_members(data_type);
     for (int i = 0; i < entries; i++, member++) {
         offset = btf_member_bit_offset(data_type, i) / 8;
-        ret = write_buffer(buffer, ctx->value_size, base_offset + offset,
-                           entry->action->params[i].data, entry->action->params[i].len,
-                           ctx, member->type, "value");
+        ret = write_buffer_btf(buffer, ctx->value_size, base_offset + offset,
+                               entry->action->params[i].data, entry->action->params[i].len,
+                               ctx, member->type, "value");
         if (ret != 0)
             return ret;
     }
 
     return 0;
-}
-
-int str_ends_with(const char *str, const char *suffix)
-{
-    size_t len_str = strlen(str);
-    size_t len_suffix = strlen(suffix);
-    if (len_suffix >  len_str)
-        return 0;
-    return strncmp(str + len_str - len_suffix, suffix, len_suffix) == 0;
 }
 
 int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
@@ -652,7 +578,7 @@ int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_
         const struct btf_type * member_type = psabtf_get_type_by_id(ctx->btf, member->type);
         const char * member_name = btf__name_by_offset(ctx->btf, member->name_off);
 
-        // skip errors, non-int members and reserved names
+        /* skip errors, non-int members and reserved names */
         if (member_name == NULL || btf_kind(member_type) != BTF_KIND_INT)
             continue;
         if (strcmp(member_name, "priority") == 0 || strcmp(member_name, "action") == 0)
@@ -660,9 +586,10 @@ int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_
 
         if (str_ends_with(member_name, "_is_group_ref")) {
             offset = btf_member_bit_offset(value_type, i) / 8;
-            printf("setting up reference type\n");
-            ret = write_buffer(buffer, ctx->value_size, offset, &(current_data->is_group_reference),
-                sizeof(current_data->is_group_reference), ctx, member->type, "reference type");
+            ret = write_buffer_btf(buffer, ctx->value_size, offset,
+                                   &(current_data->is_group_reference),
+                                   sizeof(current_data->is_group_reference),
+                                   ctx, member->type, "reference type");
             if (ret != 0)
                 return ret;
             continue;
@@ -675,10 +602,10 @@ int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_
                 return -EAGAIN;
             }
         }
-        // now we can write reference, hurrah!!!
+        /* now we can write reference, hurrah!!! */
         offset = btf_member_bit_offset(value_type, i) / 8;
-        ret = write_buffer(buffer, ctx->value_size, offset, current_data->data,
-                           current_data->len, ctx, member->type, "reference");
+        ret = write_buffer_btf(buffer, ctx->value_size, offset, current_data->data,
+                               current_data->len, ctx, member->type, "reference");
         if (ret != 0)
             return ret;
         entry_ref_used = true;
@@ -712,20 +639,38 @@ int fill_value_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_tab
 
     if (ctx->is_indirect == false) {
         ret = fill_action_id(buffer, ctx, entry, value_type_id, value_type);
-        if (ret != 0) {
-            return -EAGAIN;
-        }
+        if (ret != 0)
+            return ret;
+
         ret = fill_action_data(buffer, ctx, entry, value_type_id, value_type);
-        if (ret != 0) {
-            return -EAGAIN;
-        }
+        if (ret != 0)
+            return ret;
     } else {
         ret = fill_action_references(buffer, ctx, entry, value_type_id, value_type);
         if (ret != 0)
-            return -EAGAIN;
+            return ret;
     }
 
     return 0;
+}
+
+/* Please use this function instead of using directly family of fill_*() functions */
+int construct_buffer(char * buffer, size_t buffer_len,
+                     psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+                     int (*btf_info_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *),
+                     int (*byte_by_byte_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *))
+{
+    /* When BTF info mode fails we can fallback to byte by byte mode */
+    int return_code = -EAGAIN;
+    if (ctx->btf != NULL && ctx->btf_type_id != 0) {
+        memset(buffer, 0, buffer_len);
+        return_code = btf_info_func(buffer, ctx, entry);
+    }
+    if (return_code == -EAGAIN) {
+        memset(buffer, 0, buffer_len);
+        return_code = byte_by_byte_func(buffer, ctx, entry);
+    }
+    return return_code;
 }
 
 int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
@@ -736,19 +681,18 @@ int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
 
     if (ctx->table_fd < 0) {
         fprintf(stderr, "can't add entry: table not opened\n");
-        return_code = -EBADF;
-        goto clean_up;
+        return -EBADF;
     }
     if (ctx->key_size == 0 || ctx->value_size == 0) {
-        fprintf(stderr, "Zero-size key or value is not supported\n");
-        return_code = -ENOTSUP;
-        goto clean_up;
+        fprintf(stderr, "zero-size key or value is not supported\n");
+        return -ENOTSUP;
+    }
+    if (entry->action == NULL) {
+        fprintf(stderr, "missing action specification\n");
+        return -ENODATA;
     }
 
-    dump_table_ctx(ctx);
-    dump_entry(entry);
-
-    // prepare buffers for map key/value
+    /* prepare buffers for map key/value */
     key_buffer = malloc(ctx->key_size);
     value_buffer = malloc(ctx->value_size);
     if (key_buffer == NULL || value_buffer == NULL) {
@@ -756,47 +700,22 @@ int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
         return_code = -ENOMEM;
         goto clean_up;
     }
-    memset(key_buffer, 0, ctx->key_size);
-    memset(value_buffer, 0, ctx->value_size);
 
-    // fill-in map key, fallback to byte by byte mode when btf mode returns -EAGAIN
-    return_code = -EAGAIN;
-    if (ctx->btf != NULL && ctx->btf_type_id != 0) {
-        printf("Key construction mode: BTF info\n");
-        return_code = fill_key_btf_info(key_buffer, ctx, entry);
-    }
-    if (return_code == -EAGAIN) {
-        memset(key_buffer, 0, ctx->key_size);
-        printf("Key construction mode: byte by byte\n");
-        return_code = fill_key_byte_by_byte(key_buffer, ctx, entry);
-    }
+    return_code = construct_buffer(key_buffer, ctx->key_size, ctx, entry,
+                                   fill_key_btf_info, fill_key_byte_by_byte);
     if (return_code != 0) {
         fprintf(stderr, "Failed to construct key\n");
         goto clean_up;
     }
 
-    // fill-in map value
-    return_code = -EAGAIN;
-    if (ctx->btf != NULL && ctx->btf_type_id != 0) {
-        printf("Value construction mode: BTF info\n");
-        return_code = fill_value_btf_info(value_buffer, ctx, entry);
-    }
-    if (return_code == -EAGAIN) {
-        memset(value_buffer, 0, ctx->value_size);
-        printf("Value construction mode: byte by byte\n");
-        return_code = fill_value_byte_by_byte(value_buffer, ctx, entry);
-    }
+    return_code = construct_buffer(value_buffer, ctx->value_size, ctx, entry,
+                                   fill_value_btf_info, fill_value_byte_by_byte);
     if (return_code != 0) {
         fprintf(stderr, "Failed to construct value\n");
         goto clean_up;
     }
 
-    printf("Constructed key:\n\t");
-    dump_buffer(key_buffer, ctx->key_size);
-    printf("Constructed value:\n\t");
-    dump_buffer(value_buffer, ctx->value_size);
-
-    // update map
+    /* update map */
     uint64_t flags = BPF_NOEXIST;
     if (ctx->table_type == BPF_MAP_TYPE_ARRAY)
         flags = BPF_ANY;
