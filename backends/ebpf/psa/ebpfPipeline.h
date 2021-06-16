@@ -38,6 +38,7 @@ class EBPFPipeline : public EBPFProgram {
     void emitHeaderInstances(CodeBuilder *builder) override;
     void emitLocalVariables(CodeBuilder* builder) override;
     void emitGlobalMetadataInitializer(CodeBuilder *builder);
+    void emitUserMetadataInstance(CodeBuilder *builder);
     virtual void emitPSAControlDataTypes(CodeBuilder* builder) = 0;
     virtual void emit(CodeBuilder* builder);
 };

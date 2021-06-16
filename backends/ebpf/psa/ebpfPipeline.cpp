@@ -77,6 +77,19 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     builder->newline();
 }
 
+void EBPFPipeline::emitUserMetadataInstance(CodeBuilder* builder) {
+    builder->emitIndent();
+    auto user_md_type = typeMap->getType(control->user_metadata);
+    if (user_md_type == nullptr) {
+        ::error("cannot emit user metadata");
+    }
+    auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
+    userMetadataType->declare(builder, control->user_metadata->name.name, false);
+    builder->append(" = ");
+    userMetadataType->emitInitializer(builder);
+    builder->endOfStatement(true);
+}
+
 void EBPFPipeline::emitHeaderInstances(CodeBuilder* builder) {
     builder->emitIndent();
     // declaring header instance as volatile optimizes stack size and improves throughput
@@ -138,17 +151,8 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
                         "    *ether_type = md->pkt_ether_type;\n");
     builder->blockEnd(true);
 
-    builder->emitIndent();
-    auto user_md_type = typeMap->getType(control->user_metadata);
-    if (user_md_type == nullptr) {
-        ::error("cannot emit user metadata");
-    }
-    auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
-    userMetadataType->declare(builder, control->user_metadata->name.name, false);
-    builder->append(" = ");
-    userMetadataType->emitInitializer(builder);
-    builder->endOfStatement(true);
 
+    emitUserMetadataInstance(builder);
     emitLocalVariables(builder);
     msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, "meta->packet_path");
@@ -388,7 +392,11 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     deparser->to<XDPIngressDeparserPSA>()->emitSharedMetadataInitializer(builder);
     builder->newline();
 
+
     emitHeaderInstances(builder);
+    builder->newline();
+
+    emitUserMetadataInstance(builder);
     builder->newline();
 
     emitLocalVariables(builder);
@@ -411,11 +419,11 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     builder->newline();
 
     // CTRL
+    builder->emitIndent();
     builder->append(IR::ParserState::accept);
     builder->append(":");
     builder->spc();
     builder->blockStart();
-    builder->decreaseIndent();
     msgStr = Util::printf_format("%s control: packet processing started", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
     control->emit(builder);
@@ -434,7 +442,6 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     this->emitTrafficManager(builder);
-    builder->decreaseIndent();
     builder->blockEnd(true);
     builder->newline();
 }

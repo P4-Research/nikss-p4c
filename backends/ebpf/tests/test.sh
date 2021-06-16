@@ -1,10 +1,16 @@
 #!/bin/bash
 
+xdpTesting=false
+
 if [ "x$1" = "x--help" ]; then
   echo -e "Usage: \n"
   echo -e "\t $0 [--help]"
   echo -e "Will execute PTF test and setup/cleanup environment."
   exit 0
+fi
+
+if [ "x$1" = "x--xdp" ]; then
+  xdpTesting=true
 fi
 
 function exit_on_error() {
@@ -42,7 +48,7 @@ set -x
 declare -a INTERFACES=("eth0" "eth1" "eth2" "eth3" "eth4" "eth5")
 # For PTF tests parameter
 interface_list=$( IFS=$','; echo "${INTERFACES[*]}" )
-interface_list="psa_recirc,""$interface_list"
+#interface_list="psa_recirc,""$interface_list"
 # TODO: similar list with interfaces for ptf
 
 ip netns add switch
@@ -87,9 +93,13 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LIBBPF_LD_PATH
 # Docker image by default has lower "max locked memory" limit
 ulimit -l 65536
 
+if [ "$xdpTesting" = true ] ; then
+  TEST_PARAMS+=';xdp=True'
+fi
+
 # Start tests
 ptf \
   --test-dir ptf/ \
   --test-params=$TEST_PARAMS \
   --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
-  --interface 4@s1-eth4 --interface 5@s1-eth5 $@
+  --interface 4@s1-eth4 --interface 5@s1-eth5 $2
