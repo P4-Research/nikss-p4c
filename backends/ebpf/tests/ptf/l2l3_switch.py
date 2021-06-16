@@ -96,7 +96,7 @@ class L2L3SwitchTest(P4EbpfTest):
                           "ingress_tbl_acl", "ingress_tbl_acl_defaultAction",
                           "ingress_tbl_switching", "ingress_tbl_switching_defaultAction",
                           "ingress_tbl_routable", "ingress_tbl_routable_defaultAction",
-                          "ingress_tbl_routing", "ingress_tbl_routing_defaultAction",
+                          "ingress_tbl_routing",
                           "egress_tbl_vlan_egress", "egress_tbl_vlan_egress_defaultAction",
                           "mac_learn_digest_0"])
         super(L2L3SwitchTest, self).tearDown()
@@ -198,9 +198,6 @@ class RoutingTest(L2L3SwitchTest):
         # ActionSelector reference = 2, is_group_ref=True
         self.update_map(name="ingress_tbl_routing", key="hex 18 00 00 00 14 00 00 00", value="2 0 0 0  1 0 0 0")
 
-        # self.update_map(name="ingress_tbl_routing", key="hex 18 00 00 00 14 00 00 00", value="01 0 0 0 0 0 0 0 02 01 00 00 00 00 00 00 02 00 00 00 00 00 00 00")
-        # self.update_map(name="ingress_tbl_out_arp", key="hex 02 00 00 14", value="01 0 0 0 0 0 0 0 02 02 00 00 00 00 00 00")
-
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:01:33", ip_dst="20.0.0.2", ip_src="10.0.0.1")
         pkt = pkt_add_vlan(pkt, vlan_vid=2)
 
@@ -213,36 +210,13 @@ class RoutingTest(L2L3SwitchTest):
         for i in range(0, 5):
             pkt[IP].sport = 5000 + i
             testutils.send_packet(self, PORT3, pkt)
-            exp_pkt = pkt
+            exp_pkt = pkt.copy()
             exp_pkt[Ether].src = "00:00:00:00:01:02"
             exp_pkt[Dot1Q].vlan = 1
             exp_pkt[IP].ttl = 63
-            mask = Mask(pkt)
+            mask = Mask(exp_pkt)
             mask.set_do_not_care_scapy(Ether, 'dst')
-            testutils.verify_packet_any_port(self, exp_pkt, [PORT1, PORT2, PORT4])
-
-        # TODO: enable
-        # # enable routing from VLAN 2 to VLAN 1
-        # self.update_map(name="ingress_tbl_routable", key="02 01 00 00 00 00 00 00 02 00 00 00 00 00 00 00", value="0 0 0 0")
-        # self.update_map(name="ingress_tbl_routing", key="hex 18 00 00 00 0a 00 00 00", value="01 0 0 0 0 0 0 0 01 01 00 00 00 00 00 00 01 00 00 00 00 00 00 00")
-        # self.update_map(name="ingress_tbl_out_arp", key="hex 01 00 00 0a", value="01 0 0 0 0 0 0 0 01 00 00 00 00 00 00 00")
-        #
-        # pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:01:33", ip_dst="10.0.0.1", ip_src="20.0.0.2")
-        # pkt = pkt_add_vlan(pkt, vlan_vid=2)
-        #
-        # # verify not routable packet
-        # testutils.send_packet(self, PORT3, pkt)
-        # testutils.verify_no_other_packets(self)
-        #
-        # # verify routable packet
-        # pkt[Ether].dst = "00:00:00:00:01:02"
-        # testutils.send_packet(self, PORT3, pkt)
-        # exp_pkt = pkt
-        # exp_pkt[Ether].src = "00:00:00:00:01:01"
-        # exp_pkt[Ether].dst = "00:00:00:00:00:01"
-        # exp_pkt[Dot1Q].vlan = 1
-        # exp_pkt[IP].ttl = 63
-        # testutils.verify_packet(self, pkt, PORT1)
+            testutils.verify_packet_any_port(self, mask, [PORT1, PORT2, PORT4])
 
 
 class MACLearningTest(L2L3SwitchTest):
