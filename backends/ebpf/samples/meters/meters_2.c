@@ -123,8 +123,8 @@ enum PSA_MeterColor_t rte_meter_trtcm_color_blind_check(
     bpf_trace_message("Time diff tc: %lu\n", time_diff_tc);
     bpf_trace_message("Time diff tp: %lu\n", time_diff_tp);
     bpf_trace_message("Cir period: %lu\n", p->cir_period);
-    n_periods_tc = time_diff_tc / p->cir_period;
     bpf_trace_message("Number of periods: %lu\n", n_periods_tc);
+    n_periods_tc = time_diff_tc / p->cir_period;
     n_periods_tp = time_diff_tp / p->pir_period;
     p->time_tc += n_periods_tc * p->cir_period;
     p->time_tp += n_periods_tp * p->pir_period;
@@ -192,6 +192,7 @@ int tc_l2fwd(struct __sk_buff *ctx)
     u32 color1_0;
     u32 idx_0 = 0;
 
+//    u32 len = 1;
     if (ctx->ifindex == 2) {
         color1_0 = meter_execute_bytes(&ingress_meter1, &ctx->len, &idx_0, &ctx->tstamp);
 
@@ -213,14 +214,5 @@ int tc_l2fwd_egress(struct __sk_buff *ctx)
 //    bpf_printk("ifindex=%d, skb->priority = %d\n", ctx->ifindex, ctx->priority);
     return TC_ACT_OK;
 }
-
-//SEC("xdp/xdp-ingress")
-//int xdp_func(struct xdp_md *skb)
-//{
-//    u32 cpu = bpf_get_smp_processor_id();
-//    bpf_printk("[XDP       ] cpu=%d\n", cpu);
-//
-//    return XDP_PASS;
-//}
 
 char _license[] SEC("license") = "GPL";
