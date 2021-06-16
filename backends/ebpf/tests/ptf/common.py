@@ -109,10 +109,7 @@ class EbpfTest(BaseTest):
     def tearDown(self):
         for intf in self.interfaces:
             self.del_port(intf)
-        for filename in os.listdir("{}".format(PIPELINE_MAPS_MOUNT_PATH)):
-            if not os.path.isdir(filename):
-                self.remove_map(filename)
-        self.exec_ns_cmd("rm -rf {}".format(TEST_PIPELINE_MOUNT_PATH))
+        self.exec_ns_cmd("psabpf-ctl pipeline unload id {}".format(TEST_PIPELINE_ID))
         super(EbpfTest, self).tearDown()
 
 
@@ -144,8 +141,6 @@ class P4EbpfTest(EbpfTest):
         super(P4EbpfTest, self).setUp()
 
     def tearDown(self):
-        self.remove_map("clone_session_tbl")
-        self.remove_map("multicast_grp_tbl")
         super(P4EbpfTest, self).tearDown()
 
     def clone_session_create(self, id):

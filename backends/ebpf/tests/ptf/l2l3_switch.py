@@ -90,15 +90,6 @@ class L2L3SwitchTest(P4EbpfTest):
         self.update_map(name="multicast_grp_tbl", key="3 0 0 0", value="mcast_grp_3", map_in_map=True)
 
     def tearDown(self):
-        self.remove_maps(["mcast_grp_1", "mcast_grp_2", "mcast_grp_3",
-                          "ingress_tbl_ingress_vlan", "ingress_tbl_ingress_vlan_defaultAction",
-                          "ingress_tbl_mac_learning", "ingress_tbl_mac_learning_defaultAction",
-                          "ingress_tbl_acl", "ingress_tbl_acl_defaultAction",
-                          "ingress_tbl_switching", "ingress_tbl_switching_defaultAction",
-                          "ingress_tbl_routable", "ingress_tbl_routable_defaultAction",
-                          "ingress_tbl_routing",
-                          "egress_tbl_vlan_egress", "egress_tbl_vlan_egress_defaultAction",
-                          "mac_learn_digest_0"])
         super(L2L3SwitchTest, self).tearDown()
 
 
