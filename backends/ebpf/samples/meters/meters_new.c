@@ -8,7 +8,6 @@
 #include "ebpf_kernel.h"
 
 #include <stdbool.h>
-//#include <linux/if_ether.h>
 #include "psa.h"
 
 #include <inttypes.h>
@@ -28,13 +27,27 @@ struct key {
 typedef struct key ingress_meter1_key;
 
 struct value_meter {
-    u32 pir;
-    u32 cir;
-    u32 pbs;
-    u32 cbs;
-    u64 timestamp;
-    u32 pbs_left;
-    u32 cbs_left;
+    /* Period in nanoseconds for one update of P token bucket */
+    u64 pir_period;
+    /* Number of bytes or packets to add to P token bucket on each update */
+    u64 pir_unit_per_period;
+    /* Period in nanoseconds for one update of C token bucket */
+    u64 cir_period;
+    /* Number of bytes or packets to add to C token bucket on each update */
+    u64 cir_unit_per_period;
+    /* Size of peak token bucket in bytes or packets */
+    u64 pbs;
+    /* Size of committed token bucket in bytes or packets */
+    u64 cbs;
+    /* Number of bytes or packets currently available in peak token bucket */
+    u64 pbs_left;
+    /* Number of bytes or packets currently available in committed token bucket */
+    u64 cbs_left;
+    /* Time of latest update of P token bucket */
+    u64 time_p;
+    /* Time of latest update of C token bucket */
+    u64 time_c;
+    /* For synchronization purposes in BPF */
     struct bpf_spin_lock lock;
 };
 typedef struct value_meter meter_value;
@@ -49,19 +62,27 @@ struct bpf_map_def SEC("maps") ingress_meter1 = {
 BPF_ANNOTATE_KV_PAIR(ingress_meter1, ingress_meter1_key, meter_value);
 
 static __always_inline
-enum PSA_MeterColor_t meter_execute_bytes(void *map, u32 *packet_len, void *key, u64 *time_ns) {
+enum PSA_MeterColor_t meter_execute(void *map, u32 *packet_len, void *key, u64 *time_ns) {
     meter_value *value = BPF_MAP_LOOKUP_ELEM(*map, key);
-    enum PSA_MeterColor_t col;
-    u32 factor = 8000000;
+
     if (value != NULL) {
-//        bpf_spin_lock(&value->lock);
-        u64 delta_t = *time_ns - value->timestamp;
-        value->timestamp = value->timestamp + delta_t;
-        u32 tokens_pbs = value->pbs_left + ((delta_t * value->pir) / factor);
+        u64 delta_p, delta_c;
+        u64 n_periods_p, n_periods_c, tokens_pbs, tokens_cbs;
+        bpf_spin_lock(&value->lock);
+        delta_p = *time_ns - value->time_p;
+        delta_c = *time_ns - value->time_c;
+
+        n_periods_p = delta_p / value->pir_period;
+        n_periods_c = delta_c / value->cir_period;
+
+        value->time_p += n_periods_p * value->pir_period;
+        value->time_c += n_periods_c * value->cir_period;
+
+        tokens_pbs = value->pbs_left + n_periods_p * value->pir_unit_per_period;
         if (tokens_pbs > value->pbs) {
             tokens_pbs = value->pbs;
         }
-        u32 tokens_cbs = value->cbs_left + ((delta_t * value->cir) / factor);
+        tokens_cbs = value->cbs_left + n_periods_c * value->cir_unit_per_period;
         if (tokens_cbs > value->cbs) {
             tokens_cbs = value->cbs;
         }
@@ -69,33 +90,47 @@ enum PSA_MeterColor_t meter_execute_bytes(void *map, u32 *packet_len, void *key,
         if (*packet_len > tokens_pbs) {
             value->pbs_left = tokens_pbs;
             value->cbs_left = tokens_cbs;
-//            bpf_spin_unlock(&value->lock);
+            bpf_spin_unlock(&value->lock);
+            bpf_trace_message("Meter: RED\n");
             return RED;
         }
 
         if (*packet_len > tokens_cbs) {
             value->pbs_left = tokens_pbs - *packet_len;
             value->cbs_left = tokens_cbs;
-//            bpf_spin_unlock(&value->lock);
+            bpf_spin_unlock(&value->lock);
+            bpf_trace_message("Meter: YELLOW\n");
             return YELLOW;
         }
 
         value->pbs_left = tokens_pbs - *packet_len;
         value->cbs_left = tokens_cbs - *packet_len;
-//        bpf_spin_unlock(&value->lock);
+        bpf_spin_unlock(&value->lock);
+        bpf_trace_message("Meter: GREEN\n");
         return GREEN;
     } else {
-        return RED;
+        // From P4Runtime spec. No value - return default GREEN.
+        bpf_trace_message("Meter: No meter value! Returning default GREEN\n");
+        return GREEN;
     }
 }
 
+static __always_inline
+enum PSA_MeterColor_t meter_execute_bytes(void *map, u32 *packet_len, void *key, u64 *time_ns) {
+    bpf_trace_message("Meter: execute BYTES\n");
+    return meter_execute(map, packet_len, key, time_ns);
+}
+
+static __always_inline
+enum PSA_MeterColor_t meter_execute_packets(void *map, void *key, u64 *time_ns) {
+    bpf_trace_message("Meter: execute PACKETS\n");
+    u32 len = 1;
+    return meter_execute(map, &len, key, time_ns);
+}
 
 SEC("classifier/tc-ingress")
 int tc_l2fwd(struct __sk_buff *ctx)
 {
-//    u32 cpu = bpf_get_smp_processor_id();
-//    bpf_printk("[XDP       ] cpu=%d\n", cpu);
-
     void *data_end = (void *)(long)ctx->data_end;
     void *data = (void *)(long)ctx->data;
     struct ethhdr *eth = data;
@@ -130,7 +165,6 @@ int tc_l2fwd(struct __sk_buff *ctx)
 SEC("classifier/tc-egress")
 int tc_l2fwd_egress(struct __sk_buff *ctx)
 {
-//    bpf_printk("ifindex=%d, skb->priority = %d\n", ctx->ifindex, ctx->priority);
     return TC_ACT_OK;
 }
 
