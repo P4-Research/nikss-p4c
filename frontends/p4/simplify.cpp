@@ -70,6 +70,7 @@ const IR::Node* DoSimplifyControlFlow::postorder(IR::IfStatement* statement)  {
         statement->ifFalse = statement->ifTrue;
         statement->ifTrue = e;
     }
+
     if (SideEffects::check(statement->condition, refMap, typeMap))
         return statement;
     if (statement->ifTrue->is<IR::EmptyStatement>() &&
