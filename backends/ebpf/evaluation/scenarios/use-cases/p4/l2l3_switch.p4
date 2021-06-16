@@ -285,7 +285,6 @@ control ingress(inout headers_t headers, inout local_metadata_t local_metadata, 
                         drop();
                         exit;
                     }
-                    //tbl_out_arp.apply();
                 }
             }
         }
