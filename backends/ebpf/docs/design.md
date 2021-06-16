@@ -280,39 +280,60 @@ In order to add group reference as a table entry:
 5. Add this group reference as a value (field `_ref`) in a table (field `_is_group_ref` set to something other than `0`).
 
 # Direct Meter
-Metering mechanism implements Dual Token Bucket algorithm. Meters are translated to `BPF_MAP_TYPE_ARRAY` with unchanging value type.
+Metering mechanism implements Dual Token Bucket algorithm. Meters are translated to `BPF_MAP_TYPE_HASH` with unchanging value type.
 
 ```c
 typedef struct meter_value {
-    u32 pir;
-    u32 cir;
-    u32 pbs;
-    u32 cbs;
-    u64 timestamp;
-    u32 pbs_left;
-    u32 cbs_left;
+    /* Period in nanoseconds for one update of P token bucket */
+    u64 pir_period;
+    /* Number of bytes or packets to add to P token bucket on each update */
+    u64 pir_unit_per_period;
+    /* Period in nanoseconds for one update of C token bucket */
+    u64 cir_period;
+    /* Number of bytes or packets to add to C token bucket on each update */
+    u64 cir_unit_per_period;
+    /* Size of peak token bucket in bytes or packets */
+    u64 pbs;
+    /* Size of committed token bucket in bytes or packets */
+    u64 cbs;
+    /* Number of bytes or packets currently available in peak token bucket */
+    u64 pbs_left;
+    /* Number of bytes or packets currently available in committed token bucket */
+    u64 cbs_left;
+    /* Time of latest update of P token bucket */
+    u64 time_p;
+    /* Time of latest update of C token bucket */
+    u64 time_c;
+    /* For synchronization purposes in BPF */
+    struct bpf_spin_lock lock;
 };
 ```
 
 To configure meter you have to create an entry filing up following fields:
 For BYTES meter:
 
-- pir (Peak Information Rate) in kbits/s
-- cir (Committed Information Rate) in kbits/s
+- pir_period in ns
+- pir_unit_per_period bytes/pir_period
+- cir_period in ns
+- cir_unit_per_period bytes/cir_period
 - pbs (Peak Burst Size) in bytes
 - cbs (Committed Burst Size) in bytes
-- timestamp with zero value
 - pbs_left (PBS left) same value as pbs
 - cbs_left (CBS left) same value as cbs
+- time_p with zero value
+- time_c with zero value
 
 For PACKETS meter:
 
-- pir (Peak Information Rate) in packets/s
-- cir (Committed Information Rate) in packets/s
+- pir_period in ns
+- pir_unit_per_period packets/pir_period
+- cir_period in ns
+- cir_unit_per_period packets/cir_period
 - pbs (Peak Burst Size) in packets
 - cbs (Committed Burst Size) in packets
-- timestamp with zero value
 - pbs_left (PBS left) same value as pbs
 - cbs_left (CBS left) same value as cbs
+- time_p with zero value
+- time_c with zero value
 
 RFC 2698 explicitly says that buckets are initially full so values pbs_left and cbs_left must have buckets size.
