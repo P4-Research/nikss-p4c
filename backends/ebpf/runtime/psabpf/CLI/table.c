@@ -150,7 +150,8 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
  * Command line parsing functions
  *****************************************************************************/
 
-int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx)
+int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
+                    psabpf_table_entry_ctx_t *ctx, bool can_be_last)
 {
     if (is_keyword(**argv, "id")) {
         NEXT_ARGP_EXIT();
@@ -165,7 +166,17 @@ int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx, psabp
         if (error_code != 0)
             return error_code;
     }
-    NEXT_ARGP_EXIT();
+
+    if (can_be_last) {
+        if (*argc > 1) {
+            NEXT_ARGP();
+        } else {
+            (*argc)--;
+            (*argv)++;
+        }
+    } else {
+        NEXT_ARGP_EXIT();
+    }
 
     return 0;
 }
@@ -330,7 +341,7 @@ int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
     }
 
     /* 1. Get table */
-    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx) != 0)
+    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx, false) != 0)
         goto clean_up;
 
     /* 2. Get action */
@@ -397,7 +408,7 @@ int do_table_delete(int argc, char **argv)
         goto clean_up;
 
     /* 1. Get table */
-    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx) != 0)
+    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx, true) != 0)
         goto clean_up;
 
     /* 2. Get key */

@@ -406,7 +406,7 @@ int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
     for (size_t i = 0; i < entry->n_keys; i++) {
         psabpf_match_key_t *mk = entry->match_keys[i];
         if (mk->key_size > bytes_to_write) {
-            fprintf(stderr, "Provided keys are too long\n");
+            fprintf(stderr, "provided keys are too long\n");
             return -1;
         }
         memcpy(buffer, mk->data, mk->key_size);
@@ -416,7 +416,7 @@ int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
 
     /* TODO: maybe we should ignore this case */
     if (bytes_to_write > 0) {
-        fprintf(stderr, "Provided keys are too short\n");
+        fprintf(stderr, "provided keys are too short\n");
         return -1;
     }
     return 0;
@@ -485,7 +485,7 @@ int fill_value_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf
     for (size_t i = 0; i < entry->action->n_params; i++) {
         psabpf_action_param_t *param = &(entry->action->params[i]);
         if (param->len > bytes_to_write) {
-            fprintf(stderr, "Provided values are too long\n");
+            fprintf(stderr, "provided values are too long\n");
             return -1;
         }
         memcpy(buffer, param->data, param->len);
@@ -495,7 +495,7 @@ int fill_value_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf
 
     /* TODO: maybe we should ignore this case */
     if (bytes_to_write > 0) {
-        fprintf(stderr, "Provided values are too short\n");
+        fprintf(stderr, "provided values are too short\n");
         return -1;
     }
     return 0;
@@ -845,19 +845,64 @@ int psabpf_table_entry_update(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_
     return psabpf_table_entry_write(ctx, entry, BPF_EXIST);
 }
 
+int delete_all_table_entries(psabpf_table_entry_ctx_t *ctx)
+{
+    fprintf(stderr, "removing all entries from table\n");
+
+    char * key = malloc(ctx->key_size);
+    char * next_key = malloc(ctx->key_size);
+    int error_code = 0;
+
+    if (key == NULL || next_key == NULL) {
+        fprintf(stderr, "not enough memory\n");
+        error_code = -ENOMEM;
+        goto clean_up;
+    }
+
+    if (bpf_map_get_next_key(ctx->table_fd, NULL, next_key) != 0)
+        goto clean_up;  /* table empty */
+    do {
+        /* Swap buffers, so next_key will become key and next_key may be reused */
+        char * tmp_key = next_key;
+        next_key = key;
+        key = tmp_key;
+
+        int return_code = bpf_map_delete_elem(ctx->table_fd, key);
+        if (return_code != 0) {
+            fprintf(stderr, "failed to delete entry: %s\n", strerror(errno));
+            goto clean_up;
+        }
+    } while (bpf_map_get_next_key(ctx->table_fd, key, next_key) == 0);
+
+clean_up:
+    if (key)
+        free(key);
+    if (next_key)
+        free(next_key);
+    return error_code;
+}
+
 int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     char *key_buffer = NULL;
     int return_code = 0;
 
     if (ctx->table_fd < 0) {
-        fprintf(stderr, "can't add entry: table not opened\n");
+        fprintf(stderr, "can't delete entry: table not opened\n");
         return -EBADF;
     }
     if (ctx->key_size == 0) {
         fprintf(stderr, "zero-size key is not supported\n");
         return -ENOTSUP;
     }
+    if (ctx->table_type == BPF_MAP_TYPE_ARRAY) {
+        fprintf(stderr, "can't delete entries from array map\n");
+        return -EPERM;
+    }
+
+    /* remove all entries from table if key is not present */
+    if (entry->n_keys == 0)
+        return delete_all_table_entries(ctx);
 
     /* prepare buffers for map key */
     key_buffer = malloc(ctx->key_size);
@@ -866,8 +911,6 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
         return_code = -ENOMEM;
         goto clean_up;
     }
-
-    /* TODO: remove all entries from table */
 
     return_code = construct_buffer(key_buffer, ctx->key_size, ctx, entry,
                                    fill_key_btf_info, fill_key_byte_by_byte);
