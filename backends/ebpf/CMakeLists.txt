@@ -48,7 +48,6 @@ set (P4C_EBPF_SRCS
   ../bmv2/common/parser.cpp
   ../bmv2/common/programStructure.cpp
   ../bmv2/psa_switch/psaSwitch.cpp
-  psa/xdpTarget.cpp
   psa/ebpfPsaArch.cpp
   psa/xdpHelpProgram.cpp
   psa/ebpfPipeline.cpp
