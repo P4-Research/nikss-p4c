@@ -3,4 +3,9 @@
 target="${*:$#}"
 cd "$(dirname "$target")" || exit 1
 
-bash "$target"
+ARGS=""
+if [ "x$1" = "x--xdp" ]; then
+  ARGS="--xdp"
+fi
+
+bash "$target" $ARGS
