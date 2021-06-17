@@ -867,9 +867,9 @@ int delete_all_table_entries(psabpf_table_entry_ctx_t *ctx)
         next_key = key;
         key = tmp_key;
 
-        int return_code = bpf_map_delete_elem(ctx->table_fd, key);
-        if (return_code != 0) {
-            fprintf(stderr, "failed to delete entry: %s\n", strerror(errno));
+        if (bpf_map_delete_elem(ctx->table_fd, key) != 0) {
+            error_code = errno;
+            fprintf(stderr, "failed to delete entry: %s\naborting\n", strerror(error_code));
             goto clean_up;
         }
     } while (bpf_map_get_next_key(ctx->table_fd, key, next_key) == 0);

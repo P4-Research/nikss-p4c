@@ -16,6 +16,7 @@ TEST_PIPELINE_ID = 999
 TEST_PIPELINE_MOUNT_PATH = "/sys/fs/bpf/pipeline{}".format(TEST_PIPELINE_ID)
 PIPELINE_MAPS_MOUNT_PATH = "{}/maps".format(TEST_PIPELINE_MOUNT_PATH)
 
+
 class EbpfTest(BaseTest):
     switch_ns = 'test'
     test_prog_image = 'generic.o'  # default, if test case not specify program
@@ -123,22 +124,6 @@ class P4EbpfTest(EbpfTest):
 
     p4_file_path = ""
 
-    def table_add(self, table, keys, action=0, data=None, references=None):
-        cmd = "psabpf-ctl table add pipe {} {} ".format(TEST_PIPELINE_ID, table)
-        if references:
-            data = references
-            cmd = cmd + "ref "
-        else:
-            cmd = cmd + "id {} ".format(action)
-        cmd = cmd + "key "
-        for k in keys:
-            cmd = cmd + "{} ".format(k)
-        if data:
-            cmd = cmd + "data "
-            for d in data:
-                cmd = cmd + "{} ".format(d)
-        self.exec_ns_cmd(cmd, "Table add failed")
-
     def setUp(self):
         if not os.path.exists(self.p4_file_path):
             self.fail("P4 program not found, no such file.")
@@ -173,3 +158,36 @@ class P4EbpfTest(EbpfTest):
 
     def clone_session_delete(self, id):
         self.exec_ns_cmd("psabpf-ctl clone-session delete pipe {} id {}".format(TEST_PIPELINE_ID, id))
+
+    def table_write(self, method, table, keys, action=0, data=None, references=None):
+        """
+        Use table_add or table_update instead of this method
+        """
+        cmd = "psabpf-ctl table {} pipe {} {} ".format(method, TEST_PIPELINE_ID, table)
+        if references:
+            data = references
+            cmd = cmd + "ref "
+        else:
+            cmd = cmd + "id {} ".format(action)
+        cmd = cmd + "key "
+        for k in keys:
+            cmd = cmd + "{} ".format(k)
+        if data:
+            cmd = cmd + "data "
+            for d in data:
+                cmd = cmd + "{} ".format(d)
+        self.exec_ns_cmd(cmd, "Table {} failed".format(method))
+
+    def table_add(self, table, keys, action=0, data=None, references=None):
+        self.table_write(method="add", table=table, keys=keys, action=action, data=data, references=references)
+
+    def table_update(self, table, keys, action=0, data=None, references=None):
+        self.table_write(method="update", table=table, keys=keys, action=action, data=data, references=references)
+
+    def table_delete(self, table, keys=None):
+        cmd = "psabpf-ctl table delete pipe {} {} ".format(TEST_PIPELINE_ID, table)
+        if keys:
+            cmd = cmd + "key "
+            for k in keys:
+                cmd = cmd + "{} ".format(k)
+        self.exec_ns_cmd(cmd, "Table delete failed")

@@ -168,12 +168,7 @@ int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
     }
 
     if (can_be_last) {
-        if (*argc > 1) {
-            NEXT_ARGP();
-        } else {
-            (*argc)--;
-            (*argv)++;
-        }
+        NEXT_ARGP();
     } else {
         NEXT_ARGP_EXIT();
     }
@@ -253,6 +248,7 @@ int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
 
         has_any_key = true;
     } while ((*argc) > 1);
+    NEXT_ARGP();
 
     return 0;
 }
@@ -271,7 +267,7 @@ int parse_action_data(int *argc, char ***argv,
     do {
         NEXT_ARGP_EXIT();
         if (is_keyword(**argv, "priority"))
-            break;
+            return 0;
 
         bool ref_is_group_ref = false;
         if (indirect_table) {
@@ -293,6 +289,7 @@ int parse_action_data(int *argc, char ***argv,
         if (error_code != 0)
             return -1;
     } while ((*argc) > 1);
+    NEXT_ARGP();
 
     return 0;
 }
@@ -300,8 +297,9 @@ int parse_action_data(int *argc, char ***argv,
 int parse_entry_priority(int *argc, char ***argv)
 {
     if (is_keyword(**argv, "priority")) {
-        NEXT_ARGP_EXIT();
-        fprintf(stderr, "Priority not supported\n");
+        NEXT_ARGP_EXIT();  /* skip keyword */
+        fprintf(stderr, "Priority is not supported\n");
+        NEXT_ARGP();  /* skip priority value */
         return -1;
     }
     return 0;
@@ -360,6 +358,11 @@ int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
     if (parse_entry_priority(&argc, &argv) != 0)
         goto clean_up;
 
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto clean_up;
+    }
+
     psabpf_table_entry_action(&entry, &action);
 
     if (write_type == TABLE_ADD_NEW_ENTRY)
@@ -393,12 +396,6 @@ int do_table_delete(int argc, char **argv)
     psabpf_context_t psabpf_ctx;
     int error_code = -1;
 
-    /* no NEXT_ARG before, so this check must be preserved */
-    if (argc < 1) {
-        fprintf(stderr, "too few parameters\n");
-        return -1;
-    }
-
     psabpf_context_init(&psabpf_ctx);
     psabpf_table_entry_ctx_init(&ctx);
     psabpf_table_entry_init(&entry);
@@ -407,6 +404,12 @@ int do_table_delete(int argc, char **argv)
     if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != 0)
         goto clean_up;
 
+    /* no NEXT_ARG before in version from this file, so this check must be preserved */
+    if (argc < 1) {
+        fprintf(stderr, "too few parameters\n");
+        goto clean_up;
+    }
+
     /* 1. Get table */
     if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx, true) != 0)
         goto clean_up;
@@ -414,6 +417,11 @@ int do_table_delete(int argc, char **argv)
     /* 2. Get key */
     if (parse_table_key(&argc, &argv, &entry) != 0)
         goto clean_up;
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto clean_up;
+    }
 
     error_code = psabpf_table_entry_del(&ctx, &entry);
 

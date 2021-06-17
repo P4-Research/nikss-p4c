@@ -2,6 +2,7 @@
 #define __PSABPF_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef uint32_t psabpf_pipeline_id_t;
 
