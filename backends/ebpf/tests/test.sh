@@ -48,7 +48,9 @@ set -x
 declare -a INTERFACES=("eth0" "eth1" "eth2" "eth3" "eth4" "eth5")
 # For PTF tests parameter
 interface_list=$( IFS=$','; echo "${INTERFACES[*]}" )
-#interface_list="psa_recirc,""$interface_list"
+if [ "$xdpTesting" = false ] ; then
+  interface_list="psa_recirc,""$interface_list"
+fi
 # TODO: similar list with interfaces for ptf
 
 ip netns add switch
