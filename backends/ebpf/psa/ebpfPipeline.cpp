@@ -388,7 +388,8 @@ void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
 
 // =====================XDPPipeline====================================
 void XDPPipeline::emitPacketLength(CodeBuilder *builder) {
-    builder->appendFormat("%s->data_end - %s->data", this->contextVar.c_str(), this->contextVar.c_str());
+    builder->appendFormat("%s->data_end - %s->data",
+                          this->contextVar.c_str(), this->contextVar.c_str());
 }
 
 // =====================XDPIngressPipeline=============================
