@@ -396,6 +396,7 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     cstring msgStr, varStr;
 
     control->codeGen->asPointerVariables.clear();
+    deparser->codeGen->asPointerVariables.clear();
     builder->target->emitCodeSection(builder, sectionName);
     builder->emitIndent();
     builder->appendFormat("int %s(struct xdp_md *%s)", functionName, model.CPacketName.str());
@@ -492,8 +493,8 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
     cstring msgStr, varStr;
 
     control->codeGen->asPointerVariables.clear();
+    deparser->codeGen->asPointerVariables.clear();
     builder->target->emitCodeSection(builder, sectionName);
-    builder->emitIndent();
     builder->appendFormat("int %s(struct xdp_md *%s)",
                             functionName, model.CPacketName.str());
     builder->spc();
@@ -554,7 +555,7 @@ void XDPEgressPipeline::emitPSAControlDataTypes(CodeBuilder* builder) {
 
     builder->emitIndent();
     builder->appendFormat("struct psa_egress_input_metadata_t %s = {\n"
-                          "        .egress_port = skb->ingress_ifindex,\n"
+                          "        .egress_port = skb->egress_ifindex,\n"
                           "        .egress_timestamp = bpf_ktime_get_ns(),\n"
                           "        .parser_error = %s,\n"
                           "    };", inputMdVar.c_str(), errorVar.c_str());
