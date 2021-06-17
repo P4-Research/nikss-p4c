@@ -183,19 +183,19 @@ cstring EBPFMeterPSA::meterExecuteFunc(bool trace) {
         meterExecuteFunc = meterExecuteFunc
                 .replace(cstring("%trace_msg_meter_green%"),
                          "                bpf_trace_message(\""
-                         "Meter: GREEN\n\");\n");
+                         "Meter: GREEN\\n\");\n");
         meterExecuteFunc = meterExecuteFunc
                 .replace(cstring("%trace_msg_meter_yellow%"),
                          "                bpf_trace_message(\""
-                         "Meter: YELLOW\n\");\n");
+                         "Meter: YELLOW\\n\");\n");
         meterExecuteFunc = meterExecuteFunc
                 .replace(cstring("%trace_msg_meter_red%"),
                          "        bpf_trace_message(\""
-                         "Meter: RED\n\");\n");
+                         "Meter: RED\\n\");\n");
         meterExecuteFunc = meterExecuteFunc
                 .replace(cstring("%trace_msg_meter_no_value%"),
                          "        bpf_trace_message(\"Meter: No meter value! "
-                         "Returning default GREEN\n\");");
+                         "Returning default GREEN\\n\");");
         meterExecuteFunc = meterExecuteFunc
                 .replace(cstring("%trace_msg_meter_execute_bytes%"),
                          "        bpf_trace_message(\"Meter: execute BYTES\\n\");\n");
