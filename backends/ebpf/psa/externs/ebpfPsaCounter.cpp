@@ -174,10 +174,10 @@ void EBPFCounterPSA::emitDirectMethodInvocation(CodeBuilder* builder,
     }
     cstring msgStr = Util::printf_format("Counter: updating %s, packets=1, bytes=%%u",
                                          instanceName.c_str());
-    cstring varStr = Util::printf_format("%s->len", pipeline->contextVar.c_str());
+    cstring varStr = Util::printf_format("%s", pipeline->lengthVar.c_str());
     builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, varStr.c_str());
 
-    emitCounterUpdate(builder, target, false, pipeline->contextVar, "");
+    emitCounterUpdate(builder, target, false, pipeline->lengthVar, "");
 
     msgStr = Util::printf_format("Counter: %s updated", instanceName.c_str());
     builder->target->emitTraceMessage(builder, msgStr.c_str());
@@ -207,21 +207,21 @@ void EBPFCounterPSA::emitCount(CodeBuilder* builder,
 
     msgStr = Util::printf_format("Counter: updating %s, id=%%u, packets=1, bytes=%%u",
                                  instanceName.c_str());
-    varStr = Util::printf_format("%s->len", pipeline->contextVar.c_str());
+    varStr = Util::printf_format("%s", pipeline->lengthVar.c_str());
     builder->target->emitTraceMessage(builder, msgStr.c_str(), 2, keyName.c_str(), varStr.c_str());
 
     builder->emitIndent();
     builder->target->emitTableLookup(builder, dataMapName, keyName, valueName);
     builder->endOfStatement(true);
 
-    emitCounterUpdate(builder, valueName, true, pipeline->contextVar, keyName);
+    emitCounterUpdate(builder, valueName, true, pipeline->lengthVar, keyName);
 
     msgStr = Util::printf_format("Counter: %s updated", instanceName.c_str());
     builder->target->emitTraceMessage(builder, msgStr.c_str());
 }
 
 void EBPFCounterPSA::emitCounterUpdate(CodeBuilder* builder, const cstring target,
-                                       bool targetIsPtr, const cstring contextVar,
+                                       bool targetIsPtr, const cstring lengthVar,
                                        const cstring keyName) {
     cstring targetWAccess, varStr;
     cstring initValueName = program->refMap->newName("init_val");
@@ -239,8 +239,8 @@ void EBPFCounterPSA::emitCounterUpdate(CodeBuilder* builder, const cstring targe
 
     if (type == CounterType::BYTES || type == CounterType::PACKETS_AND_BYTES) {
         builder->emitIndent();
-        builder->appendFormat("__sync_fetch_and_add(&(%sbytes), %s->len)",
-                              targetWAccess.c_str(), contextVar.c_str());
+        builder->appendFormat("__sync_fetch_and_add(&(%sbytes), %s)",
+                              targetWAccess.c_str(), lengthVar.c_str());
         builder->endOfStatement(true);
 
         varStr = Util::printf_format("%sbytes", targetWAccess.c_str());
@@ -266,7 +266,7 @@ void EBPFCounterPSA::emitCounterUpdate(CodeBuilder* builder, const cstring targe
                                               "Counter: data not found, adding new instance");
             builder->emitIndent();
             builder->appendFormat("%s %s = ", valueTypeName.c_str(), target.c_str());
-            emitCounterInitializer(builder, contextVar);
+            emitCounterInitializer(builder, lengthVar);
             builder->endOfStatement(true);
 
             builder->emitIndent();
@@ -280,11 +280,11 @@ void EBPFCounterPSA::emitCounterUpdate(CodeBuilder* builder, const cstring targe
     }
 }
 
-void EBPFCounterPSA::emitCounterInitializer(CodeBuilder* builder, const cstring contextVar) {
+void EBPFCounterPSA::emitCounterInitializer(CodeBuilder* builder, const cstring lengthVar) {
     builder->blockStart();
     if (type == CounterType::BYTES || type == CounterType::PACKETS_AND_BYTES) {
         builder->emitIndent();
-        builder->appendFormat(".bytes = %s->len,", contextVar.c_str());
+        builder->appendFormat(".bytes = %s,", lengthVar.c_str());
         builder->newline();
     }
     if (type == CounterType::PACKETS || type == CounterType::PACKETS_AND_BYTES) {

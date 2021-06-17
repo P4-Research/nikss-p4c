@@ -75,6 +75,11 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("unsigned char %s;", byteVar.c_str());
     builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat("u32 %s = ", lengthVar.c_str());
+    emitPacketLength(builder);
+    builder->endOfStatement(true);
 }
 
 void EBPFPipeline::emitUserMetadataInstance(CodeBuilder* builder) {
@@ -104,6 +109,10 @@ void EBPFPipeline::emitGlobalMetadataInitializer(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendLine(
             "struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->cb;");
+}
+
+void EBPFPipeline::emitPacketLength(CodeBuilder *builder) {
+    builder->appendFormat("%s->len", this->contextVar.c_str());
 }
 
 // =====================TCIngressPipeline=============================
@@ -154,6 +163,7 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
 
     emitUserMetadataInstance(builder);
     emitLocalVariables(builder);
+
     msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, "meta->packet_path");
     parser->emit(builder);
@@ -374,6 +384,11 @@ void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
 
     builder->appendFormat("return %s", builder->target->forwardReturnCode());
     builder->endOfStatement(true);
+}
+
+// =====================XDPPipeline====================================
+void XDPPipeline::emitPacketLength(CodeBuilder *builder) {
+    builder->appendFormat("%s->data_end - %s->data", this->contextVar.c_str(), this->contextVar.c_str());
 }
 
 // =====================XDPIngressPipeline=============================
