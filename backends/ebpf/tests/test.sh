@@ -84,6 +84,7 @@ silent_echo_conf() {
 } 2> /dev/null
 silent_echo_conf
 
+TEST_CASE=$@
 TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
 
 # Add path to our libbpf
@@ -94,7 +95,9 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LIBBPF_LD_PATH
 ulimit -l 65536
 
 if [ "$xdpTesting" = true ] ; then
+  echo -e "Running XDP tests."
   TEST_PARAMS+=';xdp=True'
+  TEST_CASE=$2
 fi
 
 # Start tests
@@ -102,4 +105,4 @@ ptf \
   --test-dir ptf/ \
   --test-params=$TEST_PARAMS \
   --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
-  --interface 4@s1-eth4 --interface 5@s1-eth5 $2
+  --interface 4@s1-eth4 --interface 5@s1-eth5 $TEST_CASE
