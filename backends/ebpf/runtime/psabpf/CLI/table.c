@@ -8,16 +8,6 @@
 #include "../include/psabpf.h"
 #include "table.h"
 
-#ifdef NEXT_ARG
-    #undef NEXT_ARG
-#endif
-#define NEXT_ARG()	({ argc--; argv++; if (argc < 1) { fprintf(stderr, "too few parameters\n"); exit(1); }})
-
-#ifdef NEXT_ARGP
-    #undef NEXT_ARGP
-#endif
-#define NEXT_ARGP()	({ (*argc)--; (*argv)++; if ((*argc) < 1) { fprintf(stderr, "too few parameters\n"); exit(1); }})
-
 /******************************************************************************
  * Data translation functions to byte stream
  *****************************************************************************/
@@ -163,11 +153,11 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
 int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx)
 {
     if (is_keyword(**argv, "id")) {
-        NEXT_ARGP();
+        NEXT_ARGP_EXIT();
         fprintf(stderr, "id: table access not supported\n");
         return -1;
     } else if (is_keyword(**argv, "name")) {
-        NEXT_ARGP();
+        NEXT_ARGP_EXIT();
         fprintf(stderr, "name: table access not supported yet\n");
         return -1;
     } else {
@@ -175,7 +165,7 @@ int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx, psabp
         if (error_code != 0)
             return error_code;
     }
-    NEXT_ARGP();
+    NEXT_ARGP_EXIT();
 
     return 0;
 }
@@ -186,7 +176,7 @@ int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
     *indirect_table = false;
 
     if (is_keyword(**argv, "id")) {
-        NEXT_ARGP();
+        NEXT_ARGP_EXIT();
         char *ptr;
         psabpf_action_set_id(action, strtoul(**argv, &ptr, 0));
         if (*ptr) {
@@ -200,7 +190,7 @@ int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
         fprintf(stderr, "specify an action by name is not supported yet\n");
         return -1;
     }
-    NEXT_ARGP();
+    NEXT_ARGP_EXIT();
 
     return 0;
 }
@@ -214,7 +204,7 @@ int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
         return 0;
 
     do {
-        NEXT_ARGP();
+        NEXT_ARGP_EXIT();
         if (is_keyword(**argv, "data") || is_keyword(**argv, "priority"))
             return 0;
 
@@ -268,7 +258,7 @@ int parse_action_data(int *argc, char ***argv, psabpf_table_entry_t *entry,
     }
 
     do {
-        NEXT_ARGP();
+        NEXT_ARGP_EXIT();
         if (is_keyword(**argv, "priority"))
             break;
 
@@ -276,7 +266,7 @@ int parse_action_data(int *argc, char ***argv, psabpf_table_entry_t *entry,
         if (indirect_table) {
             if (is_keyword(**argv, "group")) {
                 ref_is_group_ref = true;
-                NEXT_ARGP();
+                NEXT_ARGP_EXIT();
             }
         }
 
@@ -299,7 +289,7 @@ int parse_action_data(int *argc, char ***argv, psabpf_table_entry_t *entry,
 int parse_entry_priority(int *argc, char ***argv)
 {
     if (is_keyword(**argv, "priority")) {
-        NEXT_ARGP();
+        NEXT_ARGP_EXIT();
         fprintf(stderr, "Priority not supported\n");
         return -1;
     }
