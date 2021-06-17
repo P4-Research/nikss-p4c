@@ -26,7 +26,7 @@ class RegisterActionPSATest(P4EbpfTest):
     def runTest(self):
         pkt = testutils.simple_ip_packet()
 
-        self.update_map(name="ingress_tbl_fwd", key="hex 04 00 00 00", value="hex 01 00 00 00 05 00 00 00")
+        self.table_add(table="ingress_tbl_fwd", keys=[4], action=1, data=[5])
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)  # Checks action run
 

@@ -39,8 +39,8 @@ class EbpfTest(BaseTest):
         if process.returncode != 0:
             logger.info("Command failed: %s", command)
             logger.info("Return code: %d", process.returncode)
-            logger.info("STDOUT: %s", stdout_data)
-            logger.info("STDERR: %s", stderr_data)
+            logger.info("STDOUT: %s", stdout_data.decode("utf-8"))
+            logger.info("STDERR: %s", stderr_data.decode("utf-8"))
             if do_fail:
                 self.fail("Command failed (see above for details): {}".format(str(do_fail)))
         return process.returncode, stdout_data, stderr_data
@@ -122,6 +122,22 @@ class P4EbpfTest(EbpfTest):
     """
 
     p4_file_path = ""
+
+    def table_add(self, table, keys, action=0, data=None, references=None):
+        cmd = "psabpf-ctl table add pipe {} {} ".format(TEST_PIPELINE_ID, table)
+        if references:
+            data = references
+            cmd = cmd + "ref "
+        else:
+            cmd = cmd + "id {} ".format(action)
+        cmd = cmd + "key "
+        for k in keys:
+            cmd = cmd + "{} ".format(k)
+        if data:
+            cmd = cmd + "data "
+            for d in data:
+                cmd = cmd + "{} ".format(d)
+        self.exec_ns_cmd(cmd, "Table add failed")
 
     def setUp(self):
         if not os.path.exists(self.p4_file_path):

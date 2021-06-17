@@ -83,6 +83,16 @@ struct bpf_elf_map {
 /* simple descriptor which replaces the kernel sk_buff structure */
 #define SK_BUFF struct __sk_buff
 
+/* from iproute2, annotate table with BTF which allows to read types at runtime */
+#define BPF_ANNOTATE_KV_PAIR(name, type_key, type_val)  \
+    struct ____btf_map_##name {                         \
+        type_key key;                                   \
+        type_val value;                                 \
+    };                                                  \
+    struct ____btf_map_##name                           \
+        __attribute__ ((section(".maps." #name), used)) \
+        ____btf_map_##name = {};
+
 #define REGISTER_START()
 #ifndef BTF
 /* Note: pinning exports the table name globally, do not remove */

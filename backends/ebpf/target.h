@@ -149,6 +149,9 @@ class KernelSamplesTarget : public Target {
     cstring dropReturnCode() const override { return "TC_ACT_SHOT"; }
     cstring abortReturnCode() const override { return "TC_ACT_SHOT"; }
     cstring sysMapPath() const override { return "/sys/fs/bpf/tc/globals"; }
+
+    void annotateTableWithBTF(Util::SourceCodeBuilder* builder, cstring name,
+                              cstring keyType, cstring valueType) const;
 };
 
 // Represents a target compiled by bcc that uses the TC
