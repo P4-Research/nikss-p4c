@@ -21,6 +21,7 @@ P4C=p4c-ebpf
 TARGET=kernel
 # Extra arguments for the compiler
 ARGS=
+#PSA_PORT_RECIRCULATE=3
 
 # If needed, bpf target files can be hardcoded here
 # This can be any file of type ".c", ".bc" or, ".o"

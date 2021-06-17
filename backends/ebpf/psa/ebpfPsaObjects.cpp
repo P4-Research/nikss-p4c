@@ -2,6 +2,7 @@
 #include "ebpfPsaObjects.h"
 #include "ebpfPipeline.h"
 
+
 namespace EBPF {
 
 // =====================ActionTranslationVisitorPSA=============================
@@ -177,21 +178,26 @@ void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
 void EBPFTablePSA::emitDefaultActionInitializer(CodeBuilder *builder) {
     const IR::P4Table* t = table->container;
     const IR::Expression* defaultAction = t->getDefaultAction();
+    
     BUG_CHECK(defaultAction->is<IR::MethodCallExpression>(),
               "%1%: expected an action call", defaultAction);
-    auto mce = defaultAction->to<IR::MethodCallExpression>();
 
-    auto value = program->refMap->newName("value");
-    emitTableValue(builder, mce, value.c_str());
+    if(defaultAction->to<IR::MethodCallExpression>()->method->to<IR::PathExpression>()->path->name.originalName != P4::P4CoreLibrary::instance.noAction.name) {
+        auto mce = defaultAction->to<IR::MethodCallExpression>();
+        auto value = program->refMap->newName("value");
+        emitTableValue(builder, mce, value.c_str());
 
-    auto ret = program->refMap->newName("ret");
-    builder->emitIndent();
-    builder->appendFormat("int %s = ", ret.c_str());
-    builder->target->emitTableUpdate(builder, defaultActionMapName,
-                                     program->zeroKey.c_str(), value.c_str());
-    builder->newline();
+        auto ret = program->refMap->newName("ret");
+        builder->emitIndent();
+        builder->appendFormat("int %s = ", ret.c_str());
+        builder->target->emitTableUpdate(builder, defaultActionMapName,
+                                         program->zeroKey.c_str(), value.c_str());
+        builder->newline();
 
-    emitMapUpdateTraceMsg(builder, defaultActionMapName, ret);
+        emitMapUpdateTraceMsg(builder, defaultActionMapName, ret);
+    }
+
+
 }
 
 void EBPFTablePSA::emitMapUpdateTraceMsg(CodeBuilder *builder, cstring mapName,
