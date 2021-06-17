@@ -133,7 +133,7 @@ typedef struct psabpf_table_entry_context {
     uint32_t value_size;
     bool is_indirect;
 
-    // BTF metadata are associated with eBPF program, eBPF map do not has own BTF
+    // BTF metadata are associated with eBPF program, eBPF map do not have own BTF
     int associated_prog;
     void * btf;
     uint32_t btf_type_id;

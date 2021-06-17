@@ -38,7 +38,7 @@ int update_context(const char *data, size_t len, void *ctx, enum destination_ctx
 }
 
 /* TODO: Is there any ready to use function for this purpose? */
-int is_valid_MAC_address(const char * data)
+int is_valid_mac_address(const char * data)
 {
     if (strlen(data) != 2*6+5)  /* 11:22:33:44:55:66 */
         return 0;
@@ -141,7 +141,7 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
     /* TODO: Try parse IPv6 (similar to IPv4) */
 
     /* Try parse as a MAC address */
-    if (is_valid_MAC_address(data) != 0) {
+    if (is_valid_mac_address(data) != 0) {
         int v[6];
         if (sscanf(data, "%x%*c%x%*c%x%*c%x%*c%x%*c%x",
                    &(v[0]), &(v[1]), &(v[2]), &(v[3]), &(v[4]), &(v[5])) == 6) {
@@ -159,27 +159,6 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
 /******************************************************************************
  * Command line parsing functions
  *****************************************************************************/
-
-int parse_pipeline_id(int *argc, char ***argv, psabpf_context_t * psabpf_ctx)
-{
-    if (!is_keyword(**argv, "pipe")) {
-        fprintf(stderr, "expected 'pipe' keyword\n");
-        return -1;
-    }
-    NEXT_ARGP();
-
-    char *endptr;
-    psabpf_pipeline_id_t id = strtoul(**argv, &endptr, 0);
-    if (*endptr) {
-        fprintf(stderr, "can't parse '%s'\n", **argv);
-        return -1;
-    }
-    psabpf_context_set_pipeline(psabpf_ctx, id);
-
-    NEXT_ARGP();
-
-    return 0;
-}
 
 int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx)
 {
@@ -340,12 +319,6 @@ int do_table_add(int argc, char **argv)
     int error_code = -1;
     bool table_is_indirect = false;
 
-    /* no NEXT_ARG before, so this check must be preserved */
-    if (argc < 1) {
-        fprintf(stderr, "too few parameters\n");
-        return -1;
-    }
-
     psabpf_context_init(&psabpf_ctx);
     psabpf_table_entry_ctx_init(&ctx);
     psabpf_table_entry_init(&entry);
@@ -354,6 +327,12 @@ int do_table_add(int argc, char **argv)
     /* 0. Get the pipeline id */
     if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != 0)
         goto clean_up;
+
+    /* no NEXT_ARG before in version from this file, so this check must be preserved */
+    if (argc < 1) {
+        fprintf(stderr, "too few parameters\n");
+        goto clean_up;
+    }
 
     /* 1. Get table */
     if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx) != 0)
@@ -393,17 +372,17 @@ int do_table_help(int argc, char **argv)
     (void) argc; (void) argv;
 
     fprintf(stderr,
-            "Usage: %s table add pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
-            "       %s table add pipe ID TABLE ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]\n"
+            "Usage: %1$s table add pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
+            "       %1$s table add pipe ID TABLE ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]\n"
             "Unimplemented commands:\n"
-            "       %s table update pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
-            "       %s table del pipe ID TABLE [key MATCH_KEY]\n"
-            "       %s table get pipe ID TABLE [key MATCH_KEY]\n"
-            "       %s table default pipe ID TABLE set ACTION [data ACTION_PARAMS]\n"
-            "       %s table default pipe ID TABLE\n"
+            "       %1$s table update pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
+            "       %1$s table del pipe ID TABLE [key MATCH_KEY]\n"
+            "       %1$s table get pipe ID TABLE [key MATCH_KEY]\n"
+            "       %1$s table default pipe ID TABLE set ACTION [data ACTION_PARAMS]\n"
+            "       %1$s table default pipe ID TABLE\n"
             /* for far future */
-            "       %s table timeout pipe ID TABLE set { on TTL | off }\n"
-            "       %s table timeout pipe ID TABLE\n"
+            "       %1$s table timeout pipe ID TABLE set { on TTL | off }\n"
+            "       %1$s table timeout pipe ID TABLE\n"
             "\n"
             "       TABLE := { id TABLE_ID | name FILE | TABLE_FILE }\n"
             "       ACTION := { id ACTION_ID | ACTION_NAME }\n"
@@ -419,7 +398,6 @@ int do_table_help(int argc, char **argv)
             "       TERNARY_KEY := { DATA%%MASK }\n"
             "       ACTION_PARAMS := { DATA }\n"
             "",
-            program_name, program_name, program_name, program_name, program_name, program_name,
-            program_name, program_name, program_name);
+            program_name);
     return 0;
 }

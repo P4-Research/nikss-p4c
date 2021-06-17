@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include "../include/psabpf.h"
 
 #ifndef P4C_COMMON_H
 #define P4C_COMMON_H
@@ -12,6 +13,8 @@ struct cmd {
 };
 
 bool is_keyword(const char *word, const char *str);
+
+int parse_pipeline_id(int *argc, char ***argv, psabpf_context_t * psabpf_ctx);
 
 extern const char *program_name;
 

@@ -176,9 +176,9 @@ int do_pipeline_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
     fprintf(stderr,
-            "Usage: %s pipeline load id ID PATH\n"
-            "       %s pipeline unload id ID\n"
+            "Usage: %1$s pipeline load id ID PATH\n"
+            "       %1$s pipeline unload id ID\n"
             "",
-            program_name, program_name);
+            program_name);
     return 0;
 }
