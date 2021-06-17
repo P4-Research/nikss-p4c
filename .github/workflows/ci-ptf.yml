@@ -27,5 +27,5 @@ jobs:
         sudo docker run --privileged -v /sys/fs/bpf:/sys/fs/bpf -w /p4c/build p4c-ptf bash -c 'make check-ebpf-psa-ptf; EXIT_CODE=$?; cat Testing/Temporary/LastTest.log; exit $EXIT_CODE'
 
     - name: Run PTF tests for XDP (Linux)
-        run: |
+      run: |
           sudo docker run --privileged -v /sys/fs/bpf:/sys/fs/bpf -w /p4c/build p4c-ptf bash -c 'make check-ebpf-psa-ptf-xdp; EXIT_CODE=$?; cat Testing/Temporary/LastTest.log; exit $EXIT_CODE'
