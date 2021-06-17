@@ -44,15 +44,19 @@ EBPFMeterPSA::MeterType EBPFMeterPSA::toType(const int typeCode) {
 
 EBPFType *EBPFMeterPSA::createValueType() {
     auto vec = IR::IndexedVector<IR::StructField>();
-    auto bits_32 = new IR::Type_Bits(32, false);
     auto bits_64 = new IR::Type_Bits(64, false);
-    vec.push_back(new IR::StructField(IR::ID("pir"), bits_32));
-    vec.push_back(new IR::StructField(IR::ID("cir"), bits_32));
-    vec.push_back(new IR::StructField(IR::ID("pbs"), bits_32));
-    vec.push_back(new IR::StructField(IR::ID("cbs"), bits_32));
-    vec.push_back(new IR::StructField(IR::ID("timestamp"), bits_64));
-    vec.push_back(new IR::StructField(IR::ID("pbs_left"), bits_32));
-    vec.push_back(new IR::StructField(IR::ID("cbs_left"), bits_32));
+    auto spinLock = new IR::Type_Struct(IR::ID("bpf_spin_lock"));
+    vec.push_back(new IR::StructField(IR::ID("pir_period"), bits_64));
+    vec.push_back(new IR::StructField(IR::ID("pir_unit_per_period"), bits_64));
+    vec.push_back(new IR::StructField(IR::ID("cir_period"), bits_64));
+    vec.push_back(new IR::StructField(IR::ID("cir_unit_per_period"), bits_64));
+    vec.push_back(new IR::StructField(IR::ID("pbs"), bits_64));
+    vec.push_back(new IR::StructField(IR::ID("cbs"), bits_64));
+    vec.push_back(new IR::StructField(IR::ID("pbs_left"), bits_64));
+    vec.push_back(new IR::StructField(IR::ID("cbs_left"), bits_64));
+    vec.push_back(new IR::StructField(IR::ID("time_p"), bits_64));
+    vec.push_back(new IR::StructField(IR::ID("time_c"), bits_64));
+    vec.push_back(new IR::StructField(IR::ID("lock"), spinLock));
     auto valueMeterName = program->refMap->newName("value_meter");
     auto valueStructType = new IR::Type_Struct(IR::ID(valueMeterName), vec);
     return EBPFTypeFactory::instance->create(valueStructType);
