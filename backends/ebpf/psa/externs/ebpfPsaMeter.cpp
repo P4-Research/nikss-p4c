@@ -185,7 +185,8 @@ cstring EBPFMeterPSA::meterExecuteFunc(bool trace) {
                                "}\n"
                                "\n"
                                "static __always_inline\n"
-                               "enum PSA_MeterColor_t meter_execute_packets(void *map, void *key, u64 *time_ns) {\n"
+                               "enum PSA_MeterColor_t meter_execute_packets(void *map, "
+                               "void *key, u64 *time_ns) {\n"
                                "    meter_value *value = BPF_MAP_LOOKUP_ELEM(*map, key);\n"
                                "    return meter_execute_packets_value(value, time_ns);\n"
                                "}\n";
