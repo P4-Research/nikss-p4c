@@ -136,11 +136,11 @@ struct bpf_elf_map SEC("maps") NAME = {          \
     .flags       = FLAGS,            \
 };
 #else
-#define REGISTER_TABLE(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES) \
+#define REGISTER_TABLE(NAME, TYPE, KEY_TYPE, VALUE_TYPE, MAX_ENTRIES) \
 struct {                                 \
     __uint(type, TYPE);                  \
-    __uint(key_size, KEY_SIZE);          \
-    __uint(value_size, VALUE_SIZE);      \
+    KEY_TYPE *key;                       \
+    VALUE_TYPE *value;                   \
     __uint(max_entries, MAX_ENTRIES);    \
     __uint(pinning, LIBBPF_PIN_BY_NAME); \
 } NAME SEC(".maps");

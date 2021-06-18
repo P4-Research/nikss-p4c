@@ -62,9 +62,7 @@ struct bpf_map_def SEC("maps") ingress_meter1 = {
 BPF_ANNOTATE_KV_PAIR(ingress_meter1, ingress_meter1_key, meter_value);
 
 static __always_inline
-enum PSA_MeterColor_t meter_execute(void *map, u32 *packet_len, void *key, u64 *time_ns) {
-    meter_value *value = BPF_MAP_LOOKUP_ELEM(*map, key);
-
+enum PSA_MeterColor_t meter_execute(meter_value *value, u32 *packet_len, u64 *time_ns) {
     if (value != NULL) {
         u64 delta_p, delta_c;
         u64 n_periods_p, n_periods_c, tokens_pbs, tokens_cbs;
@@ -116,16 +114,28 @@ enum PSA_MeterColor_t meter_execute(void *map, u32 *packet_len, void *key, u64 *
 }
 
 static __always_inline
-enum PSA_MeterColor_t meter_execute_bytes(void *map, u32 *packet_len, void *key, u64 *time_ns) {
+enum PSA_MeterColor_t meter_execute_bytes_value(meter_value *value, u32 *packet_len, u64 *time_ns) {
     bpf_trace_message("Meter: execute BYTES\n");
-    return meter_execute(map, packet_len, key, time_ns);
+    return meter_execute(value, packet_len, time_ns);
+}
+
+static __always_inline
+enum PSA_MeterColor_t meter_execute_bytes(void *map, u32 *packet_len, void *key, u64 *time_ns) {
+    meter_value *value = BPF_MAP_LOOKUP_ELEM(*map, key);
+    return meter_execute_bytes_value(value, packet_len, time_ns);
+}
+
+static __always_inline
+enum PSA_MeterColor_t meter_execute_packets_value(meter_value *value, u64 *time_ns) {
+    bpf_trace_message("Meter: execute PACKETS\n");
+    u32 len = 1;
+    return meter_execute(value, &len, time_ns);
 }
 
 static __always_inline
 enum PSA_MeterColor_t meter_execute_packets(void *map, void *key, u64 *time_ns) {
-    bpf_trace_message("Meter: execute PACKETS\n");
-    u32 len = 1;
-    return meter_execute(map, &len, key, time_ns);
+    meter_value *value = BPF_MAP_LOOKUP_ELEM(*map, key);
+    return meter_execute_packets_value(value, time_ns);
 }
 
 SEC("classifier/tc-ingress")

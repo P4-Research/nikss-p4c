@@ -108,10 +108,8 @@ void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* met
 
 cstring EBPFMeterPSA::meterExecuteFunc(bool trace) {
     cstring meterExecuteFunc = "static __always_inline\n"
-                               "enum PSA_MeterColor_t meter_execute(void *map, "
-                               "u32 *packet_len, void *key, u64 *time_ns) {\n"
-                               "    meter_value *value = BPF_MAP_LOOKUP_ELEM(*map, key);\n"
-                               "\n"
+                               "enum PSA_MeterColor_t meter_execute(meter_value *value, "
+                               "u32 *packet_len, u64 *time_ns) {\n"
                                "    if (value != NULL) {\n"
                                "        u64 delta_p, delta_c;\n"
                                "        u64 n_periods_p, n_periods_c, tokens_pbs, tokens_cbs;\n"
@@ -165,43 +163,56 @@ cstring EBPFMeterPSA::meterExecuteFunc(bool trace) {
                                "}\n"
                                "\n"
                                "static __always_inline\n"
-                               "enum PSA_MeterColor_t meter_execute_bytes(void *map, "
-                               "u32 *packet_len, void *key, u64 *time_ns) {\n"
+                               "enum PSA_MeterColor_t meter_execute_bytes_value("
+                               "meter_value *value, u32 *packet_len, u64 *time_ns) {\n"
                                     "%trace_msg_meter_execute_bytes%"
-                               "    return meter_execute(map, packet_len, key, time_ns);\n"
+                               "    return meter_execute(value, packet_len, time_ns);\n"
                                "}\n"
                                "\n"
                                "static __always_inline\n"
-                               "enum PSA_MeterColor_t meter_execute_packets(void *map, "
-                               "void *key, u64 *time_ns) {\n"
+                               "enum PSA_MeterColor_t meter_execute_bytes("
+                               "void *map, u32 *packet_len, void *key, u64 *time_ns) {\n"
+                               "    meter_value *value = BPF_MAP_LOOKUP_ELEM(*map, key);\n"
+                               "    return meter_execute_bytes_value(value, packet_len, time_ns);\n"
+                               "}\n"
+                               "\n"
+                               "static __always_inline\n"
+                               "enum PSA_MeterColor_t meter_execute_packets_value("
+                               "meter_value *value, u64 *time_ns) {\n"
                                     "%trace_msg_meter_execute_packets%"
                                "    u32 len = 1;\n"
-                               "    return meter_execute(map, &len, key, time_ns);\n"
-                               "}";
+                               "    return meter_execute(value, &len, time_ns);\n"
+                               "}\n"
+                               "\n"
+                               "static __always_inline\n"
+                               "enum PSA_MeterColor_t meter_execute_packets(void *map, void *key, u64 *time_ns) {\n"
+                               "    meter_value *value = BPF_MAP_LOOKUP_ELEM(*map, key);\n"
+                               "    return meter_execute_packets_value(value, time_ns);\n"
+                               "}\n";
 
     if (trace) {
         meterExecuteFunc = meterExecuteFunc
                 .replace(cstring("%trace_msg_meter_green%"),
-                         "                bpf_trace_message(\""
+                         "        bpf_trace_message(\""
                          "Meter: GREEN\\n\");\n");
         meterExecuteFunc = meterExecuteFunc
                 .replace(cstring("%trace_msg_meter_yellow%"),
-                         "                bpf_trace_message(\""
+                         "            bpf_trace_message(\""
                          "Meter: YELLOW\\n\");\n");
         meterExecuteFunc = meterExecuteFunc
                 .replace(cstring("%trace_msg_meter_red%"),
-                         "        bpf_trace_message(\""
+                         "            bpf_trace_message(\""
                          "Meter: RED\\n\");\n");
         meterExecuteFunc = meterExecuteFunc
                 .replace(cstring("%trace_msg_meter_no_value%"),
                          "        bpf_trace_message(\"Meter: No meter value! "
-                         "Returning default GREEN\\n\");");
+                         "Returning default GREEN\\n\");\n");
         meterExecuteFunc = meterExecuteFunc
                 .replace(cstring("%trace_msg_meter_execute_bytes%"),
-                         "        bpf_trace_message(\"Meter: execute BYTES\\n\");\n");
+                         "    bpf_trace_message(\"Meter: execute BYTES\\n\");\n");
         meterExecuteFunc = meterExecuteFunc
                 .replace(cstring("%trace_msg_meter_execute_packets%"),
-                         "        bpf_trace_message(\"Meter: execute PACKETS\\n\");\n");
+                         "    bpf_trace_message(\"Meter: execute PACKETS\\n\");\n");
     } else {
         meterExecuteFunc = meterExecuteFunc.replace(cstring("%trace_msg_meter_green%"),
                                                     "");

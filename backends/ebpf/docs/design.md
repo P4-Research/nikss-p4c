@@ -279,7 +279,11 @@ In order to add group reference as a table entry:
 4. Add this map into `_groups` map using fresh group reference.
 5. Add this group reference as a value (field `_ref`) in a table (field `_is_group_ref` set to something other than `0`).
 
-# Direct Meter
+# Meters
+
+Note! We base on DPDK Dual Token Bucket implementation.
+https://github.com/DPDK/dpdk/blob/0bf5832222971a0154c9150d4a7a4b82ecbc9ddb/lib/meter/rte_meter.h
+
 Metering mechanism implements Dual Token Bucket algorithm. Meters are translated to `BPF_MAP_TYPE_HASH` with unchanging value type.
 
 ```c
