@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define NO_ERROR 0
+
 typedef uint32_t psabpf_pipeline_id_t;
 
 /**
