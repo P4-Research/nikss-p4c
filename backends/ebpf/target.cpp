@@ -51,7 +51,6 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
                                         unsigned size) const {
     cstring kind;
     cstring registerTable = "REGISTER_TABLE(%s, %s, sizeof(%s), sizeof(%s), %d)";
-    cstring registerTableMeter = "REGISTER_TABLE_METERS(%s, %s, %s, %s, %d)";
     cstring registerTableWithFlags = "REGISTER_TABLE_FLAGS(%s, %s, sizeof(%s), "
                                         "sizeof(%s), %d, %s)";
     if (tableKind == TableHash) {
@@ -63,14 +62,6 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
         builder->appendFormat(registerTableWithFlags, tblName.c_str(),
                               kind.c_str(), keyType.c_str(),
                               valueType.c_str(), size, "BPF_F_NO_PREALLOC");
-        builder->newline();
-        annotateTableWithBTF(builder, tblName, keyType, valueType);
-        return;
-    } else if (tableKind == TableMeter) {
-        kind = "BPF_MAP_TYPE_HASH";
-        builder->appendFormat(registerTableMeter, tblName.c_str(),
-                              kind.c_str(), keyType.c_str(),
-                              valueType.c_str(), size);
         builder->newline();
         annotateTableWithBTF(builder, tblName, keyType, valueType);
         return;
