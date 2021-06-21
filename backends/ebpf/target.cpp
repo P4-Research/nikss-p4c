@@ -51,7 +51,7 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
                                         unsigned size) const {
     cstring kind;
     cstring registerTable = "REGISTER_TABLE(%s, %s, sizeof(%s), sizeof(%s), %d)";
-    cstring registerTableMeter = "REGISTER_TABLE(%s, %s, %s, %s, %d)";
+    cstring registerTableMeter = "REGISTER_TABLE_METERS(%s, %s, %s, %s, %d)";
     cstring registerTableWithFlags = "REGISTER_TABLE_FLAGS(%s, %s, sizeof(%s), "
                                         "sizeof(%s), %d, %s)";
     if (tableKind == TableHash) {
@@ -73,6 +73,7 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
                               valueType.c_str(), size);
         builder->newline();
         annotateTableWithBTF(builder, tblName, keyType, valueType);
+        return;
     } else {
         BUG("%1%: unsupported table kind", tableKind);
     }
