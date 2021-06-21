@@ -23,7 +23,7 @@ class PSAArch {
     static const unsigned MaxCloneSessions = 1024;
 
     std::vector<EBPFType*> ebpfTypes;
-    XDPHelpProgram*            xdp;
+    XDPHelpProgram*        xdp;
     EBPFPipeline*          tcIngress;
     EBPFPipeline*          tcEgress;
 

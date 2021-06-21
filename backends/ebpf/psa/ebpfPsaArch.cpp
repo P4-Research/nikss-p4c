@@ -216,7 +216,7 @@ void PSAArch::emitHelperFunctions2TC(CodeBuilder *builder) const {
 
     cstring meterExecuteFunc = EBPFMeterPSA::meterExecuteFunc(tcIngress->options.emitTraceMessages);
 
-    if (!tcIngress->control->meters.empty()) {
+    if (!tcIngress->control->meters.empty() && !tcEgress->control->meters.empty()) {
         builder->appendLine(meterExecuteFunc);
         builder->newline();
     }
