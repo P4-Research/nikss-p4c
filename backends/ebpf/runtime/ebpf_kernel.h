@@ -93,16 +93,6 @@ struct bpf_elf_map {
         __attribute__ ((section(".maps." #name), used)) \
         ____btf_map_##name = {};
 
-/* Due to using spin locks different map declaration is needed */
-#define REGISTER_TABLE_METER(NAME, TYPE, KEY_TYPE, VALUE_TYPE, MAX_ENTRIES) \
-struct {                                 \
-    __uint(type, TYPE);                  \
-    KEY_TYPE *key;                       \
-    VALUE_TYPE *value;                   \
-    __uint(max_entries, MAX_ENTRIES);    \
-    __uint(pinning, LIBBPF_PIN_BY_NAME); \
-} NAME SEC(".maps");
-
 #define REGISTER_START()
 #ifndef BTF
 /* Note: pinning exports the table name globally, do not remove */
@@ -178,6 +168,15 @@ struct {                                 \
     __uint(max_entries, MAX_ENTRIES);    \
     __uint(pinning, LIBBPF_PIN_BY_NAME); \
     __array(values, struct INNER_NAME);     \
+} NAME SEC(".maps");
+/* Due to using spin locks different map declaration is needed */
+#define REGISTER_TABLE_METER(NAME, TYPE, KEY_TYPE, VALUE_TYPE, MAX_ENTRIES) \
+struct {                                 \
+    __uint(type, TYPE);                  \
+    KEY_TYPE *key;                       \
+    VALUE_TYPE *value;                   \
+    __uint(max_entries, MAX_ENTRIES);    \
+    __uint(pinning, LIBBPF_PIN_BY_NAME); \
 } NAME SEC(".maps");
 #endif
 #define REGISTER_END()

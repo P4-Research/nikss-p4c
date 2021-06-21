@@ -52,8 +52,7 @@ class Target {
                                      cstring key, cstring value) const = 0;
     virtual void emitTableDecl(Util::SourceCodeBuilder* builder,
                                cstring tblName, TableKind tableKind,
-                               cstring keyType, cstring valueType,
-                               unsigned size) const = 0;
+                               cstring keyType, cstring valueType, unsigned size) const = 0;
     // map-in-map requires declaration of both inner and outer map,
     // thus we define them together in a single method.
     virtual void emitMapInMapDecl(Util::SourceCodeBuilder* builder,

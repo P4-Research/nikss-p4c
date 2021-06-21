@@ -340,4 +340,7 @@ For PACKETS meter:
 - time_p with zero value
 - time_c with zero value
 
+In psabpf library there will be a method that will translate bytes (packets) rate into period and bytes (packets) per period. 
+For now, we suggest take 1 byte (or packet) per period and based on that calculate proper pir/cir period that will match a desire speed.
+
 RFC 2698 explicitly says that buckets are initially full so values pbs_left and cbs_left must have buckets size.
