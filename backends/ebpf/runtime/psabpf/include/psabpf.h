@@ -83,11 +83,12 @@ enum psabpf_matchkind_t {
 typedef struct psabpf_match_key {
     enum psabpf_matchkind_t type;
     void *data;
-    size_t key_size;  // key_size determines size of val and mask
+    size_t key_size;
     union {
         struct {
             // used only for 'ternary'
-            const void *mask;
+            void *mask;
+            size_t mask_size;
         } ternary;
         struct {
             // used only for 'lpm'
@@ -121,7 +122,7 @@ typedef struct psabpf_table_entry {
 
     psabpf_action_t *action;
 
-    const uint32_t priority;
+    uint32_t priority;
 } psabpf_table_entry_t;
 
 /*

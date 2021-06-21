@@ -16,6 +16,7 @@
 
 enum destination_ctx_type_t {
     CTX_MATCH_KEY,
+    CTX_MATCH_KEY_TERNARY_MASK,
     CTX_ACTION_DATA
 };
 
@@ -23,6 +24,8 @@ int update_context(const char *data, size_t len, void *ctx, enum destination_ctx
 {
     if (ctx_type == CTX_MATCH_KEY)
         return psabpf_matchkey_data(ctx, data, len);
+    else if (ctx_type == CTX_MATCH_KEY_TERNARY_MASK)
+        return psabpf_matchkey_mask(ctx, data, len);
     else if (ctx_type == CTX_ACTION_DATA)
         return psabpf_action_param_create(ctx, data, len);
 
@@ -228,22 +231,36 @@ int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
 
         psabpf_match_key_t mk;
         psabpf_matchkey_init(&mk);
+        char *substr_ptr;
         if (strstr(**argv, "/") != NULL) {
             fprintf(stderr, "lpm match key not supported yet\n");
             return -EPERM;
         } else if (strstr(**argv, "..") != NULL) {
             fprintf(stderr, "range match key not supported yet\n");
             return -EPERM;
-        } else if (strstr(**argv, "%") != NULL) {
-            fprintf(stderr, "ternary match key not supported yet\n");
-            return -EPERM;
+        } else if ((substr_ptr = strstr(**argv, "%")) != NULL) {
+            psabpf_matchkey_type(&mk, PSABPF_TERNARY);
+            /* Split data and mask */
+            *substr_ptr = 0;
+            substr_ptr++;
+            if (*substr_ptr == 0) {
+                fprintf(stderr, "missing mask for ternary key\n");
+                return -EPERM;
+            }
+            printf("data: %s\nmask: %s\n", **argv, substr_ptr);
+            error_code = translate_data_to_bytes(**argv, &mk, CTX_MATCH_KEY);
+            if (error_code != NO_ERROR)
+                return -EPERM;
+            error_code = translate_data_to_bytes(substr_ptr, &mk, CTX_MATCH_KEY_TERNARY_MASK);
+            if (error_code != NO_ERROR)
+                return -EPERM;
         } else {
             psabpf_matchkey_type(&mk, PSABPF_EXACT);
             error_code = translate_data_to_bytes(**argv, &mk, CTX_MATCH_KEY);
             if (error_code != NO_ERROR)
                 return error_code;
-            error_code = psabpf_table_entry_matchkey(entry, &mk);
         }
+        error_code = psabpf_table_entry_matchkey(entry, &mk);
         psabpf_matchkey_free(&mk);
         if (error_code != NO_ERROR)
             return error_code;
@@ -296,14 +313,20 @@ int parse_action_data(int *argc, char ***argv,
     return NO_ERROR;
 }
 
-int parse_entry_priority(int *argc, char ***argv)
+int parse_entry_priority(int *argc, char ***argv, psabpf_table_entry_t *entry)
 {
-    if (is_keyword(**argv, "priority")) {
-        NEXT_ARGP_EXIT();  /* skip keyword */
-        fprintf(stderr, "Priority is not supported\n");
-        NEXT_ARGP();  /* skip priority value */
+    if (!is_keyword(**argv, "priority"))
+        return NO_ERROR;
+    NEXT_ARGP_EXIT();
+
+    char *ptr;
+    psabpf_table_entry_priority(entry, strtoul(**argv, &ptr, 0));
+    if (*ptr) {
+        fprintf(stderr, "%s: unable to parse priority\n", **argv);
         return -EPERM;
     }
+    NEXT_ARGP();
+
     return NO_ERROR;
 }
 
@@ -357,7 +380,7 @@ int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
         goto clean_up;
 
     /* 5. Get entry priority */
-    if (parse_entry_priority(&argc, &argv) != NO_ERROR)
+    if (parse_entry_priority(&argc, &argv, &entry) != NO_ERROR)
         goto clean_up;
 
     if (argc > 0) {

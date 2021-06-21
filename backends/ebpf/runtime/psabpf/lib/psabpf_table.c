@@ -203,8 +203,11 @@ int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t 
 
     /* stole data from mk to new_mk */
     mk->data = NULL;
+    if (mk->type == PSABPF_TERNARY)
+        mk->u.ternary.mask = NULL;
 
     entry->n_keys += 1;
+    // TODO: is ternary table
 
     return NO_ERROR;
 }
@@ -230,6 +233,7 @@ void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act
 /* only for ternary */
 void psabpf_table_entry_priority(psabpf_table_entry_t *entry, const uint32_t priority)
 {
+    entry->priority = priority;
 }
 
 void psabpf_matchkey_init(psabpf_match_key_t *mk)
@@ -247,6 +251,12 @@ void psabpf_matchkey_free(psabpf_match_key_t *mk)
     if (mk->data != NULL)
         free(mk->data);
     mk->data = NULL;
+
+    if (mk->type == PSABPF_TERNARY) {
+        if (mk->u.ternary.mask != NULL)
+            free(mk->u.ternary.mask);
+        mk->u.ternary.mask = NULL;
+    }
 }
 
 void psabpf_matchkey_type(psabpf_match_key_t *mk, enum psabpf_matchkind_t type)
@@ -281,6 +291,19 @@ int psabpf_matchkey_prefix(psabpf_match_key_t *mk, uint32_t prefix)
 /* only for ternary */
 int psabpf_matchkey_mask(psabpf_match_key_t *mk, const char *mask, size_t size)
 {
+    if (mk == NULL || mask == NULL)
+        return -ENODATA;
+    if (mk->type != PSABPF_TERNARY)
+        return -EINVAL;
+    if (mk->u.ternary.mask != NULL)
+        return -EEXIST;
+
+    mk->u.ternary.mask_size = size;
+    mk->u.ternary.mask = malloc(size);
+    if (mk->u.ternary.mask == NULL)
+        return -ENOMEM;
+    memcpy(mk->u.ternary.mask, mask, size);
+
     return NO_ERROR;
 }
 
