@@ -44,8 +44,8 @@ class EbpfTest(BaseTest):
         if process.returncode != 0:
             logger.info("Command failed: %s", command)
             logger.info("Return code: %d", process.returncode)
-            logger.info("STDOUT: %s", stdout_data)
-            logger.info("STDERR: %s", stderr_data)
+            logger.info("STDOUT: %s", stdout_data.decode("utf-8"))
+            logger.info("STDERR: %s", stderr_data.decode("utf-8"))
             if do_fail:
                 self.fail("Command failed (see above for details): {}".format(str(do_fail)))
         return process.returncode, stdout_data, stderr_data
@@ -170,3 +170,36 @@ class P4EbpfTest(EbpfTest):
 
     def clone_session_delete(self, id):
         self.exec_ns_cmd("psabpf-ctl clone-session delete pipe {} id {}".format(TEST_PIPELINE_ID, id))
+
+    def table_write(self, method, table, keys, action=0, data=None, references=None):
+        """
+        Use table_add or table_update instead of this method
+        """
+        cmd = "psabpf-ctl table {} pipe {} {} ".format(method, TEST_PIPELINE_ID, table)
+        if references:
+            data = references
+            cmd = cmd + "ref "
+        else:
+            cmd = cmd + "id {} ".format(action)
+        cmd = cmd + "key "
+        for k in keys:
+            cmd = cmd + "{} ".format(k)
+        if data:
+            cmd = cmd + "data "
+            for d in data:
+                cmd = cmd + "{} ".format(d)
+        self.exec_ns_cmd(cmd, "Table {} failed".format(method))
+
+    def table_add(self, table, keys, action=0, data=None, references=None):
+        self.table_write(method="add", table=table, keys=keys, action=action, data=data, references=references)
+
+    def table_update(self, table, keys, action=0, data=None, references=None):
+        self.table_write(method="update", table=table, keys=keys, action=action, data=data, references=references)
+
+    def table_delete(self, table, keys=None):
+        cmd = "psabpf-ctl table delete pipe {} {} ".format(TEST_PIPELINE_ID, table)
+        if keys:
+            cmd = cmd + "key "
+            for k in keys:
+                cmd = cmd + "{} ".format(k)
+        self.exec_ns_cmd(cmd, "Table delete failed")
