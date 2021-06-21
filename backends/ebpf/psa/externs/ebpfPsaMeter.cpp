@@ -78,7 +78,7 @@ void EBPFMeterPSA::emitValueType(CodeBuilder* builder) {
 }
 
 void EBPFMeterPSA::emitInstance(CodeBuilder *builder) {
-    builder->target->emitTableDecl(builder, instanceName, TableHash,
+    builder->target->emitTableDecl(builder, instanceName, TableMeter,
                                    this->keyTypeName,
                                    this->valueTypeName, size);
 }
