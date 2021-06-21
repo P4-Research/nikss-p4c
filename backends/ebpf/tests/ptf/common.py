@@ -16,8 +16,12 @@ TEST_PIPELINE_ID = 999
 TEST_PIPELINE_MOUNT_PATH = "/sys/fs/bpf/pipeline{}".format(TEST_PIPELINE_ID)
 PIPELINE_MAPS_MOUNT_PATH = "{}/maps".format(TEST_PIPELINE_MOUNT_PATH)
 
+def tc_only(cls):
+    cls.test_tc_only = True
+    return cls
 
 class EbpfTest(BaseTest):
+    test_tc_only = False
     switch_ns = 'test'
     test_prog_image = 'generic.o'  # default, if test case not specify program
     ctool_file_path = ""
@@ -48,6 +52,8 @@ class EbpfTest(BaseTest):
 
     def add_port(self, dev):
         self.exec_ns_cmd("psabpf-ctl pipeline add-port id {} {}".format(TEST_PIPELINE_ID, dev))
+        if self.is_xdp_test():
+            self.exec_cmd("bpftool net attach xdp pinned {}/{} dev s1-{} overwrite".format(TEST_PIPELINE_MOUNT_PATH, "xdp_redirect_dummy_sec", dev))
 
     def del_port(self, dev):
         self.exec_ns_cmd("psabpf-ctl pipeline del-port id {} {}".format(TEST_PIPELINE_ID, dev))
@@ -81,6 +87,9 @@ class EbpfTest(BaseTest):
         if expected_value != value:
             self.fail("Map {} key {} does not have correct value. Expected {}; got {}"
                       .format(name, key, expected_value, value))
+
+    def is_xdp_test(self):
+        return "xdp" in testutils.test_params_get()
 
     def setUp(self):
         super(EbpfTest, self).setUp()
@@ -125,6 +134,9 @@ class P4EbpfTest(EbpfTest):
     p4_file_path = ""
 
     def setUp(self):
+        if self.is_xdp_test() and self.test_tc_only:
+            self.skipTest("not supported by XDP")
+
         if not os.path.exists(self.p4_file_path):
             self.fail("P4 program not found, no such file.")
 
@@ -134,19 +146,19 @@ class P4EbpfTest(EbpfTest):
         head, tail = os.path.split(self.p4_file_path)
         filename = tail.split(".")[0]
         self.test_prog_image = os.path.join("ptf_out", filename + ".o")
+        p4args = "--trace"
+        if self.is_xdp_test():
+            p4args += " --xdp"
         self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "
                       "ARGS=\"{cargs}\" P4C=p4c-ebpf P4ARGS=\"{p4args}\" psa".format(
                             output=self.test_prog_image,
                             p4file=self.p4_file_path,
                             cargs="-DPSA_PORT_RECIRCULATE=2",
-                            p4args="--trace"),
+                            p4args=p4args),
                       "Compilation error")
-
         super(P4EbpfTest, self).setUp()
 
     def tearDown(self):
-        self.remove_map("clone_session_tbl")
-        self.remove_map("multicast_grp_tbl")
         super(P4EbpfTest, self).tearDown()
 
     def clone_session_create(self, id):

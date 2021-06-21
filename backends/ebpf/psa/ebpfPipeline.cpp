@@ -75,6 +75,24 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("unsigned char %s;", byteVar.c_str());
     builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat("u32 %s = ", lengthVar.c_str());
+    emitPacketLength(builder);
+    builder->endOfStatement(true);
+}
+
+void EBPFPipeline::emitUserMetadataInstance(CodeBuilder* builder) {
+    builder->emitIndent();
+    auto user_md_type = typeMap->getType(control->user_metadata);
+    if (user_md_type == nullptr) {
+        ::error("cannot emit user metadata");
+    }
+    auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
+    userMetadataType->declare(builder, control->user_metadata->name.name, false);
+    builder->append(" = ");
+    userMetadataType->emitInitializer(builder);
+    builder->endOfStatement(true);
 }
 
 void EBPFPipeline::emitHeaderInstances(CodeBuilder* builder) {
@@ -91,6 +109,10 @@ void EBPFPipeline::emitGlobalMetadataInitializer(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendLine(
             "struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->cb;");
+}
+
+void EBPFPipeline::emitPacketLength(CodeBuilder *builder) {
+    builder->appendFormat("%s->len", this->contextVar.c_str());
 }
 
 // =====================TCIngressPipeline=============================
@@ -138,18 +160,10 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
                         "    *ether_type = md->pkt_ether_type;\n");
     builder->blockEnd(true);
 
-    builder->emitIndent();
-    auto user_md_type = typeMap->getType(control->user_metadata);
-    if (user_md_type == nullptr) {
-        ::error("cannot emit user metadata");
-    }
-    auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
-    userMetadataType->declare(builder, control->user_metadata->name.name, false);
-    builder->append(" = ");
-    userMetadataType->emitInitializer(builder);
-    builder->endOfStatement(true);
 
+    emitUserMetadataInstance(builder);
     emitLocalVariables(builder);
+
     msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, "meta->packet_path");
     parser->emit(builder);
@@ -372,11 +386,18 @@ void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->endOfStatement(true);
 }
 
+// =====================XDPPipeline====================================
+void XDPPipeline::emitPacketLength(CodeBuilder *builder) {
+    builder->appendFormat("%s->data_end - %s->data",
+                          this->contextVar.c_str(), this->contextVar.c_str());
+}
+
 // =====================XDPIngressPipeline=============================
 void XDPIngressPipeline::emit(CodeBuilder *builder) {
     cstring msgStr, varStr;
 
     control->codeGen->asPointerVariables.clear();
+    deparser->codeGen->asPointerVariables.clear();
     builder->target->emitCodeSection(builder, sectionName);
     builder->emitIndent();
     builder->appendFormat("int %s(struct xdp_md *%s)", functionName, model.CPacketName.str());
@@ -388,13 +409,14 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     deparser->to<XDPIngressDeparserPSA>()->emitSharedMetadataInitializer(builder);
     builder->newline();
 
+
     emitHeaderInstances(builder);
     builder->newline();
 
-    emitLocalVariables(builder);
+    emitUserMetadataInstance(builder);
     builder->newline();
 
-    emitPSAControlDataTypes(builder);
+    emitLocalVariables(builder);
     builder->newline();
 
     builder->emitIndent();
@@ -404,18 +426,19 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     builder->newline();
 
     // PRS
-    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d", sectionName);
-    varStr = Util::printf_format("%s.packet_path", control->inputStandardMetadata->name.name);
-    builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, varStr.c_str());
+    // we do not support NM, CI2E, CE2E in XDP, so we hardcode NU as packet path
+    msgStr = Util::printf_format("%s parser: parsing new packet, path=0", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
     parser->emit(builder);
     builder->newline();
 
     // CTRL
+    builder->emitIndent();
     builder->append(IR::ParserState::accept);
     builder->append(":");
     builder->spc();
     builder->blockStart();
-    builder->decreaseIndent();
+    emitPSAControlDataTypes(builder);
     msgStr = Util::printf_format("%s control: packet processing started", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
     control->emit(builder);
@@ -434,7 +457,6 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     this->emitTrafficManager(builder);
-    builder->decreaseIndent();
     builder->blockEnd(true);
     builder->newline();
 }
@@ -472,8 +494,8 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
     cstring msgStr, varStr;
 
     control->codeGen->asPointerVariables.clear();
+    deparser->codeGen->asPointerVariables.clear();
     builder->target->emitCodeSection(builder, sectionName);
-    builder->emitIndent();
     builder->appendFormat("int %s(struct xdp_md *%s)",
                             functionName, model.CPacketName.str());
     builder->spc();
@@ -482,17 +504,20 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
     emitLocalVariables(builder);
     builder->newline();
 
-    emitPSAControlDataTypes(builder);
-    builder->newline();
-
     emitHeaderInstances(builder);
     builder->newline();
 
-    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d",
+    builder->emitIndent();
+    builder->appendFormat("struct psa_egress_output_metadata_t %s = {\n",
+                          control->outputStandardMetadata->name.name.c_str());
+    builder->appendLine("        .clone = false,\n"
+                        "        .drop = false,\n"
+                        "    };");
+
+    // we do not support NM, CI2E, CE2E in XDP, so we hardcode NU as packet path
+    msgStr = Util::printf_format("%s parser: parsing new packet, path=0",
                                     sectionName);
-    varStr = Util::printf_format("%s.packet_path",
-                                    control->inputStandardMetadata->name.name);
-    builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, varStr.c_str());
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
     parser->emit(builder);
     builder->emitIndent();
     builder->append(IR::ParserState::accept);
@@ -500,7 +525,8 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
     builder->newline();
     builder->emitIndent();
     builder->blockStart();
-
+    emitPSAControlDataTypes(builder);
+    builder->newline();
     msgStr = Util::printf_format("%s control: packet processing started",
                                     sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
@@ -525,24 +551,16 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
 }
 
 void XDPEgressPipeline::emitPSAControlDataTypes(CodeBuilder* builder) {
-    cstring outputMdVar, inputMdVar;
-    outputMdVar = control->outputStandardMetadata->name.name;
+    cstring inputMdVar;
     inputMdVar = control->inputStandardMetadata->name.name;
 
     builder->emitIndent();
     builder->appendFormat("struct psa_egress_input_metadata_t %s = {\n"
-                          "        .egress_port = skb->ingress_ifindex,\n"
+                          "        .egress_port = skb->egress_ifindex,\n"
                           "        .egress_timestamp = bpf_ktime_get_ns(),\n"
                           "        .parser_error = %s,\n"
                           "    };", inputMdVar.c_str(), errorVar.c_str());
     builder->newline();
-
-    builder->emitIndent();
-    builder->appendFormat("struct psa_egress_output_metadata_t %s = {\n",
-                                outputMdVar.c_str());
-    builder->appendLine("        .clone = false,\n"
-                        "        .drop = false,\n"
-                        "    };");
 }
 
 void XDPEgressPipeline::emitTrafficManager(CodeBuilder *builder) {

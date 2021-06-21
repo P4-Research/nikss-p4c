@@ -53,6 +53,7 @@ class PSAArch {
     void emit2XDP(CodeBuilder* builder) const;
     void emitPreamble2XDP(CodeBuilder* builder) const;
     void emitInstances2XDP(CodeBuilder *builder) const;
+    void emitHelperFunctions2XDP(CodeBuilder *builder) const;
     void emitInitializer2XDP(CodeBuilder *p_builder) const;
     void emitDummy2XDP(CodeBuilder *builder) const;
 };

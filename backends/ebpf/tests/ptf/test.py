@@ -33,6 +33,7 @@ class SimpleForwardingPSATest(P4EbpfTest):
         super(SimpleForwardingPSATest, self).tearDown()
 
 
+@tc_only
 class PSAResubmitTest(P4EbpfTest):
 
     p4_file_path = "samples/p4testdata/resubmit.p4"
@@ -58,6 +59,7 @@ class SimpleTunnelingPSATest(P4EbpfTest):
         testutils.verify_packet(self, exp_pkt, PORT1)
 
 
+@tc_only
 class PSACloneI2E(P4EbpfTest):
 
     p4_file_path = "../../../testdata/p4_16_samples/psa-i2e-cloning-basic-bmv2.p4"
@@ -100,6 +102,7 @@ class EgressTrafficManagerDropPSATest(P4EbpfTest):
         testutils.verify_no_other_packets(self)
 
 
+@tc_only
 class EgressTrafficManagerClonePSATest(P4EbpfTest):
     """
     1. Send packet to interface PORT1 (bpf ifindex = 5) with destination MAC address equals to aa:bb:cc:dd:ee:ff.
@@ -128,7 +131,7 @@ class EgressTrafficManagerClonePSATest(P4EbpfTest):
         self.clone_session_delete(8)
         super(EgressTrafficManagerClonePSATest, self).tearDown()
 
-
+@tc_only
 class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
     """
     Test resubmit packet path. eBPF program should do following operation:
@@ -152,7 +155,7 @@ class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
         pkt[Ether].src = '00:44:33:22:11:00'
         testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
-
+@tc_only
 class MulticastPSATest(P4EbpfTest):
     p4_file_path = "../../../testdata/p4_16_samples/psa-multicast-basic-bmv2.p4"
 
@@ -601,6 +604,7 @@ class RandomPSATest(P4EbpfTest):
         logger.info("f3 sequence: {}".format(sequence[2]))
 
 
+@tc_only
 class QoSPSATest(P4EbpfTest):
 
     p4_file_path = "samples/p4testdata/cos-psa.p4"

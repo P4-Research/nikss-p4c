@@ -427,7 +427,7 @@ bool TCEgressDeparserPSA::build() {
 }
 
 void XDPDeparserPSA::emitResizeHead(CodeBuilder *builder) {
-    builder->appendFormat("%s = bpf_xdp_adjust_head(%s, %s)",
+    builder->appendFormat("%s = bpf_xdp_adjust_head(%s, -%s)",
                           this->returnCode.c_str(),
                           program->model.CPacketName.str(),
                           this->outerHdrOffsetVar.c_str());

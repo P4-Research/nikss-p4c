@@ -57,47 +57,7 @@ class L2L3SwitchTest(P4EbpfTest):
         self.configure_port(port_id=8, vlan_id=1)
         self.configure_port(port_id=7, vlan_id=2)
 
-        # Create multicast group and add members
-        # TODO: replace bpftool with prectl
-        # Multicast group for VLAN 1
-        self.create_map(name="mcast_grp_1", type="hash", key_size=8, value_size=20, max_entries=64)
-        self.update_map(name="mcast_grp_1", key="00 00 00 00 00 00 00 00",
-                        value="00 00 00 00 00 00 00 00 00 00 00 00 05 00 00 00 01 00 00 00")
-        self.update_map(name="mcast_grp_1", key="05 00 00 00 01 00 00 00",
-                        value="05 00 00 00 01 00 00 00 00 00 00 00 06 00 00 00 01 00 00 00")
-        self.update_map(name="mcast_grp_1", key="06 00 00 00 01 00 00 00",
-                        value="06 00 00 00 01 00 00 00 00 00 00 00 8 00 00 00 01 00 00 00")
-        self.update_map(name="mcast_grp_1", key="hex 8 00 00 00 01 00 00 00",
-                        value="8 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
-        self.update_map(name="multicast_grp_tbl", key="1 0 0 0", value="mcast_grp_1", map_in_map=True)
-
-        # Multicast group for VLAN 2
-        self.create_map(name="mcast_grp_2", type="hash", key_size=8, value_size=20, max_entries=64)
-        self.update_map(name="mcast_grp_2", key="00 00 00 00 00 00 00 00",
-                        value="00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
-        self.update_map(name="multicast_grp_tbl", key="2 0 0 0", value="mcast_grp_2", map_in_map=True)
-
-        # Multicast group for no VLAN ports (VLAN 0)
-        self.create_map(name="mcast_grp_3", type="hash", key_size=8, value_size=20, max_entries=64)
-        self.update_map(name="mcast_grp_3", key="00 00 00 00 00 00 00 00",
-                        value="00 00 00 00 00 00 00 00 00 00 00 00 04 00 00 00 01 00 00 00")
-        self.update_map(name="mcast_grp_3", key="04 00 00 00 01 00 00 00",
-                        value="04 00 00 00 01 00 00 00 00 00 00 00 9 00 00 00 01 00 00 00")
-        self.update_map(name="mcast_grp_3", key="9 00 00 00 01 00 00 00",
-                        value="9 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
-        self.update_map(name="multicast_grp_tbl", key="3 0 0 0", value="mcast_grp_3", map_in_map=True)
-
     def tearDown(self):
-        self.remove_maps(["mcast_grp_1", "mcast_grp_2", "mcast_grp_3",
-                          "ingress_tbl_ingress_vlan", "ingress_tbl_ingress_vlan_defaultAction",
-                          "ingress_tbl_mac_learning", "ingress_tbl_mac_learning_defaultAction",
-                          "ingress_tbl_acl", "ingress_tbl_acl_defaultAction",
-                          "ingress_tbl_out_arp", "ingress_tbl_out_arp_defaultAction",
-                          "ingress_tbl_switching", "ingress_tbl_switching_defaultAction",
-                          "ingress_tbl_routable", "ingress_tbl_routable_defaultAction",
-                          "ingress_tbl_routing", "ingress_tbl_routing_defaultAction",
-                          "egress_tbl_vlan_egress", "egress_tbl_vlan_egress_defaultAction",
-                          "mac_learn_digest_0"])
         super(L2L3SwitchTest, self).tearDown()
 
 
@@ -247,10 +207,40 @@ class MACLearningTest(L2L3SwitchTest):
             if value.port != p[0]+4:
                 self.fail("Digest not generated")
 
-
+@tc_only
 class BroadcastTest(L2L3SwitchTest):
 
     def runTest(self):
+        # Create multicast group and add members
+        # TODO: replace bpftool with prectl
+        # Multicast group for VLAN 1
+        self.create_map(name="mcast_grp_1", type="hash", key_size=8, value_size=20, max_entries=64)
+        self.update_map(name="mcast_grp_1", key="00 00 00 00 00 00 00 00",
+                        value="00 00 00 00 00 00 00 00 00 00 00 00 05 00 00 00 01 00 00 00")
+        self.update_map(name="mcast_grp_1", key="05 00 00 00 01 00 00 00",
+                        value="05 00 00 00 01 00 00 00 00 00 00 00 06 00 00 00 01 00 00 00")
+        self.update_map(name="mcast_grp_1", key="06 00 00 00 01 00 00 00",
+                        value="06 00 00 00 01 00 00 00 00 00 00 00 8 00 00 00 01 00 00 00")
+        self.update_map(name="mcast_grp_1", key="hex 8 00 00 00 01 00 00 00",
+                        value="8 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
+        self.update_map(name="multicast_grp_tbl", key="1 0 0 0", value="mcast_grp_1", map_in_map=True)
+
+        # Multicast group for VLAN 2
+        self.create_map(name="mcast_grp_2", type="hash", key_size=8, value_size=20, max_entries=64)
+        self.update_map(name="mcast_grp_2", key="00 00 00 00 00 00 00 00",
+                        value="00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
+        self.update_map(name="multicast_grp_tbl", key="2 0 0 0", value="mcast_grp_2", map_in_map=True)
+
+        # Multicast group for no VLAN ports (VLAN 0)
+        self.create_map(name="mcast_grp_3", type="hash", key_size=8, value_size=20, max_entries=64)
+        self.update_map(name="mcast_grp_3", key="00 00 00 00 00 00 00 00",
+                        value="00 00 00 00 00 00 00 00 00 00 00 00 04 00 00 00 01 00 00 00")
+        self.update_map(name="mcast_grp_3", key="04 00 00 00 01 00 00 00",
+                        value="04 00 00 00 01 00 00 00 00 00 00 00 9 00 00 00 01 00 00 00")
+        self.update_map(name="mcast_grp_3", key="9 00 00 00 01 00 00 00",
+                        value="9 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
+        self.update_map(name="multicast_grp_tbl", key="3 0 0 0", value="mcast_grp_3", map_in_map=True)
+
         # no VLAN, Multicast group ID = 0
         self.table_add(table="ingress_tbl_switching", keys=["ff:ff:ff:ff:ff:ff", 0], action=2, data=[3])
         # VLAN 1, Multicast group ID = 1
