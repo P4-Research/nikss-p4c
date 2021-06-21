@@ -84,7 +84,8 @@ void EBPFMeterPSA::emitInstance(CodeBuilder *builder) {
                           this->valueTypeName.c_str(), size);
     builder->newline();
     builder->appendFormat("BPF_ANNOTATE_KV_PAIR(%s, %s, %s)",
-                          instanceName.c_str(), this->keyTypeName.c_str(), this->valueTypeName.c_str());
+                          instanceName.c_str(), this->keyTypeName.c_str(),
+                          this->valueTypeName.c_str());
     builder->newline();
 }
 
