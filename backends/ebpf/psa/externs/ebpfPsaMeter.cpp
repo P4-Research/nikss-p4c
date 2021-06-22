@@ -100,15 +100,13 @@ void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* met
     }
 
     auto indexArgExpr = method->expr->arguments->at(0)->expression->to<IR::PathExpression>();
-    // TODO packet len at XDP and timestamp at XDP
-    auto timeNs = Util::printf_format("%s->tstamp", pipeline->contextVar.c_str());
     if (type == BYTES) {
-        auto packetLen = Util::printf_format("%s->len", pipeline->contextVar.c_str());
-        builder->appendFormat("meter_execute_bytes(&%s, &%s, &%s, &%s)", instanceName, packetLen,
-                              indexArgExpr->path->name.name, timeNs);
+        builder->appendFormat("meter_execute_bytes(&%s, &%s, &%s, &%s)", instanceName,
+                              pipeline->lengthVar.c_str(),
+                              indexArgExpr->path->name.name, pipeline->timestampVar.c_str());
     } else {
         builder->appendFormat("meter_execute_packets(&%s, &%s, &%s)", instanceName,
-                              indexArgExpr->path->name.name, timeNs);
+                              indexArgExpr->path->name.name, pipeline->timestampVar.c_str());
     }
 }
 

@@ -17,6 +17,7 @@ class EBPFPipeline : public EBPFProgram {
     const cstring name;
     cstring sectionName;
     cstring contextVar;
+    cstring timestampVar;
 
     EBPFControlPSA* control;
     EBPFDeparserPSA* deparser;
@@ -32,6 +33,7 @@ class EBPFPipeline : public EBPFProgram {
         contextVar = cstring("skb");
         lengthVar = cstring("pkt_len");
         endLabel = cstring("deparser");
+        timestampVar = cstring("tstamp");
     }
 
     virtual void emitTrafficManager(CodeBuilder *builder) = 0;
@@ -40,6 +42,7 @@ class EBPFPipeline : public EBPFProgram {
     void emitGlobalMetadataInitializer(CodeBuilder *builder);
     void emitUserMetadataInstance(CodeBuilder *builder);
     virtual void emitPacketLength(CodeBuilder *builder);
+    virtual void emitTimestamp(CodeBuilder *builder);
     virtual void emitPSAControlDataTypes(CodeBuilder* builder) = 0;
     virtual void emit(CodeBuilder* builder);
 };
@@ -79,6 +82,7 @@ class XDPPipeline : public EBPFPipeline {
     }
 
     void emitPacketLength(CodeBuilder *builder) override;
+    void emitTimestamp(CodeBuilder *builder) override;
 };
 
 class XDPIngressPipeline : public XDPPipeline {
