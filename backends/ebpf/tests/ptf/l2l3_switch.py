@@ -42,13 +42,11 @@ class L2L3SwitchTest(P4EbpfTest):
 
     def configure_port(self, port_id, vlan_id=None):
         if vlan_id is None:
-            key = "{} 0 0 0".format(port_id)
-            self.update_map(name="ingress_tbl_ingress_vlan", key=key + " 0 0 0 0", value="01 00 00 00")
-            self.update_map(name="egress_tbl_vlan_egress", key=key, value="01 00 00 00 0 0 0 0 0 0 0 0 0 0 0 0")
+            self.table_add(table="ingress_tbl_ingress_vlan", keys=[port_id, 0], action=1)
+            self.table_add(table="egress_tbl_vlan_egress", keys=[port_id], action=1)
         else:
-            key = "{} 0 0 0".format(port_id)
-            self.update_map(name="ingress_tbl_ingress_vlan", key=key + " 1 0 0 0", value="00 00 00 00")
-            self.update_map(name="egress_tbl_vlan_egress", key=key, value="02 00 00 00 {} 0 0 0 0 0 0 0 0 0 0 0".format(vlan_id))
+            self.table_add(table="ingress_tbl_ingress_vlan", keys=[port_id, 1], action=0)
+            self.table_add(table="egress_tbl_vlan_egress", keys=[port_id], action=2, data=[vlan_id])
 
     def setUp(self):
         super(L2L3SwitchTest, self).setUp()
@@ -58,36 +56,6 @@ class L2L3SwitchTest(P4EbpfTest):
         self.configure_port(port_id=6, vlan_id=1)
         self.configure_port(port_id=8, vlan_id=1)
         self.configure_port(port_id=7, vlan_id=2)
-
-        # Create multicast group and add members
-        # TODO: replace bpftool with prectl
-        # Multicast group for VLAN 1
-        self.create_map(name="mcast_grp_1", type="hash", key_size=8, value_size=20, max_entries=64)
-        self.update_map(name="mcast_grp_1", key="00 00 00 00 00 00 00 00",
-                        value="00 00 00 00 00 00 00 00 00 00 00 00 05 00 00 00 01 00 00 00")
-        self.update_map(name="mcast_grp_1", key="05 00 00 00 01 00 00 00",
-                        value="05 00 00 00 01 00 00 00 00 00 00 00 06 00 00 00 01 00 00 00")
-        self.update_map(name="mcast_grp_1", key="06 00 00 00 01 00 00 00",
-                        value="06 00 00 00 01 00 00 00 00 00 00 00 8 00 00 00 01 00 00 00")
-        self.update_map(name="mcast_grp_1", key="hex 8 00 00 00 01 00 00 00",
-                        value="8 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
-        self.update_map(name="multicast_grp_tbl", key="1 0 0 0", value="mcast_grp_1", map_in_map=True)
-
-        # Multicast group for VLAN 2
-        self.create_map(name="mcast_grp_2", type="hash", key_size=8, value_size=20, max_entries=64)
-        self.update_map(name="mcast_grp_2", key="00 00 00 00 00 00 00 00",
-                        value="00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
-        self.update_map(name="multicast_grp_tbl", key="2 0 0 0", value="mcast_grp_2", map_in_map=True)
-
-        # Multicast group for no VLAN ports (VLAN 0)
-        self.create_map(name="mcast_grp_3", type="hash", key_size=8, value_size=20, max_entries=64)
-        self.update_map(name="mcast_grp_3", key="00 00 00 00 00 00 00 00",
-                        value="00 00 00 00 00 00 00 00 00 00 00 00 04 00 00 00 01 00 00 00")
-        self.update_map(name="mcast_grp_3", key="04 00 00 00 01 00 00 00",
-                        value="04 00 00 00 01 00 00 00 00 00 00 00 9 00 00 00 01 00 00 00")
-        self.update_map(name="mcast_grp_3", key="9 00 00 00 01 00 00 00",
-                        value="9 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
-        self.update_map(name="multicast_grp_tbl", key="3 0 0 0", value="mcast_grp_3", map_in_map=True)
 
     def tearDown(self):
         super(L2L3SwitchTest, self).tearDown()
@@ -109,9 +77,9 @@ class SwitchingTest(L2L3SwitchTest):
         testutils.verify_no_other_packets(self)
 
         # check connectivity between ports in VLAN 1
-        self.update_map(name="ingress_tbl_switching", key="01 00 00 00 00 00 00 00 01 00 00 00 0 0 0 0", value="01 00 00 00 05 00 00 00")
-        self.update_map(name="ingress_tbl_switching", key="02 00 00 00 00 00 00 00 01 00 00 00 0 0 0 0", value="01 00 00 00 06 00 00 00")
-        self.update_map(name="ingress_tbl_switching", key="03 00 00 00 00 00 00 00 01 00 00 00 0 0 0 0", value="01 00 00 00 8 00 00 00")
+        self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:00:01", 1], action=1, data=[5])
+        self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:00:02", 1], action=1, data=[6])
+        self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:00:03", 1], action=1, data=[8])
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:00:03")
         pkt = pkt_add_vlan(pkt, vlan_vid=1)
         testutils.send_packet(self, PORT1, pkt)
@@ -132,8 +100,8 @@ class SwitchingTest(L2L3SwitchTest):
         testutils.verify_no_other_packets(self)
 
         # check connectivity between ports with no VLAN
-        self.update_map(name="ingress_tbl_switching", key="01 00 00 00 00 00 00 00 0 00 00 00 0 0 0 0", value="01 00 00 00 04 00 00 00")
-        self.update_map(name="ingress_tbl_switching", key="02 00 00 00 00 00 00 00 0 00 00 00 0 0 0 0", value="01 00 00 00 9 00 00 00")
+        self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:00:01", 0], action=1, data=[4])
+        self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:00:02", 0], action=1, data=[9])
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:00:02")
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT5)
@@ -142,14 +110,14 @@ class SwitchingTest(L2L3SwitchTest):
         testutils.verify_packet(self, pkt, PORT0)
 
         # check no connectivity between VLAN 1 and VLAN 2
-        self.update_map(name="ingress_tbl_switching", key="02 02 00 00 00 00 00 00 02 00 00 00 0 0 0 0", value="01 00 00 00 6 00 00 00")
+        self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:02:02", 2], action=1, data=[6])
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:02:02")
         pkt = pkt_add_vlan(pkt, vlan_vid=1)
         testutils.send_packet(self, PORT1, pkt)
         testutils.verify_no_packet(self, pkt, PORT3)
 
         # check no connectivity between VLAN 1 and no VLAN ports
-        self.update_map(name="ingress_tbl_switching", key="02 03 00 00 00 00 00 00 00 00 00 00 0 0 0 0", value="01 00 00 00 4 00 00 00")
+        self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:03:02", 0], action=1, data=[4])
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:02:02")
         pkt = pkt_add_vlan(pkt, vlan_vid=1)
         testutils.send_packet(self, PORT1, pkt)
@@ -159,10 +127,10 @@ class SwitchingTest(L2L3SwitchTest):
 class RoutingTest(L2L3SwitchTest):
 
     def runTest(self):
-        self.update_map(name="ingress_tbl_switching", key="02 02 00 00 00 00 00 00 02 00 00 00 0 0 0 0", value="01 00 00 00 7 00 00 00")
-        self.update_map(name="ingress_tbl_switching", key="01 00 00 00 00 00 00 00 01 00 00 00 0 0 0 0", value="01 00 00 00 05 00 00 00")
-        self.update_map(name="ingress_tbl_switching", key="02 00 00 00 00 00 00 00 01 00 00 00 0 0 0 0", value="01 00 00 00 06 00 00 00")
-        self.update_map(name="ingress_tbl_switching", key="03 00 00 00 00 00 00 00 01 00 00 00 0 0 0 0", value="01 00 00 00 8 00 00 00")
+        self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:02:02", 2], action=1, data=[7])
+        self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:00:01", 1], action=1, data=[5])
+        self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:00:02", 1], action=1, data=[6])
+        self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:00:03", 1], action=1, data=[8])
 
         # check no connectivity between VLAN 1 and VLAN 2
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:02:02")
@@ -171,10 +139,10 @@ class RoutingTest(L2L3SwitchTest):
         testutils.verify_no_packet(self, pkt, PORT2)
 
         # enable routing from VLAN 1 to VLAN 2
-        self.update_map(name="ingress_tbl_routable", key="01 01 00 00 00 00 00 00 02 00 00 00 00 00 00 00", value="0 0 0 0")
+        self.table_add(table="ingress_tbl_routable", keys=["00:00:00:00:01:01", 2], action=0)
 
         # create all possible actions
-        # forward actions                              member ref,     action id, smac                    dmac                          vlan_id
+        # forward actions                              member ref,       action id, smac                    dmac                          vlan_id
         self.update_map(name="ingress_as_actions", key="1 0 0 0", value="1 0 0 0 0 0 0 0 02 01 00 00 00 00 00 00 01 00 00 00 00 00 00 0 01 00 00 00 0 0 0 0")
         self.update_map(name="ingress_as_actions", key="2 0 0 0", value="1 0 0 0 0 0 0 0 02 01 00 00 00 00 00 00 02 00 00 00 00 00 00 0 01 00 00 00 0 0 0 0")
         self.update_map(name="ingress_as_actions", key="3 0 0 0", value="1 0 0 0 0 0 0 0 02 01 00 00 00 00 00 00 03 00 00 00 00 00 00 0 01 00 00 00 0 0 0 0")
@@ -213,7 +181,7 @@ class RoutingTest(L2L3SwitchTest):
 class MACLearningTest(L2L3SwitchTest):
 
     def runTest(self):
-        self.update_map(name="ingress_tbl_mac_learning", key="hex 0a 09 08 07 06 00 00 00", value="00 00 00 00")
+        self.table_add(table="ingress_tbl_mac_learning", keys=["00:06:07:08:09:0a"], action=0)
         # should NOT generate learn digest
         pkt = testutils.simple_udp_packet(eth_src='00:06:07:08:09:0a')
         testutils.send_packet(self, PORT0, pkt)
@@ -236,16 +204,46 @@ class MACLearningTest(L2L3SwitchTest):
             if value.port != p[0]+4:
                 self.fail("Digest not generated")
 
-
+@tc_only
 class BroadcastTest(L2L3SwitchTest):
 
     def runTest(self):
+        # Create multicast group and add members
+        # TODO: replace bpftool with prectl
+        # Multicast group for VLAN 1
+        self.create_map(name="mcast_grp_1", type="hash", key_size=8, value_size=20, max_entries=64)
+        self.update_map(name="mcast_grp_1", key="00 00 00 00 00 00 00 00",
+                        value="00 00 00 00 00 00 00 00 00 00 00 00 05 00 00 00 01 00 00 00")
+        self.update_map(name="mcast_grp_1", key="05 00 00 00 01 00 00 00",
+                        value="05 00 00 00 01 00 00 00 00 00 00 00 06 00 00 00 01 00 00 00")
+        self.update_map(name="mcast_grp_1", key="06 00 00 00 01 00 00 00",
+                        value="06 00 00 00 01 00 00 00 00 00 00 00 8 00 00 00 01 00 00 00")
+        self.update_map(name="mcast_grp_1", key="hex 8 00 00 00 01 00 00 00",
+                        value="8 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
+        self.update_map(name="multicast_grp_tbl", key="1 0 0 0", value="mcast_grp_1", map_in_map=True)
+
+        # Multicast group for VLAN 2
+        self.create_map(name="mcast_grp_2", type="hash", key_size=8, value_size=20, max_entries=64)
+        self.update_map(name="mcast_grp_2", key="00 00 00 00 00 00 00 00",
+                        value="00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
+        self.update_map(name="multicast_grp_tbl", key="2 0 0 0", value="mcast_grp_2", map_in_map=True)
+
+        # Multicast group for no VLAN ports (VLAN 0)
+        self.create_map(name="mcast_grp_3", type="hash", key_size=8, value_size=20, max_entries=64)
+        self.update_map(name="mcast_grp_3", key="00 00 00 00 00 00 00 00",
+                        value="00 00 00 00 00 00 00 00 00 00 00 00 04 00 00 00 01 00 00 00")
+        self.update_map(name="mcast_grp_3", key="04 00 00 00 01 00 00 00",
+                        value="04 00 00 00 01 00 00 00 00 00 00 00 9 00 00 00 01 00 00 00")
+        self.update_map(name="mcast_grp_3", key="9 00 00 00 01 00 00 00",
+                        value="9 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
+        self.update_map(name="multicast_grp_tbl", key="3 0 0 0", value="mcast_grp_3", map_in_map=True)
+
         # no VLAN, Multicast group ID = 0
-        self.update_map(name="ingress_tbl_switching", key="hex ff ff ff ff ff ff 0 0 0 0 0 0 0 0 0 0", value="02 00 00 00 03 00 00 00")
+        self.table_add(table="ingress_tbl_switching", keys=["ff:ff:ff:ff:ff:ff", 0], action=2, data=[3])
         # VLAN 1, Multicast group ID = 1
-        self.update_map(name="ingress_tbl_switching", key="hex ff ff ff ff ff ff 0 0 1 0 0 0 0 0 0 0", value="02 00 00 00 01 00 00 00")
+        self.table_add(table="ingress_tbl_switching", keys=["ff:ff:ff:ff:ff:ff", 1], action=2, data=[1])
         # VLAN 2, Multicast group ID = 2
-        self.update_map(name="ingress_tbl_switching", key="hex ff ff ff ff ff ff 0 0 2 0 0 0 0 0 0 0", value="02 00 00 00 02 00 00 00")
+        self.table_add(table="ingress_tbl_switching", keys=["ff:ff:ff:ff:ff:ff", 2], action=2, data=[2])
 
         pkt = testutils.simple_udp_packet(eth_src='00:06:07:08:09:0a',
                                           eth_dst='ff:ff:ff:ff:ff:ff')
@@ -268,7 +266,7 @@ class BroadcastTest(L2L3SwitchTest):
 class ACLTest(L2L3SwitchTest):
 
     def runTest(self):
-        self.update_map(name="ingress_tbl_switching", key="05 04 03 02 01 00 00 00 00 00 00 00 0 0 0 0", value="01 00 00 00 9 00 00 00")
+        self.table_add(table="ingress_tbl_switching", keys=["00:01:02:03:04:05", 0], action=1, data=[9])
         udp_pkt_1 = testutils.simple_udp_packet(ip_src="10.0.0.1", ip_dst="10.0.0.2",
                                                 udp_sport=1234, udp_dport=50051)
         tcp_pkt_1 = testutils.simple_tcp_packet(ip_src="10.0.0.1", ip_dst="10.0.0.2",
@@ -282,8 +280,8 @@ class ACLTest(L2L3SwitchTest):
                                                 udp_sport=80, udp_dport=8080)
         tcp_pkt_2 = testutils.simple_tcp_packet(ip_src="10.0.0.1", ip_dst="10.0.0.2",
                                                 tcp_sport=80, tcp_dport=8080)
-        self.update_map(name="ingress_tbl_acl", key="hex 01 00 00 0a 02 00 00 0a 11 00 50 00 90 1f 00 00", value="01 00 00 00")
-        self.update_map(name="ingress_tbl_acl", key="hex 01 00 00 0a 02 00 00 0a 06 00 50 00 90 1f 00 00", value="01 00 00 00")
+        self.table_add(table="ingress_tbl_acl", keys=["10.0.0.1", "10.0.0.2", 0x11, 80, 8080], action=1)
+        self.table_add(table="ingress_tbl_acl", keys=["10.0.0.1", "10.0.0.2", 0x6, 80, 8080], action=1)
 
         testutils.send_packet(self, PORT0, udp_pkt_1)
         testutils.verify_packet(self, udp_pkt_1, PORT5)

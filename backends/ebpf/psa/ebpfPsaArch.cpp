@@ -297,6 +297,10 @@ void PSAArch::emitInitializer2TC(CodeBuilder *builder) const {
     builder->blockEnd(true);
 }
 
+void PSAArch::emitHelperFunctions2XDP(CodeBuilder *builder) const {
+    EBPFHashAlgorithmTypeFactoryPSA::instance()->emitGlobals(builder);
+}
+
 void PSAArch::emit2XDP(CodeBuilder *builder) const {
     builder->target->emitIncludes(builder);
     emitPSAIncludes(builder);
@@ -306,6 +310,8 @@ void PSAArch::emit2XDP(CodeBuilder *builder) const {
     emitTypes(builder);
 
     emitInstances2XDP(builder);
+
+    emitHelperFunctions2XDP(builder);
 
     emitInitializer2XDP(builder);
     xdpIngress->emit(builder);

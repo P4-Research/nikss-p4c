@@ -16,7 +16,12 @@ TEST_PIPELINE_ID = 999
 TEST_PIPELINE_MOUNT_PATH = "/sys/fs/bpf/pipeline{}".format(TEST_PIPELINE_ID)
 PIPELINE_MAPS_MOUNT_PATH = "{}/maps".format(TEST_PIPELINE_MOUNT_PATH)
 
+def tc_only(cls):
+    cls.test_tc_only = True
+    return cls
+
 class EbpfTest(BaseTest):
+    test_tc_only = False
     switch_ns = 'test'
     test_prog_image = 'generic.o'  # default, if test case not specify program
     ctool_file_path = ""
@@ -39,14 +44,16 @@ class EbpfTest(BaseTest):
         if process.returncode != 0:
             logger.info("Command failed: %s", command)
             logger.info("Return code: %d", process.returncode)
-            logger.info("STDOUT: %s", stdout_data)
-            logger.info("STDERR: %s", stderr_data)
+            logger.info("STDOUT: %s", stdout_data.decode("utf-8"))
+            logger.info("STDERR: %s", stderr_data.decode("utf-8"))
             if do_fail:
                 self.fail("Command failed (see above for details): {}".format(str(do_fail)))
         return process.returncode, stdout_data, stderr_data
 
     def add_port(self, dev):
         self.exec_ns_cmd("psabpf-ctl pipeline add-port id {} {}".format(TEST_PIPELINE_ID, dev))
+        if self.is_xdp_test():
+            self.exec_cmd("bpftool net attach xdp pinned {}/{} dev s1-{} overwrite".format(TEST_PIPELINE_MOUNT_PATH, "xdp_redirect_dummy_sec", dev))
 
     def del_port(self, dev):
         self.exec_ns_cmd("psabpf-ctl pipeline del-port id {} {}".format(TEST_PIPELINE_ID, dev))
@@ -80,6 +87,9 @@ class EbpfTest(BaseTest):
         if expected_value != value:
             self.fail("Map {} key {} does not have correct value. Expected {}; got {}"
                       .format(name, key, expected_value, value))
+
+    def is_xdp_test(self):
+        return "xdp" in testutils.test_params_get()
 
     def setUp(self):
         super(EbpfTest, self).setUp()
@@ -121,6 +131,9 @@ class P4EbpfTest(EbpfTest):
     p4_file_path = ""
 
     def setUp(self):
+        if self.is_xdp_test() and self.test_tc_only:
+            self.skipTest("not supported by XDP")
+
         if not os.path.exists(self.p4_file_path):
             self.fail("P4 program not found, no such file.")
 
@@ -130,14 +143,16 @@ class P4EbpfTest(EbpfTest):
         head, tail = os.path.split(self.p4_file_path)
         filename = tail.split(".")[0]
         self.test_prog_image = os.path.join("ptf_out", filename + ".o")
+        p4args = "--trace"
+        if self.is_xdp_test():
+            p4args += " --xdp"
         self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "
                       "ARGS=\"{cargs}\" P4C=p4c-ebpf P4ARGS=\"{p4args}\" psa".format(
                             output=self.test_prog_image,
                             p4file=self.p4_file_path,
                             cargs="-DPSA_PORT_RECIRCULATE=2",
-                            p4args="--trace"),
+                            p4args=p4args),
                       "Compilation error")
-
         super(P4EbpfTest, self).setUp()
 
     def tearDown(self):
@@ -152,3 +167,36 @@ class P4EbpfTest(EbpfTest):
 
     def clone_session_delete(self, id):
         self.exec_ns_cmd("psabpf-ctl clone-session delete pipe {} id {}".format(TEST_PIPELINE_ID, id))
+
+    def table_write(self, method, table, keys, action=0, data=None, references=None):
+        """
+        Use table_add or table_update instead of this method
+        """
+        cmd = "psabpf-ctl table {} pipe {} {} ".format(method, TEST_PIPELINE_ID, table)
+        if references:
+            data = references
+            cmd = cmd + "ref "
+        else:
+            cmd = cmd + "id {} ".format(action)
+        cmd = cmd + "key "
+        for k in keys:
+            cmd = cmd + "{} ".format(k)
+        if data:
+            cmd = cmd + "data "
+            for d in data:
+                cmd = cmd + "{} ".format(d)
+        self.exec_ns_cmd(cmd, "Table {} failed".format(method))
+
+    def table_add(self, table, keys, action=0, data=None, references=None):
+        self.table_write(method="add", table=table, keys=keys, action=action, data=data, references=references)
+
+    def table_update(self, table, keys, action=0, data=None, references=None):
+        self.table_write(method="update", table=table, keys=keys, action=action, data=data, references=references)
+
+    def table_delete(self, table, keys=None):
+        cmd = "psabpf-ctl table delete pipe {} {} ".format(TEST_PIPELINE_ID, table)
+        if keys:
+            cmd = cmd + "key "
+            for k in keys:
+                cmd = cmd + "{} ".format(k)
+        self.exec_ns_cmd(cmd, "Table delete failed")

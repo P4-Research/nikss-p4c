@@ -38,6 +38,8 @@ class EBPFPipeline : public EBPFProgram {
     void emitHeaderInstances(CodeBuilder *builder) override;
     void emitLocalVariables(CodeBuilder* builder) override;
     void emitGlobalMetadataInitializer(CodeBuilder *builder);
+    void emitUserMetadataInstance(CodeBuilder *builder);
+    virtual void emitPacketLength(CodeBuilder *builder);
     virtual void emitPSAControlDataTypes(CodeBuilder* builder) = 0;
     virtual void emit(CodeBuilder* builder);
 };
@@ -70,24 +72,33 @@ class TCEgressPipeline : public EBPFPipeline {
     void emitPSAControlDataTypes(CodeBuilder *builder) override;
 };
 
-class XDPIngressPipeline : public EBPFPipeline {
+class XDPPipeline : public EBPFPipeline {
+ public:
+    XDPPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
+    P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) {
+    }
+
+    void emitPacketLength(CodeBuilder *builder) override;
+};
+
+class XDPIngressPipeline : public XDPPipeline {
  public:
     XDPIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
-                        P4::TypeMap* typeMap) :
-                    EBPFPipeline(name, options, refMap, typeMap) {
-            sectionName = "xdp_ingress/" + name;
-        }
+                    P4::TypeMap* typeMap) :
+            XDPPipeline(name, options, refMap, typeMap) {
+        sectionName = "xdp_ingress/" + name;
+    }
 
     void emit(CodeBuilder *builder) override;
     void emitTrafficManager(CodeBuilder *builder) override;
     void emitPSAControlDataTypes(CodeBuilder *builder) override;
 };
 
-class XDPEgressPipeline : public EBPFPipeline {
+class XDPEgressPipeline : public XDPPipeline {
  public:
     XDPEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                         P4::TypeMap* typeMap):
-                    EBPFPipeline(name, options, refMap, typeMap) {
+            XDPPipeline(name, options, refMap, typeMap) {
         sectionName = "xdp_devmap/" + name;
     }
 

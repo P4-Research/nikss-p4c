@@ -24,9 +24,7 @@ class SimpleForwardingPSATest(P4EbpfTest):
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
-        # initialize default action
-        # TODO: we need to come up with a better solution to initialize default action.
-        self.update_map(name="ingress_tbl_fwd_defaultAction", key="00 00 00 00", value="01 00 00 00 05 00 00 00")
+        # use default action
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)
 
@@ -35,6 +33,7 @@ class SimpleForwardingPSATest(P4EbpfTest):
         super(SimpleForwardingPSATest, self).tearDown()
 
 
+@tc_only
 class PSAResubmitTest(P4EbpfTest):
 
     p4_file_path = "samples/p4testdata/resubmit.p4"
@@ -60,6 +59,7 @@ class SimpleTunnelingPSATest(P4EbpfTest):
         testutils.verify_packet(self, exp_pkt, PORT1)
 
 
+@tc_only
 class PSACloneI2E(P4EbpfTest):
 
     p4_file_path = "../../../testdata/p4_16_samples/psa-i2e-cloning-basic-bmv2.p4"
@@ -102,6 +102,7 @@ class EgressTrafficManagerDropPSATest(P4EbpfTest):
         testutils.verify_no_other_packets(self)
 
 
+@tc_only
 class EgressTrafficManagerClonePSATest(P4EbpfTest):
     """
     1. Send packet to interface PORT1 (bpf ifindex = 5) with destination MAC address equals to aa:bb:cc:dd:ee:ff.
@@ -130,7 +131,7 @@ class EgressTrafficManagerClonePSATest(P4EbpfTest):
         self.clone_session_delete(8)
         super(EgressTrafficManagerClonePSATest, self).tearDown()
 
-
+@tc_only
 class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
     """
     Test resubmit packet path. eBPF program should do following operation:
@@ -154,7 +155,7 @@ class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
         pkt[Ether].src = '00:44:33:22:11:00'
         testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
-
+@tc_only
 class MulticastPSATest(P4EbpfTest):
     p4_file_path = "../../../testdata/p4_16_samples/psa-multicast-basic-bmv2.p4"
 
@@ -275,9 +276,9 @@ class DirectCountersPSATest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/direct-counters.p4"
 
     def runTest(self):
-        self.update_map("ingress_tbl1", "0 0 0 10", "1 0 0 0  0 0 0 0  0 0 0 0")
-        self.update_map("ingress_tbl2", "1 0 0 10", "2 0 0 0  0 0 0 0  0 0 0 0  0 0 0 0")
-        self.update_map("ingress_tbl2", "2 0 0 10", "3 0 0 0  0 0 0 0  0 0 0 0  0 0 0 0")
+        self.table_add(table="ingress_tbl1", keys=["10.0.0.0"], action=1)
+        self.table_add(table="ingress_tbl2", keys=["10.0.0.1"], action=2)
+        self.table_add(table="ingress_tbl2", keys=["10.0.0.2"], action=3)
 
         for i in range(3):
             pkt = testutils.simple_ip_packet(pktlen=100, ip_src='10.0.0.{}'.format(i))
@@ -603,6 +604,7 @@ class RandomPSATest(P4EbpfTest):
         logger.info("f3 sequence: {}".format(sequence[2]))
 
 
+@tc_only
 class QoSPSATest(P4EbpfTest):
 
     p4_file_path = "samples/p4testdata/cos-psa.p4"

@@ -10,7 +10,6 @@ class XdpTarget : public KernelSamplesTarget {
  public:
     explicit XdpTarget(bool emitTrace) : KernelSamplesTarget(emitTrace, "XDP") {}
 
-    void emitIncludes(Util::SourceCodeBuilder* builder) const override;
     cstring forwardReturnCode() const override { return "XDP_PASS"; }
     cstring dropReturnCode() const override { return "XDP_DROP"; }
     cstring abortReturnCode() const override { return "XDP_ABORTED"; }
