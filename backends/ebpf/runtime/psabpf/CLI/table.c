@@ -247,7 +247,6 @@ int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
                 fprintf(stderr, "missing mask for ternary key\n");
                 return -EPERM;
             }
-            printf("data: %s\nmask: %s\n", **argv, substr_ptr);
             error_code = translate_data_to_bytes(**argv, &mk, CTX_MATCH_KEY);
             if (error_code != NO_ERROR)
                 return -EPERM;

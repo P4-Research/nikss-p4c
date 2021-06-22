@@ -135,12 +135,23 @@ typedef struct psabpf_table_entry_context {
     uint32_t table_type;
     uint32_t key_size;
     uint32_t value_size;
+    uint32_t btf_type_id;
     bool is_indirect;
+    bool is_ternary;
+
+    char base_dir[256];
+    char base_name[256];
+
+    /* for ternary tables */
+    uint32_t tuple_max_entries;
+    int prefixes_fd;
+    uint32_t prefixes_key_size, prefixes_value_size, prefixes_map_type, prefixes_btf_type_id;
+    int tmap_fd;
+    uint32_t tmap_key_size, tmap_value_size, tmap_map_type, tmap_btf_type_id;
 
     // BTF metadata are associated with eBPF program, eBPF map do not have own BTF
     int associated_prog;
     void * btf;
-    uint32_t btf_type_id;
 
     // below fields might be useful when iterating
     size_t curr_idx;
