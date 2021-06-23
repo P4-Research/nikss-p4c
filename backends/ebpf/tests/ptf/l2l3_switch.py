@@ -304,12 +304,11 @@ class PortCountersTest(L2L3SwitchTest):
         # FIXME: bridged_metadata is being counted in the egress pipeline.
         #  not sure if this is proper behavior, but let's keep it for now.
         ig_bytes = 0
-        eg_bytes = 0
         for i in range(0, 2):
             testutils.send_packet(self, PORT1, pkt)
             testutils.verify_packet(self, pkt, PORT4)
             ig_bytes += len(pkt)
-            eg_bytes += ig_bytes + 4
+            eg_bytes = ig_bytes + 4
             pkts_cnt = i + 1
             self.verify_map_entry("ingress_in_pkts", "5 0 0 0", "{} 00 00 00 0{} 00 00 00".format(hex(ig_bytes).split('x')[-1], pkts_cnt))
             self.verify_map_entry("egress_tbl_vlan_egress", "8 00 00 00", "02 00 00 00 01 00 00 00 {} 00 00 00 0{} 00 00 00".format(hex(eg_bytes).split('x')[-1], pkts_cnt))
