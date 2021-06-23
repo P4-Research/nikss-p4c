@@ -137,10 +137,12 @@ static int open_bpf_map(psabpf_table_entry_ctx_t *ctx, const char *name, int *fd
         *max_entries = info.max_entries;
 
     /* Find entry in BTF for our map */
-    snprintf(buffer, sizeof(buffer), ".maps.%s", name);
-    *btf_type_id = psabtf_get_type_id_by_name(ctx->btf, buffer);
-    if (*btf_type_id == 0)
-        fprintf(stderr, "can't get BTF info for %s\n", name);
+    if (btf_type_id != NULL) {
+        snprintf(buffer, sizeof(buffer), ".maps.%s", name);
+        *btf_type_id = psabtf_get_type_id_by_name(ctx->btf, buffer);
+        if (*btf_type_id == 0)
+            fprintf(stderr, "can't get BTF info for %s\n", name);
+    }
 
     return NO_ERROR;
 }
@@ -163,8 +165,8 @@ static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name)
     printf("\tBTF type id: %u\n", ctx->prefixes_btf_type_id);
 
     snprintf(derived_name, sizeof(derived_name), "%s_tuples_map", name);
-    ret = open_bpf_map(ctx, derived_name, &(ctx->tmap_fd), &(ctx->tmap_key_size), &(ctx->tmap_value_size),
-                       &(ctx->tmap_map_type), &(ctx->tmap_btf_type_id), NULL);
+    ret = open_bpf_map(ctx, derived_name, &(ctx->tmap_fd), &(ctx->tmap_key_size),
+                       &(ctx->tmap_value_size), &(ctx->tmap_map_type), NULL, NULL);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
@@ -172,7 +174,6 @@ static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name)
     printf("table: %s\n", derived_name);
     printf("\tkey size: %u\n", ctx->tmap_key_size);
     printf("\tvalue size: %u\n", ctx->tmap_value_size);
-    printf("\tBTF type id: %u\n", ctx->tmap_btf_type_id);
 
     snprintf(derived_name, sizeof(derived_name), "%s_tuple", name);
     ret = open_bpf_map(ctx, derived_name, &(ctx->table_fd), &(ctx->key_size), &(ctx->value_size),
@@ -1108,7 +1109,6 @@ static int add_ternary_table_prefix(char *new_prefix, char *prefix_value,
         uint8_t has_next = 1;
         memset(value, 0, ctx->prefixes_value_size);
         *((uint32_t *) (value + prefix_md.tuple_id_offset)) = tuple_id;
-//        *((uint8_t *) (value + prefix_md.has_next_offset)) = 0;
     }
 
     /* Iterate over every prefix to the last */
@@ -1162,10 +1162,59 @@ clean_up:
     return err;
 }
 
+static int ternary_table_add_tuple_and_open(psabpf_table_entry_ctx_t *ctx, const uint32_t tuple_id)
+{
+    int err;
+    char map_name[264];
+    snprintf(map_name, sizeof(map_name), "%s_tuple_%u", ctx->base_name, tuple_id);
+
+    struct bpf_create_map_attr attr = {
+            .key_size = ctx->key_size,
+            .value_size = ctx->value_size,
+            .max_entries = ctx->tuple_max_entries,
+            .map_type = ctx->table_type,
+            .name = map_name,
+    };
+    ctx->table_fd = bpf_create_map_xattr(&attr);
+    if (ctx->table_fd < 0) {
+        err = errno;
+        fprintf(stderr, "failed to create tuple %u: %s\n", tuple_id, strerror(err));
+        return err;
+    }
+
+    /* add tuple to tuples map */
+    err = bpf_map_update_elem(ctx->tmap_fd, &tuple_id, &(ctx->table_fd), 0);
+    if (err != 0) {
+        err = errno;
+        fprintf(stderr, "failed to add tuple %u: %s\n", tuple_id, strerror(err));
+        close_object_fd(&(ctx->table_fd));
+        return err;
+    }
+
+    /* pin map to the filesystem */
+    char file_name[1024];
+    snprintf(file_name, sizeof(file_name), "%s/%s", ctx->base_dir, map_name);
+    printf("pinning map %s to %s\n", map_name, file_name);
+    err = bpf_obj_pin(ctx->table_fd, file_name);
+    if (err != 0)
+        fprintf(stderr, "warning: failed to pin map %s to file %s: %s\n",
+                map_name, file_name, strerror(errno));
+
+    return NO_ERROR;
+}
+
 static int prepare_ternary_table_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
 {
+    if (ctx->prefixes_fd < 0 || ctx->tmap_fd < 0 || ctx->table_fd >= 0) {
+        fprintf(stderr, "ternary table not properly opened. BUG?\n");
+        return -EINVAL;
+    }
     if (ctx->key_size != ctx->prefixes_key_size) {
         fprintf(stderr, "key and its mask have different length. BUG?\n");
+        return -EINVAL;
+    }
+    if (ctx->tmap_key_size != 4 || ctx->tmap_value_size != 4) {
+        fprintf(stderr, "key/value size of tuples map have to be 4B.\n");
         return -EINVAL;
     }
 
@@ -1195,6 +1244,7 @@ static int prepare_ternary_table_write(psabpf_table_entry_ctx_t *ctx, psabpf_tab
         }
     } else if (err != 0) {
         fprintf(stderr, "entry with prefix not found\n");
+        err = -ENOENT;
         goto clean_up;
     }
 
@@ -1202,6 +1252,28 @@ static int prepare_ternary_table_write(psabpf_table_entry_ctx_t *ctx, psabpf_tab
     dump_buffer(key_mask, ctx->prefixes_key_size);
     printf("Value mask buffer:\n\t");
     dump_buffer(value_mask, ctx->prefixes_value_size);
+
+    struct ternary_table_prefix_metadata prefix_md;
+    if (get_ternary_table_prefix_md(ctx, &prefix_md) != NO_ERROR) {
+        fprintf(stderr, "failed to obtain offsets and sizes of prefix\n");
+        err = -EPERM;
+        goto clean_up;
+    }
+    uint32_t tuple_id = *((uint32_t *) (value_mask + prefix_md.tuple_id_offset));
+    uint32_t inner_map_id;
+
+    err = bpf_map_lookup_elem(ctx->tmap_fd, &tuple_id, &inner_map_id);
+    if (err == 0) {
+        ctx->table_fd = bpf_map_get_fd_by_id(inner_map_id);
+        err = NO_ERROR;
+    } else {
+        if (bpf_flags == BPF_EXIST) {
+            fprintf(stderr, "tuple not found\n");
+            err = -ENOENT;
+            goto clean_up;
+        }
+        err = ternary_table_add_tuple_and_open(ctx, tuple_id);
+    }
 
 clean_up:
     if (key_mask != NULL)
