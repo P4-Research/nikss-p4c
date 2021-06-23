@@ -17,7 +17,8 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     emitHeaderInstances(builder);
     emitLocalVariables(builder);
     emitPSAControlDataTypes(builder);
-    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d", sectionName);
+    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d",
+                                 sectionName);
     pathStr = Util::printf_format("%s.packet_path", control->inputStandardMetadata->name.name);
     lenStr = Util::printf_format("%s", lengthVar.c_str());
     builder->target->emitTraceMessage(builder, msgStr.c_str(), 2, pathStr.c_str(), lenStr.c_str());
@@ -165,9 +166,11 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
     emitUserMetadataInstance(builder);
     emitLocalVariables(builder);
 
-    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d", sectionName);
+    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d",
+                                 sectionName);
     cstring lenStr = Util::printf_format("%s", lengthVar.c_str());
-    builder->target->emitTraceMessage(builder, msgStr.c_str(), 2, "meta->packet_path", lenStr.c_str());
+    builder->target->emitTraceMessage(builder, msgStr.c_str(), 2,
+                                      "meta->packet_path", lenStr.c_str());
     parser->emit(builder);
     builder->emitIndent();
     builder->append(IR::ParserState::accept);
