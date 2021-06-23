@@ -341,24 +341,8 @@ class PSATernaryTest(P4EbpfTest):
         # flow rules for 'tbl_ternary_0'
         # 1. hdr.ipv4.srcAddr=0x01020304/0xffffff00 => action 0 priority 1
         # 2. hdr.ipv4.srcAddr=0x01020304/0xffff00ff => action 1 priority 10
-        self.update_map(name="ingress_tbl_ternary_0_prefixes", key="00 00 00 00",
-                        value="01 00 00 00 00 0xff 0xff 0xff 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_0_prefixes", key="00 0xff 0xff 0xff",
-                        value="01 00 00 00 0xff 00 0xff 0xff 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_0_prefixes", key="0xff 00 0xff 0xff",
-                        value="02 00 00 00 00 00 00 00 00 00 00 00")
-        self.create_map(name="ingress_tbl_ternary_0_tuple_1", type="hash", key_size=4, value_size=8,
-                        max_entries=100)
-        self.create_map(name="ingress_tbl_ternary_0_tuple_2", type="hash", key_size=4, value_size=8,
-                        max_entries=100)
-        self.update_map(name="ingress_tbl_ternary_0_tuple_1", key="00 0x03 0x02 0x01",
-                        value="00 00 00 00 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_0_tuple_2", key="0x04 00 0x02 0x01",
-                        value="01 00 00 00 10 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_0_tuples_map", key="01 0 0 0",
-                        value="ingress_tbl_ternary_0_tuple_1", map_in_map=True)
-        self.update_map(name="ingress_tbl_ternary_0_tuples_map", key="02 0 0 0",
-                        value="ingress_tbl_ternary_0_tuple_2", map_in_map=True)
+        self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4%0xffffff00"], action=0, priority=1)
+        self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4%0xffff00ff"], action=1, priority=10)
 
         # flow rules for 'tbl_ternary_1'
         # 1. hdr.ipv4.diffserv=0x00/0x00, hdr.ipv4.dstAddr=0xc0a80201/0xffffff00 => action 0 priority 1
@@ -413,27 +397,6 @@ class PSATernaryTest(P4EbpfTest):
         pkt[IP].dst = '255.255.255.255'
         pkt[UDP].chksum = 0x044D
         testutils.verify_packet(self, pkt, PORT1)
-
-    def tearDown(self):
-        self.remove_maps(
-            ["ingress_tbl_ternary_0_prefixes",
-             "ingress_tbl_ternary_0_tuples_map",
-             "ingress_tbl_ternary_0_tuple_1",
-             "ingress_tbl_ternary_0_tuple_2",
-             "ingress_tbl_ternary_0_defaultAction",
-             "ingress_tbl_ternary_1_prefixes",
-             "ingress_tbl_ternary_1_tuples_map",
-             "ingress_tbl_ternary_1_tuple_6",
-             "ingress_tbl_ternary_1_tuple_7",
-             "ingress_tbl_ternary_1_defaultAction",
-             "ingress_tbl_ternary_2_prefixes",
-             "ingress_tbl_ternary_2_tuples_map",
-             "ingress_tbl_ternary_2_tuple_3",
-             "ingress_tbl_ternary_2_tuple_5",
-             "ingress_tbl_ternary_2_defaultAction"]
-        )
-
-        super(PSATernaryTest, self).tearDown()
 
 
 class ParserValueSetPSATest(P4EbpfTest):

@@ -253,6 +253,11 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
         free(entry->action);
         entry->action = NULL;
     }
+
+    /* free ternary mask */
+    if (entry->ternary_mask != NULL)
+        free(entry->ternary_mask);
+    entry->ternary_mask = NULL;
 }
 
 /* can be invoked multiple times */
@@ -1276,8 +1281,7 @@ static int prepare_ternary_table_write(psabpf_table_entry_ctx_t *ctx, psabpf_tab
     }
 
 clean_up:
-    if (key_mask != NULL)
-        free(key_mask);
+    entry->ternary_mask = key_mask;
     if (value_mask != NULL)
         free(value_mask);
 
@@ -1334,6 +1338,15 @@ int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t
     if (return_code != NO_ERROR) {
         fprintf(stderr, "failed to construct value\n");
         goto clean_up;
+    }
+
+    /* transform key = key & mask for ternary table */
+    if (ctx->is_ternary == true && entry->ternary_mask != NULL) {
+        for (int i = 0; i < ctx->key_size / 4; i++) {
+            uint32_t *key = ((uint32_t *) key_buffer) + i;
+            uint32_t *mask = ((uint32_t *) entry->ternary_mask) + i;
+            *key = (uint32_t) ((*key) & (*mask));
+        }
     }
 
     /* Handle direct objects */

@@ -116,13 +116,14 @@ typedef struct psabpf_action {
 } psabpf_action_t;
 
 typedef struct psabpf_table_entry {
-
     size_t n_keys;
     psabpf_match_key_t **match_keys;
 
     psabpf_action_t *action;
 
     uint32_t priority;
+
+    void * ternary_mask;
 } psabpf_table_entry_t;
 
 /*
