@@ -645,8 +645,7 @@ int fill_action_id(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_en
         fprintf(stderr, "action id entry not found\n");
         return -ENOENT;
     }
-    return write_buffer_btf(buffer, ctx->value_size,
-                            btf_member_bit_offset(value_type, action_md.index) / 8,
+    return write_buffer_btf(buffer, ctx->value_size, action_md.bit_offset / 8,
                             &(entry->action->action_id), sizeof(entry->action->action_id),
                             ctx, action_md.effective_type_id, "action id");
 }
@@ -662,8 +661,7 @@ int fill_priority(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_ent
         fprintf(stderr, "priority entry not found\n");
         return -ENOENT;
     }
-    return write_buffer_btf(buffer, ctx->value_size,
-                            btf_member_bit_offset(value_type, priority_md.index) / 8,
+    return write_buffer_btf(buffer, ctx->value_size, priority_md.bit_offset / 8,
                             &(entry->priority), sizeof(entry->priority),
                             ctx, priority_md.effective_type_id, "priority");
 }
@@ -681,7 +679,7 @@ int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_
         return -ENOENT;
     }
     const struct btf_type * union_type = psabtf_get_type_by_id(ctx->btf, action_union_md.effective_type_id);
-    base_offset = btf_member_bit_offset(value_type, action_union_md.index) / 8;
+    base_offset = action_union_md.bit_offset / 8;
 
     /* find action data structure in the union */
     psabtf_struct_member_md_t action_data_md = {};
@@ -691,7 +689,7 @@ int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_
         return -EPERM;  /* not fixable, invalid action ID */
     }
     /* to be sure of offset, take into account offset of action data structure in the union */
-    base_offset = base_offset + (btf_member_bit_offset(union_type, action_data_md.index) / 8);
+    base_offset = base_offset + action_data_md.bit_offset / 8;
     const struct btf_type * data_type = psabtf_get_type_by_id(ctx->btf, action_data_md.effective_type_id);
 
     /* fill action data */
@@ -897,7 +895,7 @@ int handle_counters(const char *key, char *value_buffer,
     if (reference_buffer == NULL)
         return -ENOMEM;
     int err = bpf_map_lookup_elem(ctx->table_fd, key, reference_buffer);
-    if (err != NO_ERROR) {
+    if (err != 0) {
         fprintf(stderr, "entry with counters not found\n");
         goto clean_up;
     }
@@ -1016,7 +1014,155 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
     return ret;
 }
 
-static int prepare_ternary_table(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
+struct ternary_table_prefix_metadata {
+    size_t tuple_id_offset;
+    size_t tuple_id_size;
+    size_t next_mask_offset;
+    size_t next_mask_size;
+    size_t has_next_offset;
+    size_t has_next_size;
+};
+
+static int get_ternary_table_prefix_md(psabpf_table_entry_ctx_t *ctx, struct ternary_table_prefix_metadata *md)
+{
+    psabtf_struct_member_md_t member;
+
+    md->tuple_id_size = 4;
+    md->next_mask_size = ctx->key_size;
+    md->has_next_size = 1;
+    /* Lets guess offsets (they will be fixed with BTF if available) */
+    md->tuple_id_offset = 0;
+    md->next_mask_offset = ctx->key_size > 4 ? 8 : 4;
+    md->has_next_offset = md->next_mask_offset + md->next_mask_size;
+
+    if (ctx->btf == NULL || ctx->prefixes_btf_type_id == 0)
+        return NO_ERROR;
+
+    printf("Getting offsets and sizes of prefix from BTF\n");
+
+    uint32_t type_id = psabtf_get_member_type_id_by_name(ctx->btf, ctx->prefixes_btf_type_id, "value");
+    if (type_id == 0)
+        return -EPERM;
+
+    /* tuple id */
+    if (psabtf_get_member_md_by_name(ctx->btf, type_id, "tuple_id", &member) != NO_ERROR)
+        return -EPERM;
+    md->tuple_id_size = psabtf_get_type_size_by_id(ctx->btf, member.effective_type_id);
+    md->tuple_id_offset = member.bit_offset / 8;
+
+    /* next mask */
+    if (psabtf_get_member_md_by_name(ctx->btf, type_id, "next_tuple_mask", &member) != NO_ERROR)
+        return -EPERM;
+    md->next_mask_size = psabtf_get_type_size_by_id(ctx->btf, member.effective_type_id);
+    md->next_mask_offset = member.bit_offset / 8;
+    if (md->next_mask_size != ctx->key_size)
+        return -EPERM;
+
+    /* has next */
+    if (psabtf_get_member_md_by_name(ctx->btf, type_id, "has_next", &member) != NO_ERROR)
+        return -EPERM;
+    md->has_next_size = psabtf_get_type_size_by_id(ctx->btf, member.effective_type_id);
+    md->has_next_offset = member.bit_offset / 8;
+
+    printf("tuple id:\n\tsize: %zu\n\toffset: %zu\n", md->tuple_id_size, md->tuple_id_offset);
+    printf("next mask:\n\tsize: %zu\n\toffset: %zu\n", md->next_mask_size, md->next_mask_offset);
+    printf("has next:\n\tsize: %zu\n\toffset: %zu\n", md->has_next_size, md->has_next_offset);
+
+    /* validate size and offset */
+    if (md->tuple_id_offset + md->tuple_id_size > ctx->prefixes_value_size ||
+        md->next_mask_offset + md->next_mask_size > ctx->prefixes_value_size ||
+        md->has_next_offset + md->has_next_size > ctx->prefixes_value_size) {
+        fprintf(stderr, "BUG: invalid size or offset in the mask\n");
+        return -EPERM;
+    }
+
+    return NO_ERROR;
+}
+
+static int add_ternary_table_prefix(char *new_prefix, char *prefix_value,
+                                    psabpf_table_entry_ctx_t *ctx, uint64_t bpf_flags)
+{
+    int err = NO_ERROR;
+    uint32_t tuple_id = 0;
+    struct ternary_table_prefix_metadata prefix_md;
+
+    if (get_ternary_table_prefix_md(ctx, &prefix_md) != NO_ERROR) {
+        fprintf(stderr, "failed to obtain offsets and sizes of prefix\n");
+        return -EPERM;
+    }
+
+    char *key = malloc(ctx->prefixes_key_size);
+    char *value = malloc(ctx->prefixes_value_size);
+    if (key == NULL || value == NULL) {
+        fprintf(stderr, "not enough memory\n");
+        err = -ENOMEM;
+        goto clean_up;
+    }
+
+    /* Process head */
+    memset(key, 0, ctx->prefixes_key_size);
+    err = bpf_map_lookup_elem(ctx->prefixes_fd, key, value);
+    if (err != 0) {
+        /* Construct head, it will be added later */
+        printf("head not found\n");
+        uint8_t has_next = 1;
+        memset(value, 0, ctx->prefixes_value_size);
+        *((uint32_t *) (value + prefix_md.tuple_id_offset)) = tuple_id;
+//        *((uint8_t *) (value + prefix_md.has_next_offset)) = 0;
+    }
+
+    /* Iterate over every prefix to the last */
+    while (true) {
+        uint8_t has_next = *((uint8_t *) (value + prefix_md.has_next_offset));
+        if (has_next == 0)
+            break;
+
+        /* Get next prefix */
+        memcpy(key, value + prefix_md.next_mask_offset, prefix_md.next_mask_size);
+        err = bpf_map_lookup_elem(ctx->prefixes_fd, key, value);
+        if (err != 0) {
+            err = errno;
+            fprintf(stderr, "detected data inconsistency in prefixes, aborting\n");
+            goto clean_up;
+        }
+
+        /* Find highest tuple id */
+        uint32_t current_tuple_id = *((uint32_t *) (value + prefix_md.tuple_id_offset));
+        if (current_tuple_id > tuple_id)
+            tuple_id = current_tuple_id;
+    }
+
+    /* First add new prefix to avoid data inconsistency */
+    memset(prefix_value, 0, ctx->prefixes_value_size);
+    *((uint32_t *) (prefix_value + prefix_md.tuple_id_offset)) = ++tuple_id;
+    err = bpf_map_update_elem(ctx->prefixes_fd, new_prefix, prefix_value, BPF_NOEXIST);
+    if (err != 0)
+        goto clean_up;
+
+    /* Update previous node */
+    memcpy(value + prefix_md.next_mask_offset, new_prefix, prefix_md.next_mask_size);
+    *((uint8_t *) (value + prefix_md.has_next_offset)) = 1;
+    err = bpf_map_update_elem(ctx->prefixes_fd, key, value, BPF_ANY);
+    if (err != 0)
+        goto clean_up;
+
+    err = NO_ERROR;
+
+    printf("Previous key mask buffer:\n\t");
+    dump_buffer(key, ctx->prefixes_key_size);
+    printf("Previous value mask buffer:\n\t");
+    dump_buffer(value, ctx->prefixes_value_size);
+
+clean_up:
+    if (key != NULL)
+        free(key);
+    if (value != NULL)
+        free(value);
+
+    return err;
+}
+
+static int prepare_ternary_table_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
 {
     if (ctx->key_size != ctx->prefixes_key_size) {
         fprintf(stderr, "key and its mask have different length. BUG?\n");
@@ -1038,6 +1184,19 @@ static int prepare_ternary_table(psabpf_table_entry_ctx_t *ctx, psabpf_table_ent
     err = construct_buffer(key_mask, ctx->prefixes_key_size, ctx, entry, fill_key_mask_btf, fill_key_mask_byte_by_byte);
     if (err != NO_ERROR)
         goto clean_up;
+
+    err = bpf_map_lookup_elem(ctx->prefixes_fd, key_mask, value_mask);
+    /* It is not allowed to add new prefix when updating existing entry */
+    if (err != 0 && bpf_flags != BPF_EXIST) {
+        err = add_ternary_table_prefix(key_mask, value_mask, ctx, bpf_flags);
+        if (err != NO_ERROR) {
+            fprintf(stderr, "unable to add new prefix\n");
+            goto clean_up;
+        }
+    } else if (err != 0) {
+        fprintf(stderr, "entry with prefix not found\n");
+        goto clean_up;
+    }
 
     printf("Key mask buffer:\n\t");
     dump_buffer(key_mask, ctx->prefixes_key_size);
@@ -1065,7 +1224,7 @@ int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t
     int return_code = NO_ERROR;
 
     if (ctx->is_ternary) {
-        if (prepare_ternary_table(ctx, entry, bpf_flags) != NO_ERROR)
+        if (prepare_ternary_table_write(ctx, entry, bpf_flags) != NO_ERROR)
             goto clean_up;
     }
 
