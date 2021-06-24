@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <dirent.h>
 #include <bpf/bpf.h>
 #include <bpf/btf.h>
 #include <linux/bpf.h>
@@ -14,13 +15,22 @@
 #define COUNTER_PACKETS_OR_BYTES_STRUCT_ENTRIES  1
 #define COUNTER_PACKETS_AND_BYTES_STRUCT_ENTRIES 2
 
-int str_ends_with(const char *str, const char *suffix)
+static int str_ends_with(const char *str, const char *suffix)
 {
     size_t len_str = strlen(str);
     size_t len_suffix = strlen(suffix);
     if (len_suffix >  len_str)
         return 0;
     return strncmp(str + len_str - len_suffix, suffix, len_suffix) == 0;
+}
+
+/* Data len must be aligned to 4B */
+static void mem_bitwise_and(uint32_t *dst, uint32_t *mask, size_t len)
+{
+    for (int i = 0; i < len / 4; i++) {
+        *dst = (uint32_t) ((*dst) & (*mask));
+        ++dst; ++mask;
+    }
 }
 
 void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
@@ -130,7 +140,8 @@ static int open_bpf_map(psabpf_table_entry_ctx_t *ctx, const char *name, int *fd
         fprintf(stderr, "can't get info for table %s: %s\n", name, strerror(errno_val));
         return errno_val;
     }
-    *map_type = info.type;
+    if (map_type != NULL)
+        *map_type = info.type;
     *key_size = info.key_size;
     *value_size = info.value_size;
     if (max_entries != NULL)
@@ -154,7 +165,7 @@ static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name)
 
     snprintf(derived_name, sizeof(derived_name), "%s_prefixes", name);
     ret = open_bpf_map(ctx, derived_name, &(ctx->prefixes_fd), &(ctx->prefixes_key_size), &(ctx->prefixes_value_size),
-                       &(ctx->prefixes_map_type), &(ctx->prefixes_btf_type_id), NULL);
+                       NULL, &(ctx->prefixes_btf_type_id), NULL);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
@@ -166,7 +177,7 @@ static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name)
 
     snprintf(derived_name, sizeof(derived_name), "%s_tuples_map", name);
     ret = open_bpf_map(ctx, derived_name, &(ctx->tmap_fd), &(ctx->tmap_key_size),
-                       &(ctx->tmap_value_size), &(ctx->tmap_map_type), NULL, NULL);
+                       &(ctx->tmap_value_size), NULL, NULL, NULL);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
@@ -253,11 +264,6 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
         free(entry->action);
         entry->action = NULL;
     }
-
-    /* free ternary mask */
-    if (entry->ternary_mask != NULL)
-        free(entry->ternary_mask);
-    entry->ternary_mask = NULL;
 }
 
 /* can be invoked multiple times */
@@ -1208,7 +1214,8 @@ static int ternary_table_add_tuple_and_open(psabpf_table_entry_ctx_t *ctx, const
     return NO_ERROR;
 }
 
-static int prepare_ternary_table_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
+static int ternary_table_open_tuple(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+                                    char **key_mask, uint64_t bpf_flags)
 {
     if (ctx->prefixes_fd < 0 || ctx->tmap_fd < 0 || ctx->table_fd >= 0) {
         fprintf(stderr, "ternary table not properly opened. BUG?\n");
@@ -1224,25 +1231,26 @@ static int prepare_ternary_table_write(psabpf_table_entry_ctx_t *ctx, psabpf_tab
     }
 
     int err = NO_ERROR;
-    char *key_mask = malloc(ctx->prefixes_key_size);
     char *value_mask = malloc(ctx->prefixes_value_size);
+    *key_mask = malloc(ctx->prefixes_key_size);
 
-    if (key_mask == NULL || value_mask == NULL) {
+    if (*key_mask == NULL || value_mask == NULL) {
         fprintf(stderr, "not enough memory\n");
         err = -ENOMEM;
         goto clean_up;
     }
-    memset(key_mask, 0, ctx->prefixes_key_size);
+    memset(*key_mask, 0, ctx->prefixes_key_size);
     memset(value_mask, 0, ctx->prefixes_value_size);
 
-    err = construct_buffer(key_mask, ctx->prefixes_key_size, ctx, entry, fill_key_mask_btf, fill_key_mask_byte_by_byte);
+    err = construct_buffer(*key_mask, ctx->prefixes_key_size, ctx, entry,
+                           fill_key_mask_btf, fill_key_mask_byte_by_byte);
     if (err != NO_ERROR)
         goto clean_up;
 
-    err = bpf_map_lookup_elem(ctx->prefixes_fd, key_mask, value_mask);
+    err = bpf_map_lookup_elem(ctx->prefixes_fd, *key_mask, value_mask);
     /* It is not allowed to add new prefix when updating existing entry */
     if (err != 0 && bpf_flags != BPF_EXIST) {
-        err = add_ternary_table_prefix(key_mask, value_mask, ctx, bpf_flags);
+        err = add_ternary_table_prefix(*key_mask, value_mask, ctx, bpf_flags);
         if (err != NO_ERROR) {
             fprintf(stderr, "unable to add new prefix\n");
             goto clean_up;
@@ -1254,7 +1262,7 @@ static int prepare_ternary_table_write(psabpf_table_entry_ctx_t *ctx, psabpf_tab
     }
 
     printf("Key mask buffer:\n\t");
-    dump_buffer(key_mask, ctx->prefixes_key_size);
+    dump_buffer(*key_mask, ctx->prefixes_key_size);
     printf("Value mask buffer:\n\t");
     dump_buffer(value_mask, ctx->prefixes_value_size);
 
@@ -1281,26 +1289,27 @@ static int prepare_ternary_table_write(psabpf_table_entry_ctx_t *ctx, psabpf_tab
     }
 
 clean_up:
-    entry->ternary_mask = key_mask;
     if (value_mask != NULL)
         free(value_mask);
 
     return err;
 }
 
-static void cleanup_ternary_table(psabpf_table_entry_ctx_t *ctx)
+static void post_ternary_table_write(psabpf_table_entry_ctx_t *ctx)
 {
-    close_object_fd(&(ctx->table_fd));
+    if (ctx->is_ternary)
+        close_object_fd(&(ctx->table_fd));
 }
 
 int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
 {
     char *key_buffer = NULL;
+    char *key_mask_buffer = NULL;
     char *value_buffer = NULL;
     int return_code = NO_ERROR;
 
     if (ctx->is_ternary) {
-        if (prepare_ternary_table_write(ctx, entry, bpf_flags) != NO_ERROR)
+        if (ternary_table_open_tuple(ctx, entry, &key_mask_buffer, bpf_flags) != NO_ERROR)
             goto clean_up;
     }
 
@@ -1340,14 +1349,8 @@ int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t
         goto clean_up;
     }
 
-    /* transform key = key & mask for ternary table */
-    if (ctx->is_ternary == true && entry->ternary_mask != NULL) {
-        for (int i = 0; i < ctx->key_size / 4; i++) {
-            uint32_t *key = ((uint32_t *) key_buffer) + i;
-            uint32_t *mask = ((uint32_t *) entry->ternary_mask) + i;
-            *key = (uint32_t) ((*key) & (*mask));
-        }
-    }
+    if (ctx->is_ternary == true && key_mask_buffer != NULL)
+        mem_bitwise_and((uint32_t *) key_buffer, (uint32_t *) key_mask_buffer, ctx->key_size);
 
     /* Handle direct objects */
     if (bpf_flags == BPF_EXIST) {
@@ -1373,13 +1376,15 @@ int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t
     }
 
 clean_up:
-    if (key_buffer)
+    if (key_buffer != NULL)
         free(key_buffer);
-    if (value_buffer)
+    if (key_mask_buffer != NULL)
+        free(key_mask_buffer);
+    if (value_buffer != NULL)
         free(value_buffer);
 
     if (ctx->is_ternary)
-        cleanup_ternary_table(ctx);
+        post_ternary_table_write(ctx);
 
     return return_code;
 }
@@ -1394,12 +1399,12 @@ int psabpf_table_entry_update(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_
     return psabpf_table_entry_write(ctx, entry, BPF_EXIST);
 }
 
-int delete_all_table_entries(psabpf_table_entry_ctx_t *ctx)
+static int delete_all_table_entries(int fd, size_t key_size)
 {
     fprintf(stderr, "removing all entries from table\n");
 
-    char * key = malloc(ctx->key_size);
-    char * next_key = malloc(ctx->key_size);
+    char * key = malloc(key_size);
+    char * next_key = malloc(key_size);
     int error_code = NO_ERROR;
 
     if (key == NULL || next_key == NULL) {
@@ -1408,7 +1413,7 @@ int delete_all_table_entries(psabpf_table_entry_ctx_t *ctx)
         goto clean_up;
     }
 
-    if (bpf_map_get_next_key(ctx->table_fd, NULL, next_key) != 0)
+    if (bpf_map_get_next_key(fd, NULL, next_key) != 0)
         goto clean_up;  /* table empty */
     do {
         /* Swap buffers, so next_key will become key and next_key may be reused */
@@ -1416,12 +1421,11 @@ int delete_all_table_entries(psabpf_table_entry_ctx_t *ctx)
         next_key = key;
         key = tmp_key;
 
-        if (bpf_map_delete_elem(ctx->table_fd, key) != 0) {
-            error_code = errno;
-            fprintf(stderr, "failed to delete entry: %s\naborting\n", strerror(error_code));
-            goto clean_up;
-        }
-    } while (bpf_map_get_next_key(ctx->table_fd, key, next_key) == 0);
+        /* Ignore error(s) from bpf_map_delete_elem(). In some cases key may exists
+         * but entry not exists (e.g. array map). So in any case we have iterate over
+         * all key and try delete it. */
+        bpf_map_delete_elem(fd, key);
+    } while (bpf_map_get_next_key(fd, key, next_key) == 0);
 
 clean_up:
     if (key)
@@ -1431,10 +1435,74 @@ clean_up:
     return error_code;
 }
 
-int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static int prepare_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, char **key_mask)
 {
+    if (entry->n_keys != 0)
+        return ternary_table_open_tuple(ctx, entry, key_mask, BPF_EXIST);
+
+    delete_all_table_entries(ctx->prefixes_fd, ctx->prefixes_key_size);
+    fprintf(stderr, "removing entries from tuples_map, this may take a while\n");
+    delete_all_table_entries(ctx->tmap_fd, ctx->tmap_key_size);
+
+    /* unpin all tuples */
+
+    DIR *dir = opendir(ctx->base_dir);
+    if (dir == NULL) {
+        int err = errno;
+        fprintf(stderr, "failed to iterate over maps directory to unpin tuples: %s\n", strerror(err));
+        return err;
+    }
+
+    char prefix[263];
+    snprintf(prefix, sizeof(prefix), "%s_tuple_", ctx->base_name);
+    size_t prefix_len = strlen(prefix);
+    struct dirent *file;
+    while ((file = readdir(dir)) != NULL) {
+        /* pinned map files are regular files */
+        if (file->d_type != DT_REG)
+            continue;
+
+        /* filter out other tables */
+        if (strncmp(file->d_name, prefix, prefix_len) != 0)
+            continue;
+
+        /* verify that prefix is followed by a tuple id */
+        char *tuple_id_ptr = &(file->d_name[0]) + prefix_len;
+        char *end_ptr = NULL;
+        unsigned long tuple_id = strtoul(tuple_id_ptr, &end_ptr, 10);
+        if (*tuple_id_ptr == 0 || *end_ptr != 0)
+            continue;
+
+        char path[512];
+        snprintf(path, sizeof(path), "%s/%s", ctx->base_dir, file->d_name);
+        if (remove(path) != 0)
+            fprintf(stderr, "unable to remove tuple %s: %s", path, strerror(errno));
+    }
+    closedir(dir);
+
+    return NO_ERROR;
+}
+
+
+static int post_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+{
+    return NO_ERROR;
+}
+
+int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry) {
     char *key_buffer = NULL;
+    char *key_mask_buffer = NULL;
     int return_code = NO_ERROR;
+
+    if (ctx->is_ternary) {
+        return_code = prepare_ternary_table_delete(ctx, entry, &key_mask_buffer);
+        if (return_code != NO_ERROR) {
+            fprintf(stderr, "failed to prepare ternary table delete\n");
+            goto clean_up;
+        }
+        if (entry->n_keys == 0)
+            goto clean_up;
+    }
 
     if (ctx->table_fd < 0) {
         fprintf(stderr, "can't delete entry: table not opened\n");
@@ -1451,7 +1519,7 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
 
     /* remove all entries from table if key is not present */
     if (entry->n_keys == 0)
-        return delete_all_table_entries(ctx);
+        return delete_all_table_entries(ctx->table_fd, ctx->key_size);
 
     /* prepare buffers for map key */
     key_buffer = malloc(ctx->key_size);
@@ -1468,6 +1536,9 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
         goto clean_up;
     }
 
+    if (ctx->is_ternary == true && key_mask_buffer != NULL)
+        mem_bitwise_and((uint32_t *) key_buffer, (uint32_t *) key_mask_buffer, ctx->key_size);
+
     /* delete pointed entry */
     return_code = bpf_map_delete_elem(ctx->table_fd, key_buffer);
     if (return_code != NO_ERROR) {
@@ -1476,8 +1547,14 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
     }
 
 clean_up:
-    if (key_buffer)
+    /* cleanup ternary table */
+    if (ctx->is_ternary)
+        post_ternary_table_delete(ctx, entry);
+
+    if (key_buffer != NULL)
         free(key_buffer);
+    if (key_mask_buffer != NULL)
+        free(key_mask_buffer);
 
     return return_code;
 }
