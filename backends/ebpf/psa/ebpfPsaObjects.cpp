@@ -303,20 +303,21 @@ void EBPFTablePSA::emitDefaultActionInitializer(CodeBuilder *builder) {
     BUG_CHECK(defaultAction->is<IR::MethodCallExpression>(),
               "%1%: expected an action call", defaultAction);
     auto mce = defaultAction->to<IR::MethodCallExpression>();
+    auto pe = mce->method->to<IR::PathExpression>();
+    BUG_CHECK(pe->is<IR::PathExpression>(), "%1%: expected IR::PathExpression type", pe);
+    if (pe->path->name.originalName != P4::P4CoreLibrary::instance.noAction.name) {
+        auto value = program->refMap->newName("value");
+        emitTableValue(builder, mce, value.c_str());
+        auto ret = program->refMap->newName("ret");
+        builder->emitIndent();
+        builder->appendFormat("int %s = ", ret.c_str());
+        builder->target->emitTableUpdate(builder, defaultActionMapName,
+                                         program->zeroKey.c_str(), value.c_str());
+        builder->newline();
 
-    auto value = program->refMap->newName("value");
-    emitTableValue(builder, mce, value.c_str());
-
-    auto ret = program->refMap->newName("ret");
-    builder->emitIndent();
-    builder->appendFormat("int %s = ", ret.c_str());
-    builder->target->emitTableUpdate(builder, defaultActionMapName,
-                                     program->zeroKey.c_str(), value.c_str());
-    builder->newline();
-
-    emitMapUpdateTraceMsg(builder, defaultActionMapName, ret);
+        emitMapUpdateTraceMsg(builder, defaultActionMapName, ret);
+    }
 }
-
 void EBPFTablePSA::emitMapUpdateTraceMsg(CodeBuilder *builder, cstring mapName,
                                          cstring returnCode) const {
     builder->emitIndent();
