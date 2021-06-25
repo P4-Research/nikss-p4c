@@ -82,9 +82,9 @@ void EBPFTable::validateKeys(const EBPFProgram *program) const {
             auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
             if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
-                if (it == keyGenerator->keyElements.end().operator*()) {
+                if (it != keyGenerator->keyElements.back()) {
                     error(ErrorType::ERR_UNSUPPORTED,
-                          "LPM field key must be at the end of whole key");
+                          "%1% field key must be at the end of whole key", it->matchType);
                 }
             }
         }
