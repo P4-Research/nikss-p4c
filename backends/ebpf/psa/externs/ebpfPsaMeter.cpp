@@ -78,15 +78,9 @@ void EBPFMeterPSA::emitValueType(CodeBuilder* builder) {
 }
 
 void EBPFMeterPSA::emitInstance(CodeBuilder *builder) {
-    cstring registerTableMeter = "REGISTER_TABLE_WITH_SPINLOCK(%s, %s, %s, %s, %d)";
-    builder->appendFormat(registerTableMeter, instanceName.c_str(),
-                          "BPF_MAP_TYPE_HASH", this->keyTypeName.c_str(),
-                          this->valueTypeName.c_str(), size);
-    builder->newline();
-    builder->appendFormat("BPF_ANNOTATE_KV_PAIR(%s, %s, %s)",
-                          instanceName.c_str(), this->keyTypeName.c_str(),
-                          this->valueTypeName.c_str());
-    builder->newline();
+    builder->target->emitTableDeclSpinlock(builder, instanceName, TableHash,
+                                   this->keyTypeName,
+                                   this->valueTypeName, size);
 }
 
 void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* method) {
