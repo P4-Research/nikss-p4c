@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <dirent.h>  /* POSIX related, provided by libc6-dev (also files included above) */
 #include <bpf/bpf.h>
 #include <bpf/btf.h>
 #include <linux/bpf.h>
@@ -1198,19 +1197,9 @@ static int ternary_table_add_tuple_and_open(psabpf_table_entry_ctx_t *ctx, const
         err = errno;
         fprintf(stderr, "failed to add tuple %u: %s\n", tuple_id, strerror(err));
         close_object_fd(&(ctx->table_fd));
-        return err;
     }
 
-    /* pin map to the filesystem */
-    char file_name[1024];
-    snprintf(file_name, sizeof(file_name), "%s/%s", ctx->base_dir, map_name);
-    printf("pinning map %s to %s\n", map_name, file_name);
-    err = bpf_obj_pin(ctx->table_fd, file_name);
-    if (err != 0)
-        fprintf(stderr, "warning: failed to pin map %s to file %s: %s\n",
-                map_name, file_name, strerror(errno));
-
-    return NO_ERROR;
+    return err;
 }
 
 static int ternary_table_open_tuple(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
@@ -1457,41 +1446,7 @@ static int prepare_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_ta
     fprintf(stderr, "removing entries from tuples_map, this may take a while\n");
     delete_all_table_entries(ctx->tmap_fd, ctx->tmap_key_size);
 
-    /* open directory with maps */
-    DIR *dir = opendir(ctx->base_dir);
-    if (dir == NULL) {
-        int err = errno;
-        fprintf(stderr, "failed to iterate over maps directory to unpin tuples: %s\n", strerror(err));
-        return err;
-    }
-
-    /* unpin all tuples matching to our table */
-    char prefix[263];
-    snprintf(prefix, sizeof(prefix), "%s_tuple_", ctx->base_name);
-    size_t prefix_len = strlen(prefix);
-    struct dirent *file;
-    while ((file = readdir(dir)) != NULL) {
-        /* pinned map files are regular files */
-        if (file->d_type != DT_REG)
-            continue;
-
-        /* filter out other tables */
-        if (strncmp(file->d_name, prefix, prefix_len) != 0)
-            continue;
-
-        /* verify that prefix is followed by a tuple id */
-        char *tuple_id_ptr = &(file->d_name[0]) + prefix_len;
-        char *end_ptr = NULL;
-        unsigned long tuple_id = strtoul(tuple_id_ptr, &end_ptr, 10);
-        if (*tuple_id_ptr == 0 || *end_ptr != 0)
-            continue;
-
-        char path[512];
-        snprintf(path, sizeof(path), "%s/%s", ctx->base_dir, file->d_name);
-        if (remove(path) != 0)
-            fprintf(stderr, "unable to remove tuple %s: %s", path, strerror(errno));
-    }
-    closedir(dir);
+    /* unpinning inner maps for our table is not required because they are not pinned */
 
     return NO_ERROR;
 }
@@ -1583,12 +1538,7 @@ static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, psabpf_tab
     if (bpf_map_delete_elem(ctx->tmap_fd, &tuple_id) != 0)
         fprintf(stderr, "failed to remove tuple from tuples_map\n");
 
-    /* unpin tuple */
-    char file[1024];
-    snprintf(file, sizeof(file), "%s/%s_tuple_%u", ctx->base_dir, ctx->base_name, tuple_id);
-    printf("unpinning map %s\n", file);
-    if (remove(file) != 0)
-        fprintf(stderr, "failed to unpin %s from filesystem: %s\n", file, strerror(errno));
+    /* unpinning not required - inner map is not pinned */
 
     err = NO_ERROR;
 
