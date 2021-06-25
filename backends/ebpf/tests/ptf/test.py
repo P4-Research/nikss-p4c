@@ -134,6 +134,7 @@ class EgressTrafficManagerClonePSATest(P4EbpfTest):
         self.clone_session_delete(8)
         super(EgressTrafficManagerClonePSATest, self).tearDown()
 
+
 @tc_only
 @xdp2tc_head_not_supported
 class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
@@ -158,6 +159,7 @@ class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
         pkt[Ether].dst = '00:00:00:00:00:00'
         pkt[Ether].src = '00:44:33:22:11:00'
         testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
+
 
 @tc_only
 class MulticastPSATest(P4EbpfTest):
@@ -341,8 +343,8 @@ class PSATernaryTest(P4EbpfTest):
         # flow rules for 'tbl_ternary_0'
         # 1. hdr.ipv4.srcAddr=0x01020304/0xffffff00 => action 0 priority 1
         # 2. hdr.ipv4.srcAddr=0x01020304/0xffff00ff => action 1 priority 10
-        self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4%0xffffff00"], action=0, priority=1)
-        self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4%0xffff00ff"], action=1, priority=10)
+        self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4^255.255.255.0"], action=0, priority=1)
+        self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4^255.255.0.255"], action=1, priority=10)
 
         # flow rules for 'tbl_ternary_1'
         # 1. hdr.ipv4.diffserv=0x00/0x00, hdr.ipv4.dstAddr=0xc0a80201/0xffffff00 => action 0 priority 1

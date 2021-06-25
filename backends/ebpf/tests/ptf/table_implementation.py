@@ -102,7 +102,7 @@ class ActionProfileTernaryTablePSATest(P4EbpfTest):
 
     def runTest(self):
         self.table_add(table="MyIC_ap", keys=[0x10], action=2, data=[0x1122])
-        self.table_add(table="MyIC_tbl", keys=["00:00:33:44:55:00%00:00:FF:FF:FF:00"],
+        self.table_add(table="MyIC_tbl", keys=["00:00:33:44:55:00^00:00:FF:FF:FF:00"],
                        references=["0x10"], priority=1)
 
         pkt = testutils.simple_ip_packet(eth_src="11:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
@@ -348,7 +348,7 @@ class ActionSelectorTernaryTablePSATest(ActionSelectorTest):
 
     def runTest(self):
         self.create_default_rule_set(table=None, selector="MyIC_as")
-        self.table_add(table="MyIC_tbl", keys=["00:00:07:44:55:00%00:00:FF:FF:FF:00"],
+        self.table_add(table="MyIC_tbl", keys=["00:00:07:44:55:00^00:00:FF:FF:FF:00"],
                        references=["group 7"], priority=1)
 
         pkt = testutils.simple_ip_packet(eth_src="00:22:07:44:55:66", eth_dst="22:33:44:55:66:77")

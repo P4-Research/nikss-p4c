@@ -240,7 +240,7 @@ int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
         } else if (strstr(**argv, "..") != NULL) {
             fprintf(stderr, "range match key not supported yet\n");
             return -EPERM;
-        } else if ((substr_ptr = strstr(**argv, "%")) != NULL) {
+        } else if ((substr_ptr = strstr(**argv, "^")) != NULL) {
             psabpf_matchkey_type(&mk, PSABPF_TERNARY);
             /* Split data and mask */
             *substr_ptr = 0;
@@ -486,8 +486,8 @@ int do_table_help(int argc, char **argv)
              *   harder to write in a CLI (needs an escape sequence) */
             "       RANGE_KEY := { DATA_MIN..DATA_MAX }\n"
             /* note: by default '&&&' is used but it also will requires
-             *   an escape sequence in a CLI, so lets use '%' instead */
-            "       TERNARY_KEY := { DATA%%MASK }\n"
+             *   an escape sequence in a CLI, so lets use '^' instead */
+            "       TERNARY_KEY := { DATA^MASK }\n"
             "       ACTION_PARAMS := { DATA }\n"
             "",
             program_name);

@@ -1531,12 +1531,12 @@ static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, psabpf_tab
 
     /* there are no prefixes that points to removing prefix, so it can be safely removed now */
     if (bpf_map_delete_elem(ctx->prefixes_fd, key_mask) != 0)
-        fprintf(stderr, "failed to remove prefix from prefixes list\n");
+        fprintf(stderr, "warning: failed to remove prefix from prefixes list\n");
 
     /* also remove tuple from tuple_map */
     uint32_t tuple_id = *((uint32_t *) (value_mask + prefix_md.tuple_id_offset));
     if (bpf_map_delete_elem(ctx->tmap_fd, &tuple_id) != 0)
-        fprintf(stderr, "failed to remove tuple from tuples_map\n");
+        fprintf(stderr, "warning: failed to remove tuple from tuples_map\n");
 
     /* unpinning not required - inner map is not pinned */
 

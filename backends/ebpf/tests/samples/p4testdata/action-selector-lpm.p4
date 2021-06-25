@@ -39,8 +39,8 @@ control MyIC(inout headers a, inout EMPTY bc,
 
     table tbl {
         key = {
-            a.eth.srcAddr[31:0] : lpm;
             a.eth.dstAddr       : selector;
+            a.eth.srcAddr[31:0] : lpm;
         }
         actions = { NoAction; fwd; }
         psa_implementation = as;
