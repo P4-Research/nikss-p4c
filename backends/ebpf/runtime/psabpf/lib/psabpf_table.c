@@ -302,7 +302,6 @@ int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t 
         mk->u.ternary.mask = NULL;
 
     entry->n_keys += 1;
-    // TODO: is ternary table
 
     return NO_ERROR;
 }
@@ -1247,6 +1246,20 @@ static int ternary_table_open_tuple(psabpf_table_entry_ctx_t *ctx, psabpf_table_
     if (err != NO_ERROR)
         goto clean_up;
 
+    /* prefixes head protection - check whether mask is different from all 0 */
+    bool mask_is_valid = false;
+    for (int i = 0; i < ctx->prefixes_key_size; i++) {
+        if ((*key_mask)[i] != 0) {
+            mask_is_valid = true;
+            break;
+        }
+    }
+    if (mask_is_valid == false) {
+        fprintf(stderr, "invalid key mask: all bytes are zeroed - use default action instead\n");
+        err = -EINVAL;
+        goto clean_up;
+    }
+
     err = bpf_map_lookup_elem(ctx->prefixes_fd, *key_mask, value_mask);
     /* It is not allowed to add new prefix when updating existing entry */
     if (err != 0 && bpf_flags != BPF_EXIST) {
@@ -1444,8 +1457,7 @@ static int prepare_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_ta
     fprintf(stderr, "removing entries from tuples_map, this may take a while\n");
     delete_all_table_entries(ctx->tmap_fd, ctx->tmap_key_size);
 
-    /* unpin all tuples */
-
+    /* open directory with maps */
     DIR *dir = opendir(ctx->base_dir);
     if (dir == NULL) {
         int err = errno;
@@ -1453,6 +1465,7 @@ static int prepare_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_ta
         return err;
     }
 
+    /* unpin all tuples matching to our table */
     char prefix[263];
     snprintf(prefix, sizeof(prefix), "%s_tuple_", ctx->base_name);
     size_t prefix_len = strlen(prefix);
