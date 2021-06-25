@@ -78,7 +78,7 @@ void EBPFMeterPSA::emitValueType(CodeBuilder* builder) {
 }
 
 void EBPFMeterPSA::emitInstance(CodeBuilder *builder) {
-    cstring registerTableMeter = "REGISTER_TABLE_METER(%s, %s, %s, %s, %d)";
+    cstring registerTableMeter = "REGISTER_TABLE_WITH_SPINLOCK(%s, %s, %s, %s, %d)";
     builder->appendFormat(registerTableMeter, instanceName.c_str(),
                           "BPF_MAP_TYPE_HASH", this->keyTypeName.c_str(),
                           this->valueTypeName.c_str(), size);
