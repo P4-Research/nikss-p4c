@@ -142,12 +142,15 @@ class ConvertToEBPFControlPSA : public Inspector {
     P4::ReferenceMap *refmap;
 
     EBPF::EBPFControlPSA *control;
+    const EbpfOptions &options;
 
  public:
     ConvertToEBPFControlPSA(EBPF::EBPFProgram *program, const IR::Parameter* parserHeaders,
                             P4::ReferenceMap *refmap,
-                            P4::TypeMap *typemap) : program(program), parserHeaders(parserHeaders),
-                            typemap(typemap), refmap(refmap) {
+                            P4::TypeMap *typemap,
+                            const EbpfOptions &options) : program(program),
+                            parserHeaders(parserHeaders),
+                            typemap(typemap), refmap(refmap), options(options) {
         if (program->is<TCIngressPipeline>() || program->is<XDPIngressPipeline>()) {
             type = INGRESS;
         } else if (program->is<TCEgressPipeline>() || program->is<XDPEgressPipeline>()) {

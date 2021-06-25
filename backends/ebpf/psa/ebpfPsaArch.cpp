@@ -557,7 +557,7 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
 
     auto control_converter = new ConvertToEBPFControlPSA(pipeline,
                                                          pipeline->parser->headers,
-                                                         refmap, typemap);
+                                                         refmap, typemap, options);
     controlBlock->apply(*control_converter);
     pipeline->control = control_converter->getEBPFControl();
 
@@ -744,6 +744,9 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
         auto hash = new EBPFHashPSA(program, di, name);
         control->hashes.emplace(name, hash);
     } else if (typeName == "Meter") {
+        if (options.arch != "psa") {
+            BUG("Meters are supported only in PSA architecture");
+        }
         auto met = new EBPFMeterPSA(program, name, di, control->codeGen);
         control->meters.emplace(name, met);
     } else if (instance->type->getName().name == "Random") {
