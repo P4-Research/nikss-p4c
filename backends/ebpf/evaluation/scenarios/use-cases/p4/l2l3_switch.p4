@@ -79,7 +79,6 @@ struct mac_learn_digest_t {
 }
 
 struct local_metadata_t {
-    bit<16>            ecmp_select;
     bool               send_mac_learn_msg;
     mac_learn_digest_t mac_learn_msg;
     bit<16>            l4_sport;
