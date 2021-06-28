@@ -78,11 +78,16 @@ EBPFTable::EBPFTable(const EBPFProgram* program, CodeGenInspector* codeGen, cstr
 
 void EBPFTable::validateKeys(const EBPFProgram *program) const {
     if (keyGenerator != nullptr) {
+        auto lastKey = std::find_if(
+                keyGenerator->keyElements.rbegin(), keyGenerator->keyElements.rend(),
+                [](const IR::KeyElement * key)
+                    { return key->matchType->path->name.name != "selector"; });
+
         for (auto it : keyGenerator->keyElements) {
             auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
             if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
-                if (it != keyGenerator->keyElements.back()) {
+                if (it != *lastKey) {
                     error(ErrorType::ERR_UNSUPPORTED,
                           "%1% field key must be at the end of whole key", it->matchType);
                 }
