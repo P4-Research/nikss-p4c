@@ -4,7 +4,7 @@
 namespace EBPF {
 
 void EBPFPipeline::emit(CodeBuilder* builder) {
-    cstring msgStr, varStr;
+    cstring msgStr, pathStr;
     // Ingress and egress has different variables which are pointers,
     // clearing is needed to not preserving them between pipelines
     control->codeGen->asPointerVariables.clear();
@@ -17,9 +17,11 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     emitHeaderInstances(builder);
     emitLocalVariables(builder);
     emitPSAControlDataTypes(builder);
-    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d", sectionName);
-    varStr = Util::printf_format("%s.packet_path", control->inputStandardMetadata->name.name);
-    builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, varStr.c_str());
+    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d",
+                                 sectionName);
+    pathStr = Util::printf_format("%s.packet_path", control->inputStandardMetadata->name.name);
+    builder->target->emitTraceMessage(builder, msgStr.c_str(), 2, pathStr.c_str(),
+                                      lengthVar.c_str());
     parser->emit(builder);
     builder->emitIndent();
     builder->append(IR::ParserState::accept);
@@ -164,8 +166,10 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
     emitUserMetadataInstance(builder);
     emitLocalVariables(builder);
 
-    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d", sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, "meta->packet_path");
+    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d",
+                                 sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str(), 2,
+                                      "meta->packet_path", lengthVar.c_str());
     parser->emit(builder);
     builder->emitIndent();
     builder->append(IR::ParserState::accept);

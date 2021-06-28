@@ -3,7 +3,7 @@ from common import *
 
 import ctypes as c
 import struct
-
+from ptf.mask import Mask
 from scapy.layers.l2 import Ether, Dot1Q
 from scapy.layers.inet import IP
 
@@ -129,6 +129,8 @@ class RoutingTest(L2L3SwitchTest):
     def runTest(self):
         self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:02:02", 2], action=1, data=[7])
         self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:00:01", 1], action=1, data=[5])
+        self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:00:02", 1], action=1, data=[6])
+        self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:00:03", 1], action=1, data=[8])
 
         # check no connectivity between VLAN 1 and VLAN 2
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:02:02")
@@ -137,33 +139,25 @@ class RoutingTest(L2L3SwitchTest):
         testutils.verify_no_packet(self, pkt, PORT2)
 
         # enable routing from VLAN 1 to VLAN 2
-        self.table_add(table="ingress_tbl_routable", keys=["00:00:00:00:01:01", 1], action=0)
-        self.update_map(name="ingress_tbl_routing", key="hex 18 00 00 00 14 00 00 00", value="01 0 0 0 0 0 0 0 02 01 00 00 00 00 00 00 02 00 00 00 00 00 00 00")
-        self.table_add(table="ingress_tbl_out_arp", keys=["20.0.0.2"], action=1, data=["00:00:00:00:02:02"])
+        self.table_add(table="ingress_tbl_routable", keys=["00:00:00:00:01:01", 2], action=0)
+
+        # create all possible actions
+        # forward actions                              member ref,       action id, smac                    dmac                          vlan_id
+        self.update_map(name="ingress_as_actions", key="1 0 0 0", value="1 0 0 0 0 0 0 0 02 01 00 00 00 00 00 00 01 00 00 00 00 00 00 0 01 00 00 00 0 0 0 0")
+        self.update_map(name="ingress_as_actions", key="2 0 0 0", value="1 0 0 0 0 0 0 0 02 01 00 00 00 00 00 00 02 00 00 00 00 00 00 0 01 00 00 00 0 0 0 0")
+        self.update_map(name="ingress_as_actions", key="3 0 0 0", value="1 0 0 0 0 0 0 0 02 01 00 00 00 00 00 00 03 00 00 00 00 00 00 0 01 00 00 00 0 0 0 0")
+
+        self.create_map(name="as_group_g2", type="array", key_size=4, value_size=4, max_entries=129)
+        self.update_map(name="ingress_as_groups", key="hex 2 0 0 0", value="as_group_g2", map_in_map=True)
+        self.update_map(name="as_group_g2", key="0 0 0 0", value="3 0 0 0")
+        self.update_map(name="as_group_g2", key="1 0 0 0", value="1 0 0 0")
+        self.update_map(name="as_group_g2", key="2 0 0 0", value="2 0 0 0")
+        self.update_map(name="as_group_g2", key="3 0 0 0", value="3 0 0 0")
+
+        # ActionSelector reference = 2, is_group_ref=True
+        self.update_map(name="ingress_tbl_routing", key="hex 18 00 00 00 14 00 00 00", value="2 0 0 0  1 0 0 0")
 
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:01:33", ip_dst="20.0.0.2", ip_src="10.0.0.1")
-        pkt = pkt_add_vlan(pkt, vlan_vid=1)
-
-        # verify not routable packet
-        testutils.send_packet(self, PORT1, pkt)
-        testutils.verify_no_other_packets(self)
-
-        # verify routable packet
-        pkt[Ether].dst = "00:00:00:00:01:01"
-        testutils.send_packet(self, PORT1, pkt)
-        exp_pkt = pkt
-        exp_pkt[Ether].src = "00:00:00:00:01:02"
-        exp_pkt[Ether].dst = "00:00:00:00:02:02"
-        exp_pkt[Dot1Q].vlan = 2
-        exp_pkt[IP].ttl = 63
-        testutils.verify_packet(self, pkt, PORT3)
-
-        # enable routing from VLAN 2 to VLAN 1
-        self.table_add(table="ingress_tbl_routable", keys=["00:00:00:00:01:02", 2], action=0)
-        self.update_map(name="ingress_tbl_routing", key="hex 18 00 00 00 0a 00 00 00", value="01 0 0 0 0 0 0 0 01 01 00 00 00 00 00 00 01 00 00 00 00 00 00 00")
-        self.table_add(table="ingress_tbl_out_arp", keys=["10.0.0.1"], action=1, data=["00:00:00:00:00:01"])
-
-        pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:01:33", ip_dst="10.0.0.1", ip_src="20.0.0.2")
         pkt = pkt_add_vlan(pkt, vlan_vid=2)
 
         # verify not routable packet
@@ -171,14 +165,17 @@ class RoutingTest(L2L3SwitchTest):
         testutils.verify_no_other_packets(self)
 
         # verify routable packet
-        pkt[Ether].dst = "00:00:00:00:01:02"
-        testutils.send_packet(self, PORT3, pkt)
-        exp_pkt = pkt
-        exp_pkt[Ether].src = "00:00:00:00:01:01"
-        exp_pkt[Ether].dst = "00:00:00:00:00:01"
-        exp_pkt[Dot1Q].vlan = 1
-        exp_pkt[IP].ttl = 63
-        testutils.verify_packet(self, pkt, PORT1)
+        pkt[Ether].dst = "00:00:00:00:01:01"
+        for i in range(0, 5):
+            pkt[IP].sport = 5000 + i
+            testutils.send_packet(self, PORT3, pkt)
+            exp_pkt = pkt.copy()
+            exp_pkt[Ether].src = "00:00:00:00:01:02"
+            exp_pkt[Dot1Q].vlan = 1
+            exp_pkt[IP].ttl = 63
+            mask = Mask(exp_pkt)
+            mask.set_do_not_care_scapy(Ether, 'dst')
+            testutils.verify_packet_any_port(self, mask, [PORT1, PORT2, PORT4])
 
 
 class MACLearningTest(L2L3SwitchTest):
@@ -295,3 +292,25 @@ class ACLTest(L2L3SwitchTest):
         testutils.verify_no_packet(self, udp_pkt_2, PORT5)
         testutils.send_packet(self, PORT0, tcp_pkt_2)
         testutils.verify_no_packet(self, tcp_pkt_2, PORT5)
+
+
+class PortCountersTest(L2L3SwitchTest):
+
+    def runTest(self):
+        self.update_map(name="ingress_tbl_switching", key="03 00 00 00 00 00 00 00 01 00 00 00 0 0 0 0", value="01 00 00 00 8 00 00 00")
+        pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:00:03")
+        pkt = pkt_add_vlan(pkt, vlan_vid=1)
+
+        # FIXME: bridged_metadata is being counted in the egress pipeline.
+        #  not sure if this is proper behavior, but let's keep it for now.
+        ig_bytes = 0
+        for i in range(0, 2):
+            testutils.send_packet(self, PORT1, pkt)
+            testutils.verify_packet(self, pkt, PORT4)
+            ig_bytes += len(pkt)
+            eg_bytes = ig_bytes + (4*(i+1))
+            pkts_cnt = i + 1
+            self.verify_map_entry("ingress_in_pkts", "5 0 0 0", "{} 00 00 00 0{} 00 00 00".format(hex(ig_bytes).split('x')[-1], pkts_cnt))
+            self.verify_map_entry("egress_tbl_vlan_egress", "8 00 00 00", "02 00 00 00 01 00 00 00 {} 00 00 00 0{} 00 00 00".format(hex(eg_bytes).split('x')[-1], pkts_cnt))
+
+

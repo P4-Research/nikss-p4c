@@ -119,10 +119,7 @@ class EbpfTest(BaseTest):
     def tearDown(self):
         for intf in self.interfaces:
             self.del_port(intf)
-        for filename in os.listdir("{}".format(PIPELINE_MAPS_MOUNT_PATH)):
-            if not os.path.isdir(filename):
-                self.remove_map(filename)
-        self.exec_ns_cmd("rm -rf {}".format(TEST_PIPELINE_MOUNT_PATH))
+        self.exec_ns_cmd("psabpf-ctl pipeline unload id {}".format(TEST_PIPELINE_ID))
         super(EbpfTest, self).tearDown()
 
 
