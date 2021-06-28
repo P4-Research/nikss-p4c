@@ -80,7 +80,7 @@ void KernelSamplesTarget::emitTableDeclSpinlock(Util::SourceCodeBuilder* builder
                                                 cstring keyType, cstring valueType,
                                                 unsigned size) const {
     cstring kind;
-    cstring registerTableMeter = "REGISTER_TABLE_WITH_SPINLOCK(%s, %s, %s, %s, %d)";
+    cstring registerTableSpinlock = "REGISTER_TABLE_WITH_SPINLOCK(%s, %s, %s, %s, %d)";
     if (tableKind == TableHash) {
         kind = "BPF_MAP_TYPE_HASH";
     } else if (tableKind == TableArray) {
@@ -88,7 +88,7 @@ void KernelSamplesTarget::emitTableDeclSpinlock(Util::SourceCodeBuilder* builder
     } else {
         BUG("%1%: unsupported table kind", tableKind);
     }
-    builder->appendFormat(registerTableMeter, tblName,
+    builder->appendFormat(registerTableSpinlock, tblName,
                           kind.c_str(), keyType,
                           valueType, size);
     builder->newline();
