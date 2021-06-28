@@ -76,7 +76,7 @@ enum psabpf_matchkind_t {
     PSABPF_EXACT,
     PSABPF_LPM,
     PSABPF_TERNARY,
-    PSBPF_RANGE
+    PSABPF_RANGE
 };
 
 // TODO: this struct may not be well-designed yet; we need feedback from implementation; to be adjusted
@@ -92,7 +92,7 @@ typedef struct psabpf_match_key {
         } ternary;
         struct {
             // used only for 'lpm'
-            const size_t prefix_len;
+            size_t prefix_len;
         } lpm;
         struct {
             // used only for 'range'

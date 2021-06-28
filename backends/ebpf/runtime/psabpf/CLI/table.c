@@ -234,9 +234,22 @@ int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
         psabpf_match_key_t mk;
         psabpf_matchkey_init(&mk);
         char *substr_ptr;
-        if (strstr(**argv, "/") != NULL) {
-            fprintf(stderr, "lpm match key not supported yet\n");
-            return -EPERM;
+        if ((substr_ptr = strstr(**argv, "/")) != NULL) {
+            psabpf_matchkey_type(&mk, PSABPF_LPM);
+            *(substr_ptr++) = 0;
+            if (*substr_ptr == 0) {
+                fprintf(stderr, "missing prefix length for LPM key\n");
+                return -EPERM;
+            }
+            error_code = translate_data_to_bytes(**argv, &mk, CTX_MATCH_KEY);
+            if (error_code != NO_ERROR)
+                return -EPERM;
+            char *ptr;
+            psabpf_matchkey_prefix(&mk, strtoul(substr_ptr, &ptr, 0));
+            if (*ptr) {
+                fprintf(stderr, "%s: unable to parse prefix length\n", substr_ptr);
+                return -EPERM;
+            }
         } else if (strstr(**argv, "..") != NULL) {
             fprintf(stderr, "range match key not supported yet\n");
             return -EPERM;

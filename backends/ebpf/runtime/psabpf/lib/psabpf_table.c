@@ -273,6 +273,15 @@ int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t 
     if (mk->data == NULL)
         return -ENODATA;
 
+    if (mk->type == PSABPF_LPM) {
+        for (size_t i = 0; i < entry->n_keys; ++i) {
+            if (entry->match_keys[i]->type == PSABPF_LPM) {
+                fprintf(stderr, "only one LPM key is allowed\n");
+                return -EPERM;
+            }
+        }
+    }
+
     size_t new_size = (entry->n_keys + 1) * sizeof(psabpf_match_key_t *);
     psabpf_match_key_t ** tmp = malloc(new_size);
     psabpf_match_key_t * new_mk = malloc(sizeof(psabpf_match_key_t));
@@ -378,6 +387,13 @@ int psabpf_matchkey_data(psabpf_match_key_t *mk, const char *data, size_t size)
 /* only for lpm */
 int psabpf_matchkey_prefix(psabpf_match_key_t *mk, uint32_t prefix)
 {
+    if (mk == NULL)
+        return -ENODATA;
+    if (mk->type != PSABPF_LPM)
+        return -EINVAL;
+
+    mk->u.lpm.prefix_len = prefix;
+
     return NO_ERROR;
 }
 
@@ -406,6 +422,7 @@ int psabpf_matchkey_start(psabpf_match_key_t *mk, uint64_t start)
     return NO_ERROR;
 }
 
+/* only for 'range' match */
 int psabpf_matchkey_end(psabpf_match_key_t *mk, uint64_t end)
 {
     return NO_ERROR;
