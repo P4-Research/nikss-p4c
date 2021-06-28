@@ -101,7 +101,8 @@ void EBPFRegisterPSA::emitInitializer(CodeBuilder* builder) {
 }
 
 void EBPFRegisterPSA::emitInstance(CodeBuilder *builder) {
-    builder->target->emitTableDecl(builder, instanceName, TableHash,
+    builder->target->emitTableDecl(builder, instanceName,
+                                   this->arrayMapBased ? TableArray : TableHash,
                                    this->keyTypeName,
                                    this->valueTypeName, size);
 }
