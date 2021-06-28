@@ -567,7 +567,7 @@ static int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, p
     uint32_t *lpm_prefix = NULL;
 
     if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE) {
-        size_t prefix_size = 4;
+        const size_t prefix_size = 4;
         lpm_prefix = (uint32_t *) buffer;
         if (ctx->key_size < prefix_size) {
             fprintf(stderr, "key size for LPM key is lower than prefix size (4B). BUG???\n");
@@ -583,15 +583,20 @@ static int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, p
             fprintf(stderr, "provided keys are too long\n");
             return -EPERM;
         }
-        if (mk->type == PSABPF_LPM) {
+
+        if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE) {
             /* copy data in network byte order (in reverse order) */
             for (size_t k = 0; k < mk->key_size; ++k)
                 buffer[k] = ((char *) (mk->data))[mk->key_size - k - 1];
-            /* write prefix length */
-            *lpm_prefix = (buffer - ((char *) lpm_prefix) - 4) * 8 + mk->u.lpm.prefix_len;
         } else {
             memcpy(buffer, mk->data, mk->key_size);
         }
+
+        if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
+            /* write prefix length */
+            *lpm_prefix = (buffer - ((char *) lpm_prefix) - 4) * 8 + mk->u.lpm.prefix_len;
+        }
+
         buffer += mk->key_size;
         bytes_to_write -= mk->key_size;
     }
@@ -644,7 +649,7 @@ static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
             psabpf_match_key_t *mk = entry->match_keys[key_idx];
             int ret = 0, flags = WRITE_NORMAL;
 
-            if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM)
+            if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE)
                 flags = WRITE_NETWORK_ORDER;
             ret = write_buffer_btf(buffer, ctx->key_size, offset, mk->data, mk->key_size,
                                    ctx, member->type, "key", flags);

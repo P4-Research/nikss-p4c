@@ -196,21 +196,15 @@ class SimpleLpmP4PSATest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/psa-lpm.p4"
 
     def runTest(self):
-        pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='10.10.11.11')
         # This command adds LPM entry 10.10.0.0/16 with action forwarding on port 6 (PORT2 in ptf)
-        self.update_map(name="ingress_tbl_fwd_lpm", key="hex 10 00 00 00 0a 0a 00 00",
-                        value="hex 01 00 00 00 06 00 00 00")
-        # This command adds 10.10.10.10/8 entry with not existing port number (0)
-        self.update_map(name="ingress_tbl_fwd_lpm", key="hex 08 00 00 00 0a 0a 0a 0a",
-                        value="hex 01 00 00 00 00 00 00 00")
-
+        self.table_add(table="ingress_tbl_fwd_lpm", keys=["10.10.0.0/16"], action=1, data=[6])
+        self.table_add(table="ingress_tbl_fwd_lpm", keys=["10.10.10.10/8"], action=0)
+        pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='10.10.11.11')
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT2)
 
+        self.table_add(table="ingress_tbl_fwd_lpm", keys=["192.168.2.1/24"], action=1, data=[5])
         pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='192.168.2.1')
-        # This command adds LPM entry 192.168.2.1/24 with action forwarding on port 5 (PORT1 in ptf)
-        self.update_map(name="ingress_tbl_fwd_lpm", key="hex 18 00 00 00 c0 a8 02 00",
-                        value="hex 01 00 00 00 05 00 00 00")
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)
 
@@ -228,16 +222,14 @@ class SimpleLpmP4TwoKeysPSATest(P4EbpfTest):
         pkt = testutils.simple_ip_packet(ip_src='1.2.3.4', ip_dst='10.10.11.11')
         # This command adds LPM entry 10.10.11.0/24 with action forwarding on port 6 (PORT2 in ptf)
         # Note that prefix value has to be a sum of exact fields size and lpm prefix
-        self.update_map(name="ingress_tbl_fwd_exact_lpm", key="hex 38 00 00 00 01 02 03 04 0a 0a 0b 00",
-                        value="hex 01 00 00 00 06 00 00 00")
+        self.table_add(table="ingress_tbl_fwd_exact_lpm", keys=["1.2.3.4", "10.10.11.0/24"], action=1, data=[6])
+
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT2)
 
         pkt = testutils.simple_ip_packet(ip_src='1.2.3.4', ip_dst='192.168.2.1')
         # This command adds LPM entry 192.168.2.1/24 with action forwarding on port 5 (PORT1 in ptf)
-        # Note that prefix value has to be a sum of exact fields size and lpm prefix
-        self.update_map(name="ingress_tbl_fwd_exact_lpm", key="hex 38 00 00 00 01 02 03 04 c0 a8 02 00",
-                        value="hex 01 00 00 00 05 00 00 00")
+        self.table_add(table="ingress_tbl_fwd_exact_lpm", keys=["1.2.3.4", "192.168.2.1/24"], action=1, data=[5])
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)
 

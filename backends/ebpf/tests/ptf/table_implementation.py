@@ -81,7 +81,7 @@ class ActionProfileLPMTablePSATest(P4EbpfTest):
 
     def runTest(self):
         # Match all xx:xx:33:44:55:xx MAC addresses
-        self.update_map(name="MyIC_tbl", key="hex 18 0 0 0  33 44 55 0", value="hex 10 00 00 00")
+        self.table_add(table="MyIC_tbl", keys=["0x33445500/24"], references=[0x10])
         self.table_add(table="MyIC_ap", keys=[0x10], action=2, data=[0x1122])
 
         pkt = testutils.simple_ip_packet(eth_src="AA:BB:CC:DD:EE:FF", eth_dst="22:33:44:55:66:77")
@@ -327,9 +327,9 @@ class ActionSelectorLPMTablePSATest(ActionSelectorTest):
     def runTest(self):
         self.create_default_rule_set(table=None, selector="MyIC_as")
         # Match all xx:xx:02:44:55:xx MAC addresses into action ref 2
-        self.update_map(name="MyIC_tbl", key="hex 18 0 0 0  02 44 55 0", value="2 0 0 0  0 0 0 0")
+        self.table_add(table="MyIC_tbl", keys=["0x02445500/24"], references=[2])
         # Match all xx:xx:07:44:55:xx MAC addresses into group g7
-        self.update_map(name="MyIC_tbl", key="hex 18 0 0 0  07 44 55 0", value="7 0 0 0  1 0 0 0")
+        self.table_add(table="MyIC_tbl", keys=["0x07445500/24"], references=["group 7"])
 
         pkt = testutils.simple_ip_packet(eth_src="00:22:07:44:55:66", eth_dst="22:33:44:55:66:77")
         testutils.send_packet(self, PORT0, pkt)
