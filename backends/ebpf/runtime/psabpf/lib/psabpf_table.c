@@ -533,9 +533,14 @@ static void dump_buffer(const char * buff, size_t size)
     printf("\n");
 }
 
+enum write_flags {
+    WRITE_NORMAL = 0,
+    WRITE_NETWORK_ORDER
+};
+
 static int write_buffer_btf(char * buffer, size_t buffer_len, size_t offset,
                             void * data, size_t data_len, psabpf_table_entry_ctx_t *ctx,
-                            uint32_t dst_type_id, const char *dst_type)
+                            uint32_t dst_type_id, const char *dst_type, enum write_flags flags)
 {
     size_t data_type_len = psabtf_get_type_size_by_id(ctx->btf, dst_type_id);
 
@@ -545,13 +550,32 @@ static int write_buffer_btf(char * buffer, size_t buffer_len, size_t offset,
                 dst_type, buffer_len, offset, data_len, data_type_len);
         return -EAGAIN;
     }
-    memcpy(buffer + offset, data, data_len);
+    if (flags == WRITE_NORMAL)
+        memcpy(buffer + offset, data, data_len);
+    else if (flags == WRITE_NETWORK_ORDER) {
+        for (size_t i = 0; i < data_len; i++) {
+            buffer[offset + data_type_len - 1 - i] = ((char *) data)[i];
+        }
+    }
+
     return NO_ERROR;
 }
 
 static int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     size_t bytes_to_write = ctx->key_size;
+    uint32_t *lpm_prefix = NULL;
+
+    if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE) {
+        size_t prefix_size = 4;
+        lpm_prefix = (uint32_t *) buffer;
+        if (ctx->key_size < prefix_size) {
+            fprintf(stderr, "key size for LPM key is lower than prefix size (4B). BUG???\n");
+            return -EPERM;
+        }
+        buffer += prefix_size;
+        bytes_to_write -= prefix_size;
+    }
 
     for (size_t i = 0; i < entry->n_keys; i++) {
         psabpf_match_key_t *mk = entry->match_keys[i];
@@ -559,7 +583,15 @@ static int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, p
             fprintf(stderr, "provided keys are too long\n");
             return -EPERM;
         }
-        memcpy(buffer, mk->data, mk->key_size);
+        if (mk->type == PSABPF_LPM) {
+            /* copy data in network byte order (in reverse order) */
+            for (size_t k = 0; k < mk->key_size; ++k)
+                buffer[k] = ((char *) (mk->data))[mk->key_size - k - 1];
+            /* write prefix length */
+            *lpm_prefix = (buffer - ((char *) lpm_prefix) - 4) * 8 + mk->u.lpm.prefix_len;
+        } else {
+            memcpy(buffer, mk->data, mk->key_size);
+        }
         buffer += mk->key_size;
         bytes_to_write -= mk->key_size;
     }
@@ -594,18 +626,45 @@ static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
     } else if (btf_kind(key_type) == BTF_KIND_STRUCT) {
         const struct btf_member *member = btf_members(key_type);
         int entries = btf_vlen(key_type);
-        if (entry->n_keys != entries) {
-            fprintf(stderr, "expected %d keys, got %zu\n", entries, entry->n_keys);
+        int expected_entries = entries;
+
+        if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE)
+            --expected_entries;  /* omit prefix length */
+        if (entry->n_keys != expected_entries) {
+            fprintf(stderr, "expected %d keys, got %zu\n", expected_entries, entry->n_keys);
             return -EAGAIN;
         }
-        for (int i = 0; i < entries; i++, member++) {
+
+        for (int member_idx = 0, key_idx = 0; member_idx < entries; member_idx++, member++) {
+            if (member_idx == 0 && ctx->table_type == BPF_MAP_TYPE_LPM_TRIE)
+                continue;  /* skip prefix length */
+
             /* assume that every field is byte aligned */
-            unsigned offset = btf_member_bit_offset(key_type, i) / 8;
-            int ret = write_buffer_btf(buffer, ctx->key_size, offset,
-                                       entry->match_keys[i]->data, entry->match_keys[i]->key_size,
-                                       ctx, member->type, "key");
+            unsigned offset = btf_member_bit_offset(key_type, member_idx) / 8;
+            psabpf_match_key_t *mk = entry->match_keys[key_idx];
+            int ret = 0, flags = WRITE_NORMAL;
+
+            if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM)
+                flags = WRITE_NETWORK_ORDER;
+            ret = write_buffer_btf(buffer, ctx->key_size, offset, mk->data, mk->key_size,
+                                   ctx, member->type, "key", flags);
             if (ret != NO_ERROR)
                 return ret;
+
+            /* write prefix value for LPM field */
+            if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
+                uint32_t prefix_value = offset * 8 + mk->u.lpm.prefix_len - 32;
+                psabtf_struct_member_md_t prefix_md;
+                if (psabtf_get_member_md_by_index(ctx->btf, key_type_id, 0, &prefix_md) != NO_ERROR)
+                    -EAGAIN;
+                ret = write_buffer_btf(buffer, ctx->key_size, prefix_md.bit_offset / 8,
+                                       &prefix_value, sizeof(prefix_value), ctx,
+                                       prefix_md.effective_type_id, "prefix", WRITE_NORMAL);
+                if (ret != NO_ERROR)
+                    return ret;
+            }
+
+            ++key_idx;
         }
     } else {
         fprintf(stderr, "unexpected BTF type for key\n");
@@ -674,7 +733,7 @@ static int fill_action_id(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
     }
     return write_buffer_btf(buffer, ctx->value_size, action_md.bit_offset / 8,
                             &(entry->action->action_id), sizeof(entry->action->action_id),
-                            ctx, action_md.effective_type_id, "action id");
+                            ctx, action_md.effective_type_id, "action id", WRITE_NORMAL);
 }
 
 static int fill_priority(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
@@ -690,7 +749,7 @@ static int fill_priority(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_ta
     }
     return write_buffer_btf(buffer, ctx->value_size, priority_md.bit_offset / 8,
                             &(entry->priority), sizeof(entry->priority),
-                            ctx, priority_md.effective_type_id, "priority");
+                            ctx, priority_md.effective_type_id, "priority", WRITE_NORMAL);
 }
 
 static int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
@@ -731,7 +790,7 @@ static int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf
         offset = btf_member_bit_offset(data_type, i) / 8;
         ret = write_buffer_btf(buffer, ctx->value_size, base_offset + offset,
                                entry->action->params[i].data, entry->action->params[i].len,
-                               ctx, member->type, "value");
+                               ctx, member->type, "value", WRITE_NORMAL);
         if (ret != NO_ERROR)
             return ret;
     }
@@ -767,7 +826,7 @@ static int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx, 
             ret = write_buffer_btf(buffer, ctx->value_size, offset,
                                    &(current_data->is_group_reference),
                                    sizeof(current_data->is_group_reference),
-                                   ctx, member->type, "reference type");
+                                   ctx, member->type, "reference type", WRITE_NORMAL);
             if (ret != NO_ERROR)
                 return ret;
             continue;
@@ -783,7 +842,7 @@ static int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx, 
         /* now we can write reference, hurrah!!! */
         offset = btf_member_bit_offset(value_type, i) / 8;
         ret = write_buffer_btf(buffer, ctx->value_size, offset, current_data->data,
-                               current_data->len, ctx, member->type, "reference");
+                               current_data->len, ctx, member->type, "reference", WRITE_NORMAL);
         if (ret != NO_ERROR)
             return ret;
         entry_ref_used = true;
@@ -1025,10 +1084,10 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
                 break;
             memset(tmp_mask, 0xFF, size);
             ret = write_buffer_btf(buffer, ctx->prefixes_key_size, offset, tmp_mask, size,
-                                   ctx, member->type, "exact mask key");
+                                   ctx, member->type, "exact mask key", WRITE_NORMAL);
         } else if (mk->type == PSABPF_TERNARY) {
             ret = write_buffer_btf(buffer, ctx->prefixes_key_size, offset, mk->u.ternary.mask,
-                                   mk->u.ternary.mask_size, ctx, member->type, "ternary mask key");
+                                   mk->u.ternary.mask_size, ctx, member->type, "ternary mask key", WRITE_NORMAL);
         } else {
             fprintf(stderr, "unsupported key mask type\n");
         }
@@ -1383,7 +1442,7 @@ int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t
     printf("Key buffer:\n\t");
     dump_buffer(key_buffer, ctx->key_size);
     printf("Value buffer:\n\t");
-    dump_buffer(key_buffer, ctx->value_size);
+    dump_buffer(value_buffer, ctx->value_size);
 
     /* update map */
     if (ctx->table_type == BPF_MAP_TYPE_ARRAY)
