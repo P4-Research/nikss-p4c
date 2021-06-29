@@ -333,55 +333,22 @@ class PSATernaryTest(P4EbpfTest):
 
     def runTest(self):
         # flow rules for 'tbl_ternary_0'
-        # 1. hdr.ipv4.srcAddr=0x01020304/0xffffff00 => action 0 priority 1
-        # 2. hdr.ipv4.srcAddr=0x01020304/0xffff00ff => action 1 priority 10
+        # 1. ipv4.srcAddr=1.2.3.4/0xffffff00 => action 0 priority 1
+        # 2. ipv4.srcAddr=1.2.3.4/0xffff00ff => action 1 priority 10
         self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4^255.255.255.0"], action=0, priority=1)
         self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4^255.255.0.255"], action=1, priority=10)
 
         # flow rules for 'tbl_ternary_1'
-        # 1. hdr.ipv4.diffserv=0x00/0x00, hdr.ipv4.dstAddr=0xc0a80201/0xffffff00 => action 0 priority 1
-        # 2. hdr.ipv4.diffserv=0x00/0xff, hdr.ipv4.dstAddr=0xc0a80201/0xffffff00 => action 1 priority 10
-        self.update_map(name="ingress_tbl_ternary_1_prefixes", key="00 00 00 00 00 00 00 00",
-                        value="01 00 00 00 00 0xff 0xff 0xff 0xff 00 00 00 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_1_prefixes", key="00 0xff 0xff 0xff 0xff 00 00 00",
-                        value="06 00 00 00 00 0xff 0xff 0xff 00 00 00 00 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_1_prefixes", key="00 0xff 0xff 0xff 00 00 00 00",
-                        value="07 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
-        self.create_map(name="ingress_tbl_ternary_1_tuple_6", type="hash", key_size=8, value_size=8,
-                        max_entries=100)
-        self.create_map(name="ingress_tbl_ternary_1_tuple_7", type="hash", key_size=8, value_size=8,
-                        max_entries=100)
-        self.update_map(name="ingress_tbl_ternary_1_tuple_7", key="00 0x02 0xa8 0xc0 00 00 00 00",
-                        value="00 00 00 00 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_1_tuple_6", key="00 0x02 0xa8 0xc0 00 00 00 00",
-                        value="01 00 00 00 10 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_1_tuples_map", key="06 00 00 00",
-                        value="ingress_tbl_ternary_1_tuple_6", map_in_map=True)
-        self.update_map(name="ingress_tbl_ternary_1_tuples_map", key="07 00 00 00",
-                        value="ingress_tbl_ternary_1_tuple_7", map_in_map=True)
+        # 1. ipv4.diffserv=0x00/0x00, ipv4.dstAddr=192.168.2.1/24 => action 0 priority 1
+        # 2. ipv4.diffserv=0x00/0xff, ipv4.dstAddr=192.168.2.1/24 => action 1 priority 10
+        self.table_add(table="ingress_tbl_ternary_1", keys=["192.168.2.1/24", "0^0"], action=0, priority=1)
+        self.table_add(table="ingress_tbl_ternary_1", keys=["192.168.2.1/24", "0^0xFF"], action=1, priority=10)
 
         # flow rules 'tbl_ternary_2':
-        # 1. hdr.ipv4.protocol=0x11, hdr.ipv4.diffserv=0x00/0x00, hdr.ipv4.dstAddr=0xc0a80201/0xffff0000 => action 0 priority 1
-        # 2. hdr.ipv4.protocol=0x11, hdr.ipv4.diffserv=0x00/0xff, hdr.ipv4.dstAddr=0xc0a80201/0xffff0000 => action 1 priority 10
-        self.update_map(name="ingress_tbl_ternary_2_prefixes", key="00 00 00 00 00 00 00 00",
-                        value="01 00 00 00 00 00 0xff 0xff 0xff 00 00 00 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_2_prefixes", key="00 00 0xff 0xff 0xff 00 00 00",
-                        value="03 00 00 00 00 00 0xff 0xff 00 00 00 00 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_2_prefixes", key="00 00 0xff 0xff 00 00 00 00",
-                        value="05 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
-        self.create_map(name="ingress_tbl_ternary_2_tuple_3", type="hash", key_size=8, value_size=8,
-                        max_entries=100)
-        self.create_map(name="ingress_tbl_ternary_2_tuple_5", type="hash", key_size=8, value_size=8,
-                        max_entries=100)
-        self.update_map(name="ingress_tbl_ternary_2_tuple_3", key="00 00 0xa8 0xc0 0x11 00 00 00",
-                        value="00 00 00 00 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_2_tuple_5", key="00 00 0xa8 0xc0 00 00 00 00",
-                        value="01 00 00 00 10 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_2_tuples_map", key="03 00 00 00",
-                        value="ingress_tbl_ternary_2_tuple_3", map_in_map=True)
-        self.update_map(name="ingress_tbl_ternary_2_tuples_map", key="05 00 00 00",
-                        value="ingress_tbl_ternary_2_tuple_5", map_in_map=True)
-
+        # 1. ipv4.protocol=0x11, ipv4.diffserv=0x00/0x00, ipv4.dstAddr=192.168.2.1/16 => action 0 priority 1
+        # 2. ipv4.protocol=0x11, ipv4.diffserv=0x00/0xff, ipv4.dstAddr=192.168.2.1/16 => action 1 priority 10
+        self.table_add(table="ingress_tbl_ternary_2", keys=["192.168.2.1/16", "0x11", "0^0"], action=0, priority=1)
+        self.table_add(table="ingress_tbl_ternary_2", keys=["192.168.2.1/16", "0x11", "0^0xFF"], action=1, priority=10)
 
         pkt = testutils.simple_udp_packet(ip_src='1.2.3.4', ip_dst='192.168.2.1')
         testutils.send_packet(self, PORT0, pkt)

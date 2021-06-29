@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <math.h>
 #include <bpf/bpf.h>
 #include <bpf/btf.h>
 #include <linux/bpf.h>
@@ -661,7 +662,7 @@ static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
                 uint32_t prefix_value = offset * 8 + mk->u.lpm.prefix_len - 32;
                 psabtf_struct_member_md_t prefix_md;
                 if (psabtf_get_member_md_by_index(ctx->btf, key_type_id, 0, &prefix_md) != NO_ERROR)
-                    -EAGAIN;
+                    return -EAGAIN;
                 ret = write_buffer_btf(buffer, ctx->key_size, prefix_md.bit_offset / 8,
                                        &prefix_value, sizeof(prefix_value), ctx,
                                        prefix_md.effective_type_id, "prefix", WRITE_NORMAL);
@@ -1013,6 +1014,28 @@ clean_up:
     return err;
 }
 
+static int lpm_prefix_to_mask(char * buffer, size_t buffer_len, uint32_t prefix, size_t data_len)
+{
+    size_t bytes_to_write = (size_t) ceil((double) prefix / 8.0);
+    unsigned ff_bytes = prefix / 8;
+    if (bytes_to_write > data_len || bytes_to_write > buffer_len || ff_bytes > bytes_to_write) {
+        fprintf(stderr, "LPM prefix too long\n");
+        return -EINVAL;
+    }
+    printf("prefix: %u, bytes to write: %zu, ff bytes: %u, buffer len: %zu, data len: %zu\n",
+           prefix, bytes_to_write, ff_bytes, buffer_len, data_len);
+
+    memset(buffer + data_len - ff_bytes, 0xFF, ff_bytes);
+    if (prefix % 8 != 0) {
+        unsigned byte_prefix = prefix % 8;
+        byte_prefix = (~((1 << (8 - byte_prefix)) - 1)) & 0xFF;
+        memset(buffer + data_len - ff_bytes - 1, (int) byte_prefix, 1);
+    }
+    dump_buffer(buffer, data_len);
+
+    return NO_ERROR;
+}
+
 static int fill_key_mask_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     size_t bytes_to_write = ctx->prefixes_key_size;
@@ -1026,6 +1049,11 @@ static int fill_key_mask_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *c
             }
             data_len = mk->key_size;
             memset(buffer, 0xFF, data_len);
+        } else if (mk->type == PSABPF_LPM) {
+            data_len = mk->key_size;
+            int ret = lpm_prefix_to_mask(buffer, bytes_to_write, mk->u.lpm.prefix_len, data_len);
+            if (ret != NO_ERROR)
+                return ret;
         } else if (mk->type == PSABPF_TERNARY) {
             if (mk->u.ternary.mask_size > bytes_to_write) {
                 fprintf(stderr, "provided ternary key mask is too long\n");
@@ -1081,15 +1109,23 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
     for (int i = 0; i < entries; i++, member++) {
         psabpf_match_key_t *mk = entry->match_keys[i];
         unsigned offset = btf_member_bit_offset(key_type, i) / 8;
+        size_t size = psabtf_get_type_size_by_id(ctx->btf, member->type);
+        printf("member size: %zu\n", size);
 
         ret = -EAGAIN;
+        memset(tmp_mask, 0, ctx->key_size);
         if (mk->type == PSABPF_EXACT) {
-            size_t size = psabtf_get_type_size_by_id(ctx->btf, member->type);
             if (size > ctx->key_size)
                 break;
             memset(tmp_mask, 0xFF, size);
             ret = write_buffer_btf(buffer, ctx->prefixes_key_size, offset, tmp_mask, size,
                                    ctx, member->type, "exact mask key", WRITE_NORMAL);
+        } else if (mk->type == PSABPF_LPM) {
+            ret = lpm_prefix_to_mask(tmp_mask, size, mk->u.lpm.prefix_len, size);
+            if (ret != NO_ERROR)
+                return ret;
+            ret = write_buffer_btf(buffer, ctx->prefixes_key_size, offset, tmp_mask, size,
+                                   ctx, member->type, "lpm mask key", WRITE_NORMAL);
         } else if (mk->type == PSABPF_TERNARY) {
             ret = write_buffer_btf(buffer, ctx->prefixes_key_size, offset, mk->u.ternary.mask,
                                    mk->u.ternary.mask_size, ctx, member->type, "ternary mask key", WRITE_NORMAL);
