@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <math.h>
 #include <bpf/bpf.h>
 #include <bpf/btf.h>
 #include <linux/bpf.h>
@@ -1016,9 +1015,12 @@ clean_up:
 
 static int lpm_prefix_to_mask(char * buffer, size_t buffer_len, uint32_t prefix, size_t data_len)
 {
-    size_t bytes_to_write = (size_t) ceil((double) prefix / 8.0);
     unsigned ff_bytes = prefix / 8;
-    if (bytes_to_write > data_len || bytes_to_write > buffer_len || ff_bytes > bytes_to_write) {
+    size_t bytes_to_write = ff_bytes;
+    if (prefix % 8 != 0)
+        ++bytes_to_write;
+
+    if (bytes_to_write > data_len || bytes_to_write > buffer_len) {
         fprintf(stderr, "LPM prefix too long\n");
         return -EINVAL;
     }
