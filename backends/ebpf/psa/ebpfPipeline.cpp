@@ -82,6 +82,13 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     builder->appendFormat("u32 %s = ", lengthVar.c_str());
     emitPacketLength(builder);
     builder->endOfStatement(true);
+
+    if (!this->control->meters.empty()) {
+        builder->emitIndent();
+        builder->appendFormat("u64 %s = ", timestampVar.c_str());
+        emitTimestamp(builder);
+        builder->endOfStatement(true);
+    }
 }
 
 void EBPFPipeline::emitUserMetadataInstance(CodeBuilder* builder) {
@@ -115,6 +122,10 @@ void EBPFPipeline::emitGlobalMetadataInitializer(CodeBuilder *builder) {
 
 void EBPFPipeline::emitPacketLength(CodeBuilder *builder) {
     builder->appendFormat("%s->len", this->contextVar.c_str());
+}
+
+void EBPFPipeline::emitTimestamp(CodeBuilder *builder) {
+    builder->appendFormat("%s->tstamp", this->contextVar.c_str());
 }
 
 // =====================TCIngressPipeline=============================
@@ -394,6 +405,9 @@ void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
 void XDPPipeline::emitPacketLength(CodeBuilder *builder) {
     builder->appendFormat("%s->data_end - %s->data",
                           this->contextVar.c_str(), this->contextVar.c_str());
+}
+void XDPPipeline::emitTimestamp(CodeBuilder *builder) {
+    builder->appendFormat("bpf_ktime_get_ns()");
 }
 
 // =====================XDPIngressPipeline=============================

@@ -75,6 +75,26 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
     annotateTableWithBTF(builder, tblName, keyType, valueType);
 }
 
+void KernelSamplesTarget::emitTableDeclSpinlock(Util::SourceCodeBuilder* builder,
+                                                cstring tblName, TableKind tableKind,
+                                                cstring keyType, cstring valueType,
+                                                unsigned size) const {
+    cstring kind;
+    cstring registerTableSpinlock = "REGISTER_TABLE_WITH_SPINLOCK(%s, %s, %s, %s, %d)";
+    if (tableKind == TableHash) {
+        kind = "BPF_MAP_TYPE_HASH";
+    } else if (tableKind == TableArray) {
+        kind = "BPF_MAP_TYPE_ARRAY";
+    } else {
+        BUG("%1%: unsupported table kind", tableKind);
+    }
+    builder->appendFormat(registerTableSpinlock, tblName,
+                          kind.c_str(), keyType,
+                          valueType, size);
+    builder->newline();
+    annotateTableWithBTF(builder, tblName, keyType, valueType);
+}
+
 void
 KernelSamplesTarget::emitMapInMapDecl(Util::SourceCodeBuilder *builder, cstring innerName,
                                       TableKind innerTableKind, cstring innerKeyType,

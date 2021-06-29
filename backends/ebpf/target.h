@@ -53,6 +53,16 @@ class Target {
     virtual void emitTableDecl(Util::SourceCodeBuilder* builder,
                                cstring tblName, TableKind tableKind,
                                cstring keyType, cstring valueType, unsigned size) const = 0;
+    virtual void emitTableDeclSpinlock(Util::SourceCodeBuilder* builder,
+                               cstring tblName, TableKind tableKind,
+                               cstring keyType, cstring valueType, unsigned size) const {
+        (void) builder;
+        (void) tblName;
+        (void) tableKind;
+        (void) keyType;
+        (void) valueType;
+        (void) size;
+    }
     // map-in-map requires declaration of both inner and outer map,
     // thus we define them together in a single method.
     virtual void emitMapInMapDecl(Util::SourceCodeBuilder* builder,
@@ -130,6 +140,9 @@ class KernelSamplesTarget : public Target {
     void emitTableDecl(Util::SourceCodeBuilder* builder,
                        cstring tblName, TableKind tableKind,
                        cstring keyType, cstring valueType, unsigned size) const override;
+    void emitTableDeclSpinlock(Util::SourceCodeBuilder* builder,
+                               cstring tblName, TableKind tableKind,
+                               cstring keyType, cstring valueType, unsigned size) const override;
     void emitMapInMapDecl(Util::SourceCodeBuilder* builder,
                           cstring innerName, TableKind innerTableKind,
                           cstring innerKeyType, cstring innerValueType, unsigned innerSize,

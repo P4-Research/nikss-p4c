@@ -61,6 +61,7 @@ set (P4C_EBPF_SRCS
   psa/externs/ebpfPsaRandom.cpp
   psa/externs/ebpfPsaRegister.cpp
   psa/externs/ebpfPsaTableImplementation.cpp
+  psa/externs/ebpfPsaMeter.cpp
   )
 
 set (P4C_EBPF_HDRS
@@ -114,6 +115,7 @@ set (P4C_EBPF_HDRS
   psa/externs/ebpfPsaRandom.h
   psa/externs/ebpfPsaRegister.h
   psa/externs/ebpfPsaTableImplementation.h
+  psa/externs/ebpfPsaMeter.h
   )
 
 add_cpplint_files(${CMAKE_CURRENT_SOURCE_DIR} "${P4C_EBPF_SRCS};${P4C_EBPF_HDRS}")

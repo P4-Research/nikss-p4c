@@ -279,3 +279,68 @@ In order to add group reference as a table entry:
 4. Add this map into `_groups` map using fresh group reference.
 5. Add this group reference as a value (field `_ref`) in a table (field `_is_group_ref` set to something other than `0`).
 
+# Meters
+
+Note! We base on DPDK Dual Token Bucket implementation.
+https://github.com/DPDK/dpdk/blob/0bf5832222971a0154c9150d4a7a4b82ecbc9ddb/lib/meter/rte_meter.h
+
+Metering mechanism implements Dual Token Bucket algorithm. Meters are translated to `BPF_MAP_TYPE_HASH` with unchanging value type.
+
+```c
+typedef struct meter_value {
+    /* Period in nanoseconds for one update of P token bucket */
+    u64 pir_period;
+    /* Number of bytes or packets to add to P token bucket on each update */
+    u64 pir_unit_per_period;
+    /* Period in nanoseconds for one update of C token bucket */
+    u64 cir_period;
+    /* Number of bytes or packets to add to C token bucket on each update */
+    u64 cir_unit_per_period;
+    /* Size of peak token bucket in bytes or packets */
+    u64 pbs;
+    /* Size of committed token bucket in bytes or packets */
+    u64 cbs;
+    /* Number of bytes or packets currently available in peak token bucket */
+    u64 pbs_left;
+    /* Number of bytes or packets currently available in committed token bucket */
+    u64 cbs_left;
+    /* Time of latest update of P token bucket */
+    u64 time_p;
+    /* Time of latest update of C token bucket */
+    u64 time_c;
+    /* For synchronization purposes in BPF */
+    struct bpf_spin_lock lock;
+};
+```
+
+To configure meter you have to create an entry filing up following fields:
+For BYTES meter:
+
+- pir_period in ns
+- pir_unit_per_period bytes/pir_period
+- cir_period in ns
+- cir_unit_per_period bytes/cir_period
+- pbs (Peak Burst Size) in bytes
+- cbs (Committed Burst Size) in bytes
+- pbs_left (PBS left) same value as pbs
+- cbs_left (CBS left) same value as cbs
+- time_p with zero value
+- time_c with zero value
+
+For PACKETS meter:
+
+- pir_period in ns
+- pir_unit_per_period packets/pir_period
+- cir_period in ns
+- cir_unit_per_period packets/cir_period
+- pbs (Peak Burst Size) in packets
+- cbs (Committed Burst Size) in packets
+- pbs_left (PBS left) same value as pbs
+- cbs_left (CBS left) same value as cbs
+- time_p with zero value
+- time_c with zero value
+
+In psabpf library there will be a method that will translate bytes (packets) rate into period and bytes (packets) per period. 
+For now, we suggest take 1 byte (or packet) per period and based on that calculate proper pir/cir period that will match a desire speed.
+
+RFC 2698 explicitly says that buckets are initially full so values pbs_left and cbs_left must have buckets size.

@@ -6,6 +6,7 @@
 #include "backends/ebpf/psa/externs/ebpfPsaChecksum.h"
 #include "backends/ebpf/psa/externs/ebpfPsaRandom.h"
 #include "backends/ebpf/psa/externs/ebpfPsaRegister.h"
+#include "backends/ebpf/psa/externs/ebpfPsaMeter.h"
 
 namespace EBPF {
 
@@ -22,6 +23,7 @@ class EBPFControlPSA : public EBPFControl {
     std::map<cstring, EBPFHashPSA*> hashes;
     std::map<cstring, EBPFRandomPSA*> randGenerators;
     std::map<cstring, EBPFRegisterPSA*>  registers;
+    std::map<cstring, EBPFMeterPSA*>  meters;
 
     EBPFControlPSA(const EBPFProgram* program, const IR::ControlBlock* control,
                    const IR::Parameter* parserHeaders) :
@@ -46,7 +48,14 @@ class EBPFControlPSA : public EBPFControl {
     EBPFRandomPSA* getRandGenerator(cstring name) const {
         auto result = ::get(randGenerators, name);
         BUG_CHECK(result != nullptr, "No random generator named %1%", name);
-        return result; }
+        return result;
+    }
+
+    EBPFMeterPSA* getMeter(cstring name) const {
+        auto result = ::get(meters, name);
+        BUG_CHECK(result != nullptr, "No meter named %1%", name);
+        return result;
+    }
 };
 
 }  // namespace EBPF

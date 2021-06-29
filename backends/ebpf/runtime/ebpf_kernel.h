@@ -169,6 +169,15 @@ struct {                                 \
     __uint(pinning, LIBBPF_PIN_BY_NAME); \
     __array(values, struct INNER_NAME);     \
 } NAME SEC(".maps");
+/* Due to using spin locks different map declaration is needed */
+#define REGISTER_TABLE_WITH_SPINLOCK(NAME, TYPE, KEY_TYPE, VALUE_TYPE, MAX_ENTRIES) \
+struct {                                 \
+    __uint(type, TYPE);                  \
+    KEY_TYPE *key;                       \
+    VALUE_TYPE *value;                   \
+    __uint(max_entries, MAX_ENTRIES);    \
+    __uint(pinning, LIBBPF_PIN_BY_NAME); \
+} NAME SEC(".maps");
 #endif
 #define REGISTER_END()
 

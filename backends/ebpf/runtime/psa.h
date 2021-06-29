@@ -32,7 +32,9 @@ static const ParserError_t StackOutOfBounds = 3;  /// Reference to invalid eleme
 static const ParserError_t HeaderTooShort = 4;  /// Extracting too many bits into a varbit field.
 static const ParserError_t ParserTimeout = 5;  /// Parser execution time limit exceeded.
 static const ParserError_t ParserInvalidArgument = 6;  /// Parser operation was called with a value
-/// not supported by the implementation.
+/// not supported by the implementation
+
+enum PSA_MeterColor_t { RED, GREEN, YELLOW };
 
 /*
  * INGRESS data types

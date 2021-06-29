@@ -9,6 +9,7 @@
 #include "externs/ebpfPsaHashAlgorithm.h"
 #include "externs/ebpfPsaRandom.h"
 #include "externs/ebpfPsaRegister.h"
+#include "externs/ebpfPsaMeter.h"
 
 namespace EBPF {
 
@@ -212,6 +213,13 @@ void PSAArch::emitHelperFunctions2TC(CodeBuilder *builder) const {
 
     builder->appendLine(pktClonesFunc);
     builder->newline();
+
+    cstring meterExecuteFunc = EBPFMeterPSA::meterExecuteFunc(tcIngress->options.emitTraceMessages);
+
+    if (!tcIngress->control->meters.empty() || !tcEgress->control->meters.empty()) {
+        builder->appendLine(meterExecuteFunc);
+        builder->newline();
+    }
 }
 
 void PSAArch::emitInternalStructures2TC(CodeBuilder *pBuilder) const {
@@ -299,6 +307,14 @@ void PSAArch::emitInitializer2TC(CodeBuilder *builder) const {
 
 void PSAArch::emitHelperFunctions2XDP(CodeBuilder *builder) const {
     EBPFHashAlgorithmTypeFactoryPSA::instance()->emitGlobals(builder);
+
+    cstring meterExecuteFunc = EBPFMeterPSA::meterExecuteFunc(xdpIngress->
+            options.emitTraceMessages);
+
+    if (!xdpIngress->control->meters.empty() || !xdpEgress->control->meters.empty()) {
+        builder->appendLine(meterExecuteFunc);
+        builder->newline();
+    }
 }
 
 void PSAArch::emit2XDP(CodeBuilder *builder) const {
@@ -541,7 +557,7 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
 
     auto control_converter = new ConvertToEBPFControlPSA(pipeline,
                                                          pipeline->parser->headers,
-                                                         refmap, typemap);
+                                                         refmap, typemap, options);
     controlBlock->apply(*control_converter);
     pipeline->control = control_converter->getEBPFControl();
 
@@ -727,6 +743,12 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
     } else if (typeName == "Hash") {
         auto hash = new EBPFHashPSA(program, di, name);
         control->hashes.emplace(name, hash);
+    } else if (typeName == "Meter") {
+        if (options.arch != "psa") {
+            BUG("Meters are supported only in PSA architecture");
+        }
+        auto met = new EBPFMeterPSA(program, name, di, control->codeGen);
+        control->meters.emplace(name, met);
     } else if (instance->type->getName().name == "Random") {
         auto rand = new EBPFRandomPSA(di);
         control->randGenerators.emplace(name, rand);
