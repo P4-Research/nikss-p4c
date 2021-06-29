@@ -368,15 +368,21 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
             swap = getByteSwapMethod(width);
         }
 
-        auto tmpVar = "tmp_" + fieldName;
+        bool isLPMKeyBigEndian = false;
         if (isLPMTable()) {
+            if (c->matchType->path->name.name == P4::P4CoreLibrary::instance.lpmMatch.name)
+                isLPMKeyBigEndian = true;
+        }
+
+        auto tmpVar = "tmp_" + fieldName;
+        if (isLPMKeyBigEndian) {
             declareTmpLpmKey(builder, c, tmpVar);
         }
 
         builder->emitIndent();
         if (memcpy) {
             builder->appendFormat("memcpy(&%s.%s, &", keyName.c_str(), fieldName.c_str());
-            if (isLPMTable()) {
+            if (isLPMKeyBigEndian) {
                 emitLpmKeyField(builder, swap, tmpVar);
             } else {
                 codeGen->visit(c->expression);
@@ -384,7 +390,7 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
             builder->appendFormat(", %d)", scalar->bytesRequired());
         } else {
             builder->appendFormat("%s.%s = ", keyName.c_str(), fieldName.c_str());
-            if (isLPMTable()) {
+            if (isLPMKeyBigEndian) {
                 emitLpmKeyField(builder, swap, tmpVar);
             } else {
                 codeGen->visit(c->expression);

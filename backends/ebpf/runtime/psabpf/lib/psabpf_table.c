@@ -584,7 +584,7 @@ static int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, p
             return -EPERM;
         }
 
-        if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE) {
+        if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
             /* copy data in network byte order (in reverse order) */
             for (size_t k = 0; k < mk->key_size; ++k)
                 buffer[k] = ((char *) (mk->data))[mk->key_size - k - 1];
@@ -649,7 +649,7 @@ static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
             psabpf_match_key_t *mk = entry->match_keys[key_idx];
             int ret = 0, flags = WRITE_NORMAL;
 
-            if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE)
+            if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM)
                 flags = WRITE_NETWORK_ORDER;
             ret = write_buffer_btf(buffer, ctx->key_size, offset, mk->data, mk->key_size,
                                    ctx, member->type, "key", flags);
