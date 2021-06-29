@@ -592,8 +592,8 @@ static int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, p
             memcpy(buffer, mk->data, mk->key_size);
         }
 
+        /* write prefix length */
         if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
-            /* write prefix length */
             *lpm_prefix = (buffer - ((char *) lpm_prefix) - 4) * 8 + mk->u.lpm.prefix_len;
         }
 
@@ -1543,8 +1543,8 @@ static int delete_all_table_entries(int fd, size_t key_size)
         key = tmp_key;
 
         /* Ignore error(s) from bpf_map_delete_elem(). In some cases key may exists
-         * but entry not exists (e.g. array map). So in any case we have iterate over
-         * all key and try delete it. */
+         * but entry not exists (e.g. array map in map). So in any case we have iterate
+         * over all key and try delete it. */
         bpf_map_delete_elem(fd, key);
     } while (bpf_map_get_next_key(fd, key, next_key) == 0);
 
