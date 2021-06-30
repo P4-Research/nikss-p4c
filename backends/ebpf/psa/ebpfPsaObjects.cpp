@@ -420,7 +420,6 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
     commentGen.setBuilder(builder);
 
     unsigned int structAlignment = 4;  // 4 by default
-    unsigned int totalSizeOfKeys = 0;
     unsigned int lengthOfTernaryFields = 0;
     unsigned int lengthOfLPMFields = 0;
     if (keyGenerator != nullptr) {
@@ -451,7 +450,6 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
                 lengthOfLPMFields += width;
             }
 
-            totalSizeOfKeys += ebpfType->to<EBPFScalarType>()->bytesRequired();
             ordered.emplace_back(width, c);
             keyTypes.emplace(c, ebpfType);
             keyFieldNames.emplace(c, fieldName);
@@ -496,7 +494,7 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
     builder->blockStart();
 
     builder->emitIndent();
-    builder->appendFormat("__u8 mask[%d];", totalSizeOfKeys);
+    builder->appendFormat("__u8 mask[sizeof(struct %s)];", keyTypeName.c_str());
     builder->newline();
 
     builder->blockEnd(false);
