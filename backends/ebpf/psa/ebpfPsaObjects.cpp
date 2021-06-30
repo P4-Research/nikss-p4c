@@ -423,7 +423,6 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
 
     unsigned int structAlignment = 4;  // 4 by default
     if (keyGenerator != nullptr) {
-        std::vector<std::pair<size_t, const IR::KeyElement*>> ordered;
         unsigned fieldNumber = 0;
         for (auto c : keyGenerator->keyElements) {
             if (c->matchType->path->name.name == "selector")
@@ -439,20 +438,13 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
                 structAlignment = 8;
             }
 
-            ordered.emplace_back(width, c);
             keyTypes.emplace(c, ebpfType);
             keyFieldNames.emplace(c, fieldName);
             fieldNumber++;
-        }
 
-        // Emit key in decreasing order size - this way there will be no gaps
-        for (auto it : ordered) {
-            auto c = it.second;
-
-            auto ebpfType = ::get(keyTypes, c);
             builder->emitIndent();
-            cstring fieldName = ::get(keyFieldNames, c);
             ebpfType->declare(builder, fieldName, false);
+
             builder->append("; /* ");
             c->expression->apply(commentGen);
             builder->append(" */");
