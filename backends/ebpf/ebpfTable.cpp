@@ -68,7 +68,6 @@ EBPFTable::EBPFTable(const EBPFProgram* program, const IR::TableBlock* table,
 
     keyGenerator = table->container->getKey();
     actionList = table->container->getActionList();
-    validateKeys(program);
 }
 
 EBPFTable::EBPFTable(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name) :
@@ -77,26 +76,29 @@ EBPFTable::EBPFTable(const EBPFProgram* program, CodeGenInspector* codeGen, cstr
 }
 
 void EBPFTable::validateKeys(const EBPFProgram *program) const {
-    if (keyGenerator != nullptr) {
-        auto lastKey = std::find_if(
-                keyGenerator->keyElements.rbegin(), keyGenerator->keyElements.rend(),
-                [](const IR::KeyElement * key)
-                    { return key->matchType->path->name.name != "selector"; });
+    if (keyGenerator == nullptr)
+        return;
 
-        for (auto it : keyGenerator->keyElements) {
-            auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
-            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
-            if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
-                if (it != *lastKey) {
-                    error(ErrorType::ERR_UNSUPPORTED,
-                          "%1% field key must be at the end of whole key", it->matchType);
-                }
+    auto lastKey = std::find_if(
+            keyGenerator->keyElements.rbegin(), keyGenerator->keyElements.rend(),
+            [](const IR::KeyElement * key)
+                { return key->matchType->path->name.name != "selector"; });
+
+    for (auto it : keyGenerator->keyElements) {
+        auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
+        auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
+        if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
+            if (it != *lastKey) {
+                ::error(ErrorType::ERR_UNSUPPORTED,
+                        "%1% field key must be at the end of whole key", it->matchType);
             }
         }
     }
 }
 
 void EBPFTable::emitKeyType(CodeBuilder* builder) {
+    validateKeys(program);
+
     builder->emitIndent();
     builder->appendFormat("struct %s ", keyTypeName.c_str());
     builder->blockStart();

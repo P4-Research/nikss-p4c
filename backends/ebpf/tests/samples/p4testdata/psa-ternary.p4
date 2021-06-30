@@ -102,8 +102,8 @@ control ingress(inout headers hdr,
 
      table tbl_ternary_1 {
         key = {
+            hdr.ipv4.dstAddr  : lpm;
             hdr.ipv4.diffserv : ternary;
-            hdr.ipv4.dstAddr :  lpm;
         }
         actions = { do_change_dst_addr; NoAction; }
         default_action = NoAction;
@@ -112,9 +112,9 @@ control ingress(inout headers hdr,
 
     table tbl_ternary_2 {
         key = {
+            hdr.ipv4.dstAddr  : lpm;
             hdr.ipv4.protocol : exact;
             hdr.ipv4.diffserv : ternary;
-            hdr.ipv4.dstAddr :  lpm;
         }
         actions = { do_change_protocol; NoAction; }
         default_action = NoAction;
