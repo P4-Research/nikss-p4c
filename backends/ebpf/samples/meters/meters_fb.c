@@ -88,56 +88,40 @@ enum PSA_MeterColor_t meter_execute_bytes(u32 *packet_len, void *key, u64 *time_
                 n_periods_p = delta_p / value->pir_period;
                 n_periods_c = delta_c / value->cir_period;
 
-                // Dodawanie
+                // Adding new tokens
                 future_buck->time_p += n_periods_p * value->pir_period;
                 future_buck->time_c += n_periods_c * value->cir_period;
 
                 tokens_pbs = future_buck->pbs_left + n_periods_p * value->pir_unit_per_period;
-                bpf_trace_message("New Tokens PBS: %llu\n", tokens_pbs);
                 if (tokens_pbs > value->pbs) {
                     future_buck->pbs_left = value->pbs;
-                    bpf_trace_message("Wypelnij PBS: %llu\n", future_buck->pbs_left);
                 } else {
-                    bpf_trace_message("PBS przed: %llu\n", future_buck->pbs_left);
                     future_buck->pbs_left += n_periods_p * value->pir_unit_per_period;
-                    bpf_trace_message("PBS po: %llu\n", future_buck->pbs_left);
                 }
                 tokens_cbs = future_buck->cbs_left + n_periods_c * value->cir_unit_per_period;
-                bpf_trace_message("New Tokens CBS: %llu\n", tokens_cbs);
                 if (tokens_cbs > value->cbs) {
                     future_buck->cbs_left = value->cbs;
-                    bpf_trace_message("Wypelnij CBS: %llu\n", future_buck->cbs_left);
                 } else {
-                    bpf_trace_message("CBS przed: %llu\n", future_buck->cbs_left);
                     future_buck->cbs_left += n_periods_c * value->cir_unit_per_period;
-                    bpf_trace_message("CBS po: %llu\n", future_buck->cbs_left);
                 }
 
-                // Tu już odejmowanie
+                // Substracting from bucket
                 if (*packet_len > current_buck->pbs_left) {
-                    bpf_trace_message("Meter: RED\n");
                     return RED;
                 }
 
                 if (*packet_len > current_buck->cbs_left) {
-//                    __sync_fetch_and_add(&current_buck->pbs_left, (-1) * *packet_len);
                     current_buck->pbs_left -= *packet_len;
-                    bpf_trace_message("Meter: YELLOW\n");
                     return YELLOW;
                 }
 
-                bpf_trace_message("Odejmowanie PBS przed: %llu\n", current_buck->pbs_left);
                 current_buck->pbs_left -= *packet_len;
                 current_buck->cbs_left -= *packet_len;
-                bpf_trace_message("Odejmowanie PBS po: %llu\n", current_buck->pbs_left);
-//                __sync_fetch_and_add(&current_buck->pbs_left, (-1) * *packet_len);
-//                __sync_fetch_and_add(&current_buck->cbs_left, (-1) * *packet_len);
-                bpf_trace_message("Meter: GREEN\n");
+
                 return GREEN;
             }
         }
 
-        bpf_trace_message("Meter: No meter value! Returning default GREEN\n");
         return GREEN;
     }
 }
