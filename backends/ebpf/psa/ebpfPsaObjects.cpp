@@ -433,7 +433,6 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
             cstring fieldName = cstring("field") + Util::toString(fieldNumber);
             if (!ebpfType->is<IHasWidth>())
                 return;
-            unsigned width = ebpfType->to<IHasWidth>()->widthInBits();
             if (ebpfType->to<EBPFScalarType>()->alignment() > structAlignment) {
                 structAlignment = 8;
             }

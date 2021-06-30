@@ -1431,7 +1431,8 @@ int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t
     int return_code = NO_ERROR;
 
     if (ctx->is_ternary) {
-        if (ternary_table_open_tuple(ctx, entry, &key_mask_buffer, bpf_flags) != NO_ERROR)
+        return_code = ternary_table_open_tuple(ctx, entry, &key_mask_buffer, bpf_flags);
+        if (return_code != NO_ERROR)
             goto clean_up;
     }
 
@@ -1544,8 +1545,8 @@ static int delete_all_table_entries(int fd, size_t key_size)
         key = tmp_key;
 
         /* Ignore error(s) from bpf_map_delete_elem(). In some cases key may exists
-         * but entry not exists (e.g. array map in map). So in any case we have iterate
-         * over all keys and try delete it. */
+         * but entry not exists (e.g. array map in map). So in any case we have to
+         * iterate over all keys and try delete it. */
         bpf_map_delete_elem(fd, key);
     } while (bpf_map_get_next_key(fd, key, next_key) == 0);
 
