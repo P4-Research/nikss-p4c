@@ -1029,10 +1029,10 @@ static int lpm_prefix_to_mask(char * buffer, size_t buffer_len, uint32_t prefix,
 
     memset(buffer + data_len - ff_bytes, 0xFF, ff_bytes);
     if (prefix % 8 != 0) {
-        unsigned byte_prefix = prefix % 8;
-        byte_prefix = (~((1 << (8 - byte_prefix)) - 1)) & 0xFF;
-        memset(buffer + data_len - ff_bytes - 1, (int) byte_prefix, 1);
+        int byte_prefix[] = {0x00, 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE, 0xFF};
+        memset(buffer + data_len - ff_bytes - 1, byte_prefix[prefix % 8], 1);
     }
+    printf("LPM prefix mask: ");
     dump_buffer(buffer, data_len);
 
     return NO_ERROR;
@@ -1112,7 +1112,6 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
         psabpf_match_key_t *mk = entry->match_keys[i];
         unsigned offset = btf_member_bit_offset(key_type, i) / 8;
         size_t size = psabtf_get_type_size_by_id(ctx->btf, member->type);
-        printf("member size: %zu\n", size);
 
         ret = -EAGAIN;
         memset(tmp_mask, 0, ctx->key_size);
@@ -1124,8 +1123,10 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
                                    ctx, member->type, "exact mask key", WRITE_NORMAL);
         } else if (mk->type == PSABPF_LPM) {
             ret = lpm_prefix_to_mask(tmp_mask, size, mk->u.lpm.prefix_len, size);
-            if (ret != NO_ERROR)
-                return ret;
+            if (ret != NO_ERROR) {
+                ret = -EAGAIN;
+                break;
+            }
             ret = write_buffer_btf(buffer, ctx->prefixes_key_size, offset, tmp_mask, size,
                                    ctx, member->type, "lpm mask key", WRITE_NORMAL);
         } else if (mk->type == PSABPF_TERNARY) {
@@ -1234,12 +1235,11 @@ static int add_ternary_table_prefix(char *new_prefix, char *prefix_value,
     if (err != 0) {
         /* Construct head, it will be added later */
         printf("head not found\n");
-        uint8_t has_next = 1;
         memset(value, 0, ctx->prefixes_value_size);
         *((uint32_t *) (value + prefix_md.tuple_id_offset)) = tuple_id;
     }
 
-    /* Iterate over every prefix to the last */
+    /* Iterate over every prefix to the last one */
     while (true) {
         uint8_t has_next = *((uint8_t *) (value + prefix_md.has_next_offset));
         if (has_next == 0)
@@ -1418,6 +1418,7 @@ clean_up:
 
 static void post_ternary_table_write(psabpf_table_entry_ctx_t *ctx)
 {
+    /* Allow for reuse table context with the same table but other tuple (inner map). */
     if (ctx->is_ternary)
         close_object_fd(&(ctx->table_fd));
 }
@@ -1544,7 +1545,7 @@ static int delete_all_table_entries(int fd, size_t key_size)
 
         /* Ignore error(s) from bpf_map_delete_elem(). In some cases key may exists
          * but entry not exists (e.g. array map in map). So in any case we have iterate
-         * over all key and try delete it. */
+         * over all keys and try delete it. */
         bpf_map_delete_elem(fd, key);
     } while (bpf_map_get_next_key(fd, key, next_key) == 0);
 
@@ -1565,7 +1566,8 @@ static int prepare_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_ta
     fprintf(stderr, "removing entries from tuples_map, this may take a while\n");
     delete_all_table_entries(ctx->tmap_fd, ctx->tmap_key_size);
 
-    /* unpinning inner maps for our table is not required because they are not pinned */
+    /* Unpinning inner maps for our table is not required
+     * because they are not pinned by this tool. */
 
     return NO_ERROR;
 }
@@ -1657,7 +1659,7 @@ static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, psabpf_tab
     if (bpf_map_delete_elem(ctx->tmap_fd, &tuple_id) != 0)
         fprintf(stderr, "warning: failed to remove tuple from tuples_map\n");
 
-    /* unpinning not required - inner map is not pinned */
+    /* unpinning not required - inner map is not pinned by this tool*/
 
     err = NO_ERROR;
 
