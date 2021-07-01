@@ -138,7 +138,6 @@ typedef struct psabpf_table_entry_context {
     bool is_indirect;
     bool is_ternary;
 
-    char base_dir[256];
     char base_name[256];
 
     /* for ternary tables */

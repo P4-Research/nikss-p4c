@@ -119,13 +119,13 @@ static int load_btf(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx)
     return NO_ERROR;
 }
 
-static int open_bpf_map(psabpf_table_entry_ctx_t *ctx, const char *name, int *fd, uint32_t *key_size,
+static int open_bpf_map(psabpf_table_entry_ctx_t *ctx, const char *name, const char *base_path, int *fd, uint32_t *key_size,
                         uint32_t *value_size, uint32_t *map_type, uint32_t *btf_type_id, uint32_t *max_entries)
 {
     char buffer[257];
     int errno_val;
 
-    snprintf(buffer, sizeof(buffer), "%s/%s", ctx->base_dir, name);
+    snprintf(buffer, sizeof(buffer), "%s/%s", base_path, name);
     *fd = bpf_obj_get(buffer);
     if (*fd < 0)
         return errno;
@@ -157,21 +157,21 @@ static int open_bpf_map(psabpf_table_entry_ctx_t *ctx, const char *name, int *fd
     return NO_ERROR;
 }
 
-static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name)
+static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name, const char *base_path)
 {
     int ret;
     char derived_name[256];
 
     snprintf(derived_name, sizeof(derived_name), "%s_prefixes", name);
-    ret = open_bpf_map(ctx, derived_name, &(ctx->prefixes_fd), &(ctx->prefixes_key_size), &(ctx->prefixes_value_size),
-                       NULL, &(ctx->prefixes_btf_type_id), NULL);
+    ret = open_bpf_map(ctx, derived_name, base_path, &(ctx->prefixes_fd), &(ctx->prefixes_key_size),
+                       &(ctx->prefixes_value_size), NULL, &(ctx->prefixes_btf_type_id), NULL);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_tuples_map", name);
-    ret = open_bpf_map(ctx, derived_name, &(ctx->tmap_fd), &(ctx->tmap_key_size),
+    ret = open_bpf_map(ctx, derived_name, base_path, &(ctx->tmap_fd), &(ctx->tmap_key_size),
                        &(ctx->tmap_value_size), NULL, NULL, NULL);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
@@ -179,7 +179,7 @@ static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name)
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_tuple", name);
-    ret = open_bpf_map(ctx, derived_name, &(ctx->table_fd), &(ctx->key_size), &(ctx->value_size),
+    ret = open_bpf_map(ctx, derived_name, base_path, &(ctx->table_fd), &(ctx->key_size), &(ctx->value_size),
                        &(ctx->table_type), &(ctx->btf_type_id), &(ctx->tuple_max_entries));
     close_object_fd(&(ctx->table_fd));  /* We need only metadata from this map */
     if (ret != NO_ERROR) {
@@ -197,7 +197,8 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
     if (ctx == NULL)
         return -EPERM;
 
-    snprintf(ctx->base_dir, sizeof(ctx->base_dir), "%s/%s%u/maps",
+    char base_path[256];
+    snprintf(base_path, sizeof(base_path), "%s/%s%u/maps",
              BPF_FS, PIPELINE_PREFIX, psabpf_context_get_pipeline(psabpf_ctx));
     snprintf(ctx->base_name, sizeof(ctx->base_name), "%s", name);
 
@@ -205,12 +206,12 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
     if (load_btf(psabpf_ctx, ctx) != NO_ERROR)
         fprintf(stderr, "warning: couldn't find BTF info\n");
 
-    int ret = open_bpf_map(ctx, name, &(ctx->table_fd), &(ctx->key_size), &(ctx->value_size),
+    int ret = open_bpf_map(ctx, name, base_path, &(ctx->table_fd), &(ctx->key_size), &(ctx->value_size),
                            &(ctx->table_type), &(ctx->btf_type_id), NULL);
 
     /* if map does not exist, try the ternary table */
     if (ret == ENOENT)
-        ret = open_ternary_table(ctx, name);
+        ret = open_ternary_table(ctx, name, base_path);
 
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open table %s: %s\n", name, strerror(ret));
