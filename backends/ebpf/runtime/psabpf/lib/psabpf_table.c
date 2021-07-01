@@ -875,119 +875,6 @@ static int fill_value_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psa
     return NO_ERROR;
 }
 
-/* Please use this function instead of using directly family of fill_*() functions */
-static int construct_buffer(char * buffer, size_t buffer_len,
-                            psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
-                            int (*btf_info_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *),
-                            int (*byte_by_byte_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *))
-{
-    /* When BTF info mode fails we can fallback to byte by byte mode */
-    int return_code = EAGAIN;
-    if (ctx->btf != NULL && ctx->btf_type_id != 0) {
-        memset(buffer, 0, buffer_len);
-        return_code = btf_info_func(buffer, ctx, entry);
-        if (return_code == EAGAIN)
-            fprintf(stderr, "falling back to byte by byte mode\n");
-    }
-    if (return_code == EAGAIN) {
-        memset(buffer, 0, buffer_len);
-        return_code = byte_by_byte_func(buffer, ctx, entry);
-    }
-    return return_code;
-}
-
-static bool member_is_counter(psabpf_table_entry_ctx_t *ctx, const struct btf_member *member)
-{
-    const struct btf_type *type = psabtf_get_type_by_id(ctx->btf, member->type);
-    if (btf_kind(type) != BTF_KIND_STRUCT)
-        return false;
-    unsigned entries = btf_vlen(type);
-    if (entries != COUNTER_PACKETS_OR_BYTES_STRUCT_ENTRIES &&
-        entries != COUNTER_PACKETS_AND_BYTES_STRUCT_ENTRIES)
-        return false;
-
-    /* Allowed field names: "packets", "bytes" */
-    const struct btf_member *m = btf_members(type);
-    for (int i = 0; i < entries; i++, m++) {
-        const char *field_name = btf__name_by_offset(ctx->btf, m->name_off);
-        if (field_name == NULL)
-            return false;
-        if (strcmp(field_name, "bytes") == 0 ||
-            strcmp(field_name, "packets") == 0)
-            continue;
-
-        /* Unknown field name */
-        return false;
-    }
-
-    return true;
-}
-
-static int handle_counters(const char *key, char *value_buffer,
-                           psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
-{
-    if (ctx->is_indirect || ctx->btf == NULL || ctx->btf_type_id == 0) {
-        fprintf(stderr, "unable to handle counters; resetting them to 0 if exist\n");
-        return NO_ERROR;
-    }
-
-    psabtf_struct_member_md_t value_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf, ctx->btf_type_id, "value", &value_md) != NO_ERROR)
-        return ENOENT;
-
-    const struct btf_type *value_type = psabtf_get_type_by_id(ctx->btf, value_md.effective_type_id);
-    if (value_type == NULL)
-        return EPERM;
-    if (btf_kind(value_type) != BTF_KIND_STRUCT)
-        return EPERM;
-
-    unsigned entries = btf_vlen(value_type);
-    const struct btf_member *member = btf_members(value_type);
-
-    /* Optimization: check if we have any counter
-     * Rationale: do not make system call to get old value of counters if there is no counters */
-    bool has_counter = false;
-    for (int i = 0; i < entries; i++, member++) {
-        if (member_is_counter(ctx, member)) {
-            has_counter = true;
-            break;
-        }
-    }
-    if (!has_counter)
-        return NO_ERROR;
-
-    /* Read current counters value */
-    char * reference_buffer = malloc(ctx->value_size);
-    if (reference_buffer == NULL)
-        return ENOMEM;
-    int err = bpf_map_lookup_elem(ctx->table_fd, key, reference_buffer);
-    if (err != 0) {
-        fprintf(stderr, "entry with counters not found\n");
-        goto clean_up;
-    }
-
-    /* Preserve counters value */
-    member = btf_members(value_type);
-    for (int i = 0; i < entries; i++, member++) {
-        if (!member_is_counter(ctx, member))
-            continue;
-
-        size_t offset = btf_member_bit_offset(value_type, i) / 8;
-        size_t size = psabtf_get_type_size_by_id(ctx->btf, member->type);
-        if (offset + size > ctx->value_size) {
-            fprintf(stderr, "can't write counter at offset %zu and size %zu (entry size %u)\n",
-                    offset, size, ctx->value_size);
-            err = EPERM;
-            goto clean_up;
-        }
-        memcpy(value_buffer + offset, reference_buffer + offset, size);
-    }
-
-clean_up:
-    free(reference_buffer);
-    return err;
-}
-
 static int lpm_prefix_to_mask(char * buffer, size_t buffer_len, uint32_t prefix, size_t data_len)
 {
     unsigned ff_bytes = prefix / 8;
@@ -1113,6 +1000,119 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
     free(tmp_mask);
 
     return ret;
+}
+
+/* Please use this function instead of using directly family of fill_*() functions */
+static int construct_buffer(char * buffer, size_t buffer_len,
+                            psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+                            int (*btf_info_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *),
+                            int (*byte_by_byte_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *))
+{
+    /* When BTF info mode fails we can fallback to byte by byte mode */
+    int return_code = EAGAIN;
+    if (ctx->btf != NULL && ctx->btf_type_id != 0) {
+        memset(buffer, 0, buffer_len);
+        return_code = btf_info_func(buffer, ctx, entry);
+        if (return_code == EAGAIN)
+            fprintf(stderr, "falling back to byte by byte mode\n");
+    }
+    if (return_code == EAGAIN) {
+        memset(buffer, 0, buffer_len);
+        return_code = byte_by_byte_func(buffer, ctx, entry);
+    }
+    return return_code;
+}
+
+static bool member_is_counter(psabpf_table_entry_ctx_t *ctx, const struct btf_member *member)
+{
+    const struct btf_type *type = psabtf_get_type_by_id(ctx->btf, member->type);
+    if (btf_kind(type) != BTF_KIND_STRUCT)
+        return false;
+    unsigned entries = btf_vlen(type);
+    if (entries != COUNTER_PACKETS_OR_BYTES_STRUCT_ENTRIES &&
+        entries != COUNTER_PACKETS_AND_BYTES_STRUCT_ENTRIES)
+        return false;
+
+    /* Allowed field names: "packets", "bytes" */
+    const struct btf_member *m = btf_members(type);
+    for (int i = 0; i < entries; i++, m++) {
+        const char *field_name = btf__name_by_offset(ctx->btf, m->name_off);
+        if (field_name == NULL)
+            return false;
+        if (strcmp(field_name, "bytes") == 0 ||
+            strcmp(field_name, "packets") == 0)
+            continue;
+
+        /* Unknown field name */
+        return false;
+    }
+
+    return true;
+}
+
+static int handle_counters(const char *key, char *value_buffer,
+                           psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+{
+    if (ctx->is_indirect || ctx->btf == NULL || ctx->btf_type_id == 0) {
+        fprintf(stderr, "unable to handle counters; resetting them to 0 if exist\n");
+        return NO_ERROR;
+    }
+
+    psabtf_struct_member_md_t value_md = {};
+    if (psabtf_get_member_md_by_name(ctx->btf, ctx->btf_type_id, "value", &value_md) != NO_ERROR)
+        return ENOENT;
+
+    const struct btf_type *value_type = psabtf_get_type_by_id(ctx->btf, value_md.effective_type_id);
+    if (value_type == NULL)
+        return EPERM;
+    if (btf_kind(value_type) != BTF_KIND_STRUCT)
+        return EPERM;
+
+    unsigned entries = btf_vlen(value_type);
+    const struct btf_member *member = btf_members(value_type);
+
+    /* Optimization: check if we have any counter
+     * Rationale: do not make system call to get old value of counters if there is no counters */
+    bool has_counter = false;
+    for (int i = 0; i < entries; i++, member++) {
+        if (member_is_counter(ctx, member)) {
+            has_counter = true;
+            break;
+        }
+    }
+    if (!has_counter)
+        return NO_ERROR;
+
+    /* Read current counters value */
+    char * reference_buffer = malloc(ctx->value_size);
+    if (reference_buffer == NULL)
+        return ENOMEM;
+    int err = bpf_map_lookup_elem(ctx->table_fd, key, reference_buffer);
+    if (err != 0) {
+        fprintf(stderr, "entry with counters not found\n");
+        goto clean_up;
+    }
+
+    /* Preserve counters value */
+    member = btf_members(value_type);
+    for (int i = 0; i < entries; i++, member++) {
+        if (!member_is_counter(ctx, member))
+            continue;
+
+        size_t offset = btf_member_bit_offset(value_type, i) / 8;
+        size_t size = psabtf_get_type_size_by_id(ctx->btf, member->type);
+        if (offset + size > ctx->value_size) {
+            fprintf(stderr, "can't write counter at offset %zu and size %zu (entry size %u)\n",
+                    offset, size, ctx->value_size);
+            err = EPERM;
+            goto clean_up;
+        }
+        memcpy(value_buffer + offset, reference_buffer + offset, size);
+    }
+
+clean_up:
+    free(reference_buffer);
+    return err;
 }
 
 struct ternary_table_prefix_metadata {
