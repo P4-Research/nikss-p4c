@@ -169,10 +169,6 @@ static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name)
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
-    printf("table: %s\n", derived_name);
-    printf("\tkey size: %u\n", ctx->prefixes_key_size);
-    printf("\tvalue size: %u\n", ctx->prefixes_value_size);
-    printf("\tBTF type id: %u\n", ctx->prefixes_btf_type_id);
 
     snprintf(derived_name, sizeof(derived_name), "%s_tuples_map", name);
     ret = open_bpf_map(ctx, derived_name, &(ctx->tmap_fd), &(ctx->tmap_key_size),
@@ -181,9 +177,6 @@ static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name)
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
-    printf("table: %s\n", derived_name);
-    printf("\tkey size: %u\n", ctx->tmap_key_size);
-    printf("\tvalue size: %u\n", ctx->tmap_value_size);
 
     snprintf(derived_name, sizeof(derived_name), "%s_tuple", name);
     ret = open_bpf_map(ctx, derived_name, &(ctx->table_fd), &(ctx->key_size), &(ctx->value_size),
@@ -193,11 +186,6 @@ static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name)
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
-    printf("table: %s\n", derived_name);
-    printf("\tentries: %d\n", ctx->tuple_max_entries);
-    printf("\tkey size: %u\n", ctx->key_size);
-    printf("\tvalue size: %u\n", ctx->value_size);
-    printf("\tBTF type id: %u\n", ctx->btf_type_id);
 
     ctx->is_ternary = true;
 
@@ -517,20 +505,6 @@ int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param)
     action->n_params += 1;
 
     return NO_ERROR;
-}
-
-static void dump_buffer(const char * buff, size_t size)
-{
-    for (size_t i = 0; i < size; i++) {
-        if (i != 0) {
-            if (i % 16 == 0)
-                printf("\n\t");
-            else if (i % 8 == 0)
-                printf(" ");
-        }
-        printf("%02x ", (buff[i]) & 0xff);
-    }
-    printf("\n");
 }
 
 enum write_flags {
@@ -1024,16 +998,12 @@ static int lpm_prefix_to_mask(char * buffer, size_t buffer_len, uint32_t prefix,
         fprintf(stderr, "LPM prefix too long\n");
         return -EINVAL;
     }
-    printf("prefix: %u, bytes to write: %zu, ff bytes: %u, buffer len: %zu, data len: %zu\n",
-           prefix, bytes_to_write, ff_bytes, buffer_len, data_len);
 
     memset(buffer + data_len - ff_bytes, 0xFF, ff_bytes);
     if (prefix % 8 != 0) {
         int byte_prefix[] = {0x00, 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE, 0xFF};
         memset(buffer + data_len - ff_bytes - 1, byte_prefix[prefix % 8], 1);
     }
-    printf("LPM prefix mask: ");
-    dump_buffer(buffer, data_len);
 
     return NO_ERROR;
 }
@@ -1168,8 +1138,6 @@ static int get_ternary_table_prefix_md(psabpf_table_entry_ctx_t *ctx, struct ter
     if (ctx->btf == NULL || ctx->prefixes_btf_type_id == 0)
         return NO_ERROR;
 
-    printf("Getting offsets and sizes of prefix from BTF\n");
-
     uint32_t type_id = psabtf_get_member_type_id_by_name(ctx->btf, ctx->prefixes_btf_type_id, "value");
     if (type_id == 0)
         return -EPERM;
@@ -1185,8 +1153,6 @@ static int get_ternary_table_prefix_md(psabpf_table_entry_ctx_t *ctx, struct ter
         return -EPERM;
     md->next_mask_size = psabtf_get_type_size_by_id(ctx->btf, member.effective_type_id);
     md->next_mask_offset = member.bit_offset / 8;
-    if (md->next_mask_size != ctx->key_size)
-        return -EPERM;
 
     /* has next */
     if (psabtf_get_member_md_by_name(ctx->btf, type_id, "has_next", &member) != NO_ERROR)
@@ -1194,14 +1160,11 @@ static int get_ternary_table_prefix_md(psabpf_table_entry_ctx_t *ctx, struct ter
     md->has_next_size = psabtf_get_type_size_by_id(ctx->btf, member.effective_type_id);
     md->has_next_offset = member.bit_offset / 8;
 
-    printf("tuple id:\n\tsize: %zu\n\toffset: %zu\n", md->tuple_id_size, md->tuple_id_offset);
-    printf("next mask:\n\tsize: %zu\n\toffset: %zu\n", md->next_mask_size, md->next_mask_offset);
-    printf("has next:\n\tsize: %zu\n\toffset: %zu\n", md->has_next_size, md->has_next_offset);
-
     /* validate size and offset */
     if (md->tuple_id_offset + md->tuple_id_size > ctx->prefixes_value_size ||
         md->next_mask_offset + md->next_mask_size > ctx->prefixes_value_size ||
-        md->has_next_offset + md->has_next_size > ctx->prefixes_value_size) {
+        md->has_next_offset + md->has_next_size > ctx->prefixes_value_size ||
+        md->next_mask_size != ctx->key_size) {
         fprintf(stderr, "BUG: invalid size or offset in the mask\n");
         return -EPERM;
     }
@@ -1234,7 +1197,6 @@ static int add_ternary_table_prefix(char *new_prefix, char *prefix_value,
     err = bpf_map_lookup_elem(ctx->prefixes_fd, key, value);
     if (err != 0) {
         /* Construct head, it will be added later */
-        printf("head not found\n");
         memset(value, 0, ctx->prefixes_value_size);
         *((uint32_t *) (value + prefix_md.tuple_id_offset)) = tuple_id;
     }
@@ -1275,11 +1237,6 @@ static int add_ternary_table_prefix(char *new_prefix, char *prefix_value,
         goto clean_up;
 
     err = NO_ERROR;
-
-    printf("Previous key mask buffer:\n\t");
-    dump_buffer(key, ctx->prefixes_key_size);
-    printf("Previous value mask buffer:\n\t");
-    dump_buffer(value, ctx->prefixes_value_size);
 
 clean_up:
     if (key != NULL)
@@ -1382,11 +1339,6 @@ static int ternary_table_open_tuple(psabpf_table_entry_ctx_t *ctx, psabpf_table_
         goto clean_up;
     }
 
-    printf("Key mask buffer:\n\t");
-    dump_buffer(*key_mask, ctx->prefixes_key_size);
-    printf("Value mask buffer:\n\t");
-    dump_buffer(value_mask, ctx->prefixes_value_size);
-
     struct ternary_table_prefix_metadata prefix_md;
     if (get_ternary_table_prefix_md(ctx, &prefix_md) != NO_ERROR) {
         fprintf(stderr, "failed to obtain offsets and sizes of prefix\n");
@@ -1483,11 +1435,6 @@ int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t
             goto clean_up;
         }
     }
-
-    printf("Key buffer:\n\t");
-    dump_buffer(key_buffer, ctx->key_size);
-    printf("Value buffer:\n\t");
-    dump_buffer(value_buffer, ctx->value_size);
 
     /* update map */
     if (ctx->table_type == BPF_MAP_TYPE_ARRAY)
@@ -1592,11 +1539,6 @@ static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, psabpf_tab
         goto clean_up;
     }
 
-    printf("prefix key\n\t");
-    dump_buffer(key_mask, ctx->prefixes_key_size);
-    printf("prefix value\n\t");
-    dump_buffer(value_mask, ctx->prefixes_value_size);
-
     struct ternary_table_prefix_metadata prefix_md;
     if ((err = get_ternary_table_prefix_md(ctx, &prefix_md)) != NO_ERROR) {
         fprintf(stderr, "failed to obtain offsets and sizes of prefix\n");
@@ -1637,11 +1579,6 @@ static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, psabpf_tab
                value_mask + prefix_md.next_mask_offset, prefix_md.next_mask_size);
         memcpy(prev_value_mask + prefix_md.has_next_offset,
                value_mask + prefix_md.has_next_offset, prefix_md.has_next_size);
-
-        printf("new prev prefix key\n\t");
-        dump_buffer(prev_key_mask, ctx->prefixes_key_size);
-        printf("new prev prefix value\n\t");
-        dump_buffer(prev_value_mask, ctx->prefixes_value_size);
 
         err = bpf_map_update_elem(ctx->prefixes_fd, prev_key_mask, prev_value_mask, BPF_EXIST);
         if (err != 0) {
@@ -1692,7 +1629,6 @@ static int post_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_table
     }
 
     if (bpf_map_get_next_key(ctx->table_fd, NULL, tuple_next_key) != 0) {
-        printf("tuple empty, removing\n");
         err = ternary_table_remove_prefix(ctx, entry, key_mask);
     }
 
