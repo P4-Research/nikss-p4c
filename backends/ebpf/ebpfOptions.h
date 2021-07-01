@@ -20,6 +20,11 @@ limitations under the License.
 #include <getopt.h>
 #include "frontends/common/options.h"
 
+enum XDP2TC {
+    XDP2TC_META,
+    XDP2TC_HEAD,
+    XDP2TC_CPUMAP
+};
 
 class EbpfOptions : public CompilerOptions {
  public:
@@ -30,6 +35,7 @@ class EbpfOptions : public CompilerOptions {
     // Tracing eBPF code execution
     bool emitTraceMessages = false;
     bool generateToXDP = false;
+    enum XDP2TC xdp2tcMode = XDP2TC_META;
     EbpfOptions();
 };
 

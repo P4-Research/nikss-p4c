@@ -58,6 +58,9 @@ class SimpleTunnelingPSATest(P4EbpfTest):
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, exp_pkt, PORT1)
 
+        testutils.send_packet(self, PORT0, exp_pkt)
+        testutils.verify_packet(self, pkt, PORT1)
+
 
 @tc_only
 class PSACloneI2E(P4EbpfTest):
