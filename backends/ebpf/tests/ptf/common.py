@@ -151,12 +151,11 @@ class P4EbpfTest(EbpfTest):
 
         xdp2tc_mode = "meta"
         if "xdp2tc" in testutils.test_params_get():
-            xdp2tc_mode = testutils.test_param_get("namespace")
-
+            xdp2tc_mode = testutils.test_param_get("xdp2tc")
         head, tail = os.path.split(self.p4_file_path)
         filename = tail.split(".")[0]
         self.test_prog_image = os.path.join("ptf_out", filename + ".o")
-        p4args = "--trace --xdp2tc={}".format(xdp2tc_mode)
+        p4args = "--trace --xdp2tc=" + xdp2tc_mode
         if self.is_xdp_test():
             p4args += " --xdp"
         self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "

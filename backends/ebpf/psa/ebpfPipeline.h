@@ -66,6 +66,7 @@ class TCIngressPipeline : public EBPFPipeline {
  private:
     void emitTCWorkaroundUsingMeta(CodeBuilder *builder);
     void emitTCWorkaroundUsingHead(CodeBuilder *builder);
+    void emitTCWorkaroundUsingCPUMAP(CodeBuilder *builder);
 };
 
 class TCEgressPipeline : public EBPFPipeline {

@@ -166,6 +166,21 @@ void TCIngressPipeline::emitTCWorkaroundUsingHead(CodeBuilder *builder) {
                     "    eth->h_proto = original_ethtype;");
 }
 
+void TCIngressPipeline::emitTCWorkaroundUsingCPUMAP(CodeBuilder *builder) {
+    builder->append("    void *data = (void *)(long)skb->data;\n"
+                    "    void *data_end = (void *)(long)skb->data_end;\n"
+                    "    u32 zeroKey = 0;\n"
+                    "    u16 *orig_ethtype = BPF_MAP_LOOKUP_ELEM(workaround_cpumap, &zeroKey);\n"
+                    "    if (!orig_ethtype) {\n"
+                    "        return TC_ACT_SHOT;\n"
+                    "    }\n"
+                    "    struct ethhdr *eth = data;\n"
+                    "    if ((void *)((struct ethhdr *) eth + 1) > data_end) {\n"
+                    "        return TC_ACT_SHOT;\n"
+                    "    }\n"
+                    "    eth->h_proto = *orig_ethtype;\n");
+}
+
 void TCIngressPipeline::emit(CodeBuilder *builder) {
     cstring msgStr;
     // firstly emit process() in-lined function and then the actual BPF section.
@@ -198,6 +213,8 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
         emitTCWorkaroundUsingMeta(builder);
     } else if (options.xdp2tcMode == XDP2TC_HEAD) {
         emitTCWorkaroundUsingHead(builder);
+    } else if (options.xdp2tcMode == XDP2TC_CPUMAP) {
+        emitTCWorkaroundUsingCPUMAP(builder);
     } else {
         BUG("no xdp2tc mode specified?");
     }

@@ -33,7 +33,6 @@ EbpfOptions::EbpfOptions() {
                     } else if (!strcmp(arg, "head")) {
                         xdp2tcMode = XDP2TC_HEAD;
                     } else if (!strcmp(arg, "cpumap")) {
-                        BUG("XDP2TC: cpumap not supported yet");
                         xdp2tcMode = XDP2TC_CPUMAP;
                     }
                     return true;

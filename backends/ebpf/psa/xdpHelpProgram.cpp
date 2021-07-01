@@ -54,6 +54,17 @@ cstring XDPProgUsingHeadForXDP2TC = "    void *data = (void *)(long)skb->data;\n
                                     "\n"
                                     "    return XDP_PASS;";
 
+cstring XDPProgUsingCPUMAPForXDP2TC = "  void *data = (void *)(long)skb->data;\n"
+                                    "    void *data_end = (void *)(long)skb->data_end;\n"
+                                    "    struct ethhdr *eth = data;\n"
+                                    "    if ((void *)((struct ethhdr *) eth + 1) > data_end) {\n"
+                                    "        return XDP_ABORTED;\n"
+                                    "    }\n"
+                                    "    u16 orig_ethtype = eth->h_proto;\n"
+                                    "    eth->h_proto = bpf_htons(0x0800);\n"
+                                    "    u32 zero = 0;\n"
+                                    "    BPF_MAP_UPDATE_ELEM(workaround_cpumap, &zero, &orig_ethtype, BPF_ANY);\n"
+                                    "    return XDP_PASS;";
 
 void XDPHelpProgram::emit(CodeBuilder *builder) {
     builder->target->emitCodeSection(builder, sectionName);
@@ -64,11 +75,14 @@ void XDPHelpProgram::emit(CodeBuilder *builder) {
     builder->blockStart();
     builder->emitIndent();
 
+
     // this is static program, so we can just paste a piece of code.
     if (options.xdp2tcMode == XDP2TC_META) {
         builder->appendLine(XDPProgUsingMetaForXDP2TC);
     } else if (options.xdp2tcMode == XDP2TC_HEAD) {
         builder->appendLine(XDPProgUsingHeadForXDP2TC);
+    } else if (options.xdp2tcMode == XDP2TC_CPUMAP) {
+        builder->appendLine(XDPProgUsingCPUMAPForXDP2TC);
     }
 
     builder->blockEnd(true);  // end of function

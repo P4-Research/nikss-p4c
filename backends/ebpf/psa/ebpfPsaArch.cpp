@@ -268,6 +268,11 @@ void PSAArch::emitInstances2TC(CodeBuilder *builder) const {
     tcEgress->parser->emitTypes(builder);
     tcEgress->control->emitTableTypes(builder);
     builder->appendLine("REGISTER_START()");
+    if (tcIngress->options.xdp2tcMode == XDP2TC_CPUMAP) {
+        builder->target->emitTableDecl(builder, "workaround_cpumap",
+                                       TablePerCPUArray, "u32",
+                                       "u16", 1);
+    }
     builder->target->emitMapInMapDecl(builder, "clone_session_tbl_inner",
             TableHash, "elem_t",
             "struct element", MaxClones, "clone_session_tbl",
