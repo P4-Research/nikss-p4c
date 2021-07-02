@@ -52,6 +52,7 @@ class InternetChecksumPSATest(P4EbpfTest):
             testutils.verify_no_other_packets(self)
 
 
+@xdp2tc_head_not_supported
 class HashCRC16PSATest(P4EbpfTest):
     p4_file_path ="samples/p4testdata/hash-crc16.p4"
 
@@ -62,6 +63,7 @@ class HashCRC16PSATest(P4EbpfTest):
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
 
 
+@xdp2tc_head_not_supported
 class HashInActionPSATest(P4EbpfTest):
     p4_file_path ="samples/p4testdata/hash-action.p4"
 
@@ -72,6 +74,7 @@ class HashInActionPSATest(P4EbpfTest):
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
 
 
+@xdp2tc_head_not_supported
 class HashCRC32PSATest(P4EbpfTest):
     p4_file_path ="samples/p4testdata/hash-crc32.p4"
 
@@ -82,6 +85,7 @@ class HashCRC32PSATest(P4EbpfTest):
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
 
 
+@xdp2tc_head_not_supported
 class HashRangePSATest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/hash-range.p4"
 
@@ -93,11 +97,13 @@ class HashRangePSATest(P4EbpfTest):
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
 
 
+@xdp2tc_head_not_supported
 class ChecksumCRC32MultipleUpdatesPSATest(P4EbpfTest):
     p4_file_path ="samples/p4testdata/checksum-updates.p4"
 
     def runTest(self):
         pkt = Ether() / "1234567890000"
+        print(len(pkt))
         exp_pkt = Ether() / bytes.fromhex('313233343536373839 cbf43926')
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)

@@ -135,3 +135,5 @@ $ psabpf-ctl pipeline add-port id <ID> <INTF>
 
 - Multiple pipelines may not work properly even though `psabpf-ctl` allows to inject many pipelines.
 - Larget bit fields (e.g. IPv6 addresses) may not work properly
+- The `xdp2tc=head` mode works properly only for packets larger then 34 bytes (the size of Ethernet and IPv4 header). 
+- Packet recirculation does not work properly if the `xdp2tc=head` mode is used.
