@@ -431,8 +431,11 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
             auto type = program->typeMap->getType(c->expression);
             auto ebpfType = EBPFTypeFactory::instance->create(type);
             cstring fieldName = cstring("field") + Util::toString(fieldNumber);
-            if (!ebpfType->is<IHasWidth>())
+            if (!ebpfType->is<IHasWidth>()) {
+                ::error(ErrorType::ERR_TYPE_ERROR,
+                        "%1%: illegal type %2% for key field", c->expression, type);
                 return;
+            }
             if (ebpfType->to<EBPFScalarType>()->alignment() > structAlignment) {
                 structAlignment = 8;
             }
@@ -612,7 +615,6 @@ void EBPFTernaryTablePSA::emitLookup(CodeBuilder *builder, cstring key, cstring 
 }
 
 void EBPFTernaryTablePSA::validateKeys(const EBPFProgram *program) const {
-    (void) program;
     if (keyGenerator == nullptr)
         return;
 
@@ -623,11 +625,8 @@ void EBPFTernaryTablePSA::validateKeys(const EBPFProgram *program) const {
 
         auto type = program->typeMap->getType(it->expression);
         auto ebpfType = EBPFTypeFactory::instance->create(type);
-        if (!ebpfType->is<IHasWidth>()) {
-            ::error(ErrorType::ERR_TYPE_ERROR,
-                    "%1%: illegal type %2% for key field", it->expression, type);
-            return;
-        }
+        if (!ebpfType->is<IHasWidth>())
+            continue;
 
         unsigned width = ebpfType->to<IHasWidth>()->widthInBits();
         if (width > last_key_size) {

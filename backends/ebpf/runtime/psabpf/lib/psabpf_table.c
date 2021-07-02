@@ -1128,13 +1128,13 @@ static int get_ternary_table_prefix_md(psabpf_table_entry_ctx_t *ctx, struct ter
 {
     psabtf_struct_member_md_t member;
 
-    md->tuple_id_size = 4;
+    md->tuple_id_size = sizeof(uint32_t);
     md->next_mask_size = ctx->key_size;
-    md->has_next_size = 1;
+    md->has_next_size = sizeof(uint8_t);
     /* Lets guess offsets (they will be fixed with BTF if available) */
-    md->tuple_id_offset = 0;
-    md->next_mask_offset = ctx->key_size > 4 ? 8 : 4;
-    md->has_next_offset = md->next_mask_offset + md->next_mask_size;
+    md->tuple_id_offset = 0;  /* at the beginning of the structure */
+    md->next_mask_offset = ctx->key_size > 4 ? 8 : 4;  /* after tuple_id field */
+    md->has_next_offset = md->next_mask_offset + md->next_mask_size;  /* after next_mask field */
 
     if (ctx->btf == NULL || ctx->prefixes_btf_type_id == 0)
         return NO_ERROR;
