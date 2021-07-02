@@ -103,7 +103,6 @@ class ChecksumCRC32MultipleUpdatesPSATest(P4EbpfTest):
 
     def runTest(self):
         pkt = Ether() / "1234567890000"
-        print(len(pkt))
         exp_pkt = Ether() / bytes.fromhex('313233343536373839 cbf43926')
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
