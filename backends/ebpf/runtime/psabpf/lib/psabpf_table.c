@@ -42,7 +42,7 @@ void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
     ctx->table_fd = -1;
     ctx->associated_prog = -1;
     ctx->prefixes_fd = -1;
-    ctx->tmap_fd = -1;
+    ctx->tuple_map_fd = -1;
 }
 
 static void close_object_fd(int *fd)
@@ -63,7 +63,7 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
 
     close_object_fd(&(ctx->table_fd));
     close_object_fd(&(ctx->prefixes_fd));
-    close_object_fd(&(ctx->tmap_fd));
+    close_object_fd(&(ctx->tuple_map_fd));
     close_object_fd(&(ctx->associated_prog));
 }
 
@@ -171,8 +171,8 @@ static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name, c
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_tuples_map", name);
-    ret = open_bpf_map(ctx, derived_name, base_path, &(ctx->tmap_fd), &(ctx->tmap_key_size),
-                       &(ctx->tmap_value_size), NULL, NULL, NULL);
+    ret = open_bpf_map(ctx, derived_name, base_path, &(ctx->tuple_map_fd), &(ctx->tuple_map_key_size),
+                       &(ctx->tuple_map_value_size), NULL, NULL, NULL);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
@@ -1269,7 +1269,7 @@ static int ternary_table_add_tuple_and_open(psabpf_table_entry_ctx_t *ctx, const
     }
 
     /* add tuple to tuples map */
-    err = bpf_map_update_elem(ctx->tmap_fd, &tuple_id, &(ctx->table_fd), 0);
+    err = bpf_map_update_elem(ctx->tuple_map_fd, &tuple_id, &(ctx->table_fd), 0);
     if (err != 0) {
         err = errno;
         fprintf(stderr, "failed to add tuple %u: %s\n", tuple_id, strerror(err));
@@ -1282,7 +1282,7 @@ static int ternary_table_add_tuple_and_open(psabpf_table_entry_ctx_t *ctx, const
 static int ternary_table_open_tuple(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
                                     char **key_mask, uint64_t bpf_flags)
 {
-    if (ctx->prefixes_fd < 0 || ctx->tmap_fd < 0 || ctx->table_fd >= 0) {
+    if (ctx->prefixes_fd < 0 || ctx->tuple_map_fd < 0 || ctx->table_fd >= 0) {
         fprintf(stderr, "ternary table not properly opened. BUG?\n");
         return EINVAL;
     }
@@ -1290,7 +1290,7 @@ static int ternary_table_open_tuple(psabpf_table_entry_ctx_t *ctx, psabpf_table_
         fprintf(stderr, "key and its mask have different length. BUG?\n");
         return EINVAL;
     }
-    if (ctx->tmap_key_size != 4 || ctx->tmap_value_size != 4) {
+    if (ctx->tuple_map_key_size != 4 || ctx->tuple_map_value_size != 4) {
         fprintf(stderr, "key/value size of tuples map have to be 4B.\n");
         return EINVAL;
     }
@@ -1349,7 +1349,7 @@ static int ternary_table_open_tuple(psabpf_table_entry_ctx_t *ctx, psabpf_table_
     uint32_t tuple_id = *((uint32_t *) (value_mask + prefix_md.tuple_id_offset));
     uint32_t inner_map_id;
 
-    err = bpf_map_lookup_elem(ctx->tmap_fd, &tuple_id, &inner_map_id);
+    err = bpf_map_lookup_elem(ctx->tuple_map_fd, &tuple_id, &inner_map_id);
     if (err == 0) {
         ctx->table_fd = bpf_map_get_fd_by_id(inner_map_id);
         err = NO_ERROR;
@@ -1513,7 +1513,7 @@ static int prepare_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_ta
 
     delete_all_table_entries(ctx->prefixes_fd, ctx->prefixes_key_size);
     fprintf(stderr, "removing entries from tuples_map, this may take a while\n");
-    delete_all_table_entries(ctx->tmap_fd, ctx->tmap_key_size);
+    delete_all_table_entries(ctx->tuple_map_fd, ctx->tuple_map_key_size);
 
     /* Unpinning inner maps for our table is not required
      * because they are not pinned by this tool. */
@@ -1595,7 +1595,7 @@ static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, psabpf_tab
 
     /* also remove tuple from tuple_map */
     uint32_t tuple_id = *((uint32_t *) (value_mask + prefix_md.tuple_id_offset));
-    if (bpf_map_delete_elem(ctx->tmap_fd, &tuple_id) != 0)
+    if (bpf_map_delete_elem(ctx->tuple_map_fd, &tuple_id) != 0)
         fprintf(stderr, "warning: failed to remove tuple from tuples_map\n");
 
     /* unpinning not required - inner map is not pinned by this tool*/

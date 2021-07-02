@@ -144,8 +144,8 @@ typedef struct psabpf_table_entry_context {
     uint32_t tuple_max_entries;
     int prefixes_fd;
     uint32_t prefixes_key_size, prefixes_value_size, prefixes_btf_type_id;
-    int tmap_fd;
-    uint32_t tmap_key_size, tmap_value_size;
+    int tuple_map_fd;
+    uint32_t tuple_map_key_size, tuple_map_value_size;
 
     // BTF metadata are associated with eBPF program, eBPF map do not have own BTF
     int associated_prog;
