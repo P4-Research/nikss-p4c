@@ -26,4 +26,16 @@ EbpfOptions::EbpfOptions() {
         registerOption("--xdp", nullptr,
                 [this](const char*) { generateToXDP = true; return true; },
                 "Compile and generate the P4 prog to XDP layer");
+        registerOption("--xdp2tc", nullptr,
+                [this](const char* arg) {
+                    if (!strcmp(arg, "meta")) {
+                        xdp2tcMode = XDP2TC_META;
+                    } else if (!strcmp(arg, "head")) {
+                        xdp2tcMode = XDP2TC_HEAD;
+                    } else if (!strcmp(arg, "cpumap")) {
+                        xdp2tcMode = XDP2TC_CPUMAP;
+                    }
+                    return true;
+                },
+                "[psa] Select the mode used to pass metadata from XDP to TC.");
 }

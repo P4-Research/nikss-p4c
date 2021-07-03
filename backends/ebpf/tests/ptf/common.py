@@ -17,11 +17,21 @@ TEST_PIPELINE_MOUNT_PATH = "/sys/fs/bpf/pipeline{}".format(TEST_PIPELINE_ID)
 PIPELINE_MAPS_MOUNT_PATH = "{}/maps".format(TEST_PIPELINE_MOUNT_PATH)
 
 def tc_only(cls):
-    cls.test_tc_only = True
+    if cls.is_xdp_test(cls):
+        cls.skip = True
+        cls.skip_reason = "not supported by XDP"
     return cls
 
+def xdp2tc_head_not_supported(cls):
+    if cls.xdp2tc_mode(cls) == 'head':
+        cls.skip = True
+        cls.skip_reason = "not supported for xdp2tc=head"
+    return cls
+
+
 class EbpfTest(BaseTest):
-    test_tc_only = False
+    skip = False
+    skip_reason = ''
     switch_ns = 'test'
     test_prog_image = 'generic.o'  # default, if test case not specify program
     ctool_file_path = ""
@@ -97,6 +107,9 @@ class EbpfTest(BaseTest):
             self.fail("Map {} key {} does not have correct value. Expected {}; got {}"
                       .format(name, key, expected_value, value))
 
+    def xdp2tc_mode(self):
+        return testutils.test_param_get("xdp2tc")
+
     def is_xdp_test(self):
         return "xdp" in testutils.test_params_get()
 
@@ -140,8 +153,8 @@ class P4EbpfTest(EbpfTest):
     p4_file_path = ""
 
     def setUp(self):
-        if self.is_xdp_test() and self.test_tc_only:
-            self.skipTest("not supported by XDP")
+        if self.skip:
+            self.skipTest(self.skip_reason)
 
         if not os.path.exists(self.p4_file_path):
             self.fail("P4 program not found, no such file.")
@@ -152,7 +165,8 @@ class P4EbpfTest(EbpfTest):
         head, tail = os.path.split(self.p4_file_path)
         filename = tail.split(".")[0]
         self.test_prog_image = os.path.join("ptf_out", filename + ".o")
-        p4args = "--trace"
+        xdp2tc_mode = "meta" if self.xdp2tc_mode() is None else self.xdp2tc_mode()
+        p4args = "--trace --xdp2tc=" + xdp2tc_mode
         if self.is_xdp_test():
             p4args += " --xdp"
         self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "
