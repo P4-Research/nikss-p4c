@@ -137,3 +137,4 @@ $ psabpf-ctl pipeline add-port id <ID> <INTF>
 - Larget bit fields (e.g. IPv6 addresses) may not work properly
 - The `xdp2tc=head` mode works properly only for packets larger then 34 bytes (the size of Ethernet and IPv4 header). 
 - Packet recirculation does not work properly if the `xdp2tc=head` mode is used.
+- The packet recirculation and packet resubmission is not supported, if the XDP acceleration is used (`--xdp`). 

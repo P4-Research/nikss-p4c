@@ -115,6 +115,16 @@ class XDPEgressPipeline : public XDPPipeline {
     void emitPSAControlDataTypes(CodeBuilder *builder) override;
 };
 
+class TCTrafficManagerForXDP : public TCIngressPipeline {
+ public:
+    TCTrafficManagerForXDP(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
+                           P4::TypeMap* typeMap) :
+            TCIngressPipeline(name, options, refMap, typeMap) {
+    }
+
+    void emit(CodeBuilder *builder) override;
+};
+
 }  // namespace EBPF
 
 #endif /* BACKENDS_EBPF_PSA_EBPFPIPELINE_H_ */

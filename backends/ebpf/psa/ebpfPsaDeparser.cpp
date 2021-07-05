@@ -410,6 +410,18 @@ void TCIngressDeparserPSA::emitSharedMetadataInitializer(CodeBuilder *builder) {
     builder->endOfStatement(true);
 }
 
+// =====================TCIngressDeparserForTrafficManagerPSA===========
+void TCIngressDeparserForTrafficManagerPSA::emitPreDeparser(CodeBuilder *builder) {
+    // clone support
+    builder->appendFormat("if (%s.clone) ", this->istd->name.name);
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendFormat("do_packet_clones(%s, &clone_session_tbl, %s.clone_session_id,"
+                          " CLONE_I2E, 1);", program->model.CPacketName.str(), this->istd->name.name);
+    builder->newline();
+    builder->blockEnd(true);
+}
+
 // =====================TCEgressDeparserPSA=============================
 bool TCEgressDeparserPSA::build() {
     auto pl = controlBlock->container->type->applyParams;
@@ -458,8 +470,32 @@ bool XDPIngressDeparserPSA::build() {
  */
 void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->emitIndent();
-    builder->appendFormat("if (%s.clone || %s.drop || %s.resubmit) ",
-                           istd->name.name, istd->name.name, istd->name.name);
+    builder->appendFormat("if (%s.clone) ", istd->name.name);
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendLine("struct xdp2tc_metadata xdp2tc_md = {};");
+    builder->emitIndent();
+    builder->appendFormat("xdp2tc_md.headers = %s", this->headers->name.name);
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->appendFormat("xdp2tc_md.ostd = %s", this->istd->name.name);
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->appendFormat("xdp2tc_md.packetOffsetInBits = %s", this->program->offsetVar);
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->target->emitTableUpdate(builder, "xdp2tc_shared_map",
+                                     this->program->zeroKey.c_str(), "xdp2tc_md");
+    builder->newline();
+    builder->target->emitTraceMessage(builder,
+                                      "Sending packet up to TC for cloning");
+    builder->emitIndent();
+    builder->appendFormat("return %s", builder->target->forwardReturnCode());
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
+    builder->emitIndent();
+    builder->appendFormat("if (%s.drop || %s.resubmit) ",
+                           istd->name.name, istd->name.name);
     builder->blockStart();
     builder->target->emitTraceMessage(builder, "PreDeparser: dropping packet..");
     builder->emitIndent();

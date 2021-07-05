@@ -444,7 +444,7 @@ void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
 
     builder->newline();
 
-    builder->appendFormat("return %s", builder->target->forwardReturnCode());
+    builder->append("return TC_ACT_OK");
     builder->endOfStatement(true);
 }
 
@@ -460,7 +460,6 @@ void XDPPipeline::emitTimestamp(CodeBuilder *builder) {
 // =====================XDPIngressPipeline=============================
 void XDPIngressPipeline::emit(CodeBuilder *builder) {
     cstring msgStr, varStr;
-
     control->codeGen->asPointerVariables.clear();
     deparser->codeGen->asPointerVariables.clear();
     builder->target->emitCodeSection(builder, sectionName);
@@ -473,7 +472,6 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     builder->emitIndent();
     deparser->to<XDPIngressDeparserPSA>()->emitSharedMetadataInitializer(builder);
     builder->newline();
-
 
     emitHeaderInstances(builder);
     builder->newline();
@@ -654,6 +652,59 @@ void XDPEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("return %s", builder->target->forwardReturnCode());
     builder->endOfStatement(true);
+}
+
+// =====================TCTrafficManagerForXDP=============================
+void TCTrafficManagerForXDP::emit(CodeBuilder *builder) {
+    cstring msgStr;
+    builder->target->emitCodeSection(builder, sectionName);
+    builder->emitIndent();
+    builder->target->emitMain(builder, functionName, model.CPacketName.str());
+    builder->spc();
+    builder->blockStart();
+    builder->emitIndent();
+    emitLocalVariables(builder);
+    builder->emitIndent();
+    builder->target->emitTraceMessage(builder,
+                                      "TC-TM: Received packet");
+    builder->emitIndent();
+    builder->target->emitTableLookup(builder, "xdp2tc_shared_map", this->zeroKey.c_str(),
+                                     "struct xdp2tc_metadata *md");
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->append("if (!md) ");
+    builder->blockStart();
+    builder->appendLine("return TC_ACT_SHOT;");
+    builder->blockEnd(true);
+    builder->emitIndent();
+
+    builder->emitIndent();
+    // declaring header instance as volatile optimizes stack size and improves throughput
+    builder->append("volatile ");
+    parser->headerType->declare(builder, parser->headers->name.name, false);
+    builder->appendLine(" = md->headers;");
+    builder->emitIndent();
+    builder->appendLine("struct psa_ingress_output_metadata_t ostd = md->ostd;");
+    builder->emitIndent();
+    builder->appendFormat("%s = md->packetOffsetInBits;", offsetVar.c_str());
+    builder->emitIndent();
+    builder->target->emitTraceMessage(builder,
+                                      "TC-TM: Received packet, eth_type=%x, offset=%d", 2,
+                                      "md->headers.ethernet.etherType",
+                                      offsetVar.c_str());
+
+
+    builder->emitIndent();
+    msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    builder->emitIndent();
+    deparser->emit(builder);
+    msgStr = Util::printf_format("%s deparser: packet deparsing finished", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    this->emitTrafficManager(builder);
+
+    builder->emitIndent();
+    builder->blockEnd(true);
 }
 
 }  // namespace EBPF

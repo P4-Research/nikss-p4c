@@ -62,7 +62,6 @@ class SimpleTunnelingPSATest(P4EbpfTest):
         testutils.verify_packet(self, pkt, PORT1)
 
 
-@tc_only
 class PSACloneI2E(P4EbpfTest):
 
     p4_file_path = "../../../testdata/p4_16_samples/psa-i2e-cloning-basic-bmv2.p4"
