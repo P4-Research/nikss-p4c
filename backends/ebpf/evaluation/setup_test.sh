@@ -61,7 +61,7 @@ declare -a ARGS="-DPSA_PORT_RECIRCULATE=$RECIRC_PORT_ID"
 if [ -n "$P4PROGRAM" ]; then
   echo "Found P4 program: $P4PROGRAM"
   make -f ../runtime/kernel.mk BPFOBJ=out.o \
-      P4FILE=$P4PROGRAM ARGS="$ARGS" psa
+      P4FILE=$P4PROGRAM ARGS="$ARGS" P4ARGS="$P4ARGS" psa
   exit_on_error
 else
   declare -a CFILE=$(find "$2" -maxdepth 1 -type f -name "*.c")
