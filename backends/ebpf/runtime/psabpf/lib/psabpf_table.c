@@ -509,7 +509,7 @@ int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param)
 }
 
 enum write_flags {
-    WRITE_NORMAL = 0,
+    WRITE_HOST_ORDER = 0,
     WRITE_NETWORK_ORDER
 };
 
@@ -525,7 +525,7 @@ static int write_buffer_btf(char * buffer, size_t buffer_len, size_t offset,
                 dst_type, buffer_len, offset, data_len, data_type_len);
         return EAGAIN;
     }
-    if (flags == WRITE_NORMAL)
+    if (flags == WRITE_HOST_ORDER)
         memcpy(buffer + offset, data, data_len);
     else if (flags == WRITE_NETWORK_ORDER) {
         for (size_t i = 0; i < data_len; i++) {
@@ -622,7 +622,7 @@ static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
             /* assume that every field is byte aligned */
             unsigned offset = btf_member_bit_offset(key_type, member_idx) / 8;
             psabpf_match_key_t *mk = entry->match_keys[key_idx];
-            int ret = 0, flags = WRITE_NORMAL;
+            int ret = 0, flags = WRITE_HOST_ORDER;
 
             if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM)
                 flags = WRITE_NETWORK_ORDER;
@@ -639,7 +639,7 @@ static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
                     return EAGAIN;
                 ret = write_buffer_btf(buffer, ctx->key_size, prefix_md.bit_offset / 8,
                                        &prefix_value, sizeof(prefix_value), ctx,
-                                       prefix_md.effective_type_id, "prefix", WRITE_NORMAL);
+                                       prefix_md.effective_type_id, "prefix", WRITE_HOST_ORDER);
                 if (ret != NO_ERROR)
                     return ret;
             }
@@ -713,7 +713,7 @@ static int fill_action_id(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
     }
     return write_buffer_btf(buffer, ctx->value_size, action_md.bit_offset / 8,
                             &(entry->action->action_id), sizeof(entry->action->action_id),
-                            ctx, action_md.effective_type_id, "action id", WRITE_NORMAL);
+                            ctx, action_md.effective_type_id, "action id", WRITE_HOST_ORDER);
 }
 
 static int fill_priority(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
@@ -729,7 +729,7 @@ static int fill_priority(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_ta
     }
     return write_buffer_btf(buffer, ctx->value_size, priority_md.bit_offset / 8,
                             &(entry->priority), sizeof(entry->priority),
-                            ctx, priority_md.effective_type_id, "priority", WRITE_NORMAL);
+                            ctx, priority_md.effective_type_id, "priority", WRITE_HOST_ORDER);
 }
 
 static int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
@@ -770,7 +770,7 @@ static int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf
         offset = btf_member_bit_offset(data_type, i) / 8;
         ret = write_buffer_btf(buffer, ctx->value_size, base_offset + offset,
                                entry->action->params[i].data, entry->action->params[i].len,
-                               ctx, member->type, "value", WRITE_NORMAL);
+                               ctx, member->type, "value", WRITE_HOST_ORDER);
         if (ret != NO_ERROR)
             return ret;
     }
@@ -806,7 +806,7 @@ static int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx, 
             ret = write_buffer_btf(buffer, ctx->value_size, offset,
                                    &(current_data->is_group_reference),
                                    sizeof(current_data->is_group_reference),
-                                   ctx, member->type, "reference type", WRITE_NORMAL);
+                                   ctx, member->type, "reference type", WRITE_HOST_ORDER);
             if (ret != NO_ERROR)
                 return ret;
             continue;
@@ -822,7 +822,7 @@ static int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx, 
         /* now we can write reference, hurrah!!! */
         offset = btf_member_bit_offset(value_type, i) / 8;
         ret = write_buffer_btf(buffer, ctx->value_size, offset, current_data->data,
-                               current_data->len, ctx, member->type, "reference", WRITE_NORMAL);
+                               current_data->len, ctx, member->type, "reference", WRITE_HOST_ORDER);
         if (ret != NO_ERROR)
             return ret;
         entry_ref_used = true;
@@ -978,7 +978,7 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
                 break;
             memset(tmp_mask, 0xFF, size);
             ret = write_buffer_btf(buffer, ctx->prefixes_key_size, offset, tmp_mask, size,
-                                   ctx, member->type, "exact mask key", WRITE_NORMAL);
+                                   ctx, member->type, "exact mask key", WRITE_HOST_ORDER);
         } else if (mk->type == PSABPF_LPM) {
             ret = lpm_prefix_to_mask(tmp_mask, size, mk->u.lpm.prefix_len, size);
             if (ret != NO_ERROR) {
@@ -986,10 +986,10 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
                 break;
             }
             ret = write_buffer_btf(buffer, ctx->prefixes_key_size, offset, tmp_mask, size,
-                                   ctx, member->type, "lpm mask key", WRITE_NORMAL);
+                                   ctx, member->type, "lpm mask key", WRITE_HOST_ORDER);
         } else if (mk->type == PSABPF_TERNARY) {
             ret = write_buffer_btf(buffer, ctx->prefixes_key_size, offset, mk->u.ternary.mask,
-                                   mk->u.ternary.mask_size, ctx, member->type, "ternary mask key", WRITE_NORMAL);
+                                   mk->u.ternary.mask_size, ctx, member->type, "ternary mask key", WRITE_HOST_ORDER);
         } else {
             fprintf(stderr, "unsupported key mask type\n");
         }

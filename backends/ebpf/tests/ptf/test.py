@@ -335,8 +335,8 @@ class PSATernaryTest(P4EbpfTest):
         # flow rules for 'tbl_ternary_0'
         # 1. ipv4.srcAddr=1.2.3.4/0xffffff00 => action 0 priority 1
         # 2. ipv4.srcAddr=1.2.3.4/0xffff00ff => action 1 priority 10
-        self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4^255.255.255.0"], action=0, priority=1)
-        self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4^255.255.0.255"], action=1, priority=10)
+        self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4^0xffffff00"], action=0, priority=1)
+        self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4^0xffff00ff"], action=1, priority=10)
 
         # flow rules for 'tbl_ternary_1'
         # 1. ipv4.diffserv=0x00/0x00, ipv4.dstAddr=192.168.2.1/24 => action 0 priority 1
