@@ -121,7 +121,7 @@ class EBPFTable : public EBPFTableBase {
     void emitLpmKeyField(CodeBuilder *builder,
                          const cstring &swap,
                          const std::string &tmpVar) const;
-    virtual void validateKeys(const EBPFProgram *program) const;
+    virtual void validateKeys() const;
 };
 
 class EBPFCounterTable : public EBPFTableBase {

@@ -75,7 +75,7 @@ EBPFTable::EBPFTable(const EBPFProgram* program, CodeGenInspector* codeGen, cstr
         keyGenerator(nullptr), actionList(nullptr), table(nullptr) {
 }
 
-void EBPFTable::validateKeys(const EBPFProgram *program) const {
+void EBPFTable::validateKeys() const {
     if (keyGenerator == nullptr)
         return;
 
@@ -97,8 +97,6 @@ void EBPFTable::validateKeys(const EBPFProgram *program) const {
 }
 
 void EBPFTable::emitKeyType(CodeBuilder* builder) {
-    validateKeys(program);
-
     builder->emitIndent();
     builder->appendFormat("struct %s ", keyTypeName.c_str());
     builder->blockStart();
@@ -251,6 +249,7 @@ void EBPFTable::emitValueStructStructure(CodeBuilder* builder) {
 }
 
 void EBPFTable::emitTypes(CodeBuilder* builder) {
+    validateKeys();
     emitKeyType(builder);
     emitValueType(builder);
 }

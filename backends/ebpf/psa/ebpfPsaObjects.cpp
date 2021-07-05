@@ -412,8 +412,6 @@ void EBPFTernaryTablePSA::emitInstance(CodeBuilder *builder) {
 }
 
 void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
-    validateKeys(program);
-
     builder->emitIndent();
     builder->appendFormat("struct %s ", keyTypeName.c_str());
     builder->blockStart();
@@ -614,7 +612,7 @@ void EBPFTernaryTablePSA::emitLookup(CodeBuilder *builder, cstring key, cstring 
     builder->blockEnd(true);
 }
 
-void EBPFTernaryTablePSA::validateKeys(const EBPFProgram *program) const {
+void EBPFTernaryTablePSA::validateKeys() const {
     if (keyGenerator == nullptr)
         return;
 

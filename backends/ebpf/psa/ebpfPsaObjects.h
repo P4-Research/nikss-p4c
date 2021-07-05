@@ -105,7 +105,7 @@ class EBPFTernaryTablePSA : public EBPFTablePSA {
     }
 
  protected:
-    void validateKeys(const EBPFProgram *program) const override;
+    void validateKeys() const override;
 };
 
 class EBPFValueSetPSA : public EBPFTableBase {
