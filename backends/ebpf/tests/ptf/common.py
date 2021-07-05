@@ -191,7 +191,7 @@ class P4EbpfTest(EbpfTest):
     def clone_session_delete(self, id):
         self.exec_ns_cmd("psabpf-ctl clone-session delete pipe {} id {}".format(TEST_PIPELINE_ID, id))
 
-    def table_write(self, method, table, keys, action=0, data=None, references=None):
+    def table_write(self, method, table, keys, action=0, data=None, priority=None, references=None):
         """
         Use table_add or table_update instead of this method
         """
@@ -208,13 +208,17 @@ class P4EbpfTest(EbpfTest):
             cmd = cmd + "data "
             for d in data:
                 cmd = cmd + "{} ".format(d)
+        if priority:
+            cmd = cmd + "priority {}".format(priority)
         self.exec_ns_cmd(cmd, "Table {} failed".format(method))
 
-    def table_add(self, table, keys, action=0, data=None, references=None):
-        self.table_write(method="add", table=table, keys=keys, action=action, data=data, references=references)
+    def table_add(self, table, keys, action=0, data=None, priority=None, references=None):
+        self.table_write(method="add", table=table, keys=keys, action=action, data=data,
+                         priority=priority, references=references)
 
-    def table_update(self, table, keys, action=0, data=None, references=None):
-        self.table_write(method="update", table=table, keys=keys, action=action, data=data, references=references)
+    def table_update(self, table, keys, action=0, data=None, priority=None, references=None):
+        self.table_write(method="update", table=table, keys=keys, action=action, data=data,
+                         priority=priority, references=references)
 
     def table_delete(self, table, keys=None):
         cmd = "psabpf-ctl table delete pipe {} {} ".format(TEST_PIPELINE_ID, table)

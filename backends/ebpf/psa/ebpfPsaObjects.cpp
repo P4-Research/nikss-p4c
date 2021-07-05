@@ -420,16 +420,10 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
     commentGen.setBuilder(builder);
 
     unsigned int structAlignment = 4;  // 4 by default
-    unsigned int totalSizeOfKeys = 0;
-    unsigned int lengthOfTernaryFields = 0;
-    unsigned int lengthOfLPMFields = 0;
     if (keyGenerator != nullptr) {
-        std::vector<std::pair<size_t, const IR::KeyElement*>> ordered;
         unsigned fieldNumber = 0;
         for (auto c : keyGenerator->keyElements) {
-            auto mtdecl = program->refMap->getDeclaration(c->matchType->path, true);
-            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
-            if (matchType->name.name == "selector")
+            if (c->matchType->path->name.name == "selector")
                 continue;  // this match type is intended for ActionSelector, not table itself
 
             auto type = program->typeMap->getType(c->expression);
@@ -437,42 +431,20 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
             cstring fieldName = cstring("field") + Util::toString(fieldNumber);
             if (!ebpfType->is<IHasWidth>()) {
                 ::error(ErrorType::ERR_TYPE_ERROR,
-                        "%1%: illegal type %2% for key field", c, type);
+                        "%1%: illegal type %2% for key field", c->expression, type);
                 return;
             }
-            unsigned width = ebpfType->to<IHasWidth>()->widthInBits();
             if (ebpfType->to<EBPFScalarType>()->alignment() > structAlignment) {
                 structAlignment = 8;
             }
 
-            if (matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name) {
-                lengthOfTernaryFields += width;
-            } else if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
-                lengthOfLPMFields += width;
-            }
-
-            totalSizeOfKeys += ebpfType->to<EBPFScalarType>()->bytesRequired();
-            ordered.emplace_back(width, c);
             keyTypes.emplace(c, ebpfType);
             keyFieldNames.emplace(c, fieldName);
             fieldNumber++;
-        }
 
-        // Use this to order elements by size
-        std::stable_sort(ordered.begin(), ordered.end(),
-                [] (std::pair<size_t, const IR::KeyElement*> p1,
-                    std::pair<size_t, const IR::KeyElement*> p2) {
-            return p1.first <= p2.first;
-        });
-
-        // Emit key in decreasing order size - this way there will be no gaps
-        for (auto it = ordered.rbegin(); it != ordered.rend(); ++it) {
-            auto c = it->second;
-
-            auto ebpfType = ::get(keyTypes, c);
             builder->emitIndent();
-            cstring fieldName = ::get(keyFieldNames, c);
             ebpfType->declare(builder, fieldName, false);
+
             builder->append("; /* ");
             c->expression->apply(commentGen);
             builder->append(" */");
@@ -496,7 +468,7 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
     builder->blockStart();
 
     builder->emitIndent();
-    builder->appendFormat("__u8 mask[%d];", totalSizeOfKeys);
+    builder->appendFormat("__u8 mask[sizeof(struct %s)];", keyTypeName.c_str());
     builder->newline();
 
     builder->blockEnd(false);
@@ -638,6 +610,31 @@ void EBPFTernaryTablePSA::emitLookup(CodeBuilder *builder, cstring key, cstring 
     builder->blockEnd(true);
     builder->blockEnd(true);
     builder->blockEnd(true);
+}
+
+void EBPFTernaryTablePSA::validateKeys() const {
+    if (keyGenerator == nullptr)
+        return;
+
+    unsigned last_key_size = std::numeric_limits<unsigned>::max();
+    for (auto it : keyGenerator->keyElements) {
+        if (it->matchType->path->name.name == "selector")
+            continue;
+
+        auto type = program->typeMap->getType(it->expression);
+        auto ebpfType = EBPFTypeFactory::instance->create(type);
+        if (!ebpfType->is<IHasWidth>())
+            continue;
+
+        unsigned width = ebpfType->to<IHasWidth>()->widthInBits();
+        if (width > last_key_size) {
+            ::error(ErrorType::WARN_ORDERING,
+                    "%1%: key field larger than previous key, move it before previous key "
+                    "to avoid padding between these keys", it->expression);
+            return;
+        }
+        last_key_size = width;
+    }
 }
 
 // =====================EBPFValueSetPSA=============================

@@ -68,7 +68,6 @@ EBPFTable::EBPFTable(const EBPFProgram* program, const IR::TableBlock* table,
 
     keyGenerator = table->container->getKey();
     actionList = table->container->getActionList();
-    validateKeys(program);
 }
 
 EBPFTable::EBPFTable(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name) :
@@ -76,16 +75,22 @@ EBPFTable::EBPFTable(const EBPFProgram* program, CodeGenInspector* codeGen, cstr
         keyGenerator(nullptr), actionList(nullptr), table(nullptr) {
 }
 
-void EBPFTable::validateKeys(const EBPFProgram *program) const {
-    if (keyGenerator != nullptr) {
-        for (auto it : keyGenerator->keyElements) {
-            auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
-            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
-            if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
-                if (it == keyGenerator->keyElements.end().operator*()) {
-                    error(ErrorType::ERR_UNSUPPORTED,
-                          "LPM field key must be at the end of whole key");
-                }
+void EBPFTable::validateKeys() const {
+    if (keyGenerator == nullptr)
+        return;
+
+    auto lastKey = std::find_if(
+            keyGenerator->keyElements.rbegin(), keyGenerator->keyElements.rend(),
+            [](const IR::KeyElement * key)
+                { return key->matchType->path->name.name != "selector"; });
+
+    for (auto it : keyGenerator->keyElements) {
+        auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
+        auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
+        if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
+            if (it != *lastKey) {
+                ::error(ErrorType::ERR_UNSUPPORTED,
+                        "%1% field key must be at the end of whole key", it->matchType);
             }
         }
     }
@@ -244,6 +249,7 @@ void EBPFTable::emitValueStructStructure(CodeBuilder* builder) {
 }
 
 void EBPFTable::emitTypes(CodeBuilder* builder) {
+    validateKeys();
     emitKeyType(builder);
     emitValueType(builder);
 }
@@ -363,15 +369,21 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
             swap = getByteSwapMethod(width);
         }
 
-        auto tmpVar = "tmp_" + fieldName;
+        bool isLPMKeyBigEndian = false;
         if (isLPMTable()) {
+            if (c->matchType->path->name.name == P4::P4CoreLibrary::instance.lpmMatch.name)
+                isLPMKeyBigEndian = true;
+        }
+
+        auto tmpVar = "tmp_" + fieldName;
+        if (isLPMKeyBigEndian) {
             declareTmpLpmKey(builder, c, tmpVar);
         }
 
         builder->emitIndent();
         if (memcpy) {
             builder->appendFormat("memcpy(&%s.%s, &", keyName.c_str(), fieldName.c_str());
-            if (isLPMTable()) {
+            if (isLPMKeyBigEndian) {
                 emitLpmKeyField(builder, swap, tmpVar);
             } else {
                 codeGen->visit(c->expression);
@@ -379,7 +391,7 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
             builder->appendFormat(", %d)", scalar->bytesRequired());
         } else {
             builder->appendFormat("%s.%s = ", keyName.c_str(), fieldName.c_str());
-            if (isLPMTable()) {
+            if (isLPMKeyBigEndian) {
                 emitLpmKeyField(builder, swap, tmpVar);
             } else {
                 codeGen->visit(c->expression);

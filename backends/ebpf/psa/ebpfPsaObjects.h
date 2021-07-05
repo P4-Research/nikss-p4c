@@ -103,6 +103,9 @@ class EBPFTernaryTablePSA : public EBPFTablePSA {
         return EBPFTablePSA::isMatchTypeSupported(matchType) ||
                matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name;
     }
+
+ protected:
+    void validateKeys() const override;
 };
 
 class EBPFValueSetPSA : public EBPFTableBase {

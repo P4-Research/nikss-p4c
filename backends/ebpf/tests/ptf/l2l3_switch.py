@@ -155,7 +155,7 @@ class RoutingTest(L2L3SwitchTest):
         self.update_map(name="as_group_g2", key="3 0 0 0", value="3 0 0 0")
 
         # ActionSelector reference = 2, is_group_ref=True
-        self.update_map(name="ingress_tbl_routing", key="hex 18 00 00 00 14 00 00 00", value="2 0 0 0  1 0 0 0")
+        self.table_add(table="ingress_tbl_routing", keys=["20.0.0.0/24"], references=["group 2"])
 
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:01:33", ip_dst="20.0.0.2", ip_src="10.0.0.1")
         pkt = pkt_add_vlan(pkt, vlan_vid=2)
@@ -203,6 +203,7 @@ class MACLearningTest(L2L3SwitchTest):
             value = self.get_digest_value()
             if value.port != p[0]+4:
                 self.fail("Digest not generated")
+
 
 @tc_only
 class BroadcastTest(L2L3SwitchTest):
@@ -297,7 +298,7 @@ class ACLTest(L2L3SwitchTest):
 class PortCountersTest(L2L3SwitchTest):
 
     def runTest(self):
-        self.update_map(name="ingress_tbl_switching", key="03 00 00 00 00 00 00 00 01 00 00 00 0 0 0 0", value="01 00 00 00 8 00 00 00")
+        self.table_add(table="ingress_tbl_switching", keys=["00:00:00:00:00:03", 1], action=1, data=[8])
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:00:03")
         pkt = pkt_add_vlan(pkt, vlan_vid=1)
 
@@ -312,5 +313,3 @@ class PortCountersTest(L2L3SwitchTest):
             pkts_cnt = i + 1
             self.verify_map_entry("ingress_in_pkts", "5 0 0 0", "{} 00 00 00 0{} 00 00 00".format(hex(ig_bytes).split('x')[-1], pkts_cnt))
             self.verify_map_entry("egress_tbl_vlan_egress", "8 00 00 00", "02 00 00 00 01 00 00 00 {} 00 00 00 0{} 00 00 00".format(hex(eg_bytes).split('x')[-1], pkts_cnt))
-
-

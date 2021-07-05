@@ -27,3 +27,14 @@ class Issue127(P4EbpfTest):
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
         self.verify_map_entry("ingress_cnt", key="0 0 0 0", expected_value="01 00 00 00")
+
+
+class Issue177(P4EbpfTest):
+    """
+    When length of keys in a ternary table is not equal to base type (1, 2, 4 or 8 bytes)
+    then generated mask for prefix is shorter than prefix itself.
+    """
+    p4_file_path = "samples/p4testdata/issue177.p4"
+
+    def runTest(self):
+        self.table_add(table="ingress_test_tbl", keys=["11:22:33:44:55:66", 0x8100], action=1)
