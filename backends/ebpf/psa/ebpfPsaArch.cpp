@@ -214,12 +214,31 @@ void PSAArch::emitHelperFunctions2TC(CodeBuilder *builder) const {
     builder->appendLine(pktClonesFunc);
     builder->newline();
 
-    cstring meterExecuteFunc = EBPFMeterPSA::meterExecuteFunc(tcIngress->options.emitTraceMessages);
-
-    if (!tcIngress->control->meters.empty() || !tcEgress->control->meters.empty()) {
+    EBPFMeterPSA *meter;
+    meter = findMeter(tcIngress);
+    if (meter == nullptr) {
+        meter = findMeter(tcEgress);
+    }
+    if (meter != nullptr) {
+        cstring meterExecuteFunc = meter->meterExecuteFunc(tcIngress->options.emitTraceMessages);
         builder->appendLine(meterExecuteFunc);
         builder->newline();
     }
+}
+
+EBPFMeterPSA *PSAArch::findMeter(EBPFPipeline *pipeline) {
+    if (!pipeline->control->meters.empty()) {
+        return pipeline->control->meters.begin()->second;
+    }
+    auto directMeter = std::find_if(pipeline->control->tables.begin(),
+                                    pipeline->control->tables.end(),
+                                    [](std::pair<const cstring, EBPFTable*> elem) {
+                     return !dynamic_cast<EBPFTablePSA *>(elem.second)->meters.empty();
+                 });
+    if (directMeter != pipeline->control->tables.end()) {
+        return dynamic_cast<EBPFTablePSA *>(directMeter->second)->meters.front().second;
+    }
+    return nullptr;
 }
 
 void PSAArch::emitInternalStructures2TC(CodeBuilder *pBuilder) const {
@@ -313,10 +332,14 @@ void PSAArch::emitInitializer2TC(CodeBuilder *builder) const {
 void PSAArch::emitHelperFunctions2XDP(CodeBuilder *builder) const {
     EBPFHashAlgorithmTypeFactoryPSA::instance()->emitGlobals(builder);
 
-    cstring meterExecuteFunc = EBPFMeterPSA::meterExecuteFunc(xdpIngress->
-            options.emitTraceMessages);
-
-    if (!xdpIngress->control->meters.empty() || !xdpEgress->control->meters.empty()) {
+    EBPFMeterPSA *meter;
+    meter = findMeter(xdpIngress);
+    if (meter == nullptr) {
+        meter = findMeter(xdpEgress);
+    }
+    if (meter != nullptr) {
+        cstring meterExecuteFunc = meter->meterExecuteFunc(xdpIngress->
+                options.emitTraceMessages);
         builder->appendLine(meterExecuteFunc);
         builder->newline();
     }
@@ -754,6 +777,8 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
         }
         auto met = new EBPFMeterPSA(program, name, di, control->codeGen);
         control->meters.emplace(name, met);
+    } else if (typeName == "DirectMeter") {
+        return false;
     } else if (instance->type->getName().name == "Random") {
         auto rand = new EBPFRandomPSA(di);
         control->randGenerators.emplace(name, rand);

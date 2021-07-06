@@ -112,7 +112,8 @@ const IR::ToplevelBlock* MidEnd::run(EbpfOptions& options,
                 new P4::ValidateTableProperties({ "size",
                                                   "psa_direct_counter",
                                                   "psa_empty_group_action",
-                                                  "psa_implementation" })
+                                                  "psa_implementation",
+                                                  "psa_direct_meter" })
             });
         } else {
             midEnd.addPasses({

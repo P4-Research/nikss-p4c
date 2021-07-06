@@ -34,6 +34,15 @@ void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) 
             ::error(ErrorType::ERR_NOT_FOUND,
                     "%1%: Table %2% do not own DirectCounter named %3%",
                     method->expr, table->name, name);
+    } else if (declType->name.name == "DirectMeter") {
+        auto met = table->getMeter(name);
+        if (met != nullptr) {
+            met->emitDirectExecute(builder, method, valueName);
+        } else {
+            ::error(ErrorType::ERR_NOT_FOUND,
+                    "%1%: Table %2% do not own DirectMeter named %3%",
+                    method->expr, table->name, name);
+        }
     } else {
         ControlBodyTranslatorPSA::processMethod(method);
     }
@@ -93,7 +102,10 @@ void EBPFTablePSA::initDirectMeters() {
     auto meterAdder = [this](const IR::PathExpression * pe) {
         CHECK_NULL(pe);
         auto decl = program->refMap->getDeclaration(pe->path, true);
-        this->meters.emplace_back(EBPFObject::externalName(decl));
+        auto di = decl->to<IR::Declaration_Instance>();
+        CHECK_NULL(di);
+        auto met = new EBPFMeterPSA(program, EBPFObject::externalName(di), di, codeGen);
+        this->meters.emplace_back(std::make_pair(pe->path->name.name, met));
     };
 
     forEachPropertyEntry("psa_direct_meter", meterAdder);
@@ -199,9 +211,27 @@ void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
     }
 }
 
+void EBPFTablePSA::emitValueType(CodeBuilder* builder) {
+    if (!meters.empty()) {
+        meters.begin()->second->emitValueStruct(builder);
+    }
+    EBPFTable::emitValueType(builder);
+}
+
+/**
+ * Remember that order of emitting counters and meters affects future access to BPF maps.
+ * Do not change this order!
+ */
 void EBPFTablePSA::emitDirectTypes(CodeBuilder* builder) {
     for (auto ctr : counters) {
         ctr.second->emitValueType(builder);
+    }
+    for (auto met : meters) {
+        met.second->emitValueType(builder);
+    }
+    if (!meters.empty()) {
+        builder->emitIndent();
+        builder->appendLine("struct bpf_spin_lock lock;");
     }
 }
 
@@ -318,6 +348,7 @@ void EBPFTablePSA::emitDefaultActionInitializer(CodeBuilder *builder) {
         emitMapUpdateTraceMsg(builder, defaultActionMapName, ret);
     }
 }
+
 void EBPFTablePSA::emitMapUpdateTraceMsg(CodeBuilder *builder, cstring mapName,
                                          cstring returnCode) const {
     builder->emitIndent();
