@@ -61,7 +61,7 @@ EBPFTable::EBPFTable(const EBPFProgram* program, const IR::TableBlock* table,
                      CodeGenInspector* codeGen) :
         EBPFTableBase(program, EBPFObject::externalName(table->container), codeGen), table(table) {
     cstring base = instanceName + "_defaultAction";
-    defaultActionMapName = program->refMap->newName(base);
+    defaultActionMapName = base;
 
     base = table->container->name.name + "_actions";
     actionEnumName = program->refMap->newName(base);

@@ -28,6 +28,7 @@ class EBPFDeparserPSA : public EBPFControlPSA {
     const IR::Parameter* packet_out;
     const IR::Parameter* istd;
 
+    bool emitOnly = false;
     EBPFType* headerType;
     std::vector<cstring> headersExpressions;
     std::vector<const IR::Type_Header *> headersToEmit;

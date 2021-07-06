@@ -45,8 +45,10 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     for (auto a : controlBlock->container->controlLocals)
         emitDeclaration(builder, a);
 
-    controlBlock->container->body->apply(*codeGen);
-    builder->newline();
+    if (!emitOnly) {
+        controlBlock->container->body->apply(*codeGen);
+        builder->newline();
+    }
 
     emitPreDeparser(builder);
 
@@ -470,7 +472,9 @@ bool XDPIngressDeparserPSA::build() {
  */
 void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->emitIndent();
-    builder->appendFormat("if (%s.clone) ", istd->name.name);
+    // perform early multicast detection; if multicast is invoked, a packet will be
+    // passed up anyway, so we can do deparsing entirely in TC
+    builder->appendFormat("if (%s.clone || %s.multicast_group != 0) ", istd->name.name, istd->name.name);
     builder->blockStart();
     builder->emitIndent();
     builder->appendLine("struct xdp2tc_metadata xdp2tc_md = {};");

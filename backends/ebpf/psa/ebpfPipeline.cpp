@@ -534,20 +534,8 @@ void XDPIngressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
     builder->newline();
 }
 
-/*
- * The Traffic Manager for Ingress pipeline SHOULD implements:
- * - Multicast handling
- * - send to port
- */
 void XDPIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
-    cstring mcast_grp = Util::printf_format("ostd.multicast_group");
-    builder->emitIndent();
-    builder->appendFormat("if (%s != 0) ", mcast_grp.c_str());
-    builder->blockStart();
-    builder->emitIndent();
-    builder->appendFormat("return %s;\n", builder->target->abortReturnCode().c_str());
-    builder->blockEnd(true);
-
+    // do not handle multicast; it has been handled earlier by PreDeparser.
     builder->emitIndent();
     builder->appendLine("return bpf_redirect_map(&tx_port, ostd.egress_port, 0);");
 }
@@ -687,12 +675,6 @@ void TCTrafficManagerForXDP::emit(CodeBuilder *builder) {
     builder->appendLine("struct psa_ingress_output_metadata_t ostd = md->ostd;");
     builder->emitIndent();
     builder->appendFormat("%s = md->packetOffsetInBits;", offsetVar.c_str());
-    builder->emitIndent();
-    builder->target->emitTraceMessage(builder,
-                                      "TC-TM: Received packet, eth_type=%x, offset=%d", 2,
-                                      "md->headers.ethernet.etherType",
-                                      offsetVar.c_str());
-
 
     builder->emitIndent();
     msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
@@ -706,5 +688,4 @@ void TCTrafficManagerForXDP::emit(CodeBuilder *builder) {
     builder->emitIndent();
     builder->blockEnd(true);
 }
-
 }  // namespace EBPF

@@ -160,7 +160,7 @@ class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
         testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
 
-@tc_only
+
 class MulticastPSATest(P4EbpfTest):
     p4_file_path = "../../../testdata/p4_16_samples/psa-multicast-basic-bmv2.p4"
 

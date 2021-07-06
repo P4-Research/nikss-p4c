@@ -58,8 +58,8 @@ class EBPFTableBase : public EBPFObject {
                   CodeGenInspector* codeGen) :
             program(program), instanceName(instanceName), codeGen(codeGen) {
         CHECK_NULL(codeGen); CHECK_NULL(program);
-        keyTypeName = program->refMap->newName(instanceName + "_key");
-        valueTypeName = program->refMap->newName(instanceName + "_value");
+        keyTypeName = instanceName + "_key";
+        valueTypeName = instanceName + "_value";
         dataMapName = instanceName;
     }
 };

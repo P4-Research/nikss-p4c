@@ -414,6 +414,8 @@ void PSAArch::emitInstances2XDP(CodeBuilder *builder) const {
     xdpEgress->control->emitTableInstances(builder);
     xdpEgress->deparser->emitDigestInstances(builder);
 
+    tcEgressForXDP->control->tables.insert(xdpEgress->control->tables.begin(), xdpEgress->control->tables.end());
+
     builder->target->emitTableDecl(builder, "xdp2tc_shared_map", TablePerCPUArray,
                                    "u32", "struct xdp2tc_metadata", 1);
     builder->appendLine("REGISTER_END()");
@@ -832,8 +834,11 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
     }
 
     auto codegen = new DeparserBodyTranslator(deparser);
-    if (this->type == INGRESS) {
+    if (this->type == TC_INGRESS) {
         codegen->asPointerVariables.insert(parserHeaders->name.name);
+    }
+    if (this->type == TC_TRAFFIC_MANAGER) {
+        deparser->emitOnly = true;
     }
 
     deparser->codeGen = codegen;
@@ -851,7 +856,7 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
 }
 void ConvertToEBPFDeparserPSA::findDigests(const IR::P4Control *p4Control) {
     // Digests are only at ingress
-    if (type == INGRESS) {
+    if (type == TC_INGRESS || type == XDP_INGRESS) {
         for (auto decl : p4Control->controlLocals) {
             if (decl->is<IR::Declaration_Instance>()) {
                 auto di = decl->to<IR::Declaration_Instance>();
@@ -892,13 +897,8 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expressi
                 auto exprMemb = expr->to<IR::Member>();
                 auto headerName = exprMemb->member.name;
                 auto headersStructName = deparser->parserHeaders->name.name;
-                if (!options.generateToXDP) {
-                    cstring op = this->type == INGRESS ? "->" : ".";
-                    deparser->headersExpressions.push_back(headersStructName + op + headerName);
-                } else {
-                    deparser->headersExpressions.push_back(headersStructName + "." + headerName);
-                }
-
+                cstring op = this->type == TC_INGRESS ? "->" : ".";
+                deparser->headersExpressions.push_back(headersStructName + op + headerName);
                 return false;
             }
         }
