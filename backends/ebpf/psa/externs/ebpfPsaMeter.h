@@ -9,7 +9,8 @@ class EBPFMeterPSA : public EBPFTablePSA {
  private:
     EBPFType *createValueType();
     IR::IndexedVector<IR::StructField> getValueFields() const;
-    cstring meterValueStructName;
+    cstring meterStructName;
+    cstring directMeterStructName;
 
  protected:
     size_t size{};

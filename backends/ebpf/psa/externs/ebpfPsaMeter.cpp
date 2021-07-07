@@ -29,7 +29,8 @@ EBPFMeterPSA::EBPFMeterPSA(const EBPFProgram *program,
         return;
     }
 
-    meterValueStructName = program->refMap->newName("value_meter");
+    meterStructName = program->refMap->newName("indirect_meter");
+    directMeterStructName = program->refMap->newName("direct_meter");
     this->valueTypeName = program->refMap->newName("meter_value");
     this->valueType = createValueType();
 
@@ -49,9 +50,11 @@ EBPFMeterPSA::MeterType EBPFMeterPSA::toType(const int typeCode) {
 
 EBPFType *EBPFMeterPSA::createValueType() {
     IR::IndexedVector<IR::StructField> vec = getValueFields();
-    auto valueStructType = new IR::Type_Struct(IR::ID(meterValueStructName), vec);
+    auto valueStructType = new IR::Type_Struct(
+            IR::ID(isDirect ? directMeterStructName : meterStructName), vec);
     return EBPFTypeFactory::instance->create(valueStructType);
 }
+
 IR::IndexedVector<IR::StructField> EBPFMeterPSA::getValueFields() const {
     auto vec = IR::IndexedVector<IR::StructField>();
     auto bits_64 = new IR::Type_Bits(64, false);
@@ -155,7 +158,7 @@ cstring EBPFMeterPSA::meterExecuteFunc(bool trace) {
                                "enum PSA_MeterColor_t meter_execute(%meter_struct% *value, "
                                "void *lock, "
                                "u32 *packet_len, u64 *time_ns) {\n"
-                               "    if (value != NULL) {\n"
+                               "    if (value != NULL && value->pir_period != 0) {\n"
                                "        u64 delta_p, delta_c;\n"
                                "        u64 n_periods_p, n_periods_c, tokens_pbs, tokens_cbs;\n"
                                "        bpf_spin_lock(lock);\n"
@@ -209,7 +212,7 @@ cstring EBPFMeterPSA::meterExecuteFunc(bool trace) {
                                "\n"
                                "static __always_inline\n"
                                "enum PSA_MeterColor_t meter_execute_bytes_value("
-                               "%meter_struct% *value, void *lock, u32 *packet_len, "
+                               "void *value, void *lock, u32 *packet_len, "
                                "u64 *time_ns) {\n"
                                     "%trace_msg_meter_execute_bytes%"
                                "    return meter_execute(value, lock, packet_len, time_ns);\n"
@@ -225,7 +228,7 @@ cstring EBPFMeterPSA::meterExecuteFunc(bool trace) {
                                "\n"
                                "static __always_inline\n"
                                "enum PSA_MeterColor_t meter_execute_packets_value("
-                               "%meter_struct% *value, void *lock, u64 *time_ns) {\n"
+                               "void *value, void *lock, u64 *time_ns) {\n"
                                     "%trace_msg_meter_execute_packets%"
                                "    u32 len = 1;\n"
                                "    return meter_execute(value, lock, &len, time_ns);\n"
@@ -278,7 +281,7 @@ cstring EBPFMeterPSA::meterExecuteFunc(bool trace) {
     }
 
     meterExecuteFunc = meterExecuteFunc.replace(cstring("%meter_struct%"),
-                                                cstring("struct ") + meterValueStructName);
+                                                cstring("struct ") + meterStructName);
 
     return meterExecuteFunc;
 }
