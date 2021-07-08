@@ -247,7 +247,8 @@ cstring EBPFMeterPSA::meterExecuteFunc(bool trace) {
                                "enum PSA_MeterColor_t meter_execute_bytes("
                                "void *map, u32 *packet_len, void *key, u64 *time_ns) {\n"
                                "    %meter_struct% *value = BPF_MAP_LOOKUP_ELEM(*map, key);\n"
-                               "    return meter_execute_bytes_value(value, &value->lock, "
+                               "    return meter_execute_bytes_value(value, "
+                               "value + sizeof(%meter_struct%), "
                                "packet_len, time_ns);\n"
                                "}\n"
                                "\n"
@@ -263,7 +264,8 @@ cstring EBPFMeterPSA::meterExecuteFunc(bool trace) {
                                "enum PSA_MeterColor_t meter_execute_packets(void *map, "
                                "void *key, u64 *time_ns) {\n"
                                "    %meter_struct% *value = BPF_MAP_LOOKUP_ELEM(*map, key);\n"
-                               "    return meter_execute_packets_value(value, &value->lock, "
+                               "    return meter_execute_packets_value(value, value + "
+                               "sizeof(%meter_struct%), "
                                "time_ns);\n"
                                "}\n";
 
