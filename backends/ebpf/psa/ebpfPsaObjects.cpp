@@ -199,21 +199,36 @@ void EBPFTablePSA::emitValueStructStructure(CodeBuilder* builder) {
 
 void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
     TableKind kind = isLPMTable() ? TableLPMTrie : TableHash;
-    if (meters.empty()) {
-        builder->target->emitTableDecl(builder, name, kind,
-                                       cstring("struct ") + keyTypeName,
-                                       cstring("struct ") + valueTypeName, size);
-    } else {
-        builder->target->emitTableDeclSpinlock(builder, name, kind,
-                                               cstring("struct ") + keyTypeName,
-                                               cstring("struct ") + valueTypeName, size);
-    }
+    emitTableDecl(builder, name, kind,
+                  cstring("struct ") + keyTypeName,
+                  cstring("struct ") + valueTypeName, size);
 
     if (!hasImplementation()) {
         // Default action is up to implementation
-        builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
-                                       program->arrayIndexType,
-                                       cstring("struct ") + valueTypeName, 1);
+        emitTableDecl(builder, defaultActionMapName, TableArray,
+                      program->arrayIndexType,
+                      cstring("struct ") + valueTypeName, 1);
+    }
+}
+
+void EBPFTablePSA::emitTableDecl(CodeBuilder *builder,
+                                 cstring tblName,
+                                 TableKind kind,
+                                 cstring keyTypeName,
+                                 cstring valueTypeName,
+                                 size_t size) const {
+    if (meters.empty()) {
+        builder->target->emitTableDecl(builder,
+                                       tblName, kind,
+                                       keyTypeName,
+                                       valueTypeName,
+                                       size);
+    } else {
+        builder->target->emitTableDeclSpinlock(builder,
+                                               tblName, kind,
+                                               keyTypeName,
+                                               valueTypeName,
+                                               size);
     }
 }
 

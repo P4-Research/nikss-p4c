@@ -11,6 +11,14 @@ class EBPFTableImplementationPSA;
 class EBPFMeterPSA;
 
 class EBPFTablePSA : public EBPFTable {
+ private:
+    void emitTableDecl(CodeBuilder *builder,
+                       cstring tblName,
+                       TableKind kind,
+                       cstring keyTypeName,
+                       cstring valueTypeName,
+                       size_t size) const;
+
  protected:
     ActionTranslationVisitor*
         createActionTranslationVisitor(cstring valueName,
