@@ -199,9 +199,15 @@ void EBPFTablePSA::emitValueStructStructure(CodeBuilder* builder) {
 
 void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
     TableKind kind = isLPMTable() ? TableLPMTrie : TableHash;
-    builder->target->emitTableDecl(builder, name, kind,
-                                   cstring("struct ") + keyTypeName,
-                                   cstring("struct ") + valueTypeName, size);
+    if (meters.empty()) {
+        builder->target->emitTableDecl(builder, name, kind,
+                                       cstring("struct ") + keyTypeName,
+                                       cstring("struct ") + valueTypeName, size);
+    } else {
+        builder->target->emitTableDeclSpinlock(builder, name, kind,
+                                               cstring("struct ") + keyTypeName,
+                                               cstring("struct ") + valueTypeName, size);
+    }
 
     if (!hasImplementation()) {
         // Default action is up to implementation
