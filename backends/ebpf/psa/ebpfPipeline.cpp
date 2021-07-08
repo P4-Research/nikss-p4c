@@ -677,6 +677,14 @@ void TCTrafficManagerForXDP::emit(CodeBuilder *builder) {
     builder->appendFormat("%s = md->packetOffsetInBits;", offsetVar.c_str());
 
     builder->emitIndent();
+    builder->append("    __u16 *ether_type = (__u16 *) ((void *) (long)skb->data + 12);\n"
+                    "    if ((void *) ((__u16 *) ether_type + 1) > "
+                    "    (void *) (long) skb->data_end) {\n"
+                    "        return TC_ACT_SHOT;\n"
+                    "    }\n"
+                    "    *ether_type = md->pkt_ether_type;\n");
+
+    builder->emitIndent();
     msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
     builder->emitIndent();
