@@ -7,13 +7,12 @@ namespace EBPF {
 
 class EBPFMeterPSA : public EBPFTablePSA {
  private:
-    static IR::IndexedVector<IR::StructField> getValueFields() ;
-    static IR::Type_Struct *createSpinlockStruct() ;
+    static IR::IndexedVector<IR::StructField> getValueFields();
+    static IR::Type_Struct *createSpinlockStruct();
     EBPFType *createBaseValueType() const;
     EBPFType *createIndirectValueType() const;
     cstring valueBaseStructName;
     cstring valueIndirectStructName;
-
     const cstring indirectValueField = "value";
     const cstring spinlockField = "lock";
 

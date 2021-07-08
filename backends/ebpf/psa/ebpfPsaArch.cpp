@@ -431,7 +431,8 @@ EBPFMeterPSA *PSAArch::findMeter(EBPFPipeline *pipeline) {
     auto directMeter = std::find_if(pipeline->control->tables.begin(),
                                     pipeline->control->tables.end(),
                                     [](std::pair<const cstring, EBPFTable*> elem) {
-                                        return !dynamic_cast<EBPFTablePSA *>(elem.second)->meters.empty();
+                                        return !dynamic_cast<EBPFTablePSA *>(elem.second)->
+                                        meters.empty();
                                     });
     if (directMeter != pipeline->control->tables.end()) {
         return dynamic_cast<EBPFTablePSA *>(directMeter->second)->meters.front().second;
