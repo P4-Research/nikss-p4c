@@ -212,9 +212,6 @@ void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
 }
 
 void EBPFTablePSA::emitValueType(CodeBuilder* builder) {
-    if (!meters.empty()) {
-        meters.begin()->second->emitValueStruct(builder);
-    }
     EBPFTable::emitValueType(builder);
 }
 
@@ -230,8 +227,7 @@ void EBPFTablePSA::emitDirectTypes(CodeBuilder* builder) {
         met.second->emitValueType(builder);
     }
     if (!meters.empty()) {
-        builder->emitIndent();
-        builder->appendLine("struct bpf_spin_lock lock;");
+        meters.begin()->second->emitSpinLockField(builder);
     }
 }
 

@@ -7,16 +7,22 @@ namespace EBPF {
 
 class EBPFMeterPSA : public EBPFTablePSA {
  private:
-    EBPFType *createValueType();
-    IR::IndexedVector<IR::StructField> getValueFields() const;
-    cstring meterStructName;
-    cstring directMeterStructName;
+    static IR::IndexedVector<IR::StructField> getValueFields() ;
+    static IR::Type_Struct *createSpinlockStruct() ;
+    EBPFType *createBaseValueType() const;
+    EBPFType *createIndirectValueType() const;
+    cstring valueBaseStructName;
+    cstring valueIndirectStructName;
+
+    const cstring indirectValueField = "value";
+    const cstring spinlockField = "lock";
 
  protected:
     size_t size{};
     const IR::Type *keyArg{};
     EBPFType *keyType{};
-    EBPFType *valueType{};
+    EBPFType *valueIndirectType{};
+    EBPFType *valueBaseType{};
     bool isDirect;
 
  public:
@@ -35,6 +41,7 @@ class EBPFMeterPSA : public EBPFTablePSA {
     void emitKeyType(CodeBuilder* builder) override;
     void emitValueStruct(CodeBuilder* builder);
     void emitValueType(CodeBuilder* builder) override;
+    void emitSpinLockField(CodeBuilder* builder);
     void emitInstance(CodeBuilder* builder) override;
     void emitExecute(CodeBuilder* builder, const P4::ExternMethod* method);
     void emitDirectExecute(CodeBuilder* builder, const P4::ExternMethod* method,

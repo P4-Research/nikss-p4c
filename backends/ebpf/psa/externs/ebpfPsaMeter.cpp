@@ -29,10 +29,11 @@ EBPFMeterPSA::EBPFMeterPSA(const EBPFProgram *program,
         return;
     }
 
-    meterStructName = program->refMap->newName("indirect_meter");
-    directMeterStructName = program->refMap->newName("direct_meter");
-    this->valueTypeName = program->refMap->newName("meter_value");
-    this->valueType = createValueType();
+    this->valueBaseStructName = program->refMap->newName("meter_value");
+    this->valueBaseType = createBaseValueType();
+
+    this->valueIndirectStructName = program->refMap->newName("indirect_meter");
+    this->valueIndirectType = createIndirectValueType();
 
     auto typeExpr = di->arguments->at(isDirect ? 0 : 1)->expression->to<IR::Constant>();
     this->type = toType(typeExpr->asInt());
@@ -48,14 +49,14 @@ EBPFMeterPSA::MeterType EBPFMeterPSA::toType(const int typeCode) {
     }
 }
 
-EBPFType *EBPFMeterPSA::createValueType() {
+EBPFType *EBPFMeterPSA::createBaseValueType() const {
     IR::IndexedVector<IR::StructField> vec = getValueFields();
     auto valueStructType = new IR::Type_Struct(
-            IR::ID(isDirect ? directMeterStructName : meterStructName), vec);
+            IR::ID(this->valueBaseStructName), vec);
     return EBPFTypeFactory::instance->create(valueStructType);
 }
 
-IR::IndexedVector<IR::StructField> EBPFMeterPSA::getValueFields() const {
+IR::IndexedVector<IR::StructField> EBPFMeterPSA::getValueFields() {
     auto vec = IR::IndexedVector<IR::StructField>();
     auto bits_64 = new IR::Type_Bits(64, false);
     vec.push_back(new IR::StructField(IR::ID("pir_period"), bits_64));
@@ -68,11 +69,35 @@ IR::IndexedVector<IR::StructField> EBPFMeterPSA::getValueFields() const {
     vec.push_back(new IR::StructField(IR::ID("cbs_left"), bits_64));
     vec.push_back(new IR::StructField(IR::ID("time_p"), bits_64));
     vec.push_back(new IR::StructField(IR::ID("time_c"), bits_64));
-    if (!isDirect) {
-        auto spinLock = new IR::Type_Struct(IR::ID("bpf_spin_lock"));
-        vec.push_back(new IR::StructField(IR::ID("lock"), spinLock));
-    }
     return vec;
+}
+
+EBPFType *EBPFMeterPSA::createIndirectValueType() const {
+    auto vec = IR::IndexedVector<IR::StructField>();
+
+    auto baseValue = new IR::Type_Struct(IR::ID(valueBaseStructName));
+    vec.push_back(new IR::StructField(IR::ID(indirectValueField), baseValue));
+
+    IR::Type_Struct *spinLock = createSpinlockStruct();
+    vec.push_back(new IR::StructField(IR::ID(spinlockField), spinLock));
+
+    auto valueType = new IR::Type_Struct(
+            IR::ID(valueIndirectStructName), vec);
+    auto meterType = EBPFTypeFactory::instance->create(valueType);
+
+    return meterType;
+}
+IR::Type_Struct *EBPFMeterPSA::createSpinlockStruct() {
+    auto spinLock = new IR::Type_Struct(IR::ID("bpf_spin_lock"));
+    return spinLock;
+}
+
+void EBPFMeterPSA::emitSpinLockField(CodeBuilder* builder) {
+    auto spinlockStruct = createSpinlockStruct();
+    auto spinlockType = EBPFTypeFactory::instance->create(spinlockStruct);
+    builder->emitIndent();
+    spinlockType->declare(builder, spinlockField, false);
+    builder->endOfStatement(true);
 }
 
 void EBPFMeterPSA::emitKeyType(CodeBuilder* builder) {
@@ -84,27 +109,27 @@ void EBPFMeterPSA::emitKeyType(CodeBuilder* builder) {
 
 void EBPFMeterPSA::emitValueStruct(CodeBuilder* builder) {
     builder->emitIndent();
-    this->valueType->emit(builder);
+    this->valueBaseType->emit(builder);
 }
-
 void EBPFMeterPSA::emitValueType(CodeBuilder* builder) {
     if (isDirect) {
         builder->emitIndent();
-        this->valueType->declare(builder, valueTypeName, false);
+        this->valueBaseType->declare(builder, instanceName, false);
         builder->endOfStatement(true);
     } else {
-        emitValueStruct(builder);
-        builder->emitIndent();
-        builder->append("typedef ");
-        this->valueType->declare(builder, valueTypeName, false);
-        builder->endOfStatement(true);
+        this->valueIndirectType->emit(builder);
     }
 }
 
 void EBPFMeterPSA::emitInstance(CodeBuilder *builder) {
-    builder->target->emitTableDeclSpinlock(builder, instanceName, TableHash,
-                                   this->keyTypeName,
-                                   this->valueTypeName, size);
+    if (!isDirect) {
+        builder->target->emitTableDeclSpinlock(builder, instanceName, TableHash,
+                                               this->keyTypeName,
+                                               "struct " + this->valueIndirectStructName, size);
+    } else {
+        ::error(ErrorType::ERR_UNEXPECTED, "Direct meter belongs to table "
+                                           "and cannot have own instance");
+    }
 }
 
 void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* method) {
@@ -137,8 +162,8 @@ void EBPFMeterPSA::emitDirectExecute(CodeBuilder *builder,
         return;
     }
 
-    cstring lockVar = valuePtr + "->lock";
-    cstring valueMeter = valuePtr + "->" + valueTypeName;
+    cstring lockVar = valuePtr + "->" + spinlockField;
+    cstring valueMeter = valuePtr + "->" + instanceName;
     if (type == BYTES) {
         builder->appendFormat("meter_execute_bytes_value(&%s, &%s, &%s, &%s)",
                               valueMeter,
@@ -281,7 +306,7 @@ cstring EBPFMeterPSA::meterExecuteFunc(bool trace) {
     }
 
     meterExecuteFunc = meterExecuteFunc.replace(cstring("%meter_struct%"),
-                                                cstring("struct ") + meterStructName);
+                                                cstring("struct ") + valueBaseStructName);
 
     return meterExecuteFunc;
 }
