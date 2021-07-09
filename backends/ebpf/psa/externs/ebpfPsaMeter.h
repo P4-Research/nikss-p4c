@@ -9,19 +9,18 @@ class EBPFMeterPSA : public EBPFTablePSA {
  private:
     static IR::IndexedVector<IR::StructField> getValueFields();
     static IR::Type_Struct *createSpinlockStruct();
-    EBPFType *createBaseValueType() const;
-    EBPFType *createIndirectValueType() const;
-    cstring valueBaseStructName;
-    cstring valueIndirectStructName;
     const cstring indirectValueField = "value";
     const cstring spinlockField = "lock";
+    EBPFType *getBaseValueType() const;
+    EBPFType *getIndirectValueType() const;
+    cstring getBaseStructName() const;
+    cstring getIndirectStructName() const;
+    cstring getIndexString(const P4::ExternMethod *method) const;
 
  protected:
     size_t size{};
     const IR::Type *keyArg{};
     EBPFType *keyType{};
-    EBPFType *valueIndirectType{};
-    EBPFType *valueBaseType{};
     bool isDirect;
 
  public:

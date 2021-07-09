@@ -38,7 +38,8 @@ bool ControlBodyTranslatorPSA::preorder(const IR::AssignmentStatement* a) {
                 auto reg = control->to<EBPFControlPSA>()->getRegister(name);
                 reg->emitRegisterRead(builder, ext, this, a->left);
                 return false;
-            } else if (ext->originalExternType->name.name == "Meter") {
+            } else if (ext->originalExternType->name.name == "Meter" ||
+                       ext->originalExternType->name.name == "DirectMeter") {
                 cstring name = EBPFObject::externalName(ext->object);
                 auto msgStr = Util::printf_format("Executing meter: %s", name);
                 builder->target->emitTraceMessage(builder, msgStr.c_str());
@@ -80,6 +81,8 @@ void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
         name = EBPFObject::externalName(di);
         auto meter = control->to<EBPFControlPSA>()->getMeter(name);
         meter->emitExecute(builder, method);
+        return;
+    } else if (declType->name.name == "DirectMeter") {
         return;
     }
 

@@ -29,14 +29,51 @@ EBPFMeterPSA::EBPFMeterPSA(const EBPFProgram *program,
         return;
     }
 
-    this->valueBaseStructName = program->refMap->newName("meter_value");
-    this->valueBaseType = createBaseValueType();
-
-    this->valueIndirectStructName = program->refMap->newName("indirect_meter");
-    this->valueIndirectType = createIndirectValueType();
-
     auto typeExpr = di->arguments->at(isDirect ? 0 : 1)->expression->to<IR::Constant>();
     this->type = toType(typeExpr->asInt());
+}
+
+EBPFType * EBPFMeterPSA::getBaseValueType() const {
+    IR::IndexedVector<IR::StructField> vec = getValueFields();
+    auto valueStructType = new IR::Type_Struct(
+            IR::ID(getBaseStructName()), vec);
+    return EBPFTypeFactory::instance->create(valueStructType);
+}
+
+EBPFType * EBPFMeterPSA::getIndirectValueType() const {
+    auto vec = IR::IndexedVector<IR::StructField>();
+
+    auto baseValue = new IR::Type_Struct(IR::ID(getBaseStructName()));
+    vec.push_back(new IR::StructField(IR::ID(indirectValueField), baseValue));
+
+    IR::Type_Struct *spinLock = createSpinlockStruct();
+    vec.push_back(new IR::StructField(IR::ID(spinlockField), spinLock));
+
+    auto valueType = new IR::Type_Struct(
+            IR::ID(getIndirectStructName()), vec);
+    auto meterType = EBPFTypeFactory::instance->create(valueType);
+
+    return meterType;
+}
+
+cstring EBPFMeterPSA::getBaseStructName() const {
+    static cstring valueBaseStructName;
+
+    if (valueBaseStructName.isNullOrEmpty()) {
+        valueBaseStructName = program->refMap->newName("meter_value");
+    }
+
+    return valueBaseStructName;
+}
+
+cstring EBPFMeterPSA::getIndirectStructName() const {
+    static cstring valueIndirectStructName;
+
+    if (valueIndirectStructName.isNullOrEmpty()) {
+        valueIndirectStructName = program->refMap->newName("indirect_meter");
+    }
+
+    return valueIndirectStructName;
 }
 
 EBPFMeterPSA::MeterType EBPFMeterPSA::toType(const int typeCode) {
@@ -47,13 +84,6 @@ EBPFMeterPSA::MeterType EBPFMeterPSA::toType(const int typeCode) {
     } else {
         BUG("Unknown meter type %1%", typeCode);
     }
-}
-
-EBPFType *EBPFMeterPSA::createBaseValueType() const {
-    IR::IndexedVector<IR::StructField> vec = getValueFields();
-    auto valueStructType = new IR::Type_Struct(
-            IR::ID(this->valueBaseStructName), vec);
-    return EBPFTypeFactory::instance->create(valueStructType);
 }
 
 IR::IndexedVector<IR::StructField> EBPFMeterPSA::getValueFields() {
@@ -72,21 +102,6 @@ IR::IndexedVector<IR::StructField> EBPFMeterPSA::getValueFields() {
     return vec;
 }
 
-EBPFType *EBPFMeterPSA::createIndirectValueType() const {
-    auto vec = IR::IndexedVector<IR::StructField>();
-
-    auto baseValue = new IR::Type_Struct(IR::ID(valueBaseStructName));
-    vec.push_back(new IR::StructField(IR::ID(indirectValueField), baseValue));
-
-    IR::Type_Struct *spinLock = createSpinlockStruct();
-    vec.push_back(new IR::StructField(IR::ID(spinlockField), spinLock));
-
-    auto valueType = new IR::Type_Struct(
-            IR::ID(valueIndirectStructName), vec);
-    auto meterType = EBPFTypeFactory::instance->create(valueType);
-
-    return meterType;
-}
 IR::Type_Struct *EBPFMeterPSA::createSpinlockStruct() {
     auto spinLock = new IR::Type_Struct(IR::ID("bpf_spin_lock"));
     return spinLock;
@@ -109,15 +124,15 @@ void EBPFMeterPSA::emitKeyType(CodeBuilder* builder) {
 
 void EBPFMeterPSA::emitValueStruct(CodeBuilder* builder) {
     builder->emitIndent();
-    this->valueBaseType->emit(builder);
+    getBaseValueType()->emit(builder);
 }
 void EBPFMeterPSA::emitValueType(CodeBuilder* builder) {
     if (isDirect) {
         builder->emitIndent();
-        this->valueBaseType->declare(builder, instanceName, false);
+        getBaseValueType()->declare(builder, instanceName, false);
         builder->endOfStatement(true);
     } else {
-        this->valueIndirectType->emit(builder);
+        getIndirectValueType()->emit(builder);
     }
 }
 
@@ -125,7 +140,7 @@ void EBPFMeterPSA::emitInstance(CodeBuilder *builder) {
     if (!isDirect) {
         builder->target->emitTableDeclSpinlock(builder, instanceName, TableHash,
                                                this->keyTypeName,
-                                               "struct " + this->valueIndirectStructName, size);
+                                               "struct " + getIndirectStructName(), size);
     } else {
         ::error(ErrorType::ERR_UNEXPECTED, "Direct meter belongs to table "
                                            "and cannot have own instance");
@@ -142,14 +157,30 @@ void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* met
         return;
     }
 
-    auto indexArgExpr = method->expr->arguments->at(0)->expression->to<IR::PathExpression>();
+    cstring index = getIndexString(method);
+
     if (type == BYTES) {
-        builder->appendFormat("meter_execute_bytes(&%s, &%s, &%s, &%s)", instanceName,
+        builder->appendFormat("meter_execute_bytes(&%s, &%s, %s, &%s)", instanceName,
                               pipeline->lengthVar.c_str(),
-                              indexArgExpr->path->name.name, pipeline->timestampVar.c_str());
+                              index, pipeline->timestampVar.c_str());
     } else {
-        builder->appendFormat("meter_execute_packets(&%s, &%s, &%s)", instanceName,
-                              indexArgExpr->path->name.name, pipeline->timestampVar.c_str());
+        builder->appendFormat("meter_execute_packets(&%s, %s, &%s)", instanceName,
+                              index, pipeline->timestampVar.c_str());
+    }
+}
+
+cstring EBPFMeterPSA::getIndexString(const P4::ExternMethod *method) const {
+    if (method->expr->arguments->at(0)->expression->is<IR::PathExpression>()) {
+        auto indexArgExpr = method->expr->arguments->at(0)->expression->to<IR::PathExpression>();
+        return "&" + indexArgExpr->path->name.name;
+    } else if (method->expr->arguments->at(0)->expression->is<IR::Constant>()) {
+        auto indexArgExpr = method->expr->arguments->at(0)->expression->to<IR::Constant>();
+        return Util::printf_format("&(u32){%s}",
+                                         Util::toString(indexArgExpr->value, 0, false));
+    } else {
+        ::error(ErrorType::ERR_INVALID, "Invalid meter index expression %1%",
+                method->expr->arguments->at(0)->expression);
+        return cstring::empty;
     }
 }
 
@@ -308,7 +339,7 @@ cstring EBPFMeterPSA::meterExecuteFunc(bool trace) {
     }
 
     meterExecuteFunc = meterExecuteFunc.replace(cstring("%meter_struct%"),
-                                                cstring("struct ") + valueBaseStructName);
+                                                cstring("struct ") + getBaseStructName());
 
     return meterExecuteFunc;
 }

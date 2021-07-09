@@ -425,6 +425,9 @@ void PSAArch::emitDummy2XDP(CodeBuilder *builder) const {
 }
 
 EBPFMeterPSA *PSAArch::findMeter(EBPFPipeline *pipeline) {
+    if (pipeline == nullptr) {
+        return nullptr;
+    }
     if (!pipeline->control->meters.empty()) {
         return pipeline->control->meters.begin()->second;
     }
