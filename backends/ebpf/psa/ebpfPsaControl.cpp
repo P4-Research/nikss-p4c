@@ -82,8 +82,6 @@ void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
         auto meter = control->to<EBPFControlPSA>()->getMeter(name);
         meter->emitExecute(builder, method);
         return;
-    } else if (declType->name.name == "DirectMeter") {
-        return;
     }
 
     ControlBodyTranslator::processMethod(method);
