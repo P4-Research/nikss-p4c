@@ -380,7 +380,7 @@ class DirectAndCounterMeterPSATest(P4EbpfTest):
         self.update_map(name="ingress_tbl_fwd", key="hex 04 00 00 00",
                         value="hex "
                               "01 00 00 00 05 00 00 00 "  # action id | egress port
-                              "00 00 00 00 "              # counter packets 
+                              "00 00 00 00 00 00 00 00 "  # counter packets and padding
                               "40 42 0F 00 00 00 00 00 "  # pir_period
                               "E2 04 00 00 00 00 00 00 "  # pir_unit_per_period
                               "40 42 0F 00 00 00 00 00 "  # cir_period
@@ -399,7 +399,7 @@ class DirectAndCounterMeterPSATest(P4EbpfTest):
         self.verify_map_entry(name="ingress_tbl_fwd", key="hex 04 00 00 00",
                               expected_value="hex "
                                              "01 00 00 00 05 00 00 00 "
-                                             "01 00 00 00 "              # counter packets 
+                                             "01 00 00 00 00 00 00 00 "  # counter packets and padding
                                              "40 42 0F 00 00 00 00 00 "
                                              "E2 04 00 00 00 00 00 00 "
                                              "40 42 0F 00 00 00 00 00 "
