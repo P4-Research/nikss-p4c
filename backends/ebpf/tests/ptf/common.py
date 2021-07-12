@@ -95,10 +95,6 @@ class EbpfTest(BaseTest):
     def verify_map_entry(self, name, key, expected_value, mask=None):
         value = self.read_map(name, key)
 
-        logger.info("Expected value: ")
-        logger.info(expected_value)
-        logger.info("Value: ")
-        logger.info(value)
         if mask:
             expected_value = expected_value.replace("hex ", "0x")
             expected_value = expected_value.replace(" ", "")
