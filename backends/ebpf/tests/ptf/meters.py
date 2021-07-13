@@ -292,6 +292,15 @@ class DirectAndIndirectMeterPSATest(P4EbpfTest):
         super(DirectAndIndirectMeterPSATest, self).tearDown()
 
 
+class DirectAndIndirectActionMeterPSATest(DirectAndIndirectMeterPSATest):
+    """
+    Test Direct Meter and Indirect Meter together
+    and execute Indirect Meter in single action.
+    """
+
+    p4_file_path = "samples/p4testdata/meters-direct-and-indirect-single-action.p4"
+
+
 class DirectTwoMetersPSATest(P4EbpfTest):
     """
     Test two Direct Meters in one table. Type BYTES.
