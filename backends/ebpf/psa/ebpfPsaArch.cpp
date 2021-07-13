@@ -318,8 +318,8 @@ void PSAArch::emitHelperFunctions2XDP(CodeBuilder *builder) const {
     EBPFHashAlgorithmTypeFactoryPSA::instance()->emitGlobals(builder);
 
     if (auto meter = findAnyMeter(false, true)) {
-        cstring meterExecuteFunc = meter->meterExecuteFunc(xdpIngress->
-                options.emitTraceMessages);
+        cstring meterExecuteFunc = meter->meterExecuteFunc(
+                xdpIngress->options.emitTraceMessages);
         builder->appendLine(meterExecuteFunc);
         builder->newline();
     }

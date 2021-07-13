@@ -175,8 +175,7 @@ cstring EBPFMeterPSA::getIndexString(const P4::ExternMethod *method) const {
         return "&" + indexArgExpr->path->name.name;
     } else if (method->expr->arguments->at(0)->expression->is<IR::Constant>()) {
         auto indexArgExpr = method->expr->arguments->at(0)->expression->to<IR::Constant>();
-        return Util::printf_format("&(u32){%s}",
-                                         Util::toString(indexArgExpr->value, 0, false));
+        return Util::printf_format("&(u32){%s}", Util::toString(indexArgExpr->value, 0, false));
     } else {
         ::error(ErrorType::ERR_INVALID, "Invalid meter index expression %1%",
                 method->expr->arguments->at(0)->expression);

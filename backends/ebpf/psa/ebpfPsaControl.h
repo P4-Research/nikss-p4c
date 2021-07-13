@@ -24,7 +24,6 @@ class EBPFControlPSA : public EBPFControl {
     std::map<cstring, EBPFRandomPSA*> randGenerators;
     std::map<cstring, EBPFRegisterPSA*>  registers;
     std::map<cstring, EBPFMeterPSA*>  meters;
-//    std::map<cstring, EBPFTablePSA*>  tables;
 
     EBPFControlPSA(const EBPFProgram* program, const IR::ControlBlock* control,
                    const IR::Parameter* parserHeaders) :

@@ -40,6 +40,7 @@ bool ControlBodyTranslatorPSA::preorder(const IR::AssignmentStatement* a) {
                 return false;
             } else if (ext->originalExternType->name.name == "Meter" ||
                        ext->originalExternType->name.name == "DirectMeter") {
+                // Only for trace message
                 cstring name = EBPFObject::externalName(ext->object);
                 auto msgStr = Util::printf_format("Executing meter: %s", name);
                 builder->target->emitTraceMessage(builder, msgStr.c_str());
