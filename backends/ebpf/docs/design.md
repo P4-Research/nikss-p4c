@@ -347,4 +347,5 @@ RFC 2698 explicitly says that buckets are initially full so values pbs_left and 
 
 If meter is not initialized it returns GREEN colour by default (see PSA spec).
 For Indirect Meter no table entry means uninitialized meter. 
-For DirectMeter a user has to zero pir_period field.
+For DirectMeter a zeroed pir_period field means uninitialized meter. 
+When a meter has a zeroed pir_period field, then a meter execute function will return GREEN colour.

@@ -106,7 +106,8 @@ void EBPFTablePSA::initDirectMeters() {
         CHECK_NULL(di);
         if (isLPMTable() || isTernaryTable()) {
             ::error(ErrorType::ERR_UNSUPPORTED,
-                    "DirectMeter in LPM or ternary table is not supported: %1%", di);
+                    "DirectMeter in table with ternary key or "
+                    "Longest Prefix Match key is not supported: %1%", di);
             return;
         }
         auto met = new EBPFMeterPSA(program, EBPFObject::externalName(di), di, codeGen);
