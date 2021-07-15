@@ -338,7 +338,7 @@ void TCIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
     // In multicast mode, unicast packet is not send
     builder->target->emitTraceMessage(builder, "IngressTM: Multicast done, dropping source packet");
     builder->emitIndent();
-    builder->appendFormat("return %s", builder->target->dropReturnCode());
+    builder->appendFormat("return %s", dropReturnCode());
     builder->endOfStatement(true);
     builder->blockEnd(true);
 
@@ -411,7 +411,7 @@ void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->blockStart();
     builder->target->emitTraceMessage(builder, "EgressTM: Packet dropped due to metadata");
     builder->emitIndent();
-    builder->appendFormat("return %s", builder->target->dropReturnCode().c_str());
+    builder->appendFormat("return %s;", dropReturnCode());
     builder->endOfStatement(true);
     builder->blockEnd(true);
 
@@ -443,8 +443,8 @@ void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->emitIndent();
 
     builder->newline();
-
-    builder->append("return TC_ACT_OK");
+    builder->emitIndent();
+    builder->appendFormat("return %s", forwardReturnCode());
     builder->endOfStatement(true);
 }
 
@@ -626,7 +626,7 @@ void XDPEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder,
                                     "EgressTM: Packet dropped due to metadata");
     builder->emitIndent();
-    builder->appendFormat("return %s", builder->target->dropReturnCode().c_str());
+    builder->appendFormat("return %s", dropReturnCode());
     builder->endOfStatement(true);
     builder->blockEnd(true);
 
@@ -638,7 +638,7 @@ void XDPEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
                                         "EgressTM: output packet to port %d",
                                       1, varStr.c_str());
     builder->emitIndent();
-    builder->appendFormat("return %s", builder->target->forwardReturnCode());
+    builder->appendFormat("return %s", forwardReturnCode());
     builder->endOfStatement(true);
 }
 
@@ -662,7 +662,8 @@ void TCTrafficManagerForXDP::emit(CodeBuilder *builder) {
     builder->emitIndent();
     builder->append("if (!md) ");
     builder->blockStart();
-    builder->appendLine("return TC_ACT_SHOT;");
+    builder->appendFormat("return %s;", dropReturnCode());
+    builder->newline();
     builder->blockEnd(true);
     builder->emitIndent();
 

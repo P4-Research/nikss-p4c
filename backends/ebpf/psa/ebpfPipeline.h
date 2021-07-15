@@ -36,6 +36,14 @@ class EBPFPipeline : public EBPFProgram {
         timestampVar = cstring("tstamp");
     }
 
+    virtual cstring dropReturnCode() {
+        // TC is the default hookpoint
+        return "TC_ACT_SHOT";
+    }
+    virtual cstring forwardReturnCode() {
+        // TC is the default hookpoint
+        return "TC_ACT_OK";
+    }
     virtual void emitTrafficManager(CodeBuilder *builder) = 0;
     void emitHeaderInstances(CodeBuilder *builder) override;
     void emitLocalVariables(CodeBuilder* builder) override;
@@ -87,6 +95,12 @@ class XDPPipeline : public EBPFPipeline {
 
     void emitPacketLength(CodeBuilder *builder) override;
     void emitTimestamp(CodeBuilder *builder) override;
+    cstring forwardReturnCode() override {
+        return "XDP_PASS";
+    }
+    cstring dropReturnCode() override {
+        return "XDP_DROP";
+    }
 };
 
 class XDPIngressPipeline : public XDPPipeline {

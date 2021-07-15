@@ -419,7 +419,9 @@ void TCIngressDeparserForTrafficManagerPSA::emitPreDeparser(CodeBuilder *builder
     builder->blockStart();
     builder->emitIndent();
     builder->appendFormat("do_packet_clones(%s, &clone_session_tbl, %s.clone_session_id,"
-                          " CLONE_I2E, 1);", program->model.CPacketName.str(), this->istd->name.name);
+                          " CLONE_I2E, 1);",
+                          program->model.CPacketName.str(),
+                          this->istd->name.name);
     builder->newline();
     builder->blockEnd(true);
 }
@@ -474,7 +476,9 @@ void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->emitIndent();
     // perform early multicast detection; if multicast is invoked, a packet will be
     // passed up anyway, so we can do deparsing entirely in TC
-    builder->appendFormat("if (%s.clone || %s.multicast_group != 0) ", istd->name.name, istd->name.name);
+    builder->appendFormat("if (%s.clone || %s.multicast_group != 0) ",
+                          istd->name.name,
+                          istd->name.name);
     builder->blockStart();
     builder->emitIndent();
     builder->appendLine("struct xdp2tc_metadata xdp2tc_md = {};");
@@ -487,6 +491,17 @@ void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("xdp2tc_md.packetOffsetInBits = %s", this->program->offsetVar);
     builder->endOfStatement(true);
+
+    builder->emitIndent();
+    builder->append("    void *data = (void *)(long)skb->data;\n"
+                    "    void *data_end = (void *)(long)skb->data_end;\n"
+                    "    struct ethhdr *eth = data;\n"
+                    "    if ((void *)((struct ethhdr *) eth + 1) > data_end) {\n"
+                    "        return XDP_ABORTED;\n"
+                    "    }\n"
+                    "    xdp2tc_md.pkt_ether_type = eth->h_proto;\n"
+                    "    eth->h_proto = bpf_htons(0x0800);\n");
+
     builder->emitIndent();
     builder->target->emitTableUpdate(builder, "xdp2tc_shared_map",
                                      this->program->zeroKey.c_str(), "xdp2tc_md");

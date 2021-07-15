@@ -44,8 +44,8 @@ class PSAArch {
     // If the XDP mode is used, we need to have TC Egress pipeline to handle cloned packets.
     EBPFPipeline*          tcEgressForXDP;
 
-    PSAArch(const EbpfOptions &options, std::vector<EBPFType*> ebpfTypes, XDPHelpProgram* xdp, EBPFPipeline* tcIngress,
-            EBPFPipeline* tcEgress) :
+    PSAArch(const EbpfOptions &options, std::vector<EBPFType*> ebpfTypes,
+            XDPHelpProgram* xdp, EBPFPipeline* tcIngress, EBPFPipeline* tcEgress) :
             options(options),
             ebpfTypes(ebpfTypes), xdp(xdp), tcIngress(tcIngress),
             tcEgress(tcEgress) { }

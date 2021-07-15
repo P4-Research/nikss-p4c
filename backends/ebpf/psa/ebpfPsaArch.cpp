@@ -414,7 +414,8 @@ void PSAArch::emitInstances2XDP(CodeBuilder *builder) const {
     xdpEgress->control->emitTableInstances(builder);
     xdpEgress->deparser->emitDigestInstances(builder);
 
-    tcEgressForXDP->control->tables.insert(xdpEgress->control->tables.begin(), xdpEgress->control->tables.end());
+    tcEgressForXDP->control->tables.insert(xdpEgress->control->tables.begin(),
+                                           xdpEgress->control->tables.end());
 
     builder->target->emitTableDecl(builder, "xdp2tc_shared_map", TablePerCPUArray,
                                    "u32", "struct xdp2tc_metadata", 1);
