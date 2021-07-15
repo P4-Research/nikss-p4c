@@ -104,6 +104,11 @@ void EBPFTablePSA::initDirectMeters() {
         auto decl = program->refMap->getDeclaration(pe->path, true);
         auto di = decl->to<IR::Declaration_Instance>();
         CHECK_NULL(di);
+        if (isLPMTable() || isTernaryTable()) {
+            ::error(ErrorType::ERR_UNSUPPORTED,
+                    "DirectMeter in LPM or ternary table is not supported: %1%", di);
+            return;
+        }
         auto met = new EBPFMeterPSA(program, EBPFObject::externalName(di), di, codeGen);
         this->meters.emplace_back(std::make_pair(pe->path->name.name, met));
     };

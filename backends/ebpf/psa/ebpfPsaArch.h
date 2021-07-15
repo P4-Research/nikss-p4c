@@ -19,8 +19,8 @@ enum pipeline_type {
 
 class PSAArch {
  private:
-    static EBPFMeterPSA *findMeter(EBPFPipeline *pipeline);
-    EBPFMeterPSA *findAnyMeter(bool atTc, bool atXdp) const;
+    static EBPFMeterPSA *getMeter(EBPFPipeline *pipeline);
+    EBPFMeterPSA *getAnyMeter(bool atTc, bool atXdp) const;
 
 
  public:

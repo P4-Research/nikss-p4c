@@ -38,7 +38,7 @@ void PSAArch::emitTypes(CodeBuilder *builder) const {
         type->emit(builder);
     }
 
-    EBPFMeterPSA *meter = findAnyMeter(true, true);
+    EBPFMeterPSA *meter = getAnyMeter(true, true);
     if (meter != nullptr) {
         meter->emitValueStruct(builder);
     }
@@ -219,7 +219,7 @@ void PSAArch::emitHelperFunctions2TC(CodeBuilder *builder) const {
     builder->appendLine(pktClonesFunc);
     builder->newline();
 
-    if (auto meter = findAnyMeter(true, false)) {
+    if (auto meter = getAnyMeter(true, false)) {
         cstring meterExecuteFunc = meter->meterExecuteFunc(tcIngress->options.emitTraceMessages);
         builder->appendLine(meterExecuteFunc);
         builder->newline();
@@ -317,7 +317,7 @@ void PSAArch::emitInitializer2TC(CodeBuilder *builder) const {
 void PSAArch::emitHelperFunctions2XDP(CodeBuilder *builder) const {
     EBPFHashAlgorithmTypeFactoryPSA::instance()->emitGlobals(builder);
 
-    if (auto meter = findAnyMeter(false, true)) {
+    if (auto meter = getAnyMeter(false, true)) {
         cstring meterExecuteFunc = meter->meterExecuteFunc(
                 xdpIngress->options.emitTraceMessages);
         builder->appendLine(meterExecuteFunc);
@@ -424,7 +424,7 @@ void PSAArch::emitDummy2XDP(CodeBuilder *builder) const {
     builder->blockEnd(true);  // end of function
 }
 
-EBPFMeterPSA *PSAArch::findMeter(EBPFPipeline *pipeline) {
+EBPFMeterPSA *PSAArch::getMeter(EBPFPipeline *pipeline) {
     if (pipeline == nullptr) {
         return nullptr;
     }
@@ -434,29 +434,28 @@ EBPFMeterPSA *PSAArch::findMeter(EBPFPipeline *pipeline) {
     auto directMeter = std::find_if(pipeline->control->tables.begin(),
                                     pipeline->control->tables.end(),
                                     [](std::pair<const cstring, EBPFTable*> elem) {
-                                        return !dynamic_cast<EBPFTablePSA *>(elem.second)->
-                                        meters.empty();
+                                        return !elem.second->to<EBPFTablePSA>()->meters.empty();
                                     });
     if (directMeter != pipeline->control->tables.end()) {
-        return dynamic_cast<EBPFTablePSA *>(directMeter->second)->meters.front().second;
+        return directMeter->second->to<EBPFTablePSA>()->meters.front().second;
     }
     return nullptr;
 }
 
-EBPFMeterPSA *PSAArch::findAnyMeter(bool atTc, bool atXdp) const {
+EBPFMeterPSA *PSAArch::getAnyMeter(bool atTc, bool atXdp) const {
     EBPFMeterPSA *meter;
     if (atTc) {
-        meter = findMeter(tcIngress);
+        meter = getMeter(tcIngress);
         if (meter == nullptr) {
-            meter = findMeter(tcEgress);
+            meter = getMeter(tcEgress);
         }
     }
     if (atXdp) {
         if (meter == nullptr) {
-            meter = findMeter(xdpEgress);
+            meter = getMeter(xdpEgress);
         }
         if (meter == nullptr) {
-            meter = findMeter(xdpIngress);
+            meter = getMeter(xdpIngress);
         }
     }
     return meter;

@@ -344,3 +344,7 @@ In psabpf library there will be a method that will translate bytes (packets) rat
 For now, we suggest take 1 byte (or packet) per period and based on that calculate proper pir/cir period that will match a desire speed.
 
 RFC 2698 explicitly says that buckets are initially full so values pbs_left and cbs_left must have buckets size.
+
+If meter is not initialized it returns GREEN colour by default (see PSA spec).
+For Indirect Meter no table entry means uninitialized meter. 
+For DirectMeter a user has to zero pir_period field.
