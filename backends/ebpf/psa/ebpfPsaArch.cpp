@@ -67,7 +67,7 @@ void PSAArch::emit2TC(CodeBuilder *builder) const {
     /*
      * 3. Macro definitions (it's called "preamble")
      */
-    emitPreamble2TC(builder);
+    emitPreamble(builder);
 
     /*
      * 4. Headers, structs, types, PSA-specific data types.
@@ -268,7 +268,7 @@ void PSAArch::emitXDP2TCInternalStructures(CodeBuilder *pBuilder) const {
     pBuilder->newline();
 }
 
-void PSAArch::emitPreamble2TC(CodeBuilder *builder) const {
+void PSAArch::emitPreamble(CodeBuilder *builder) const {
     emitCommonPreamble(builder);
     builder->newline();
 
@@ -346,7 +346,7 @@ void PSAArch::emit2XDP(CodeBuilder *builder) const {
     builder->target->emitIncludes(builder);
     emitPSAIncludes(builder);
 
-    emitPreamble2TC(builder);
+    emitPreamble(builder);
 
     emitInternalStructures(builder);
     emitTypes(builder);
@@ -368,12 +368,6 @@ void PSAArch::emit2XDP(CodeBuilder *builder) const {
     tcEgressForXDP->emit(builder);
 
     builder->appendLine("char _license[] SEC(\"license\") = \"GPL\";");
-}
-
-void PSAArch::emitPreamble2XDP(CodeBuilder *builder) const {
-    emitCommonPreamble(builder);
-
-    builder->newline();
 }
 
 void PSAArch::emitInstances2XDP(CodeBuilder *builder) const {

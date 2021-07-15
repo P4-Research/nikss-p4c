@@ -62,15 +62,14 @@ class PSAArch {
     void emitInternalStructures(CodeBuilder* pBuilder) const;
     void emitHelperFunctions(CodeBuilder *builder) const;
     void emitCloneSessionMulticastTables(CodeBuilder *builder) const;
+    void emitPreamble(CodeBuilder* builder) const;
 
     void emit2TC(CodeBuilder* builder) const;  // emits C file for eBPF program - at TC layer
-    void emitPreamble2TC(CodeBuilder* builder) const;
 
     void emitInstances2TC(CodeBuilder *builder) const;
     void emitInitializer2TC(CodeBuilder *p_builder) const;
 
     void emit2XDP(CodeBuilder* builder) const;
-    void emitPreamble2XDP(CodeBuilder* builder) const;
     void emitInstances2XDP(CodeBuilder *builder) const;
     void emitHelperFunctions2XDP(CodeBuilder *builder) const;
     void emitInitializer2XDP(CodeBuilder *p_builder) const;
