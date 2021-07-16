@@ -219,7 +219,7 @@ void PSAArch::emitHelperFunctions2TC(CodeBuilder *builder) const {
     builder->appendLine(pktClonesFunc);
     builder->newline();
 
-    if (auto meter = getAnyMeter(true, false)) {
+    if (auto meter = getAnyMeter()) {
         cstring meterExecuteFunc = meter->meterExecuteFunc(tcIngress->options.emitTraceMessages);
         builder->appendLine(meterExecuteFunc);
         builder->newline();
@@ -317,7 +317,7 @@ void PSAArch::emitInitializer2TC(CodeBuilder *builder) const {
 void PSAArch::emitHelperFunctions2XDP(CodeBuilder *builder) const {
     EBPFHashAlgorithmTypeFactoryPSA::instance()->emitGlobals(builder);
 
-    if (auto meter = getAnyMeter(false, true)) {
+    if (auto meter = getAnyMeter()) {
         cstring meterExecuteFunc = meter->meterExecuteFunc(
                 xdpIngress->options.emitTraceMessages);
         builder->appendLine(meterExecuteFunc);
