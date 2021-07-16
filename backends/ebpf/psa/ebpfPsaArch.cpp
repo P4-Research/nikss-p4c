@@ -38,7 +38,7 @@ void PSAArch::emitTypes(CodeBuilder *builder) const {
         type->emit(builder);
     }
 
-    EBPFMeterPSA *meter = getAnyMeter(true, true);
+    EBPFMeterPSA *meter = getAnyMeter();
     if (meter != nullptr) {
         meter->emitValueStruct(builder);
     }
@@ -442,20 +442,13 @@ EBPFMeterPSA *PSAArch::getMeter(EBPFPipeline *pipeline) {
     return nullptr;
 }
 
-EBPFMeterPSA *PSAArch::getAnyMeter(bool atTc, bool atXdp) const {
+EBPFMeterPSA *PSAArch::getAnyMeter() const {
     EBPFMeterPSA *meter;
-    if (atTc) {
-        meter = getMeter(tcIngress);
-        if (meter == nullptr) {
-            meter = getMeter(tcEgress);
-        }
-    }
-    if (atXdp) {
-        if (meter == nullptr) {
-            meter = getMeter(xdpEgress);
-        }
-        if (meter == nullptr) {
-            meter = getMeter(xdpIngress);
+    std::array<EBPFPipeline*, 4> pipelines = {tcIngress, tcEgress, xdpEgress, xdpIngress};
+    for (auto pipeline : pipelines) {
+        meter = getMeter(pipeline);
+        if (meter != nullptr) {
+            return meter;
         }
     }
     return meter;
