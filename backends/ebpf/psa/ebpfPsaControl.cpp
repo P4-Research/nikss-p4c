@@ -38,7 +38,9 @@ bool ControlBodyTranslatorPSA::preorder(const IR::AssignmentStatement* a) {
                 auto reg = control->to<EBPFControlPSA>()->getRegister(name);
                 reg->emitRegisterRead(builder, ext, this, a->left);
                 return false;
-            } else if (ext->originalExternType->name.name == "Meter") {
+            } else if (ext->originalExternType->name.name == "Meter" ||
+                       ext->originalExternType->name.name == "DirectMeter") {
+                // Only for trace message
                 cstring name = EBPFObject::externalName(ext->object);
                 auto msgStr = Util::printf_format("Executing meter: %s", name);
                 builder->target->emitTraceMessage(builder, msgStr.c_str());
@@ -134,7 +136,7 @@ void EBPFControlPSA::emitTableTypes(CodeBuilder *builder) {
     for (auto it : meters)
         it.second->emitKeyType(builder);
 
-    //  Value type for meters is the same
+    //  Value type for any indirect meter is the same
     if (!meters.empty()) {
         meters.begin()->second->emitValueType(builder);
     }

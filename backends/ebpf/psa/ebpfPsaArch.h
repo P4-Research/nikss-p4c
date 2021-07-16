@@ -18,6 +18,11 @@ enum pipeline_type {
 };
 
 class PSAArch {
+ private:
+    static EBPFMeterPSA *getMeter(EBPFPipeline *pipeline);
+    EBPFMeterPSA *getAnyMeter() const;
+
+
  public:
     static const unsigned MaxClones = 64;
     static const unsigned MaxCloneSessions = 1024;

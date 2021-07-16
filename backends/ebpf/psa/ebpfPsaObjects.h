@@ -8,8 +8,17 @@
 namespace EBPF {
 
 class EBPFTableImplementationPSA;
+class EBPFMeterPSA;
 
 class EBPFTablePSA : public EBPFTable {
+ private:
+    void emitTableDecl(CodeBuilder *builder,
+                       cstring tblName,
+                       TableKind kind,
+                       cstring keyTypeName,
+                       cstring valueTypeName,
+                       size_t size) const;
+
  protected:
     ActionTranslationVisitor*
         createActionTranslationVisitor(cstring valueName,
@@ -55,7 +64,7 @@ class EBPFTablePSA : public EBPFTable {
     cstring name;
     size_t size;
     std::vector<std::pair<cstring, EBPFCounterPSA *>> counters;
-    std::vector<cstring> meters;  // TODO: implement, now needed for ActionProfile
+    std::vector<std::pair<cstring, EBPFMeterPSA *>> meters;
 
     std::vector<EBPFTableImplementationPSA *> implementations;
 
@@ -64,6 +73,7 @@ class EBPFTablePSA : public EBPFTable {
     EBPFTablePSA(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name);
 
     void emitInstance(CodeBuilder* builder) override;
+    void emitValueType(CodeBuilder* builder) override;
     void emitValueActionIDNames(CodeBuilder* builder) override;
     void emitValueStructStructure(CodeBuilder* builder) override;
     void emitAction(CodeBuilder* builder, cstring valueName, cstring actionRunVariable) override;
@@ -79,6 +89,16 @@ class EBPFTablePSA : public EBPFTable {
                 return name == elem.first;
             });
         if (result != counters.end())
+            return result->second;
+        return nullptr;
+    }
+
+    EBPFMeterPSA* getMeter(cstring name) const {
+        auto result = std::find_if(meters.begin(), meters.end(),
+            [name](std::pair<cstring, EBPFMeterPSA *> elem)->bool {
+               return name == elem.first;
+            });
+        if (result != meters.end())
             return result->second;
         return nullptr;
     }

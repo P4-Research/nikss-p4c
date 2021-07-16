@@ -7,6 +7,8 @@ PORT2 = 2
 ALL_PORTS = [PORT0, PORT1, PORT2]
 
 meter_value_mask = 0xff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00
+two_meters_value_mask = 0xff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_00
+
 
 class MeterPSATest(P4EbpfTest):
     """
@@ -22,17 +24,17 @@ class MeterPSATest(P4EbpfTest):
         # period 1M ns -> 0F 42 40 -> 250 B per period -> FA
         self.update_map(name="ingress_meter1", key="hex 00",
                         value="hex "
-                              "40 42 0F 00 00 00 00 00 " # pir_period
-                              "FA 00 00 00 00 00 00 00 " # pir_unit_per_period
-                              "40 42 0F 00 00 00 00 00 " # cir_period
-                              "FA 00 00 00 00 00 00 00 " # cir_unit_per_period
-                              "C4 09 00 00 00 00 00 00 " # pbs
-                              "C4 09 00 00 00 00 00 00 " # cbs
-                              "C4 09 00 00 00 00 00 00 " # pbs_left
-                              "C4 09 00 00 00 00 00 00 " # cbs_left
-                              "00 00 00 00 00 00 00 00 " # time_p
-                              "00 00 00 00 00 00 00 00 " # time_c
-                              "00 00 00 00 00 00 00 00") # Spin lock
+                              "40 42 0F 00 00 00 00 00 "  # pir_period
+                              "FA 00 00 00 00 00 00 00 "  # pir_unit_per_period
+                              "40 42 0F 00 00 00 00 00 "  # cir_period
+                              "FA 00 00 00 00 00 00 00 "  # cir_unit_per_period
+                              "C4 09 00 00 00 00 00 00 "  # pbs
+                              "C4 09 00 00 00 00 00 00 "  # cbs
+                              "C4 09 00 00 00 00 00 00 "  # pbs_left
+                              "C4 09 00 00 00 00 00 00 "  # cbs_left
+                              "00 00 00 00 00 00 00 00 "  # time_p
+                              "00 00 00 00 00 00 00 00 "  # time_c
+                              "00 00 00 00 00 00 00 00")  # Spin lock
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)
         # Expecting pbs_left, cbs_left 2500 B - 100 B = 2400 B -> 09 60
@@ -44,8 +46,8 @@ class MeterPSATest(P4EbpfTest):
                                              "FA 00 00 00 00 00 00 00 "
                                              "C4 09 00 00 00 00 00 00 "
                                              "C4 09 00 00 00 00 00 00 "
-                                             "60 09 00 00 00 00 00 00 " # pbs_left
-                                             "60 09 00 00 00 00 00 00 " # cbs_left
+                                             "60 09 00 00 00 00 00 00 "  # pbs_left
+                                             "60 09 00 00 00 00 00 00 "  # cbs_left
                                              "00 00 00 00 00 00 00 00 "
                                              "00 00 00 00 00 00 00 00 "
                                              "00 00 00 00 00 00 00 00",
@@ -71,17 +73,17 @@ class MeterActionPSATest(P4EbpfTest):
         # period 1ms -> 1250 B per period, 1ms -> 1e6 ns -> 0F 42 40, 1250 -> 04 E2
         self.update_map(name="ingress_meter1", key="hex 00",
                         value="hex "
-                              "40 42 0F 00 00 00 00 00 " # pir_period
-                              "E2 04 00 00 00 00 00 00 " # pir_unit_per_period
-                              "40 42 0F 00 00 00 00 00 " # cir_period
-                              "E2 04 00 00 00 00 00 00 " # cir_unit_per_period
-                              "6A 18 00 00 00 00 00 00 " # pbs
-                              "6A 18 00 00 00 00 00 00 " # cbs
-                              "6A 18 00 00 00 00 00 00 " # pbs_left
-                              "6A 18 00 00 00 00 00 00 " # cbs_left
-                              "00 00 00 00 00 00 00 00 " # time_p
-                              "00 00 00 00 00 00 00 00 " # time_c
-                              "00 00 00 00 00 00 00 00") # Spin lock
+                              "40 42 0F 00 00 00 00 00 "  # pir_period
+                              "E2 04 00 00 00 00 00 00 "  # pir_unit_per_period
+                              "40 42 0F 00 00 00 00 00 "  # cir_period
+                              "E2 04 00 00 00 00 00 00 "  # cir_unit_per_period
+                              "6A 18 00 00 00 00 00 00 "  # pbs
+                              "6A 18 00 00 00 00 00 00 "  # cbs
+                              "6A 18 00 00 00 00 00 00 "  # pbs_left
+                              "6A 18 00 00 00 00 00 00 "  # cbs_left
+                              "00 00 00 00 00 00 00 00 "  # time_p
+                              "00 00 00 00 00 00 00 00 "  # time_c
+                              "00 00 00 00 00 00 00 00")  # Spin lock
         self.update_map(name="ingress_tbl_fwd", key="hex 04 00 00 00", value="hex 01 00 00 00 05 00 00 00")
 
         testutils.send_packet(self, PORT0, pkt)
@@ -95,8 +97,8 @@ class MeterActionPSATest(P4EbpfTest):
                                              "E2 04 00 00 00 00 00 00 "
                                              "6A 18 00 00 00 00 00 00 "
                                              "6A 18 00 00 00 00 00 00 "
-                                             "06 18 00 00 00 00 00 00 " # pbs_left
-                                             "06 18 00 00 00 00 00 00 " # cbs_left
+                                             "06 18 00 00 00 00 00 00 "  # pbs_left
+                                             "06 18 00 00 00 00 00 00 "  # cbs_left
                                              "00 00 00 00 00 00 00 00 "
                                              "00 00 00 00 00 00 00 00 "
                                              "00 00 00 00 00 00 00 00",
@@ -142,8 +144,8 @@ class MeterPacketsPSATest(P4EbpfTest):
                                              "01 00 00 00 00 00 00 00 "
                                              "0A 00 00 00 00 00 00 00 "
                                              "0A 00 00 00 00 00 00 00 "
-                                             "09 00 00 00 00 00 00 00 " # pbs_left
-                                             "09 00 00 00 00 00 00 00 " # cbs_left
+                                             "09 00 00 00 00 00 00 00 "  # pbs_left
+                                             "09 00 00 00 00 00 00 00 "  # cbs_left
                                              "00 00 00 00 00 00 00 00 "
                                              "00 00 00 00 00 00 00 00 "
                                              "00 00 00 00 00 00 00 00",
@@ -152,3 +154,274 @@ class MeterPacketsPSATest(P4EbpfTest):
     def tearDown(self):
         self.remove_maps(["ingress_meter1"])
         super(MeterPacketsPSATest, self).tearDown()
+
+
+class DirectMeterPSATest(P4EbpfTest):
+    """
+    Test Direct Meter. Type BYTES.
+    Send 100 B packet and verify if there is 100 tokens less left.
+    """
+
+    p4_file_path = "samples/p4testdata/meters-direct.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+
+        # cir, pir -> 10 Mb/s, cbs, pbs -> bs (10 ms) -> 6250 B -> 18 6A
+        # period 1ms -> 1250 B per period, 1ms -> 1e6 ns -> 0F 42 40, 1250 -> 04 E2
+        self.update_map(name="ingress_tbl_fwd", key="hex 04 00 00 00",
+                        value="hex "
+                              "01 00 00 00 05 00 00 00 "  # action id | egress port
+                              "40 42 0F 00 00 00 00 00 "  # pir_period
+                              "E2 04 00 00 00 00 00 00 "  # pir_unit_per_period
+                              "40 42 0F 00 00 00 00 00 "  # cir_period
+                              "E2 04 00 00 00 00 00 00 "  # cir_unit_per_period
+                              "6A 18 00 00 00 00 00 00 "  # pbs
+                              "6A 18 00 00 00 00 00 00 "  # cbs
+                              "6A 18 00 00 00 00 00 00 "  # pbs_left
+                              "6A 18 00 00 00 00 00 00 "  # cbs_left
+                              "00 00 00 00 00 00 00 00 "  # time_p
+                              "00 00 00 00 00 00 00 00 "  # time_c
+                              "00 00 00 00 00 00 00 00")  # Spin lock
+
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
+        # Expecting pbs_left, cbs_left 6250 B - 100 B = 6150 B -> 18 06
+        self.verify_map_entry(name="ingress_tbl_fwd", key="hex 04 00 00 00",
+                              expected_value="hex "
+                                             "01 00 00 00 05 00 00 00 "
+                                             "40 42 0F 00 00 00 00 00 "
+                                             "E2 04 00 00 00 00 00 00 "
+                                             "40 42 0F 00 00 00 00 00 "
+                                             "E2 04 00 00 00 00 00 00 "
+                                             "6A 18 00 00 00 00 00 00 "
+                                             "6A 18 00 00 00 00 00 00 "
+                                             "06 18 00 00 00 00 00 00 "  # pbs_left
+                                             "06 18 00 00 00 00 00 00 "  # cbs_left
+                                             "00 00 00 00 00 00 00 00 "
+                                             "00 00 00 00 00 00 00 00 "
+                                             "00 00 00 00 00 00 00 00",
+                              mask=meter_value_mask)
+
+    def tearDown(self):
+        self.remove_maps(["ingress_tbl_fwd"])
+        super(DirectMeterPSATest, self).tearDown()
+
+
+class DirectAndIndirectMeterPSATest(P4EbpfTest):
+    """
+    Test Direct Meter and Indirect Meter together. Type BYTES.
+    Send 100 B packet and verify if there is 100 tokens less left.
+    """
+
+    p4_file_path = "samples/p4testdata/meters-direct-and-indirect.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+
+        # cir, pir -> 10 Mb/s, cbs, pbs -> bs (10 ms) -> 6250 B -> 18 6A
+        # period 1ms -> 1250 B per period, 1ms -> 1e6 ns -> 0F 42 40, 1250 -> 04 E2
+        self.update_map(name="ingress_tbl_fwd", key="hex 04 00 00 00",
+                        value="hex "
+                              "01 00 00 00 05 00 00 00 "  # action id | egress port
+                              "40 42 0F 00 00 00 00 00 "  # pir_period
+                              "E2 04 00 00 00 00 00 00 "  # pir_unit_per_period
+                              "40 42 0F 00 00 00 00 00 "  # cir_period
+                              "E2 04 00 00 00 00 00 00 "  # cir_unit_per_period
+                              "6A 18 00 00 00 00 00 00 "  # pbs
+                              "6A 18 00 00 00 00 00 00 "  # cbs
+                              "6A 18 00 00 00 00 00 00 "  # pbs_left
+                              "6A 18 00 00 00 00 00 00 "  # cbs_left
+                              "00 00 00 00 00 00 00 00 "  # time_p
+                              "00 00 00 00 00 00 00 00 "  # time_c
+                              "00 00 00 00 00 00 00 00")  # Spin lock
+
+        # cir, pir -> 10 Mb/s, cbs, pbs -> bs (10 ms) -> 6250 B -> 18 6A
+        # period 1ms -> 1250 B per period, 1ms -> 1e6 ns -> 0F 42 40, 1250 -> 04 E2
+        self.update_map(name="ingress_indirect_meter", key="hex 00",
+                        value="hex "
+                              "40 42 0F 00 00 00 00 00 "  # pir_period
+                              "E2 04 00 00 00 00 00 00 "  # pir_unit_per_period
+                              "40 42 0F 00 00 00 00 00 "  # cir_period
+                              "E2 04 00 00 00 00 00 00 "  # cir_unit_per_period
+                              "6A 18 00 00 00 00 00 00 "  # pbs
+                              "6A 18 00 00 00 00 00 00 "  # cbs
+                              "6A 18 00 00 00 00 00 00 "  # pbs_left
+                              "6A 18 00 00 00 00 00 00 "  # cbs_left
+                              "00 00 00 00 00 00 00 00 "  # time_p
+                              "00 00 00 00 00 00 00 00 "  # time_c
+                              "00 00 00 00 00 00 00 00")  # Spin lock
+
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
+        # Expecting pbs_left, cbs_left 6250 B - 100 B = 6150 B -> 18 06
+        self.verify_map_entry(name="ingress_tbl_fwd", key="hex 04 00 00 00",
+                              expected_value="hex "
+                                             "01 00 00 00 05 00 00 00 "
+                                             "40 42 0F 00 00 00 00 00 "
+                                             "E2 04 00 00 00 00 00 00 "
+                                             "40 42 0F 00 00 00 00 00 "
+                                             "E2 04 00 00 00 00 00 00 "
+                                             "6A 18 00 00 00 00 00 00 "
+                                             "6A 18 00 00 00 00 00 00 "
+                                             "06 18 00 00 00 00 00 00 "  # pbs_left
+                                             "06 18 00 00 00 00 00 00 "  # cbs_left
+                                             "00 00 00 00 00 00 00 00 "
+                                             "00 00 00 00 00 00 00 00 "
+                                             "00 00 00 00 00 00 00 00",
+                              mask=meter_value_mask)
+
+        # Expecting pbs_left, cbs_left 6250 B - 100 B = 6150 B -> 18 06
+        self.verify_map_entry(name="ingress_indirect_meter", key="hex 00",
+                              expected_value="hex "
+                                             "40 42 0F 00 00 00 00 00 "
+                                             "E2 04 00 00 00 00 00 00 "
+                                             "40 42 0F 00 00 00 00 00 "
+                                             "E2 04 00 00 00 00 00 00 "
+                                             "6A 18 00 00 00 00 00 00 "
+                                             "6A 18 00 00 00 00 00 00 "
+                                             "06 18 00 00 00 00 00 00 "  # pbs_left
+                                             "06 18 00 00 00 00 00 00 "  # cbs_left
+                                             "00 00 00 00 00 00 00 00 "
+                                             "00 00 00 00 00 00 00 00 "
+                                             "00 00 00 00 00 00 00 00",
+                              mask=meter_value_mask)
+
+    def tearDown(self):
+        self.remove_maps(["ingress_tbl_fwd", "ingress_indirect_meter"])
+        super(DirectAndIndirectMeterPSATest, self).tearDown()
+
+
+class DirectAndIndirectActionMeterPSATest(DirectAndIndirectMeterPSATest):
+    """
+    Test Direct Meter and Indirect Meter together
+    and execute Indirect Meter in single action.
+    """
+
+    p4_file_path = "samples/p4testdata/meters-direct-and-indirect-single-action.p4"
+
+
+class DirectTwoMetersPSATest(P4EbpfTest):
+    """
+    Test two Direct Meters in one table. Type BYTES.
+    Send 100 B packet and verify if there is 100 tokens less left.
+    """
+
+    p4_file_path = "samples/p4testdata/meters-two-direct.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+
+        # cir, pir -> 10 Mb/s, cbs, pbs -> bs (10 ms) -> 6250 B -> 18 6A
+        # period 1ms -> 1250 B per period, 1ms -> 1e6 ns -> 0F 42 40, 1250 -> 04 E2
+        self.update_map(name="ingress_tbl_fwd", key="hex 04 00 00 00",
+                        value="hex "
+                              "01 00 00 00 05 00 00 00 "  # action id | egress port
+                              "40 42 0F 00 00 00 00 00 "  # pir_period
+                              "E2 04 00 00 00 00 00 00 "  # pir_unit_per_period
+                              "40 42 0F 00 00 00 00 00 "  # cir_period
+                              "E2 04 00 00 00 00 00 00 "  # cir_unit_per_period
+                              "6A 18 00 00 00 00 00 00 "  # pbs
+                              "6A 18 00 00 00 00 00 00 "  # cbs
+                              "6A 18 00 00 00 00 00 00 "  # pbs_left
+                              "6A 18 00 00 00 00 00 00 "  # cbs_left
+                              "00 00 00 00 00 00 00 00 "  # time_p
+                              "00 00 00 00 00 00 00 00 "  # time_c
+                              "40 42 0F 00 00 00 00 00 "  # pir_period -- second meter
+                              "E2 04 00 00 00 00 00 00 "  # pir_unit_per_period
+                              "40 42 0F 00 00 00 00 00 "  # cir_period
+                              "E2 04 00 00 00 00 00 00 "  # cir_unit_per_period
+                              "6A 18 00 00 00 00 00 00 "  # pbs
+                              "6A 18 00 00 00 00 00 00 "  # cbs
+                              "6A 18 00 00 00 00 00 00 "  # pbs_left
+                              "6A 18 00 00 00 00 00 00 "  # cbs_left
+                              "00 00 00 00 00 00 00 00 "  # time_p
+                              "00 00 00 00 00 00 00 00 "  # time_c
+                              "00 00 00 00 00 00 00 00")  # Spin lock
+
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
+        # Expecting pbs_left, cbs_left 6250 B - 100 B = 6150 B -> 18 06
+        self.verify_map_entry(name="ingress_tbl_fwd", key="hex 04 00 00 00",
+                              expected_value="hex "
+                                             "01 00 00 00 05 00 00 00 "
+                                             "40 42 0F 00 00 00 00 00 "
+                                             "E2 04 00 00 00 00 00 00 "
+                                             "40 42 0F 00 00 00 00 00 "
+                                             "E2 04 00 00 00 00 00 00 "
+                                             "6A 18 00 00 00 00 00 00 "
+                                             "6A 18 00 00 00 00 00 00 "
+                                             "06 18 00 00 00 00 00 00 "  # pbs_left
+                                             "06 18 00 00 00 00 00 00 "  # cbs_left
+                                             "00 00 00 00 00 00 00 00 "
+                                             "00 00 00 00 00 00 00 00 "
+                                             "40 42 0F 00 00 00 00 00 "  # second meter
+                                             "E2 04 00 00 00 00 00 00 "
+                                             "40 42 0F 00 00 00 00 00 "
+                                             "E2 04 00 00 00 00 00 00 "
+                                             "6A 18 00 00 00 00 00 00 "
+                                             "6A 18 00 00 00 00 00 00 "
+                                             "06 18 00 00 00 00 00 00 "  # pbs_left
+                                             "06 18 00 00 00 00 00 00 "  # cbs_left
+                                             "00 00 00 00 00 00 00 00 "
+                                             "00 00 00 00 00 00 00 00 "
+                                             "00 00 00 00 00 00 00 00",
+                              mask=two_meters_value_mask)
+
+    def tearDown(self):
+        self.remove_maps(["ingress_tbl_fwd"])
+        super(DirectTwoMetersPSATest, self).tearDown()
+
+
+class DirectAndCounterMeterPSATest(P4EbpfTest):
+    """
+    Test Direct Meter with Direct Counter.
+    Send 100 B packet and verify if there is 100 tokens less left.
+    """
+
+    p4_file_path = "samples/p4testdata/meters-direct-and-counter.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+
+        # cir, pir -> 10 Mb/s, cbs, pbs -> bs (10 ms) -> 6250 B -> 18 6A
+        # period 1ms -> 1250 B per period, 1ms -> 1e6 ns -> 0F 42 40, 1250 -> 04 E2
+        self.update_map(name="ingress_tbl_fwd", key="hex 04 00 00 00",
+                        value="hex "
+                              "01 00 00 00 05 00 00 00 "  # action id | egress port
+                              "00 00 00 00 00 00 00 00 "  # counter packets and padding
+                              "40 42 0F 00 00 00 00 00 "  # pir_period
+                              "E2 04 00 00 00 00 00 00 "  # pir_unit_per_period
+                              "40 42 0F 00 00 00 00 00 "  # cir_period
+                              "E2 04 00 00 00 00 00 00 "  # cir_unit_per_period
+                              "6A 18 00 00 00 00 00 00 "  # pbs
+                              "6A 18 00 00 00 00 00 00 "  # cbs
+                              "6A 18 00 00 00 00 00 00 "  # pbs_left
+                              "6A 18 00 00 00 00 00 00 "  # cbs_left
+                              "00 00 00 00 00 00 00 00 "  # time_p
+                              "00 00 00 00 00 00 00 00 "  # time_c
+                              "00 00 00 00 00 00 00 00")  # Spin lock
+
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
+        # Expecting pbs_left, cbs_left 6250 B - 100 B = 6150 B -> 18 06
+        self.verify_map_entry(name="ingress_tbl_fwd", key="hex 04 00 00 00",
+                              expected_value="hex "
+                                             "01 00 00 00 05 00 00 00 "
+                                             "01 00 00 00 00 00 00 00 "  # counter packets and padding
+                                             "40 42 0F 00 00 00 00 00 "
+                                             "E2 04 00 00 00 00 00 00 "
+                                             "40 42 0F 00 00 00 00 00 "
+                                             "E2 04 00 00 00 00 00 00 "
+                                             "6A 18 00 00 00 00 00 00 "
+                                             "6A 18 00 00 00 00 00 00 "
+                                             "06 18 00 00 00 00 00 00 "  # pbs_left
+                                             "06 18 00 00 00 00 00 00 "  # cbs_left
+                                             "00 00 00 00 00 00 00 00 "
+                                             "00 00 00 00 00 00 00 00 "
+                                             "00 00 00 00 00 00 00 00",
+                              mask=meter_value_mask)
+
+    def tearDown(self):
+        self.remove_maps(["ingress_tbl_fwd"])
+        super(DirectAndCounterMeterPSATest, self).tearDown()
