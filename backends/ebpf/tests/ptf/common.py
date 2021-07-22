@@ -105,7 +105,7 @@ class EbpfTest(BaseTest):
 
         if expected_value != value:
             self.fail("Map {} key {} does not have correct value. Expected {}; got {}"
-                      .format(name, key, expected_value, value))
+                      .format(name, key, hex(expected_value), hex(value)))
 
     def xdp2tc_mode(self):
         return testutils.test_param_get("xdp2tc")
