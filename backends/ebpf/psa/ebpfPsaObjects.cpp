@@ -422,6 +422,9 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
     unsigned int structAlignment = 4;  // 4 by default
     if (keyGenerator != nullptr) {
         for (auto c : keyGenerator->keyElements) {
+            if (c->matchType->path->name.name == "selector")
+                continue;  // this match type is intended for ActionSelector, not table itself
+
             auto ebpfType = ::get(keyTypes, c);
             cstring fieldName = ::get(keyFieldNames, c);
 

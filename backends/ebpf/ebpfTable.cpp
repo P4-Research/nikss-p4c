@@ -69,29 +69,35 @@ EBPFTable::EBPFTable(const EBPFProgram* program, const IR::TableBlock* table,
     keyGenerator = table->container->getKey();
     actionList = table->container->getActionList();
 
-    unsigned fieldNumber = 0;
-    for (auto c : keyGenerator->keyElements) {
-        if (c->matchType->path->name.name == "selector")
-            continue;  // this match type is intended for ActionSelector, not table itself
-
-        auto type = program->typeMap->getType(c->expression);
-        auto ebpfType = EBPFTypeFactory::instance->create(type);
-        if (!ebpfType->is<IHasWidth>()) {
-            ::error(ErrorType::ERR_TYPE_ERROR,
-                    "%1%: illegal type %2% for key field", c, type);
-            return;
-        }
-
-        cstring fieldName = cstring("field") + Util::toString(fieldNumber);
-        keyTypes.emplace(c, ebpfType);
-        keyFieldNames.emplace(c, fieldName);
-        fieldNumber++;
-    }
+    initKey();
 }
 
 EBPFTable::EBPFTable(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name) :
         EBPFTableBase(program, name, codeGen),
         keyGenerator(nullptr), actionList(nullptr), table(nullptr) {
+}
+
+void EBPFTable::initKey() {
+    if (keyGenerator != nullptr) {
+        unsigned fieldNumber = 0;
+        for (auto c : keyGenerator->keyElements) {
+            if (c->matchType->path->name.name == "selector")
+                continue;  // this match type is intended for ActionSelector, not table itself
+
+            auto type = program->typeMap->getType(c->expression);
+            auto ebpfType = EBPFTypeFactory::instance->create(type);
+            if (!ebpfType->is<IHasWidth>()) {
+                ::error(ErrorType::ERR_TYPE_ERROR,
+                        "%1%: illegal type %2% for key field", c, type);
+                return;
+            }
+
+            cstring fieldName = cstring("field") + Util::toString(fieldNumber);
+            keyTypes.emplace(c, ebpfType);
+            keyFieldNames.emplace(c, fieldName);
+            fieldNumber++;
+        }
+    }
 }
 
 void EBPFTable::validateKeys() const {
