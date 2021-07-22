@@ -650,12 +650,53 @@ void TCTrafficManagerForXDP::emit(CodeBuilder *builder) {
     builder->blockStart();
     builder->emitIndent();
     emitLocalVariables(builder);
-    builder->emitIndent();
-    builder->target->emitTraceMessage(builder,
-                                      "TC-TM: Received packet");
 
     if (options.xdp2tcMode == XDP2TC_HEAD) {
-        // to do
+        builder->emitIndent();
+        builder->append("    void *data = (void *)(long)skb->data;\n"
+            "    void *data_end = (void *)(long)skb->data_end;\n"
+            "    if (((char *) data + 14 + sizeof(struct xdp2tc_metadata)) > (char *) data_end) {\n"
+            "        return TC_ACT_SHOT;\n"
+            "    }\n");
+        builder->emitIndent();
+        builder->appendLine("struct xdp2tc_metadata xdp2tc_md = {};");
+        builder->emitIndent();
+        builder->appendFormat("bpf_skb_load_bytes(%s, 14, &xdp2tc_md, "
+                              "sizeof(struct xdp2tc_metadata))",
+                              model.CPacketName.str());
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        builder->append("    __u16 *ether_type = (__u16 *) ((void *) (long)skb->data + 12);\n"
+                        "    if ((void *) ((__u16 *) ether_type + 1) > "
+                        "    (void *) (long) skb->data_end) {\n"
+                        "        return TC_ACT_SHOT;\n"
+                        "    }\n"
+                        "    *ether_type = xdp2tc_md.pkt_ether_type;\n");
+        builder->emitIndent();
+        builder->appendLine("struct psa_ingress_output_metadata_t ostd = xdp2tc_md.ostd;");
+        builder->emitIndent();
+        // declaring header instance as volatile optimizes stack size and improves throughput
+        builder->append("volatile ");
+        parser->headerType->declare(builder, parser->headers->name.name, false);
+        builder->appendLine(" = xdp2tc_md.headers;");
+        builder->emitIndent();
+        builder->appendFormat("%s = xdp2tc_md.packetOffsetInBits;", offsetVar.c_str());
+
+        builder->emitIndent();
+        builder->appendFormat("int ret = bpf_skb_adjust_room(%s, -(int)%s, 1, 0)",
+                              model.CPacketName.str(),
+                              "sizeof(struct xdp2tc_metadata)");
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        builder->append("if (ret) ");
+        builder->blockStart();
+        builder->target->emitTraceMessage(builder,
+                                  "Deparser: failed to remove XDP2TC metadata from packet, ret=%d",
+                                  1, "ret");
+        builder->emitIndent();
+        builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
+        builder->newline();
+        builder->blockEnd(true);
     } else if (options.xdp2tcMode == XDP2TC_CPUMAP) {
         builder->emitIndent();
         builder->target->emitTableLookup(builder, "xdp2tc_shared_map", this->zeroKey.c_str(),
