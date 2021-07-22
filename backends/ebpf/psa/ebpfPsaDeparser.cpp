@@ -465,7 +465,7 @@ bool XDPIngressDeparserPSA::build() {
     headerType = EBPFTypeFactory::instance->create(ht);
 
     codeGen->asPointerVariables.insert(resubmit_meta->name.name);
-    codeGen->substitute(this->headers, parserHeaders);
+    codeGen->substitute(headers, parserHeaders);
     return true;
 }
 
@@ -480,32 +480,36 @@ void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
                           istd->name.name,
                           istd->name.name);
     builder->blockStart();
-    builder->emitIndent();
-    builder->appendLine("struct xdp2tc_metadata xdp2tc_md = {};");
-    builder->emitIndent();
-    builder->appendFormat("xdp2tc_md.headers = %s", this->headers->name.name);
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->appendFormat("xdp2tc_md.ostd = %s", this->istd->name.name);
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->appendFormat("xdp2tc_md.packetOffsetInBits = %s", this->program->offsetVar);
-    builder->endOfStatement(true);
+    if (program->options.xdp2tcMode == XDP2TC_HEAD) {
 
-    builder->emitIndent();
-    builder->append("    void *data = (void *)(long)skb->data;\n"
-                    "    void *data_end = (void *)(long)skb->data_end;\n"
-                    "    struct ethhdr *eth = data;\n"
-                    "    if ((void *)((struct ethhdr *) eth + 1) > data_end) {\n"
-                    "        return XDP_ABORTED;\n"
-                    "    }\n"
-                    "    xdp2tc_md.pkt_ether_type = eth->h_proto;\n"
-                    "    eth->h_proto = bpf_htons(0x0800);\n");
+    } else if (program->options.xdp2tcMode == XDP2TC_CPUMAP) {
+        builder->emitIndent();
+        builder->appendLine("struct xdp2tc_metadata xdp2tc_md = {};");
+        builder->emitIndent();
+        builder->appendFormat("xdp2tc_md.headers = %s", this->headers->name.name);
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        builder->appendFormat("xdp2tc_md.ostd = %s", this->istd->name.name);
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        builder->appendFormat("xdp2tc_md.packetOffsetInBits = %s", this->program->offsetVar);
+        builder->endOfStatement(true);
 
-    builder->emitIndent();
-    builder->target->emitTableUpdate(builder, "xdp2tc_shared_map",
-                                     this->program->zeroKey.c_str(), "xdp2tc_md");
-    builder->newline();
+        builder->emitIndent();
+        builder->append("    void *data = (void *)(long)skb->data;\n"
+                        "    void *data_end = (void *)(long)skb->data_end;\n"
+                        "    struct ethhdr *eth = data;\n"
+                        "    if ((void *)((struct ethhdr *) eth + 1) > data_end) {\n"
+                        "        return XDP_ABORTED;\n"
+                        "    }\n"
+                        "    xdp2tc_md.pkt_ether_type = eth->h_proto;\n"
+                        "    eth->h_proto = bpf_htons(0x0800);\n");
+
+        builder->emitIndent();
+        builder->target->emitTableUpdate(builder, "xdp2tc_shared_map",
+                                         this->program->zeroKey.c_str(), "xdp2tc_md");
+        builder->newline();
+    }
     builder->target->emitTraceMessage(builder,
                                       "Sending packet up to TC for cloning");
     builder->emitIndent();

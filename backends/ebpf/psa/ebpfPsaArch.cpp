@@ -231,7 +231,7 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
     builder->newline();
 
     if (auto meter = getAnyMeter()) {
-        cstring meterExecuteFunc = meter->meterExecuteFunc(tcIngress->options.emitTraceMessages);
+        cstring meterExecuteFunc = meter->meterExecuteFunc(options.emitTraceMessages);
         builder->appendLine(meterExecuteFunc);
         builder->newline();
     }
@@ -872,7 +872,7 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
     if (!deparser->build()) {
         BUG("failed to build deparser");
     }
-
+    deparser->headers = parserHeaders;
     if (ctrl->container->is<IR::P4Control>()) {
         auto p4Control = ctrl->container->to<IR::P4Control>();
         findDigests(p4Control);

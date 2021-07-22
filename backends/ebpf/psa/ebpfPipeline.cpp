@@ -653,37 +653,43 @@ void TCTrafficManagerForXDP::emit(CodeBuilder *builder) {
     builder->emitIndent();
     builder->target->emitTraceMessage(builder,
                                       "TC-TM: Received packet");
-    builder->emitIndent();
-    builder->target->emitTableLookup(builder, "xdp2tc_shared_map", this->zeroKey.c_str(),
-                                     "struct xdp2tc_metadata *md");
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->append("if (!md) ");
-    builder->blockStart();
-    builder->appendFormat("return %s;", dropReturnCode());
-    builder->newline();
-    builder->blockEnd(true);
-    builder->emitIndent();
 
-    builder->emitIndent();
-    // declaring header instance as volatile optimizes stack size and improves throughput
-    builder->append("volatile ");
-    parser->headerType->declare(builder, parser->headers->name.name, false);
-    builder->appendLine(" = md->headers;");
-    builder->emitIndent();
-    builder->appendLine("struct psa_ingress_output_metadata_t ostd = md->ostd;");
-    builder->emitIndent();
-    builder->appendFormat("%s = md->packetOffsetInBits;", offsetVar.c_str());
+    if (options.xdp2tcMode == XDP2TC_HEAD) {
+        // to do
+    } else if (options.xdp2tcMode == XDP2TC_CPUMAP) {
+        builder->emitIndent();
+        builder->target->emitTableLookup(builder, "xdp2tc_shared_map", this->zeroKey.c_str(),
+                                         "struct xdp2tc_metadata *md");
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        builder->append("if (!md) ");
+        builder->blockStart();
+        builder->appendFormat("return %s;", dropReturnCode());
+        builder->newline();
+        builder->blockEnd(true);
+        builder->emitIndent();
 
-    builder->emitIndent();
-    builder->append("    __u16 *ether_type = (__u16 *) ((void *) (long)skb->data + 12);\n"
-                    "    if ((void *) ((__u16 *) ether_type + 1) > "
-                    "    (void *) (long) skb->data_end) {\n"
-                    "        return TC_ACT_SHOT;\n"
-                    "    }\n"
-                    "    *ether_type = md->pkt_ether_type;\n");
+        builder->emitIndent();
+        // declaring header instance as volatile optimizes stack size and improves throughput
+        builder->append("volatile ");
+        parser->headerType->declare(builder, parser->headers->name.name, false);
+        builder->appendLine(" = md->headers;");
+        builder->emitIndent();
+        builder->appendLine("struct psa_ingress_output_metadata_t ostd = md->ostd;");
+        builder->emitIndent();
+        builder->appendFormat("%s = md->packetOffsetInBits;", offsetVar.c_str());
 
-    builder->emitIndent();
+        builder->emitIndent();
+        builder->append("    __u16 *ether_type = (__u16 *) ((void *) (long)skb->data + 12);\n"
+                        "    if ((void *) ((__u16 *) ether_type + 1) > "
+                        "    (void *) (long) skb->data_end) {\n"
+                        "        return TC_ACT_SHOT;\n"
+                        "    }\n"
+                        "    *ether_type = md->pkt_ether_type;\n");
+
+        builder->emitIndent();
+    }
+
     msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
     builder->emitIndent();
