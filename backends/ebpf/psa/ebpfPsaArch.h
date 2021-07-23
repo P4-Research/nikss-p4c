@@ -20,11 +20,6 @@ enum pipeline_type {
     TC_TRAFFIC_MANAGER
 };
 
-enum gress_t {
-    INGRESS,
-    EGRESS
-};
-
 class PSAArch {
  private:
     static EBPFMeterPSA *getMeter(EBPFPipeline *pipeline);
@@ -129,7 +124,7 @@ class ConvertToEbpfPipeline : public Inspector {
 
 class ConvertToEBPFParserPSA : public Inspector {
     EBPF::EBPFProgram *program;
-    gress_t type;
+    pipeline_type type;
 
     P4::TypeMap *typemap;
     P4::ReferenceMap *refmap;
@@ -139,16 +134,8 @@ class ConvertToEBPFParserPSA : public Inspector {
 
  public:
     ConvertToEBPFParserPSA(EBPF::EBPFProgram* program, P4::ReferenceMap* refmap,
-            P4::TypeMap* typemap, const EbpfOptions &options) :
-            program(program), typemap(typemap), refmap(refmap), options(options) {
-        if (program->is<TCIngressPipeline>() || program->is<XDPIngressPipeline>()) {
-            type = INGRESS;
-        } else if (program->is<TCEgressPipeline>() || program->is<XDPEgressPipeline>()) {
-            type = EGRESS;
-        } else {
-            BUG("undefined pipeline type, cannot build parser");
-        }
-    }
+            P4::TypeMap* typemap, const EbpfOptions &options, pipeline_type type) :
+            program(program), typemap(typemap), refmap(refmap), options(options), type(type) { }
 
     bool preorder(const IR::ParserBlock *prsr) override;
     bool preorder(const IR::ParserState *s) override;

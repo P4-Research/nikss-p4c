@@ -308,7 +308,6 @@ void PSAArch::emitInstances2TC(CodeBuilder *builder) const {
 
     tcEgress->parser->emitValueSetInstances(builder);
     tcEgress->control->emitTableInstances(builder);
-    tcEgress->deparser->emitDigestInstances(builder);
 
     builder->appendLine("REGISTER_END()");
     builder->newline();
@@ -629,7 +628,7 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
         return false;
     }
 
-    auto parser_converter = new ConvertToEBPFParserPSA(pipeline, refmap, typemap, options);
+    auto parser_converter = new ConvertToEBPFParserPSA(pipeline, refmap, typemap, options, type);
     parserBlock->apply(*parser_converter);
     pipeline->parser = parser_converter->getEBPFParser();
     CHECK_NULL(pipeline->parser);
@@ -672,7 +671,7 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     parser->headerType = EBPFTypeFactory::instance->create(ht);
 
     parser->visitor->asPointerVariables.insert(resubmit_meta->name.name);
-    if (!options.generateToXDP && this->type == INGRESS) {
+    if (type == TC_INGRESS) {
         parser->visitor->asPointerVariables.insert(parser->headers->name.name);
     }
 
