@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "bpf_defs.h"
+
 #define NO_ERROR 0
 
 typedef uint32_t psabpf_pipeline_id_t;
@@ -124,6 +126,12 @@ typedef struct psabpf_table_entry {
     uint32_t priority;
 } psabpf_table_entry_t;
 
+typedef struct psabpf_btf {
+    // BTF metadata are associated with eBPF program, eBPF map do not have own BTF
+    int associated_prog;
+    void * btf;
+} psabpf_btf_t;
+
 /*
  * TODO: specific fields of table entry context are still to be added.
  * The table entry context may store information about a table itself (e.g. key size, num of entries, etc.).
@@ -147,9 +155,10 @@ typedef struct psabpf_table_entry_context {
     int tuple_map_fd;
     uint32_t tuple_map_key_size, tuple_map_value_size;
 
-    // BTF metadata are associated with eBPF program, eBPF map do not have own BTF
-    int associated_prog;
-    void * btf;
+//    // BTF metadata are associated with eBPF program, eBPF map do not have own BTF
+//    int associated_prog;
+//    void * btf;
+    psabpf_btf_t btf_metadata;
 
     // below fields might be useful when iterating
     size_t curr_idx;
@@ -247,6 +256,74 @@ typedef struct {
 
 int psabpf_counter_read(const char *name, size_t index, psabpf_counter_data_t *data);
 int psabpf_counter_reset(const char *name, size_t index);
+
+/*
+ * P4 Meters
+ */
+
+typedef uint64_t psabpf_meter_value_t;
+
+typedef struct {
+    void *data;
+    size_t size;
+} psabpf_meter_index_t;
+
+typedef struct {
+    psabpf_meter_value_t pbs;
+    psabpf_meter_value_t pir;
+    psabpf_meter_value_t cbs;
+    psabpf_meter_value_t cir;
+} psabpf_meter_data_t;
+
+typedef struct {
+    psabpf_meter_value_t pir_period;
+    psabpf_meter_value_t pir_unit_per_period;
+    psabpf_meter_value_t cir_period;
+    psabpf_meter_value_t cir_unit_per_period;
+    psabpf_meter_value_t pbs;
+    psabpf_meter_value_t cbs;
+    psabpf_meter_value_t pbs_left;
+    psabpf_meter_value_t cbs_left;
+    psabpf_meter_value_t time_p;
+    psabpf_meter_value_t time_c;
+} psabpf_meter_entry_t;
+
+typedef struct {
+    int table_fd;
+    uint32_t table_type;
+    uint32_t key_size;
+    uint32_t value_size;
+    uint32_t btf_type_id;
+    char base_name[256];
+    psabpf_btf_t btf_metadata;
+    psabpf_meter_index_t *index;
+    psabpf_meter_data_t *data;
+    psabpf_meter_entry_t *entry;
+} psabpf_meter_ctx_t;
+
+void psabpf_meter_index_init(psabpf_meter_index_t *index);
+void psabpf_meter_index_free(psabpf_meter_index_t *index);
+int psabpf_meter_index_data(psabpf_meter_index_t *index, const char *data, size_t size);
+
+void psabpf_meter_data_init(psabpf_meter_data_t *data);
+void psabpf_meter_data_free(psabpf_meter_data_t *data);
+int psabpf_meter_data_entry(psabpf_meter_data_t *data, psabpf_meter_entry_t *entry);
+int psabpf_meter_data_pbs(psabpf_meter_data_t *data, psabpf_meter_value_t pbs);
+int psabpf_meter_data_pir(psabpf_meter_data_t *data, psabpf_meter_value_t pir);
+int psabpf_meter_data_cbs(psabpf_meter_data_t *data, psabpf_meter_value_t cbs);
+int psabpf_meter_data_cir(psabpf_meter_data_t *data, psabpf_meter_value_t cir);
+
+void psabpf_meter_entry_init(psabpf_meter_entry_t *entry);
+void psabpf_meter_entry_free(psabpf_meter_entry_t *entry);
+int psabpf_meter_entry_data(psabpf_meter_entry_t *entry, psabpf_meter_data_t *data);
+
+void psabpf_meter_ctx_init(psabpf_meter_ctx_t *ctx);
+void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx);
+int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx, const char *name);
+int psabpf_meter_ctx_index(psabpf_meter_ctx_t *ctx, psabpf_meter_index_t *index);
+int psabpf_meter_ctx_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
+int psabpf_meter_ctx_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
+int psabpf_meter_ctx_reset(psabpf_meter_ctx_t *ctx);
 
 ////// P4 Registers
 // TODO: to be implemented
