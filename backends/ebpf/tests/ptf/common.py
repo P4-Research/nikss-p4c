@@ -141,7 +141,7 @@ class EbpfTest(BaseTest):
     def tearDown(self):
         for intf in self.interfaces:
             self.del_port(intf)
-        # self.exec_ns_cmd("psabpf-ctl pipeline unload id {}".format(TEST_PIPELINE_ID))
+        self.exec_ns_cmd("psabpf-ctl pipeline unload id {}".format(TEST_PIPELINE_ID))
         super(EbpfTest, self).tearDown()
 
 
