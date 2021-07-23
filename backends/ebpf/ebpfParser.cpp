@@ -263,8 +263,9 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
     auto type = state->parser->typeMap->getType(destination);
     auto ht = type->to<IR::Type_StructLike>();
     if (ht == nullptr) {
-        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
-                "Cannot extract to a non-struct type %1%", destination);
+        // FIXME: uncomment
+        //        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+        //                "Cannot extract to a non-struct type %1%", destination);
         return;
     }
 
@@ -278,11 +279,26 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
                               (program->packetEndVar + " - " + program->packetStartVar).c_str(),
                               offsetStr.c_str());
 
+    // to load some fields the compiler will use larger words
+    // than actual width of a field (e.g. 48-bit field loaded using load_dword())
+    // we must ensure that the larger word is not outside of packet buffer.
+    // FIXME: this can fail if a packet does not contain additional payload after header.
+    //  However, we don't have better solution in case of using load_X functions to parse packet.
+    unsigned padding = 0;
+    for (auto f : ht->fields) {
+        auto ftype = state->parser->typeMap->getType(f);
+        auto etype = EBPFTypeFactory::instance->create(ftype);
+        if (etype->is<EBPFScalarType>()) {
+            auto scalarType = etype->to<EBPFScalarType>();
+            padding += scalarType->alignment() * 8 - scalarType->widthInBits();
+        }
+    }
+
     builder->emitIndent();
-    builder->appendFormat("if (%s < %s + BYTES(%s + %d)) ",
+    builder->appendFormat("if (%s < %s + BYTES(%s + %d + %u)) ",
                           program->packetEndVar.c_str(),
                           program->packetStartVar.c_str(),
-                          program->offsetVar.c_str(), width);
+                          program->offsetVar.c_str(), width, padding);
     builder->blockStart();
 
     builder->target->emitTraceMessage(builder, "Parser: invalid packet (packet too short)");

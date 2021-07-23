@@ -15,6 +15,7 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     builder->blockStart();
     emitGlobalMetadataInitializer(builder);
     emitHeaderInstances(builder);
+    emitUserMetadataInstance(builder);
     emitLocalVariables(builder);
     emitPSAControlDataTypes(builder);
     msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d",
@@ -568,6 +569,9 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
     builder->newline();
 
     emitHeaderInstances(builder);
+    builder->newline();
+
+    emitUserMetadataInstance(builder);
     builder->newline();
 
     builder->emitIndent();
