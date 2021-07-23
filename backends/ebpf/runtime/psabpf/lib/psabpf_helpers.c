@@ -8,6 +8,7 @@
 #include <linux/btf.h>
 
 #include "../include/psabpf_helpers.h"
+#include "btf.h"
 
 int try_load_btf(psabpf_btf_t *btf, const char *program_name)
 {
