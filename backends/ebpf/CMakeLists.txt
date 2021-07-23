@@ -270,7 +270,7 @@ if (LIBBPF)
           runtime/psabpf/main.c)
   add_executable(psabpf-ctl ${PSABPFCTL_SRCS})
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/runtime/usr/include)
-  target_link_libraries (psabpf-ctl z elf ${LIBBPF} gmp)
+  target_link_libraries (psabpf-ctl z elf ${LIBBPF} gmp m)
   install (TARGETS psabpf-ctl
           RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
 endif()
