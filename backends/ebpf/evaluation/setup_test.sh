@@ -56,7 +56,7 @@ declare -a RECIRC_PORT_ID=$(ip -o link | awk '$2 == "psa_recirc:" {print $1}' | 
 
 echo "Compiling data plane program.."
 declare -a P4PROGRAM=$(find "$2" -maxdepth 1 -type f -name "*.p4")
-declare -a ARGS="-DPSA_PORT_RECIRCULATE=$RECIRC_PORT_ID"
+declare -a ARGS="-DBTF -DPSA_PORT_RECIRCULATE=$RECIRC_PORT_ID"
 
 if [ -n "$P4PROGRAM" ]; then
   echo "Found P4 program: $P4PROGRAM"
