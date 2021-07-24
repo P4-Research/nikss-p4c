@@ -488,7 +488,8 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
                         "%1%: illegal type %2% for key field", c->expression, type);
                 return;
             }
-            if (ebpfType->to<EBPFScalarType>()->alignment() > structAlignment) {
+            if (ebpfType->is<EBPFScalarType>() &&
+                    ebpfType->to<EBPFScalarType>()->alignment() > structAlignment) {
                 structAlignment = 8;
             }
 
@@ -514,7 +515,8 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
     builder->emitIndent();
     // we set 256 as maximum number of ternary masks due to BPF_COMPLEXITY_LIMIT_JMP_SEQ.
     // TODO: find better solution to workaround BPF_COMPLEXITY_LIMIT_JMP_SEQ.
-    builder->appendFormat("#define MAX_%s_MASKS %d", keyTypeName.toUpper(), 256);
+    // FIXME: revert max number
+    builder->appendFormat("#define MAX_%s_MASKS %d", keyTypeName.toUpper(), 2);
     builder->newline();
 
     builder->emitIndent();
