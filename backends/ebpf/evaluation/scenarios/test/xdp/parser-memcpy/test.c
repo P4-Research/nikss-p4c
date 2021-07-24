@@ -207,14 +207,14 @@ parse_inner_ip:
 reject:
     {
         bpf_trace_message("Packet rejected\n");
-        return TC_ACT_SHOT;   /* zmienic akcje na XDP_DROP*/
+        return XDP_DROP;   /* zmienic akcje na XDP_DROP*/
     }
 
     // **************************************************************
     // control
     // **************************************************************
 accept:
-    bpf_trace_message("classifier/tc-ingress control: packet processing started\n");
+    bpf_trace_message("xdp/xdp-ingress control: packet processing started\n");
     u8 hit_1;
     u32 ebpf_zero = 0;
     {
@@ -304,11 +304,11 @@ accept:
                         break;
                     default:
                         bpf_trace_message("Control: Invalid action type, aborting\n");
-                        return TC_ACT_SHOT;
+                        return XDP_DROP;
                 }
             } else {
                 bpf_trace_message("Control: Entry not found, aborting\n");
-                return TC_ACT_SHOT;
+                return XDP_DROP;
             }
         }
         bpf_trace_message("Control: vxlan_0 applied\n");
@@ -320,7 +320,7 @@ accept:
     // **************************************************************
     if (ostd.drop) {
         bpf_trace_message("PreDeparser: dropping packet..\n");
-        return TC_ACT_SHOT;
+        return XDP_DROP;
     }
 
     int ebpf_packetOffsetInBytes = current_data - data;
@@ -350,7 +350,7 @@ accept:
         returnCode = bpf_skb_adjust_room(ctx, outHeaderOffset, 1, 0);
         if (returnCode) {
             bpf_trace_message("Deparser: pkt_len adjust failed\n");
-            return TC_ACT_SHOT;
+            return XDP_DROP;
         }
         bpf_trace_message("Deparser: pkt_len adjusted\n");
     }
@@ -363,7 +363,7 @@ accept:
         bpf_trace_message("Deparser: emitting header hdr.outer_eth\n");
         if (data_end < current_data + sizeof(struct ethhdr_t)) {
             bpf_trace_message("Deparser: invalid packet (packet too short)\n");
-            return TC_ACT_SHOT;
+            return XDP_DROP;
         }
         __builtin_memcpy(current_data, (void *) &(hdr.outer_eth), sizeof(struct ethhdr_t));
         current_data += sizeof(struct ethhdr_t);
@@ -373,7 +373,7 @@ accept:
         bpf_trace_message("Deparser: emitting header hdr.outer_ip\n");
         if (data_end < current_data + sizeof(struct iphdr)) {
             bpf_trace_message("Deparser: invalid packet (packet too short)\n");
-            return TC_ACT_SHOT;
+            return XDP_DROP;
         }
 
         hdr.outer_ip.tot_len = bpf_htons(hdr.outer_ip.tot_len);
@@ -386,7 +386,7 @@ accept:
         bpf_trace_message("Deparser: emitting header hdr.udp\n");
         if (data_end < current_data + sizeof(struct udphdr)) {
             bpf_trace_message("Deparser: invalid packet (packet too short)\n");
-            return TC_ACT_SHOT;
+            return XDP_DROP;
         }
 
         hdr.udp.len = htons(hdr.udp.len);
@@ -399,7 +399,7 @@ accept:
         bpf_trace_message("Deparser: emitting header hdr.vxlan\n");
         if (data_end < current_data + sizeof(struct vxlanhdr)) {
             bpf_trace_message("Deparser: invalid packet (packet too short)\n");
-            return TC_ACT_SHOT;
+            return XDP_DROP;
         }
         __builtin_memcpy(current_data, (void *) &(hdr.vxlan), sizeof(struct vxlanhdr));
         current_data += sizeof(struct vxlanhdr);
@@ -409,7 +409,7 @@ accept:
         bpf_trace_message("Deparser: emitting header hdr.eth\n");
         if (data_end < current_data + sizeof(struct ethhdr_t)) {
             bpf_trace_message("Deparser: invalid packet (packet too short)\n");
-            return TC_ACT_SHOT;
+            return XDP_DROP;
         }
         __builtin_memcpy(current_data, (void *) &(hdr.eth), sizeof(struct ethhdr_t));
         current_data += sizeof(struct ethhdr_t);
@@ -419,7 +419,7 @@ accept:
         bpf_trace_message("Deparser: emitting header hdr.ip\n");
         if (data_end < current_data + sizeof(struct iphdr)) {
             bpf_trace_message("Deparser: invalid packet (packet too short)\n");
-            return TC_ACT_SHOT;
+            return XDP_DROP;
         }
 
         hdr.ip.tot_len = bpf_htons(hdr.ip.tot_len);
@@ -435,7 +435,7 @@ accept:
 /*SEC("xdp/xdp-egress")
 int tc_egress_func(struct xdp_md *ctx)
 {
-    return TC_ACT_OK;
+    return ;
 }*/ 
 
 /*SEC("xdp/xdp-ingress")
