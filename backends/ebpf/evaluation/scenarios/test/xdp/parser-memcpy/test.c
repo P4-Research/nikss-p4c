@@ -347,7 +347,9 @@ accept:
     if (outHeaderOffset != 0) {
         bpf_trace_message("Deparser: pkt_len adjusting by %d B\n", outHeaderOffset);
         int returnCode = 0;
-        returnCode = bpf_skb_adjust_room(ctx, outHeaderOffset, 1, 0);
+        __u32 new_hdrsz = sizeof(struct ethhdr) + sizeof(struct iphdr) +
+                          sizeof(struct udphdr) + sizeof(struct vxlanhdr);
+        returnCode = bpf_xdp_adjust_head(ctx, -new_hdrsz);
         if (returnCode) {
             bpf_trace_message("Deparser: pkt_len adjust failed\n");
             return XDP_DROP;
