@@ -155,9 +155,6 @@ typedef struct psabpf_table_entry_context {
     int tuple_map_fd;
     uint32_t tuple_map_key_size, tuple_map_value_size;
 
-//    // BTF metadata are associated with eBPF program, eBPF map do not have own BTF
-//    int associated_prog;
-//    void * btf;
     psabpf_btf_t btf_metadata;
 
     // below fields might be useful when iterating
@@ -290,12 +287,9 @@ typedef struct {
 
 typedef struct {
     int table_fd;
-    uint32_t table_type;
     uint32_t key_size;
     uint32_t value_size;
-    uint32_t btf_type_id;
     char base_name[256];
-    psabpf_btf_t btf_metadata;
     psabpf_meter_index_t *index;
     psabpf_meter_data_t *data;
     psabpf_meter_entry_t *entry;

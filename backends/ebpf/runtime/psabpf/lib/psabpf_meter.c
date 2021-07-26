@@ -8,7 +8,7 @@
 #include <linux/bpf.h>
 
 #include "../include/psabpf.h"
-#include "../include/psabpf_helpers.h"
+#include "btf.h"
 
 #ifndef METER_PERIOD_MIN
 #define METER_PERIOD_MIN 100
@@ -194,14 +194,11 @@ int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx,
              BPF_FS, PIPELINE_PREFIX, psabpf_context_get_pipeline(psabpf_ctx));
     snprintf(ctx->base_name, sizeof(ctx->base_name), "%s", name);
 
-    if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR)
-        fprintf(stderr, "warning: couldn't find BTF info\n");
-
-    int ret = open_bpf_map(&ctx->btf_metadata, name, base_path, &(ctx->table_fd), &(ctx->key_size), &(ctx->value_size),
-                           &(ctx->table_type), &(ctx->btf_type_id), NULL);
+    int ret = open_bpf_map(NULL, name, base_path, &(ctx->table_fd), &(ctx->key_size), &(ctx->value_size),
+                           NULL, NULL, NULL);
 
     if (ret != NO_ERROR) {
-        fprintf(stderr, "couldn't open table %s: %s\n", name, strerror(ret));
+        fprintf(stderr, "couldn't open meter %s: %s\n", name, strerror(ret));
         return ret;
     }
 
@@ -224,11 +221,17 @@ int psabpf_meter_ctx_index(psabpf_meter_ctx_t *ctx, psabpf_meter_index_t *index)
 }
 
 int psabpf_meter_ctx_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry) {
-
     int return_code = NO_ERROR;
     uint64_t bpf_flags = BPF_F_LOCK;
     char *value_buffer = NULL;
     char *index_buffer = NULL;
+
+    if (sizeof(*entry) > ctx->value_size) {
+        fprintf(stderr, "Meter entry has bigger size "
+                        "(%lu) than meter definition value size (%u)!\n",
+                        sizeof(*entry), ctx->value_size);
+        return EINVAL;
+    }
 
     index_buffer = malloc(ctx->key_size);
     value_buffer = malloc(ctx->value_size);
@@ -259,7 +262,6 @@ int psabpf_meter_ctx_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry) {
 clean_up:
     free(value_buffer);
     free(index_buffer);
-
     return return_code;
 }
 
@@ -268,6 +270,13 @@ int psabpf_meter_ctx_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry
     uint64_t bpf_flags = BPF_F_LOCK;
     char *value_buffer = NULL;
     char *index_buffer = NULL;
+
+    if (sizeof(*entry) > ctx->value_size) {
+        fprintf(stderr, "Meter entry has bigger size "
+                        "(%lu) than meter definition value size (%u)!\n",
+                sizeof(*entry), ctx->value_size);
+        return EINVAL;
+    }
 
     index_buffer = malloc(ctx->key_size);
     value_buffer = malloc(ctx->value_size);

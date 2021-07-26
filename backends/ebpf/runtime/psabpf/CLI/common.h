@@ -32,9 +32,6 @@ enum destination_ctx_type_t {
     CTX_METER_INDEX,
 };
 
-int update_context(const char *data, size_t len, void *ctx, enum destination_ctx_type_t ctx_type);
-bool is_valid_mac_address(const char * data);
-int convert_number_to_bytes(const char *data, void *ctx, enum destination_ctx_type_t ctx_type);
 int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_type_t ctx_type);
 
 #endif //P4C_COMMON_H

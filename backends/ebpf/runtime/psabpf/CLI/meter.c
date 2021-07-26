@@ -12,7 +12,7 @@
 
 int convert_str_to_meter_value(const char *str, psabpf_meter_value_t *value) {
     char * end_ptr = NULL;
-    *value = strtoul(str, &end_ptr, 0);
+    *value = strtoull(str, &end_ptr, 0);
     if (*value == 0 || end_ptr == NULL) {
         fprintf(stderr, "%s: failed to parse value\n", str);
         return EINVAL;

@@ -79,11 +79,11 @@ static int do_meter(int argc, char **argv)
 }
 
 static const struct cmd cmds[] = {
-        { "help",	         do_help },
-        { "clone-session",	 do_clone_session },
-        { "pipeline",       do_pipeline },
-        { "table",          do_table },
-        { "meter",          do_meter },
+        { "help",          do_help },
+        { "clone-session", do_clone_session },
+        { "pipeline",      do_pipeline },
+        { "table",         do_table },
+        { "meter",         do_meter },
         { 0 }
 };
 

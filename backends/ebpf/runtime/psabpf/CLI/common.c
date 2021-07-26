@@ -47,7 +47,7 @@ int parse_pipeline_id(int *argc, char ***argv, psabpf_context_t * psabpf_ctx)
  * Data translation functions to byte stream
  *****************************************************************************/
 
-int update_context(const char *data, size_t len, void *ctx, enum destination_ctx_type_t ctx_type)
+static int update_context(const char *data, size_t len, void *ctx, enum destination_ctx_type_t ctx_type)
 {
     if (ctx_type == CTX_MATCH_KEY)
         return psabpf_matchkey_data(ctx, data, len);
@@ -62,7 +62,7 @@ int update_context(const char *data, size_t len, void *ctx, enum destination_ctx
 }
 
 /* TODO: Is there any ready to use function for this purpose? */
-bool is_valid_mac_address(const char * data)
+static bool is_valid_mac_address(const char * data)
 {
     if (strlen(data) != 2*6+5)  /* 11:22:33:44:55:66 */
         return false;
@@ -86,7 +86,7 @@ bool is_valid_mac_address(const char * data)
     return true;
 }
 
-int convert_number_to_bytes(const char *data, void *ctx, enum destination_ctx_type_t ctx_type)
+static int convert_number_to_bytes(const char *data, void *ctx, enum destination_ctx_type_t ctx_type)
 {
     mpz_t number;  /* converts any precision number to stream of bytes */
     size_t len, forced_len = 0;

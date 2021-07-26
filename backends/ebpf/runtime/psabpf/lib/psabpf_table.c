@@ -7,7 +7,7 @@
 #include <linux/bpf.h>
 #include <linux/btf.h>
 
-#include "../include/psabpf_helpers.h"
+#include "../include/psabpf.h"
 #include "btf.h"
 
 #define COUNTER_PACKETS_OR_BYTES_STRUCT_ENTRIES  1
