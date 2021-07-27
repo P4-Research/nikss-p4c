@@ -37,6 +37,11 @@ void PSAArch::emitTypes(CodeBuilder *builder) const {
     for (auto type : ebpfTypes) {
         type->emit(builder);
     }
+
+    EBPFMeterPSA *meter = getAnyMeter();
+    if (meter != nullptr) {
+        meter->emitValueStruct(builder);
+    }
 }
 
 void PSAArch::emit2TC(CodeBuilder *builder) const {
@@ -214,9 +219,8 @@ void PSAArch::emitHelperFunctions2TC(CodeBuilder *builder) const {
     builder->appendLine(pktClonesFunc);
     builder->newline();
 
-    cstring meterExecuteFunc = EBPFMeterPSA::meterExecuteFunc(tcIngress->options.emitTraceMessages);
-
-    if (!tcIngress->control->meters.empty() || !tcEgress->control->meters.empty()) {
+    if (auto meter = getAnyMeter()) {
+        cstring meterExecuteFunc = meter->meterExecuteFunc(tcIngress->options.emitTraceMessages);
         builder->appendLine(meterExecuteFunc);
         builder->newline();
     }
@@ -268,6 +272,11 @@ void PSAArch::emitInstances2TC(CodeBuilder *builder) const {
     tcEgress->parser->emitTypes(builder);
     tcEgress->control->emitTableTypes(builder);
     builder->appendLine("REGISTER_START()");
+    if (tcIngress->options.xdp2tcMode == XDP2TC_CPUMAP) {
+        builder->target->emitTableDecl(builder, "workaround_cpumap",
+                                       TablePerCPUArray, "u32",
+                                       "u16", 1);
+    }
     builder->target->emitMapInMapDecl(builder, "clone_session_tbl_inner",
             TableHash, "elem_t",
             "struct element", MaxClones, "clone_session_tbl",
@@ -308,10 +317,9 @@ void PSAArch::emitInitializer2TC(CodeBuilder *builder) const {
 void PSAArch::emitHelperFunctions2XDP(CodeBuilder *builder) const {
     EBPFHashAlgorithmTypeFactoryPSA::instance()->emitGlobals(builder);
 
-    cstring meterExecuteFunc = EBPFMeterPSA::meterExecuteFunc(xdpIngress->
-            options.emitTraceMessages);
-
-    if (!xdpIngress->control->meters.empty() || !xdpEgress->control->meters.empty()) {
+    if (auto meter = getAnyMeter()) {
+        cstring meterExecuteFunc = meter->meterExecuteFunc(
+                xdpIngress->options.emitTraceMessages);
         builder->appendLine(meterExecuteFunc);
         builder->newline();
     }
@@ -414,6 +422,36 @@ void PSAArch::emitDummy2XDP(CodeBuilder *builder) const {
     builder->appendLine("return XDP_PASS;");
 
     builder->blockEnd(true);  // end of function
+}
+
+EBPFMeterPSA *PSAArch::getMeter(EBPFPipeline *pipeline) {
+    if (pipeline == nullptr) {
+        return nullptr;
+    }
+    if (!pipeline->control->meters.empty()) {
+        return pipeline->control->meters.begin()->second;
+    }
+    auto directMeter = std::find_if(pipeline->control->tables.begin(),
+                                    pipeline->control->tables.end(),
+                                    [](std::pair<const cstring, EBPFTable*> elem) {
+                                        return !elem.second->to<EBPFTablePSA>()->meters.empty();
+                                    });
+    if (directMeter != pipeline->control->tables.end()) {
+        return directMeter->second->to<EBPFTablePSA>()->meters.front().second;
+    }
+    return nullptr;
+}
+
+EBPFMeterPSA *PSAArch::getAnyMeter() const {
+    EBPFMeterPSA *meter;
+    std::array<EBPFPipeline*, 4> pipelines = {tcIngress, tcEgress, xdpEgress, xdpIngress};
+    for (auto pipeline : pipelines) {
+        meter = getMeter(pipeline);
+        if (meter != nullptr) {
+            return meter;
+        }
+    }
+    return meter;
 }
 
 const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
@@ -749,6 +787,8 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
         }
         auto met = new EBPFMeterPSA(program, name, di, control->codeGen);
         control->meters.emplace(name, met);
+    } else if (typeName == "DirectMeter") {
+        return false;
     } else if (instance->type->getName().name == "Random") {
         auto rand = new EBPFRandomPSA(di);
         control->randGenerators.emplace(name, rand);

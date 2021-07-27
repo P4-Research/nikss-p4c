@@ -116,12 +116,12 @@ class EBPFTable : public EBPFTableBase {
     virtual bool dropOnNoMatchingEntryFound() const { return true; }
     virtual bool singleActionRun() const { return true; }
 
- private:
+ protected:
     void declareTmpLpmKey(CodeBuilder *builder, const IR::KeyElement *c, std::string &tmpVar);
     void emitLpmKeyField(CodeBuilder *builder,
                          const cstring &swap,
                          const std::string &tmpVar) const;
-    void validateKeys(const EBPFProgram *program) const;
+    virtual void validateKeys() const;
 };
 
 class EBPFCounterTable : public EBPFTableBase {

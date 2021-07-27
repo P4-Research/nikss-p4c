@@ -58,6 +58,9 @@ class SimpleTunnelingPSATest(P4EbpfTest):
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, exp_pkt, PORT1)
 
+        testutils.send_packet(self, PORT0, exp_pkt)
+        testutils.verify_packet(self, pkt, PORT1)
+
 
 @tc_only
 class PSACloneI2E(P4EbpfTest):
@@ -131,7 +134,9 @@ class EgressTrafficManagerClonePSATest(P4EbpfTest):
         self.clone_session_delete(8)
         super(EgressTrafficManagerClonePSATest, self).tearDown()
 
+
 @tc_only
+@xdp2tc_head_not_supported
 class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
     """
     Test resubmit packet path. eBPF program should do following operation:
@@ -154,6 +159,7 @@ class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
         pkt[Ether].dst = '00:00:00:00:00:00'
         pkt[Ether].src = '00:44:33:22:11:00'
         testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
+
 
 @tc_only
 class MulticastPSATest(P4EbpfTest):
@@ -190,21 +196,15 @@ class SimpleLpmP4PSATest(P4EbpfTest):
     p4_file_path = "samples/p4testdata/psa-lpm.p4"
 
     def runTest(self):
-        pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='10.10.11.11')
         # This command adds LPM entry 10.10.0.0/16 with action forwarding on port 6 (PORT2 in ptf)
-        self.update_map(name="ingress_tbl_fwd_lpm", key="hex 10 00 00 00 0a 0a 00 00",
-                        value="hex 01 00 00 00 06 00 00 00")
-        # This command adds 10.10.10.10/8 entry with not existing port number (0)
-        self.update_map(name="ingress_tbl_fwd_lpm", key="hex 08 00 00 00 0a 0a 0a 0a",
-                        value="hex 01 00 00 00 00 00 00 00")
-
+        self.table_add(table="ingress_tbl_fwd_lpm", keys=["10.10.0.0/16"], action=1, data=[6])
+        self.table_add(table="ingress_tbl_fwd_lpm", keys=["10.10.10.10/8"], action=0)
+        pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='10.10.11.11')
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT2)
 
+        self.table_add(table="ingress_tbl_fwd_lpm", keys=["192.168.2.1/24"], action=1, data=[5])
         pkt = testutils.simple_ip_packet(ip_src='1.1.1.1', ip_dst='192.168.2.1')
-        # This command adds LPM entry 192.168.2.1/24 with action forwarding on port 5 (PORT1 in ptf)
-        self.update_map(name="ingress_tbl_fwd_lpm", key="hex 18 00 00 00 c0 a8 02 00",
-                        value="hex 01 00 00 00 05 00 00 00")
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)
 
@@ -222,16 +222,14 @@ class SimpleLpmP4TwoKeysPSATest(P4EbpfTest):
         pkt = testutils.simple_ip_packet(ip_src='1.2.3.4', ip_dst='10.10.11.11')
         # This command adds LPM entry 10.10.11.0/24 with action forwarding on port 6 (PORT2 in ptf)
         # Note that prefix value has to be a sum of exact fields size and lpm prefix
-        self.update_map(name="ingress_tbl_fwd_exact_lpm", key="hex 38 00 00 00 01 02 03 04 0a 0a 0b 00",
-                        value="hex 01 00 00 00 06 00 00 00")
+        self.table_add(table="ingress_tbl_fwd_exact_lpm", keys=["1.2.3.4", "10.10.11.0/24"], action=1, data=[6])
+
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT2)
 
         pkt = testutils.simple_ip_packet(ip_src='1.2.3.4', ip_dst='192.168.2.1')
         # This command adds LPM entry 192.168.2.1/24 with action forwarding on port 5 (PORT1 in ptf)
-        # Note that prefix value has to be a sum of exact fields size and lpm prefix
-        self.update_map(name="ingress_tbl_fwd_exact_lpm", key="hex 38 00 00 00 01 02 03 04 c0 a8 02 00",
-                        value="hex 01 00 00 00 05 00 00 00")
+        self.table_add(table="ingress_tbl_fwd_exact_lpm", keys=["1.2.3.4", "192.168.2.1/24"], action=1, data=[5])
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)
 
@@ -335,71 +333,22 @@ class PSATernaryTest(P4EbpfTest):
 
     def runTest(self):
         # flow rules for 'tbl_ternary_0'
-        # 1. hdr.ipv4.srcAddr=0x01020304/0xffffff00 => action 0 priority 1
-        # 2. hdr.ipv4.srcAddr=0x01020304/0xffff00ff => action 1 priority 10
-        self.update_map(name="ingress_tbl_ternary_0_prefixes", key="00 00 00 00",
-                        value="01 00 00 00 00 0xff 0xff 0xff 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_0_prefixes", key="00 0xff 0xff 0xff",
-                        value="01 00 00 00 0xff 00 0xff 0xff 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_0_prefixes", key="0xff 00 0xff 0xff",
-                        value="02 00 00 00 00 00 00 00 00 00 00 00")
-        self.create_map(name="ingress_tbl_ternary_0_tuple_1", type="hash", key_size=4, value_size=8,
-                        max_entries=100)
-        self.create_map(name="ingress_tbl_ternary_0_tuple_2", type="hash", key_size=4, value_size=8,
-                        max_entries=100)
-        self.update_map(name="ingress_tbl_ternary_0_tuple_1", key="00 0x03 0x02 0x01",
-                        value="00 00 00 00 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_0_tuple_2", key="0x04 00 0x02 0x01",
-                        value="01 00 00 00 10 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_0_tuples_map", key="01 0 0 0",
-                        value="ingress_tbl_ternary_0_tuple_1", map_in_map=True)
-        self.update_map(name="ingress_tbl_ternary_0_tuples_map", key="02 0 0 0",
-                        value="ingress_tbl_ternary_0_tuple_2", map_in_map=True)
+        # 1. ipv4.srcAddr=1.2.3.4/0xffffff00 => action 0 priority 1
+        # 2. ipv4.srcAddr=1.2.3.4/0xffff00ff => action 1 priority 10
+        self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4^0xffffff00"], action=0, priority=1)
+        self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4^0xffff00ff"], action=1, priority=10)
 
         # flow rules for 'tbl_ternary_1'
-        # 1. hdr.ipv4.diffserv=0x00/0x00, hdr.ipv4.dstAddr=0xc0a80201/0xffffff00 => action 0 priority 1
-        # 2. hdr.ipv4.diffserv=0x00/0xff, hdr.ipv4.dstAddr=0xc0a80201/0xffffff00 => action 1 priority 10
-        self.update_map(name="ingress_tbl_ternary_1_prefixes", key="00 00 00 00 00 00 00 00",
-                        value="01 00 00 00 00 0xff 0xff 0xff 0xff 00 00 00 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_1_prefixes", key="00 0xff 0xff 0xff 0xff 00 00 00",
-                        value="06 00 00 00 00 0xff 0xff 0xff 00 00 00 00 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_1_prefixes", key="00 0xff 0xff 0xff 00 00 00 00",
-                        value="07 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
-        self.create_map(name="ingress_tbl_ternary_1_tuple_6", type="hash", key_size=8, value_size=8,
-                        max_entries=100)
-        self.create_map(name="ingress_tbl_ternary_1_tuple_7", type="hash", key_size=8, value_size=8,
-                        max_entries=100)
-        self.update_map(name="ingress_tbl_ternary_1_tuple_7", key="00 0x02 0xa8 0xc0 00 00 00 00",
-                        value="00 00 00 00 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_1_tuple_6", key="00 0x02 0xa8 0xc0 00 00 00 00",
-                        value="01 00 00 00 10 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_1_tuples_map", key="06 00 00 00",
-                        value="ingress_tbl_ternary_1_tuple_6", map_in_map=True)
-        self.update_map(name="ingress_tbl_ternary_1_tuples_map", key="07 00 00 00",
-                        value="ingress_tbl_ternary_1_tuple_7", map_in_map=True)
+        # 1. ipv4.diffserv=0x00/0x00, ipv4.dstAddr=192.168.2.1/24 => action 0 priority 1
+        # 2. ipv4.diffserv=0x00/0xff, ipv4.dstAddr=192.168.2.1/24 => action 1 priority 10
+        self.table_add(table="ingress_tbl_ternary_1", keys=["192.168.2.1/24", "0^0"], action=0, priority=1)
+        self.table_add(table="ingress_tbl_ternary_1", keys=["192.168.2.1/24", "0^0xFF"], action=1, priority=10)
 
         # flow rules 'tbl_ternary_2':
-        # 1. hdr.ipv4.protocol=0x11, hdr.ipv4.diffserv=0x00/0x00, hdr.ipv4.dstAddr=0xc0a80201/0xffff0000 => action 0 priority 1
-        # 2. hdr.ipv4.protocol=0x11, hdr.ipv4.diffserv=0x00/0xff, hdr.ipv4.dstAddr=0xc0a80201/0xffff0000 => action 1 priority 10
-        self.update_map(name="ingress_tbl_ternary_2_prefixes", key="00 00 00 00 00 00 00 00",
-                        value="01 00 00 00 00 00 0xff 0xff 0xff 00 00 00 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_2_prefixes", key="00 00 0xff 0xff 0xff 00 00 00",
-                        value="03 00 00 00 00 00 0xff 0xff 00 00 00 00 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_2_prefixes", key="00 00 0xff 0xff 00 00 00 00",
-                        value="05 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
-        self.create_map(name="ingress_tbl_ternary_2_tuple_3", type="hash", key_size=8, value_size=8,
-                        max_entries=100)
-        self.create_map(name="ingress_tbl_ternary_2_tuple_5", type="hash", key_size=8, value_size=8,
-                        max_entries=100)
-        self.update_map(name="ingress_tbl_ternary_2_tuple_3", key="00 00 0xa8 0xc0 0x11 00 00 00",
-                        value="00 00 00 00 01 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_2_tuple_5", key="00 00 0xa8 0xc0 00 00 00 00",
-                        value="01 00 00 00 10 00 00 00")
-        self.update_map(name="ingress_tbl_ternary_2_tuples_map", key="03 00 00 00",
-                        value="ingress_tbl_ternary_2_tuple_3", map_in_map=True)
-        self.update_map(name="ingress_tbl_ternary_2_tuples_map", key="05 00 00 00",
-                        value="ingress_tbl_ternary_2_tuple_5", map_in_map=True)
-
+        # 1. ipv4.protocol=0x11, ipv4.diffserv=0x00/0x00, ipv4.dstAddr=192.168.2.1/16 => action 0 priority 1
+        # 2. ipv4.protocol=0x11, ipv4.diffserv=0x00/0xff, ipv4.dstAddr=192.168.2.1/16 => action 1 priority 10
+        self.table_add(table="ingress_tbl_ternary_2", keys=["192.168.2.1/16", "0x11", "0^0"], action=0, priority=1)
+        self.table_add(table="ingress_tbl_ternary_2", keys=["192.168.2.1/16", "0x11", "0^0xFF"], action=1, priority=10)
 
         pkt = testutils.simple_udp_packet(ip_src='1.2.3.4', ip_dst='192.168.2.1')
         testutils.send_packet(self, PORT0, pkt)
@@ -409,27 +358,6 @@ class PSATernaryTest(P4EbpfTest):
         pkt[IP].dst = '255.255.255.255'
         pkt[UDP].chksum = 0x044D
         testutils.verify_packet(self, pkt, PORT1)
-
-    def tearDown(self):
-        self.remove_maps(
-            ["ingress_tbl_ternary_0_prefixes",
-             "ingress_tbl_ternary_0_tuples_map",
-             "ingress_tbl_ternary_0_tuple_1",
-             "ingress_tbl_ternary_0_tuple_2",
-             "ingress_tbl_ternary_0_defaultAction",
-             "ingress_tbl_ternary_1_prefixes",
-             "ingress_tbl_ternary_1_tuples_map",
-             "ingress_tbl_ternary_1_tuple_6",
-             "ingress_tbl_ternary_1_tuple_7",
-             "ingress_tbl_ternary_1_defaultAction",
-             "ingress_tbl_ternary_2_prefixes",
-             "ingress_tbl_ternary_2_tuples_map",
-             "ingress_tbl_ternary_2_tuple_3",
-             "ingress_tbl_ternary_2_tuple_5",
-             "ingress_tbl_ternary_2_defaultAction"]
-        )
-
-        super(PSATernaryTest, self).tearDown()
 
 
 class ParserValueSetPSATest(P4EbpfTest):
@@ -555,6 +483,7 @@ class VerifyPSATest(P4EbpfTest):
         testutils.verify_no_other_packets(self)
 
 
+@xdp2tc_head_not_supported
 class RandomPSATest(P4EbpfTest):
     """
     Read random data generated by data plane.

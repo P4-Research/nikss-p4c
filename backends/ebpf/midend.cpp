@@ -111,6 +111,7 @@ const IR::ToplevelBlock* MidEnd::run(EbpfOptions& options,
             midEnd.addPasses({
                 new P4::ValidateTableProperties({ "size",
                                                   "psa_direct_counter",
+                                                  "psa_direct_meter",
                                                   "psa_empty_group_action",
                                                   "psa_implementation" })
             });

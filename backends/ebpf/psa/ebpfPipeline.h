@@ -63,6 +63,10 @@ class TCIngressPipeline : public EBPFPipeline {
     void emitTrafficManager(CodeBuilder *builder) override;
     void emit(CodeBuilder *builder) override;
     void emitPSAControlDataTypes(CodeBuilder *builder) override;
+ private:
+    void emitTCWorkaroundUsingMeta(CodeBuilder *builder);
+    void emitTCWorkaroundUsingHead(CodeBuilder *builder);
+    void emitTCWorkaroundUsingCPUMAP(CodeBuilder *builder);
 };
 
 class TCEgressPipeline : public EBPFPipeline {

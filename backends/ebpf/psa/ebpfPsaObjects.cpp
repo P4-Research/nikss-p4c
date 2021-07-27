@@ -34,6 +34,15 @@ void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) 
             ::error(ErrorType::ERR_NOT_FOUND,
                     "%1%: Table %2% do not own DirectCounter named %3%",
                     method->expr, table->name, name);
+    } else if (declType->name.name == "DirectMeter") {
+        auto met = table->getMeter(name);
+        if (met != nullptr) {
+            met->emitDirectExecute(builder, method, valueName);
+        } else {
+            ::error(ErrorType::ERR_NOT_FOUND,
+                    "%1%: Table %2% do not own DirectMeter named %3%",
+                    method->expr, table->name, name);
+        }
     } else {
         ControlBodyTranslatorPSA::processMethod(method);
     }
@@ -93,7 +102,16 @@ void EBPFTablePSA::initDirectMeters() {
     auto meterAdder = [this](const IR::PathExpression * pe) {
         CHECK_NULL(pe);
         auto decl = program->refMap->getDeclaration(pe->path, true);
-        this->meters.emplace_back(EBPFObject::externalName(decl));
+        auto di = decl->to<IR::Declaration_Instance>();
+        CHECK_NULL(di);
+        if (isLPMTable() || isTernaryTable()) {
+            ::error(ErrorType::ERR_UNSUPPORTED,
+                    "DirectMeter in table with ternary key or "
+                    "Longest Prefix Match key is not supported: %1%", di);
+            return;
+        }
+        auto met = new EBPFMeterPSA(program, EBPFObject::externalName(di), di, codeGen);
+        this->meters.emplace_back(std::make_pair(pe->path->name.name, met));
     };
 
     forEachPropertyEntry("psa_direct_meter", meterAdder);
@@ -187,21 +205,56 @@ void EBPFTablePSA::emitValueStructStructure(CodeBuilder* builder) {
 
 void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
     TableKind kind = isLPMTable() ? TableLPMTrie : TableHash;
-    builder->target->emitTableDecl(builder, name, kind,
-                                   cstring("struct ") + keyTypeName,
-                                   cstring("struct ") + valueTypeName, size);
+    emitTableDecl(builder, name, kind,
+                  cstring("struct ") + keyTypeName,
+                  cstring("struct ") + valueTypeName, size);
 
     if (!hasImplementation()) {
         // Default action is up to implementation
-        builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
-                                       program->arrayIndexType,
-                                       cstring("struct ") + valueTypeName, 1);
+        emitTableDecl(builder, defaultActionMapName, TableArray,
+                      program->arrayIndexType,
+                      cstring("struct ") + valueTypeName, 1);
     }
 }
 
+void EBPFTablePSA::emitTableDecl(CodeBuilder *builder,
+                                 cstring tblName,
+                                 TableKind kind,
+                                 cstring keyTypeName,
+                                 cstring valueTypeName,
+                                 size_t size) const {
+    if (meters.empty()) {
+        builder->target->emitTableDecl(builder,
+                                       tblName, kind,
+                                       keyTypeName,
+                                       valueTypeName,
+                                       size);
+    } else {
+        builder->target->emitTableDeclSpinlock(builder,
+                                               tblName, kind,
+                                               keyTypeName,
+                                               valueTypeName,
+                                               size);
+    }
+}
+
+void EBPFTablePSA::emitValueType(CodeBuilder* builder) {
+    EBPFTable::emitValueType(builder);
+}
+
+/**
+ * Remember that order of emitting counters and meters affects future access to BPF maps.
+ * Do not change this order!
+ */
 void EBPFTablePSA::emitDirectTypes(CodeBuilder* builder) {
     for (auto ctr : counters) {
         ctr.second->emitValueType(builder);
+    }
+    for (auto met : meters) {
+        met.second->emitValueType(builder);
+    }
+    if (!meters.empty()) {
+        meters.begin()->second->emitSpinLockField(builder);
     }
 }
 
@@ -318,6 +371,7 @@ void EBPFTablePSA::emitDefaultActionInitializer(CodeBuilder *builder) {
         emitMapUpdateTraceMsg(builder, defaultActionMapName, ret);
     }
 }
+
 void EBPFTablePSA::emitMapUpdateTraceMsg(CodeBuilder *builder, cstring mapName,
                                          cstring returnCode) const {
     builder->emitIndent();
@@ -420,16 +474,10 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
     commentGen.setBuilder(builder);
 
     unsigned int structAlignment = 4;  // 4 by default
-    unsigned int totalSizeOfKeys = 0;
-    unsigned int lengthOfTernaryFields = 0;
-    unsigned int lengthOfLPMFields = 0;
     if (keyGenerator != nullptr) {
-        std::vector<std::pair<size_t, const IR::KeyElement*>> ordered;
         unsigned fieldNumber = 0;
         for (auto c : keyGenerator->keyElements) {
-            auto mtdecl = program->refMap->getDeclaration(c->matchType->path, true);
-            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
-            if (matchType->name.name == "selector")
+            if (c->matchType->path->name.name == "selector")
                 continue;  // this match type is intended for ActionSelector, not table itself
 
             auto type = program->typeMap->getType(c->expression);
@@ -437,42 +485,20 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
             cstring fieldName = cstring("field") + Util::toString(fieldNumber);
             if (!ebpfType->is<IHasWidth>()) {
                 ::error(ErrorType::ERR_TYPE_ERROR,
-                        "%1%: illegal type %2% for key field", c, type);
+                        "%1%: illegal type %2% for key field", c->expression, type);
                 return;
             }
-            unsigned width = ebpfType->to<IHasWidth>()->widthInBits();
             if (ebpfType->to<EBPFScalarType>()->alignment() > structAlignment) {
                 structAlignment = 8;
             }
 
-            if (matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name) {
-                lengthOfTernaryFields += width;
-            } else if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
-                lengthOfLPMFields += width;
-            }
-
-            totalSizeOfKeys += ebpfType->to<EBPFScalarType>()->bytesRequired();
-            ordered.emplace_back(width, c);
             keyTypes.emplace(c, ebpfType);
             keyFieldNames.emplace(c, fieldName);
             fieldNumber++;
-        }
 
-        // Use this to order elements by size
-        std::stable_sort(ordered.begin(), ordered.end(),
-                [] (std::pair<size_t, const IR::KeyElement*> p1,
-                    std::pair<size_t, const IR::KeyElement*> p2) {
-            return p1.first <= p2.first;
-        });
-
-        // Emit key in decreasing order size - this way there will be no gaps
-        for (auto it = ordered.rbegin(); it != ordered.rend(); ++it) {
-            auto c = it->second;
-
-            auto ebpfType = ::get(keyTypes, c);
             builder->emitIndent();
-            cstring fieldName = ::get(keyFieldNames, c);
             ebpfType->declare(builder, fieldName, false);
+
             builder->append("; /* ");
             c->expression->apply(commentGen);
             builder->append(" */");
@@ -496,7 +522,7 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
     builder->blockStart();
 
     builder->emitIndent();
-    builder->appendFormat("__u8 mask[%d];", totalSizeOfKeys);
+    builder->appendFormat("__u8 mask[sizeof(struct %s)];", keyTypeName.c_str());
     builder->newline();
 
     builder->blockEnd(false);
@@ -638,6 +664,31 @@ void EBPFTernaryTablePSA::emitLookup(CodeBuilder *builder, cstring key, cstring 
     builder->blockEnd(true);
     builder->blockEnd(true);
     builder->blockEnd(true);
+}
+
+void EBPFTernaryTablePSA::validateKeys() const {
+    if (keyGenerator == nullptr)
+        return;
+
+    unsigned last_key_size = std::numeric_limits<unsigned>::max();
+    for (auto it : keyGenerator->keyElements) {
+        if (it->matchType->path->name.name == "selector")
+            continue;
+
+        auto type = program->typeMap->getType(it->expression);
+        auto ebpfType = EBPFTypeFactory::instance->create(type);
+        if (!ebpfType->is<IHasWidth>())
+            continue;
+
+        unsigned width = ebpfType->to<IHasWidth>()->widthInBits();
+        if (width > last_key_size) {
+            ::error(ErrorType::WARN_ORDERING,
+                    "%1%: key field larger than previous key, move it before previous key "
+                    "to avoid padding between these keys", it->expression);
+            return;
+        }
+        last_key_size = width;
+    }
 }
 
 // =====================EBPFValueSetPSA=============================

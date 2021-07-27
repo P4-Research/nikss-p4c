@@ -57,6 +57,11 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
         kind = "BPF_MAP_TYPE_HASH";
     } else if (tableKind == TableArray) {
         kind = "BPF_MAP_TYPE_ARRAY";
+    } else if (tableKind == TablePerCPUArray) {
+        kind = "BPF_MAP_TYPE_PERCPU_ARRAY";
+        // it's more safe to overwrite user-provided key type,
+        // as array map must have u32 key type.
+        keyType = "u32";
     } else if (tableKind == TableLPMTrie) {
         kind = "BPF_MAP_TYPE_LPM_TRIE";
         builder->appendFormat(registerTableWithFlags, tblName.c_str(),

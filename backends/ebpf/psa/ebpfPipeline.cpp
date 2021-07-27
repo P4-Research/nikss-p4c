@@ -83,12 +83,10 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     emitPacketLength(builder);
     builder->endOfStatement(true);
 
-    if (!this->control->meters.empty()) {
-        builder->emitIndent();
-        builder->appendFormat("u64 %s = ", timestampVar.c_str());
-        emitTimestamp(builder);
-        builder->endOfStatement(true);
-    }
+    builder->emitIndent();
+    builder->appendFormat("u64 %s = ", timestampVar.c_str());
+    emitTimestamp(builder);
+    builder->endOfStatement(true);
 }
 
 void EBPFPipeline::emitUserMetadataInstance(CodeBuilder* builder) {
@@ -129,6 +127,58 @@ void EBPFPipeline::emitTimestamp(CodeBuilder *builder) {
 }
 
 // =====================TCIngressPipeline=============================
+void TCIngressPipeline::emitTCWorkaroundUsingMeta(CodeBuilder *builder) {
+    builder->append("struct internal_metadata *md = "
+                    "(struct internal_metadata *)(unsigned long)skb->data_meta;\n");
+    builder->emitIndent();
+    builder->append("if ((void *) ((struct internal_metadata *) md + 1) > "
+                        "(void *)(long)skb->data) {\n"
+                        "           return TC_ACT_SHOT;\n"
+                        "       }\n");
+    builder->append("    __u16 *ether_type = (__u16 *) ((void *) (long)skb->data + 12);\n"
+                        "    if ((void *) ((__u16 *) ether_type + 1) > "
+                        "    (void *) (long) skb->data_end) {\n"
+                        "        return TC_ACT_SHOT;\n"
+                        "    }\n"
+                        "    *ether_type = md->pkt_ether_type;\n");
+}
+
+void TCIngressPipeline::emitTCWorkaroundUsingHead(CodeBuilder *builder) {
+    builder->append("    void *data = (void *)(long)skb->data;\n"
+                    "    void *data_end = (void *)(long)skb->data_end;\n"
+                    "    __u16 *orig_ethtype = data + 14;\n"
+                    "    if ((void *)((__u16 *) orig_ethtype + 1) > data_end) {\n"
+                    "        return TC_ACT_SHOT;\n"
+                    "    }\n"
+                    "    __u16 original_ethtype = *orig_ethtype;\n"
+                    "    int ret = bpf_skb_adjust_room(skb, -2, 1, 0);\n"
+                    "    if (ret < 0) {\n"
+                    "        return TC_ACT_SHOT;\n"
+                    "    }\n"
+                    "    data = (void *)(long)skb->data;\n"
+                    "    data_end = (void *)(long)skb->data_end;\n"
+                    "    struct ethhdr *eth = data;\n"
+                    "    if ((void *)((struct ethhdr *) eth + 1) > data_end) {\n"
+                    "        return TC_ACT_SHOT;\n"
+                    "    }\n"
+                    "    eth->h_proto = original_ethtype;");
+}
+
+void TCIngressPipeline::emitTCWorkaroundUsingCPUMAP(CodeBuilder *builder) {
+    builder->append("    void *data = (void *)(long)skb->data;\n"
+                    "    void *data_end = (void *)(long)skb->data_end;\n"
+                    "    u32 zeroKey = 0;\n"
+                    "    u16 *orig_ethtype = BPF_MAP_LOOKUP_ELEM(workaround_cpumap, &zeroKey);\n"
+                    "    if (!orig_ethtype) {\n"
+                    "        return TC_ACT_SHOT;\n"
+                    "    }\n"
+                    "    struct ethhdr *eth = data;\n"
+                    "    if ((void *)((struct ethhdr *) eth + 1) > data_end) {\n"
+                    "        return TC_ACT_SHOT;\n"
+                    "    }\n"
+                    "    eth->h_proto = *orig_ethtype;\n");
+}
+
 void TCIngressPipeline::emit(CodeBuilder *builder) {
     cstring msgStr;
     // firstly emit process() in-lined function and then the actual BPF section.
@@ -151,26 +201,21 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
     builder->newline();
     builder->blockStart();
     emitGlobalMetadataInitializer(builder);
-
     // workaround to make TC protocol-independent, DO NOT REMOVE
     builder->emitIndent();
     // replace ether_type only if a packet comes from XDP
     builder->append("if (meta->packet_path == NORMAL) ");
     builder->blockStart();
     builder->emitIndent();
-    builder->append("struct internal_metadata *md = "
-                        "(struct internal_metadata *)(unsigned long)skb->data_meta;\n");
-    builder->emitIndent();
-    builder->append("if ((void *) ((struct internal_metadata *) md + 1) > "
-                        "(void *)(long)skb->data) {\n"
-                        "           return TC_ACT_SHOT;\n"
-                        "       }\n");
-    builder->append("    __u16 *ether_type = (__u16 *) ((void *) (long)skb->data + 12);\n"
-                        "    if ((void *) ((__u16 *) ether_type + 1) > "
-                        "    (void *) (long) skb->data_end) {\n"
-                        "        return TC_ACT_SHOT;\n"
-                        "    }\n"
-                        "    *ether_type = md->pkt_ether_type;\n");
+    if (options.xdp2tcMode == XDP2TC_META) {
+        emitTCWorkaroundUsingMeta(builder);
+    } else if (options.xdp2tcMode == XDP2TC_HEAD) {
+        emitTCWorkaroundUsingHead(builder);
+    } else if (options.xdp2tcMode == XDP2TC_CPUMAP) {
+        emitTCWorkaroundUsingCPUMAP(builder);
+    } else {
+        BUG("no xdp2tc mode specified?");
+    }
     builder->blockEnd(true);
 
 

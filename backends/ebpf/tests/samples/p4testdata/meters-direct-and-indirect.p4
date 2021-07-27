@@ -2,7 +2,6 @@
 #include <psa.p4>
 
 typedef bit<48>  EthernetAddress;
-typedef bit<32>  IPv4Address;
 
 header ethernet_t {
     EthernetAddress dstAddr;
@@ -10,19 +9,19 @@ header ethernet_t {
     bit<16>         etherType;
 }
 
-header ipv4_h {
-    bit<4>       version;
-    bit<4>       ihl;
-    bit<8>       diffserv;
-    bit<16>      totalLen;
-    bit<16>      identification;
-    bit<3>       flags;
-    bit<13>      fragOffset;
-    bit<8>       ttl;
-    bit<8>       protocol;
-    bit<16>      hdrChecksum;
-    IPv4Address  srcAddr;
-    IPv4Address  dstAddr;
+header ipv4_t {
+    bit<4>  version;
+    bit<4>  ihl;
+    bit<8>  diffserv;
+    bit<16> totalLen;
+    bit<16> identification;
+    bit<3>  flags;
+    bit<13> fragOffset;
+    bit<8>  ttl;
+    bit<8>  protocol;
+    bit<16> hdrChecksum;
+    bit<32> srcAddr;
+    bit<32> dstAddr;
 }
 
 struct fwd_metadata_t {
@@ -36,32 +35,33 @@ struct metadata {
 
 struct headers {
     ethernet_t       ethernet;
-    ipv4_h           ipv4;
+    ipv4_t           ipv4;
 }
 
+
 parser IngressParserImpl(packet_in buffer,
-                         out headers hdr,
+                         out headers parsed_hdr,
                          inout metadata user_meta,
                          in psa_ingress_parser_input_metadata_t istd,
                          in empty_t resubmit_meta,
                          in empty_t recirculate_meta)
 {
     state start {
-        buffer.extract(hdr.ethernet);
-        transition select(hdr.ethernet.etherType) {
-            16w0x800 : ipv4;
-            default : reject;
+        buffer.extract(parsed_hdr.ethernet);
+        transition select(parsed_hdr.ethernet.etherType) {
+            0x0800: parse_ipv4;
+            default: accept;
         }
     }
 
-    state ipv4 {
-        buffer.extract(hdr.ipv4);
+    state parse_ipv4 {
+        buffer.extract(parsed_hdr.ipv4);
         transition accept;
     }
 }
 
 parser EgressParserImpl(packet_in buffer,
-                        out headers hdr,
+                        out headers parsed_hdr,
                         inout metadata user_meta,
                         in psa_egress_parser_input_metadata_t istd,
                         in empty_t normal_meta,
@@ -69,7 +69,15 @@ parser EgressParserImpl(packet_in buffer,
                         in empty_t clone_e2e_meta)
 {
     state start {
-        buffer.extract(hdr.ethernet);
+        buffer.extract(parsed_hdr.ethernet);
+        transition select(parsed_hdr.ethernet.etherType) {
+            0x0800: parse_ipv4;
+            default: accept;
+        }
+    }
+
+    state parse_ipv4 {
+        buffer.extract(parsed_hdr.ipv4);
         transition accept;
     }
 }
@@ -79,53 +87,33 @@ control ingress(inout headers hdr,
                 in    psa_ingress_input_metadata_t  istd,
                 inout psa_ingress_output_metadata_t ostd)
 {
-    action do_change_src_addr() {
-        hdr.ipv4.srcAddr = 0x11111111;
-    }
+    DirectMeter(PSA_MeterType_t.BYTES) direct_meter;
+    Meter<bit<7>>(1, PSA_MeterType_t.BYTES) indirect_meter;
+    PSA_MeterColor_t color1 = PSA_MeterColor_t.RED;
 
-    action do_change_dst_addr() {
-        hdr.ipv4.dstAddr = 0xffffffff;
-    }
+    action do_forward(PortId_t egress_port) {
+        color1 = direct_meter.execute();
 
-    action do_change_protocol() {
-        hdr.ipv4.protocol = 0x7;
-    }
-
-    table tbl_ternary_0 {
-        key = {
-            hdr.ipv4.srcAddr : ternary;
+        if (color1 != PSA_MeterColor_t.RED) {
+            send_to_port(ostd, egress_port);
+        } else {
+            ingress_drop(ostd);
         }
-        actions = { do_change_src_addr; NoAction; }
-        default_action = NoAction;
-        size = 100;
     }
 
-     table tbl_ternary_1 {
+    table tbl_fwd {
         key = {
-            hdr.ipv4.dstAddr  : lpm;
-            hdr.ipv4.diffserv : ternary;
+            istd.ingress_port : exact;
         }
-        actions = { do_change_dst_addr; NoAction; }
-        default_action = NoAction;
+        actions = { do_forward; NoAction; }
+        default_action = do_forward((PortId_t) 6);
         size = 100;
-    }
-
-    table tbl_ternary_2 {
-        key = {
-            hdr.ipv4.dstAddr  : lpm;
-            hdr.ipv4.protocol : exact;
-            hdr.ipv4.diffserv : ternary;
-        }
-        actions = { do_change_protocol; NoAction; }
-        default_action = NoAction;
-        size = 100;
+        psa_direct_meter = direct_meter;
     }
 
     apply {
-         send_to_port(ostd, (PortId_t) 5);
-         tbl_ternary_0.apply();
-         tbl_ternary_2.apply();
-         tbl_ternary_1.apply();
+         tbl_fwd.apply();
+         indirect_meter.execute(0);
     }
 }
 
@@ -142,6 +130,7 @@ control CommonDeparserImpl(packet_out packet,
 {
     apply {
         packet.emit(hdr.ethernet);
+        packet.emit(hdr.ipv4);
     }
 }
 
@@ -153,9 +142,9 @@ control IngressDeparserImpl(packet_out buffer,
                             in metadata meta,
                             in psa_ingress_output_metadata_t istd)
 {
+    CommonDeparserImpl() cp;
     apply {
-        buffer.emit(hdr.ethernet);
-        buffer.emit(hdr.ipv4);
+        cp.apply(buffer, hdr);
     }
 }
 
@@ -182,3 +171,4 @@ EgressPipeline(EgressParserImpl(),
                EgressDeparserImpl()) ep;
 
 PSA_Switch(ip, PacketReplicationEngine(), ep, BufferingQueueingEngine()) main;
+
