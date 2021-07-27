@@ -644,10 +644,10 @@ void XDPEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
 void TCTrafficManagerForXDP::emitReadXDP2TCMetadataFromHead(CodeBuilder *builder) {
         builder->emitIndent();
         builder->append("    void *data = (void *)(long)skb->data;\n"
-                        "    void *data_end = (void *)(long)skb->data_end;\n"
-                        "    if (((char *) data + 14 + sizeof(struct xdp2tc_metadata)) > (char *) data_end) {\n"
-                        "        return TC_ACT_SHOT;\n"
-                        "    }\n");
+            "    void *data_end = (void *)(long)skb->data_end;\n"
+            "    if (((char *) data + 14 + sizeof(struct xdp2tc_metadata)) > (char *) data_end) {\n"
+            "        return TC_ACT_SHOT;\n"
+            "    }\n");
         builder->emitIndent();
         builder->appendLine("struct xdp2tc_metadata xdp2tc_md = {};");
         builder->emitIndent();
@@ -681,8 +681,8 @@ void TCTrafficManagerForXDP::emitReadXDP2TCMetadataFromHead(CodeBuilder *builder
         builder->append("if (ret) ");
         builder->blockStart();
         builder->target->emitTraceMessage(builder,
-                                          "Deparser: failed to remove XDP2TC metadata from packet, ret=%d",
-                                          1, "ret");
+                      "Deparser: failed to remove XDP2TC metadata from packet, ret=%d",
+                      1, "ret");
         builder->emitIndent();
         builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
         builder->newline();
