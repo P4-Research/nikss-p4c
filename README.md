@@ -139,7 +139,7 @@ $ psabpf-ctl pipeline add-port id <ID> <INTF>
 - Packet recirculation does not work properly if the `xdp2tc=head` mode is used.
 - The packet recirculation and packet resubmission is not supported, if the XDP acceleration is used (`--xdp`). 
 - In the XDP acceleration mode, packet cloning in the egress pipeline (`CLONE_E2E`) does not work. 
-  The standard TC mode should used then.
+  The standard TC mode should be used then.
 - Metadata length must be less than 32 bytes. Otherwise, `bpf_xdp_adjust_meta()` return error.
 - `skb` is protocol-dependent and tightly coupled with the Ethernet/IP protocols. Therefore, in order to
    achieve a protocol-independence, we had to introduce some workarounds that make TC protocol-independent.

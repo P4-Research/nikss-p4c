@@ -130,6 +130,9 @@ class XDPEgressPipeline : public XDPPipeline {
 };
 
 class TCTrafficManagerForXDP : public TCIngressPipeline {
+    void emitReadXDP2TCMetadataFromHead(CodeBuilder *builder);
+    void emitReadXDP2TCMetadataFromCPUMAP(CodeBuilder *builder);
+
  public:
     TCTrafficManagerForXDP(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                            P4::TypeMap* typeMap) :

@@ -114,7 +114,7 @@ void PSAArch::emit2TC(CodeBuilder *builder) const {
     builder->target->emitLicense(builder, xdp->license);
 }
 
-void PSAArch::emitCloneSessionMulticastTables(CodeBuilder *builder) const {
+void PSAArch::emitPacketReplicationTables(CodeBuilder *builder) const {
     builder->target->emitMapInMapDecl(builder, "clone_session_tbl_inner",
                                       TableHash, "elem_t",
                                       "struct element", MaxClones, "clone_session_tbl",
@@ -300,7 +300,7 @@ void PSAArch::emitInstances2TC(CodeBuilder *builder) const {
                                        TablePerCPUArray, "u32",
                                        "u16", 1);
     }
-    emitCloneSessionMulticastTables(builder);
+    emitPacketReplicationTables(builder);
 
     tcIngress->parser->emitValueSetInstances(builder);
     tcIngress->control->emitTableInstances(builder);
@@ -398,7 +398,7 @@ void PSAArch::emitInstances2XDP(CodeBuilder *builder) const {
     builder->newline();
 
     builder->appendLine("REGISTER_START()");
-    emitCloneSessionMulticastTables(builder);
+    emitPacketReplicationTables(builder);
     xdpIngress->parser->emitValueSetInstances(builder);
     xdpIngress->control->emitTableInstances(builder);
     xdpIngress->deparser->emitDigestInstances(builder);
