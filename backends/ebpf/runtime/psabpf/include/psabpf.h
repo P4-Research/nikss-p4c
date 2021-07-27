@@ -261,60 +261,33 @@ int psabpf_counter_reset(const char *name, size_t index);
 typedef uint64_t psabpf_meter_value_t;
 
 typedef struct {
-    void *data;
-    size_t size;
-} psabpf_meter_index_t;
-
-typedef struct {
+    size_t index_size;
+    void *index;
     psabpf_meter_value_t pbs;
     psabpf_meter_value_t pir;
     psabpf_meter_value_t cbs;
     psabpf_meter_value_t cir;
-} psabpf_meter_data_t;
-
-typedef struct {
-    psabpf_meter_value_t pir_period;
-    psabpf_meter_value_t pir_unit_per_period;
-    psabpf_meter_value_t cir_period;
-    psabpf_meter_value_t cir_unit_per_period;
-    psabpf_meter_value_t pbs;
-    psabpf_meter_value_t cbs;
-    psabpf_meter_value_t pbs_left;
-    psabpf_meter_value_t cbs_left;
-    psabpf_meter_value_t time_p;
-    psabpf_meter_value_t time_c;
 } psabpf_meter_entry_t;
 
 typedef struct {
     int table_fd;
-    uint32_t key_size;
+    uint32_t index_size;
     uint32_t value_size;
     char base_name[256];
-    psabpf_meter_index_t *index;
-    psabpf_meter_data_t *data;
-    psabpf_meter_entry_t *entry;
 } psabpf_meter_ctx_t;
-
-void psabpf_meter_index_init(psabpf_meter_index_t *index);
-void psabpf_meter_index_free(psabpf_meter_index_t *index);
-int psabpf_meter_index_data(psabpf_meter_index_t *index, const char *data, size_t size);
-
-void psabpf_meter_data_init(psabpf_meter_data_t *data);
-void psabpf_meter_data_free(psabpf_meter_data_t *data);
-int psabpf_meter_data_entry(psabpf_meter_data_t *data, psabpf_meter_entry_t *entry);
-int psabpf_meter_data_pbs(psabpf_meter_data_t *data, psabpf_meter_value_t pbs);
-int psabpf_meter_data_pir(psabpf_meter_data_t *data, psabpf_meter_value_t pir);
-int psabpf_meter_data_cbs(psabpf_meter_data_t *data, psabpf_meter_value_t cbs);
-int psabpf_meter_data_cir(psabpf_meter_data_t *data, psabpf_meter_value_t cir);
 
 void psabpf_meter_entry_init(psabpf_meter_entry_t *entry);
 void psabpf_meter_entry_free(psabpf_meter_entry_t *entry);
-int psabpf_meter_entry_data(psabpf_meter_entry_t *entry, psabpf_meter_data_t *data);
+int psabpf_meter_entry_index(psabpf_meter_entry_t *entry, const char *data, size_t size);
+int psabpf_meter_entry_data(psabpf_meter_entry_t *entry,
+                            psabpf_meter_value_t pir,
+                            psabpf_meter_value_t pbs,
+                            psabpf_meter_value_t cir,
+                            psabpf_meter_value_t cbs);
 
 void psabpf_meter_ctx_init(psabpf_meter_ctx_t *ctx);
 void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx);
 int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx, const char *name);
-int psabpf_meter_ctx_index(psabpf_meter_ctx_t *ctx, psabpf_meter_index_t *index);
 int psabpf_meter_ctx_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
 int psabpf_meter_ctx_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
 int psabpf_meter_ctx_reset(psabpf_meter_ctx_t *ctx);

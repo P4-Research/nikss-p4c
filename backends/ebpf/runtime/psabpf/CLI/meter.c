@@ -42,8 +42,7 @@ int parse_dst_meter(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
     return NO_ERROR;
 }
 
-int parse_meter_index(int *argc, char ***argv, psabpf_meter_ctx_t *ctx,
-                      psabpf_meter_index_t *index) {
+int parse_meter_index(int *argc, char ***argv, psabpf_meter_entry_t *entry) {
     int error_code = NO_ERROR;
 
     if (!is_keyword(**argv, "index"))
@@ -51,18 +50,14 @@ int parse_meter_index(int *argc, char ***argv, psabpf_meter_ctx_t *ctx,
 
     NEXT_ARGP_RET();
 
-    error_code = translate_data_to_bytes(**argv, index, CTX_METER_INDEX);
-    if (error_code != NO_ERROR)
-        return error_code;
-
-    error_code = psabpf_meter_ctx_index(ctx, index);
+    error_code = translate_data_to_bytes(**argv, entry, CTX_METER_INDEX);
     if (error_code != NO_ERROR)
         return error_code;
 
     return NO_ERROR;
 }
 
-int parse_meter_data(int *argc, char ***argv, psabpf_meter_data_t *data) {
+int parse_meter_data(int *argc, char ***argv, psabpf_meter_entry_t *entry) {
     NEXT_ARGP_RET();
 
     int error_code = NO_ERROR;
@@ -103,20 +98,7 @@ int parse_meter_data(int *argc, char ***argv, psabpf_meter_data_t *data) {
     if (error_code != NO_ERROR)
         return error_code;
 
-    error_code = psabpf_meter_data_pir(data, pir);
-    if (error_code != NO_ERROR)
-        return error_code;
-    error_code = psabpf_meter_data_pbs(data, pbs);
-    if (error_code != NO_ERROR)
-        return error_code;
-    error_code = psabpf_meter_data_cir(data, cir);
-    if (error_code != NO_ERROR)
-        return error_code;
-    error_code = psabpf_meter_data_cbs(data, cbs);
-    if (error_code != NO_ERROR)
-        return error_code;
-
-    return NO_ERROR;
+    return psabpf_meter_entry_data(entry, pir, pbs, cir, cbs);
 }
 
 /******************************************************************************
@@ -124,15 +106,11 @@ int parse_meter_data(int *argc, char ***argv, psabpf_meter_data_t *data) {
  *****************************************************************************/
 
 int do_meter_get(int argc, char **argv) {
-    psabpf_meter_data_t data;
-    psabpf_meter_index_t index;
     psabpf_meter_entry_t entry;
     psabpf_meter_ctx_t meter_ctx;
     psabpf_context_t psabpf_ctx;
     int error_code = EPERM;
 
-    psabpf_meter_data_init(&data);
-    psabpf_meter_index_init(&index);
     psabpf_meter_entry_init(&entry);
     psabpf_meter_ctx_init(&meter_ctx);
     psabpf_context_init(&psabpf_ctx);
@@ -146,25 +124,19 @@ int do_meter_get(int argc, char **argv) {
         goto clean_up;
 
     /* 2. Get index */
-    if (parse_meter_index(&argc, &argv, &meter_ctx, &index) != NO_ERROR)
+    if (parse_meter_index(&argc, &argv, &entry) != NO_ERROR)
         goto clean_up;
 
     /* 3. Get meter value */
     if (psabpf_meter_ctx_get(&meter_ctx, &entry) != NO_ERROR)
         goto clean_up;
 
-    /* 4. Convert meter entry into data representation */
-    if (psabpf_meter_data_entry(&data, &entry) != NO_ERROR)
-        goto clean_up;
-
-    /* 5. Display meter entry */
+    /* 4. Display meter entry */
     fprintf(stderr, "pir=%lu, pbs=%lu, cir=%lu, cbs=%lu\n",
-            data.pir, data.pbs, data.cir, data.cbs);
+            entry.pir, entry.pbs, entry.cir, entry.cbs);
     error_code = NO_ERROR;
 
 clean_up:
-    psabpf_meter_data_free(&data);
-    psabpf_meter_index_free(&index);
     psabpf_meter_entry_free(&entry);
     psabpf_meter_ctx_free(&meter_ctx);
     psabpf_context_free(&psabpf_ctx);
@@ -172,15 +144,11 @@ clean_up:
 }
 
 int do_meter_update(int argc, char **argv) {
-    psabpf_meter_data_t data;
-    psabpf_meter_index_t index;
     psabpf_meter_entry_t entry;
     psabpf_meter_ctx_t meter_ctx;
     psabpf_context_t psabpf_ctx;
     int error_code = EPERM;
 
-    psabpf_meter_data_init(&data);
-    psabpf_meter_index_init(&index);
     psabpf_meter_entry_init(&entry);
     psabpf_meter_ctx_init(&meter_ctx);
     psabpf_context_init(&psabpf_ctx);
@@ -194,22 +162,16 @@ int do_meter_update(int argc, char **argv) {
         goto clean_up;
 
     /* 2. Get index */
-    if (parse_meter_index(&argc, &argv, &meter_ctx, &index) != NO_ERROR)
+    if (parse_meter_index(&argc, &argv, &entry) != NO_ERROR)
         goto clean_up;
 
     /* 3. Get meter parameters */
-    if (parse_meter_data(&argc, &argv, &data) != NO_ERROR)
-        goto clean_up;
-
-    /* 4. Convert meter parameters to meter entry */
-    if (psabpf_meter_entry_data(&entry, &data) != NO_ERROR)
+    if (parse_meter_data(&argc, &argv, &entry) != NO_ERROR)
         goto clean_up;
 
     error_code = psabpf_meter_ctx_update(&meter_ctx, &entry);
 
 clean_up:
-    psabpf_meter_data_free(&data);
-    psabpf_meter_index_free(&index);
     psabpf_meter_entry_free(&entry);
     psabpf_meter_ctx_free(&meter_ctx);
     psabpf_context_free(&psabpf_ctx);
@@ -217,12 +179,12 @@ clean_up:
 }
 
 int do_meter_reset(int argc, char **argv) {
-    psabpf_meter_index_t index;
+    psabpf_meter_entry_t entry;
     psabpf_meter_ctx_t meter_ctx;
     psabpf_context_t psabpf_ctx;
     int error_code = EPERM;
 
-    psabpf_meter_index_init(&index);
+    psabpf_meter_entry_init(&entry);
     psabpf_meter_ctx_init(&meter_ctx);
     psabpf_context_init(&psabpf_ctx);
 
@@ -235,14 +197,13 @@ int do_meter_reset(int argc, char **argv) {
         goto clean_up;
 
     /* 2. Get index */
-    if (parse_meter_index(&argc, &argv, &meter_ctx, &index) != NO_ERROR)
+    if (parse_meter_index(&argc, &argv, &entry) != NO_ERROR)
         goto clean_up;
-
 
     error_code = psabpf_meter_ctx_reset(&meter_ctx);
 
 clean_up:
-    psabpf_meter_index_free(&index);
+    psabpf_meter_entry_free(&entry);
     psabpf_meter_ctx_free(&meter_ctx);
     psabpf_context_free(&psabpf_ctx);
     return error_code;

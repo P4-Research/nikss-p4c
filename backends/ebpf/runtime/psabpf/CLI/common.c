@@ -56,7 +56,7 @@ static int update_context(const char *data, size_t len, void *ctx, enum destinat
     else if (ctx_type == CTX_ACTION_DATA)
         return psabpf_action_param_create(ctx, data, len);
     else if (ctx_type == CTX_METER_INDEX)
-        return psabpf_meter_index_data(ctx, data, len);
+        return psabpf_meter_entry_index(ctx, data, len);
 
     return EPERM;
 }
