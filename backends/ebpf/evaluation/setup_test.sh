@@ -85,7 +85,7 @@ for intf in ${INTERFACES//,/ } ; do
   ifconfig "$intf" promisc
 
   # TODO: move this to psabpf-ctl
-  bpftool net attach xdp pinned /sys/fs/bpf/prog/xdp_xdp-ingress dev "$intf" overwrite
+  bpftool net attach xdp pinned /sys/fs/bpf/prog/xdp_ingress_xdp-ingress dev "$intf" #overwrite
   tc qdisc add dev "$intf" clsact
   tc filter add dev "$intf" ingress bpf da fd /sys/fs/bpf/prog/classifier_tc-ingress
   tc filter add dev "$intf" egress bpf da fd /sys/fs/bpf/prog/classifier_tc-egress
