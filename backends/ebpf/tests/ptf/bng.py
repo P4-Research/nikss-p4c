@@ -77,7 +77,7 @@ def pkt_add_inner_vlan(pkt, vlan_vid=10, vlan_pcp=0, dl_vlan_cfi=0):
 def pkt_add_pppoe(pkt, type, code, session_id):
     return Ether(src=pkt[Ether].src, dst=pkt[Ether].dst) / \
            PPPoE(version=1, type=type, code=code, sessionid=session_id) / \
-           PPP() / pkt[Ether].payload
+           PPP(proto=0x0021) / pkt[Ether].payload
 
 
 def pkt_add_mpls(pkt, label, ttl, cos=0, s=1):
@@ -144,6 +144,9 @@ class BNGTest(P4EbpfTest):
         if ethertype == ETH_TYPE_IPV4:
             key_eth_type = "0^0"
             key_ip_eth_type = ETH_TYPE_IPV4
+        elif ethertype == ETH_TYPE_PPPOE:
+            key_eth_type = "{}^0xffff".format(ETH_TYPE_PPPOE)
+            key_ip_eth_type = ETH_TYPE_IPV4
         elif ethertype == ETH_TYPE_MPLS_UNICAST:
             key_eth_type = "{}^0xffff".format(ETH_TYPE_MPLS_UNICAST)
             key_ip_eth_type = ETH_TYPE_IPV4
@@ -162,6 +165,10 @@ class BNGTest(P4EbpfTest):
     def add_next_vlan(self, port_id, new_vlan_id):
         self.table_add(table="ingress_next_vlan", keys=[port_id],
                        action=1, data=[new_vlan_id])
+
+    def add_next_double_vlan(self, port_id, new_vlan_id, new_inner_vlan_id):
+        self.table_add(table="ingress_next_vlan", keys=[port_id],
+                       action=2, data=[new_vlan_id, new_inner_vlan_id])
 
     def set_upstream_pppoe_cp_table(self, pppoe_codes=()):
         for code in pppoe_codes:
@@ -194,15 +201,9 @@ class BNGTest(P4EbpfTest):
                            action=2)
 
 
-class BasicTest(BNGTest):
+class PPPoEUpstreamTest(BNGTest):
 
-    def doRunTest(self, pkt, tagged2, mpls, line_enabled):
-        if not self.session_installed:
-            self.setup_line_v4(
-                s_tag=s_tag, c_tag=c_tag, line_id=line_id, ipv4_addr=pkt[IP].src,
-                mac_src=pkt[Ether].src, pppoe_session_id=pppoe_session_id, enabled=line_enabled)
-            self.session_installed = True
-
+    def doRunTest(self, pkt):
         # Input is the given packet with double VLAN tags and PPPoE headers.
         pppoe_pkt = pkt_add_pppoe(pkt, type=1, code=PPPOE_CODE_SESSION_STAGE,
                                   session_id=pppoe_session_id)
@@ -213,12 +214,7 @@ class BasicTest(BNGTest):
         # if it was without VLAN tags and PPPoE headers.
         exp_pkt = pkt.copy()
         exp_pkt = pkt_route(exp_pkt, core_router_mac)
-        if tagged2:
-            exp_pkt = pkt_add_vlan(exp_pkt, VLAN_ID_3)
-        if mpls:
-            exp_pkt = pkt_add_mpls(exp_pkt, MPLS_LABEL_2, DEFAULT_MPLS_TTL)
-        else:
-            exp_pkt = pkt_decrement_ttl(exp_pkt)
+        exp_pkt = pkt_decrement_ttl(exp_pkt)
 
         if Dot1Q not in pppoe_pkt:
             pppoe_pkt = pkt_add_vlan(pkt, vlan_vid=s_tag)
@@ -234,13 +230,8 @@ class BasicTest(BNGTest):
                     pppoe_pkt = pkt_add_vlan(pppoe_pkt, vlan_vid=s_tag)
                 else:
                     self.fail("Packet should be without VLANs or with correct VLANs")
-        if mpls:
-            # If MPLS test, egress_port is assumed to be a spine port, with
-            # default vlan untagged.
-            next_vlan = DEFAULT_VLAN
-            assert not tagged2
-        else:
-            next_vlan = VLAN_ID_3 if tagged2 else s_tag
+
+        next_vlan = s_tag
         next_id = 100
         group_id = next_id
         mpls_label = MPLS_LABEL_2
@@ -248,32 +239,71 @@ class BasicTest(BNGTest):
         dst_ipv4 = pppoe_pkt[IP].dst
         switch_mac = pppoe_pkt[Ether].dst
 
-        # Setup port 1: packets on this port are double tagged packets
-        self.setup_port(4, vlan_id=s_tag, port_type=PORT_TYPE_EDGE, double_tagged=True, inner_vlan_id=c_tag)
-        # Setup port 2
-        self.setup_port(5, vlan_id=next_vlan, port_type=PORT_TYPE_INFRA, tagged=tagged2)
+        if not self.session_installed:
+            self.setup_line_v4(
+                s_tag=s_tag, c_tag=c_tag, line_id=line_id, ipv4_addr=pkt[IP].src,
+                mac_src=pkt[Ether].src, pppoe_session_id=pppoe_session_id, enabled=True)
+            self.session_installed = True
+            # Setup port 1: packets on this port are double tagged packets
+            self.setup_port(4, vlan_id=s_tag, port_type=PORT_TYPE_EDGE, double_tagged=True, inner_vlan_id=c_tag)
+            # Setup port 2
+            self.setup_port(5, vlan_id=next_vlan, port_type=PORT_TYPE_INFRA, tagged=False)
 
-        self.set_forwarding_type(4, switch_mac, ETH_TYPE_IPV4,
-                                 FORWARDING_TYPE_UNICAST_IPV4)
-        self.add_forwarding_routing_v4_entry(dst_ipv4, 24, 5, switch_mac, HOST1_MAC)
-        self.add_next_vlan(5, next_vlan)
+            self.set_forwarding_type(4, switch_mac, ETH_TYPE_PPPOE,
+                                     FORWARDING_TYPE_UNICAST_IPV4)
+            self.add_forwarding_routing_v4_entry(dst_ipv4, 24, 5, switch_mac, HOST1_MAC)
+            self.add_next_vlan(5, next_vlan)
 
         testutils.send_packet(self, PORT0, pppoe_pkt)
         testutils.verify_packet(self, exp_pkt, PORT1)
-        self.verify_no_other_packets()
+        testutils.verify_no_other_packets(self)
 
     def runTest(self):
         self.set_upstream_pppoe_cp_table(PPPOED_CODES)
         print("")
-        for line_enabled in [True, False]:
-            for out_tagged in [False, True]:
-                for mpls in [False, True]:
-                    if mpls and out_tagged:
-                        continue
-                    for pkt_type in ["tcp", "udp", "icmp"]:
-                        print("Testing %s packet, line_enabled=%s, " \
-                              "out_tagged=%s, mpls=%s ..." \
-                              % (pkt_type, line_enabled, out_tagged, mpls))
-                        pkt = getattr(testutils, "simple_%s_packet" % pkt_type)(
-                            pktlen=120)
-                        self.doRunTest(pkt, out_tagged, mpls, line_enabled)
+        for pkt_type in ["tcp", "udp", "icmp"]:
+            print("Testing %s packet..." \
+                  % pkt_type)
+            pkt = getattr(testutils, "simple_%s_packet" % pkt_type)(
+                pktlen=120)
+            self.doRunTest(pkt)
+
+class PPPoEDownstreamTest(BNGTest):
+
+    def doRunTest(self, pkt):
+        # Build expected packet from the input one, we expect it to be routed
+        # and encapsulated in double VLAN tags and PPPoE.
+        exp_pkt = pkt_add_pppoe(pkt, type=1, code=PPPOE_CODE_SESSION_STAGE, session_id=pppoe_session_id)
+        exp_pkt = pkt_add_vlan(exp_pkt, vlan_vid=vlan_id_outer)
+        exp_pkt = pkt_add_inner_vlan(exp_pkt, vlan_vid=vlan_id_inner)
+        exp_pkt = pkt_route(exp_pkt, HOST1_MAC)
+        exp_pkt = pkt_decrement_ttl(exp_pkt)
+
+        if not self.session_installed:
+            self.setup_line_v4(
+                s_tag=s_tag, c_tag=c_tag, line_id=line_id, ipv4_addr=pkt[IP].src,
+                mac_src=pkt[Ether].src, pppoe_session_id=pppoe_session_id, enabled=True)
+            self.session_installed = True
+            # Setup port 1: packets on this port are double tagged packets
+            self.setup_port(4, vlan_id=VLAN_ID_3, port_type=PORT_TYPE_EDGE, double_tagged=True, inner_vlan_id=c_tag)
+            # Setup port 2
+            self.setup_port(5, vlan_id=s_tag, port_type=PORT_TYPE_INFRA, tagged=False)
+
+            self.set_forwarding_type(5, pkt[Ether].dst, ETH_TYPE_IPV4,
+                                     FORWARDING_TYPE_UNICAST_IPV4)
+            self.add_forwarding_routing_v4_entry(pkt[IP].dst, 24, 4, pkt[Ether].dst, HOST1_MAC)
+            self.add_next_double_vlan(4, s_tag, c_tag)
+
+        testutils.send_packet(self, PORT1, pkt)
+        testutils.verify_packet(self, exp_pkt, PORT0)
+        testutils.verify_no_other_packets(self)
+
+
+    def runTest(self):
+        print("")
+        for pkt_type in ["tcp", "udp", "icmp"]:
+            print("Testing %s packet..." \
+                  % pkt_type)
+            pkt = getattr(testutils, "simple_%s_packet" % pkt_type)(
+                pktlen=120)
+            self.doRunTest(pkt)

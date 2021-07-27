@@ -45,9 +45,8 @@ const bit<16> ETHERTYPE_ARP  = 0x0806;
 const bit<16> ETHERTYPE_PPPOED = 0x8863;
 const bit<16> ETHERTYPE_PPPOES = 0x8864;
 
-const bit<16> PPPOE_PROTOCOL_IP4 = 0x0021;
+const bit<8> PPPOE_PROTOCOL_IP4 = 0x21;
 const bit<16> PPPOE_PROTOCOL_IP6 = 0x0057;
-const bit<16> PPPOE_PROTOCOL_MPLS = 0x0281;
 
 const bit<8> PROTO_ICMP = 1;
 const bit<8> PROTO_TCP = 6;
@@ -87,7 +86,7 @@ header pppoe_t {
     bit<8>  code;
     bit<16> session_id;
     bit<16> length;
-    bit<16> protocol;
+    bit<8> protocol;
 }
 
 header ipv4_t {
@@ -108,8 +107,12 @@ header ipv4_t {
 
 header bridged_metadata_t {
     bit<32>   line_id;
-    bit<16>   vlan_id;
+    bit<16>   pppoe_session_id;
+    bit<12>   vlan_id;
     bit<8>    bng_type;
+    bit<8>    fwd_type;
+    bit<8>    push_double_vlan;
+    bit<12>   inner_vlan_id;
 }
 
 typedef bit<2> bng_type_t;
@@ -209,7 +212,6 @@ parser packet_parser(packet_in packet, out headers_t hdr, inout local_metadata_t
     state parse_pppoe {
         packet.extract(hdr.pppoe);
         transition select(hdr.pppoe.protocol) {
-            PPPOE_PROTOCOL_MPLS: parse_mpls;
             PPPOE_PROTOCOL_IP4: parse_ipv4;
             default: accept;
         }
@@ -541,8 +543,12 @@ control ingress(inout headers_t hdr, inout local_metadata_t local_metadata, in p
 
         if (!ostd.drop) {
             hdr.bmd.setValid();
-            hdr.bmd.vlan_id = (bit<16>) local_metadata.vlan_id;
+            hdr.bmd.vlan_id = local_metadata.vlan_id;
             hdr.bmd.bng_type = (bit<8>) local_metadata.bng.type;
+            hdr.bmd.fwd_type = (bit<8>) local_metadata.fwd_type;
+            hdr.bmd.push_double_vlan = local_metadata.push_double_vlan == true ? 8w1 : 8w0;
+            hdr.bmd.pppoe_session_id = local_metadata.bng.pppoe_session_id;
+            hdr.bmd.inner_vlan_id = local_metadata.inner_vlan_id;
         }
     }
 
@@ -556,18 +562,14 @@ control egress(inout headers_t hdr, inout local_metadata_t local_metadata, in ps
         // If VLAN is already valid, we overwrite it with a potentially new VLAN
         // ID, and same CFI, PRI, and eth_type values found in ingress.
         hdr.vlan_tag.setValid();
-        hdr.vlan_tag.cfi = local_metadata.vlan_cfi;
-        hdr.vlan_tag.pri = local_metadata.vlan_pri;
         hdr.vlan_tag.eth_type = ETHERTYPE_VLAN;
-        hdr.vlan_tag.vlan_id = local_metadata.vlan_id;
+        hdr.vlan_tag.vlan_id = hdr.bmd.vlan_id;
     }
 
     action push_inner_vlan() {
         // Push inner VLAN TAG, rewriting correclty the outer vlan eth_type
         hdr.inner_vlan_tag.setValid();
-        hdr.inner_vlan_tag.cfi = local_metadata.inner_vlan_cfi;
-        hdr.inner_vlan_tag.pri = local_metadata.inner_vlan_pri;
-        hdr.inner_vlan_tag.vlan_id = local_metadata.inner_vlan_id;
+        hdr.inner_vlan_tag.vlan_id = hdr.bmd.inner_vlan_id;
         hdr.inner_vlan_tag.eth_type = ETHERTYPE_VLAN;
         hdr.vlan_tag.eth_type = ETHERTYPE_VLAN;
     }
@@ -606,18 +608,18 @@ control egress(inout headers_t hdr, inout local_metadata_t local_metadata, in ps
         hdr.pppoe.version = 4w1;
         hdr.pppoe.type_id = 4w1;
         hdr.pppoe.code = 8w0; // 0 means session stage.
-        hdr.pppoe.session_id = local_metadata.bng.pppoe_session_id;
+        hdr.pppoe.session_id = hdr.bmd.pppoe_session_id;
         c_line_tx.count(local_metadata.bng.line_id);
     }
 
     action encap_v4() {
         encap();
-        hdr.pppoe.length = hdr.ipv4.total_len + 16w2;
+        hdr.pppoe.length = hdr.ipv4.total_len + 16w1;
         hdr.pppoe.protocol = PPPOE_PROTOCOL_IP4;
     }
 
     apply {
-        if (local_metadata.push_double_vlan == true) {
+        if (hdr.bmd.push_double_vlan == 8w1) {
             // Double VLAN termination.
             push_outer_vlan();
             push_inner_vlan();
@@ -632,7 +634,7 @@ control egress(inout headers_t hdr, inout local_metadata_t local_metadata, in ps
             hdr.mpls.ttl = hdr.mpls.ttl - 1;
             if (hdr.mpls.ttl == 0) egress_drop(ostd);
         } else {
-            if (hdr.ipv4.isValid() && local_metadata.fwd_type != FWD_BRIDGING) {
+            if (hdr.ipv4.isValid() && hdr.bmd.fwd_type != (bit<8>) FWD_BRIDGING) {
                 hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
                 if (hdr.ipv4.ttl == 0) egress_drop(ostd);
             }
@@ -648,6 +650,8 @@ control egress(inout headers_t hdr, inout local_metadata_t local_metadata, in ps
 }
 
 parser egress_parser(packet_in packet, out headers_t hdr, inout local_metadata_t local_metadata, in psa_egress_parser_input_metadata_t istd, in empty_metadata_t normal_meta, in empty_metadata_t clone_i2e_meta, in empty_metadata_t clone_e2e_meta) {
+    InternetChecksum() ck;
+
     state start {
         packet.extract(hdr.bmd);
         transition parse_ethernet;
@@ -701,6 +705,11 @@ parser egress_parser(packet_in packet, out headers_t hdr, inout local_metadata_t
 
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
+
+        ck.subtract(hdr.ipv4.hdr_checksum);
+        ck.subtract({/* 16-bit word */ hdr.ipv4.ttl, hdr.ipv4.protocol });
+        hdr.ipv4.hdr_checksum = ck.get();
+
         local_metadata.ip_proto = hdr.ipv4.protocol;
         local_metadata.ip_eth_type = ETHERTYPE_IPV4;
         local_metadata.ipv4_src_addr = hdr.ipv4.src_addr;
@@ -710,7 +719,13 @@ parser egress_parser(packet_in packet, out headers_t hdr, inout local_metadata_t
 }
 
 control egress_deparser(packet_out packet, out empty_metadata_t clone_e2e_meta, out empty_metadata_t recirculate_meta, inout headers_t hdr, in local_metadata_t local_metadata, in psa_egress_output_metadata_t istd, in psa_egress_deparser_input_metadata_t edstd) {
+    InternetChecksum() ck;
+
     apply {
+        ck.subtract(hdr.ipv4.hdr_checksum);
+        ck.add({/* 16-bit word */ hdr.ipv4.ttl, hdr.ipv4.protocol });
+        hdr.ipv4.hdr_checksum = ck.get();
+
         packet.emit(hdr.ethernet);
         packet.emit(hdr.vlan_tag);
         packet.emit(hdr.inner_vlan_tag);
