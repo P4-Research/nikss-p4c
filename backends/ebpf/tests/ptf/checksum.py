@@ -57,8 +57,9 @@ class HashCRC16PSATest(P4EbpfTest):
     p4_file_path ="samples/p4testdata/hash-crc16.p4"
 
     def runTest(self):
-        pkt = Ether() / "12345678900"
-        exp_pkt = Ether() / bytes.fromhex('313233343536373839 bb3d')
+        pkt = Ether() / "12345678900" / "dummy_payload" # FIXME: add dummy payload to avoid parser issues.
+                                                        #  Can be removed if we get rid of load_X functions in Parser.
+        exp_pkt = Ether() / bytes.fromhex('313233343536373839 bb3d') / "dummy_payload"
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
 
@@ -68,8 +69,9 @@ class HashInActionPSATest(P4EbpfTest):
     p4_file_path ="samples/p4testdata/hash-action.p4"
 
     def runTest(self):
-        pkt = Ether() / "12345678900"
-        exp_pkt = Ether() / bytes.fromhex('313233343536373839 bb3d')
+        pkt = Ether() / "12345678900" / "dummy_payload" # FIXME: add dummy payload to avoid parser issues.
+                                                        #  Can be removed if we get rid of load_X functions in Parser.
+        exp_pkt = Ether() / bytes.fromhex('313233343536373839 bb3d') / "dummy_payload"
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
 
@@ -79,8 +81,9 @@ class HashCRC32PSATest(P4EbpfTest):
     p4_file_path ="samples/p4testdata/hash-crc32.p4"
 
     def runTest(self):
-        pkt = Ether() / "1234567890000"
-        exp_pkt = Ether() / bytes.fromhex('313233343536373839 cbf43926')
+        pkt = Ether() / "1234567890000" / "dummy_payload" # FIXME: add dummy payload to avoid parser issues.
+                                                          #  Can be removed if we get rid of load_X functions in Parser.
+        exp_pkt = Ether() / bytes.fromhex('313233343536373839 cbf43926') / "dummy_payload"
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
 
@@ -102,7 +105,8 @@ class ChecksumCRC32MultipleUpdatesPSATest(P4EbpfTest):
     p4_file_path ="samples/p4testdata/checksum-updates.p4"
 
     def runTest(self):
-        pkt = Ether() / "1234567890000"
-        exp_pkt = Ether() / bytes.fromhex('313233343536373839 cbf43926')
+        pkt = Ether() / "1234567890000" / "dummy_payload" # FIXME: add dummy payload to avoid parser issues.
+                                                          #  Can be removed if we get rid of load_X functions in Parser.
+        exp_pkt = Ether() / bytes.fromhex('313233343536373839 cbf43926') / "dummy_payload"
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, exp_pkt, ALL_PORTS)
