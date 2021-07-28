@@ -518,11 +518,12 @@ headers->ethernet.dst_addr = headers->outer_ethernet.dst_addr;            }
                             break;
                         case 0: 
                             {
-                                if (skb->ifindex == 8) {
-                                    ostd->egress_port = 11;
+
+                                if (standard_metadata.ingress_port == (u32) 8) {
+                                    ostd->egress_port = (u32) 11;
                                 }
-                                else if (skb->ifindex == 11) {
-                                    ostd->egress_port = 8;
+                                else if (standard_metadata.ingress_port == (u32) 11) {
+                                    ostd->egress_port = (u32) 8;
                                 }
                             }
                             break;
