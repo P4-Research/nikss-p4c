@@ -520,10 +520,10 @@ headers->ethernet.dst_addr = headers->outer_ethernet.dst_addr;            }
                             {
 
                                 if (skb->ifindex == (u32) 8) {
-                                    ostd->egress_port = (u32) 11 >> 8;
+                                    ostd->egress_port = value->u.ingress_vxlan_decap.port_out;
                                 }
                                 else if (skb->ifindex == (u32) 11) {
-                                    ostd->egress_port = (u32) 8 >> 8;
+                                    ostd->egress_port = value->u.ingress_vxlan_decap.port_out;
                                 }
                             }
                             break;
