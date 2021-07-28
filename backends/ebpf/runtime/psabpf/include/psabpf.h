@@ -289,7 +289,7 @@ void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx);
 int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx, const char *name);
 int psabpf_meter_ctx_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
 int psabpf_meter_ctx_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
-int psabpf_meter_ctx_reset(psabpf_meter_ctx_t *ctx);
+int psabpf_meter_ctx_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
 
 ////// P4 Registers
 // TODO: to be implemented

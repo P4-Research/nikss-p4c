@@ -200,7 +200,7 @@ int do_meter_reset(int argc, char **argv) {
     if (parse_meter_index(&argc, &argv, &entry) != NO_ERROR)
         goto clean_up;
 
-    error_code = psabpf_meter_ctx_reset(&meter_ctx);
+    error_code = psabpf_meter_ctx_reset(&meter_ctx, &entry);
 
 clean_up:
     psabpf_meter_entry_free(&entry);

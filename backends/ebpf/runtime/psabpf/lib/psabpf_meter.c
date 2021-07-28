@@ -279,11 +279,6 @@ clean_up:
     return return_code;
 }
 
-int psabpf_meter_ctx_reset(psabpf_meter_ctx_t *ctx) {
-    int error_code = NO_ERROR;
-    psabpf_meter_entry_t entry;
-    psabpf_meter_entry_init(&entry);
-    error_code = psabpf_meter_ctx_update(ctx, &entry);
-    psabpf_meter_entry_free(&entry);
-    return error_code;
+int psabpf_meter_ctx_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry) {
+    return psabpf_meter_ctx_update(ctx, entry);
 }
