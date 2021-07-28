@@ -280,5 +280,8 @@ clean_up:
 }
 
 int psabpf_meter_ctx_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry) {
+    int return_code = psabpf_meter_entry_data(entry, 0, 0, 0, 0);
+    if (return_code != NO_ERROR)
+        return return_code;
     return psabpf_meter_ctx_update(ctx, entry);
 }
