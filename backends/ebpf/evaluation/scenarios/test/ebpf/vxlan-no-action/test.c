@@ -518,18 +518,15 @@ headers->ethernet.dst_addr = headers->outer_ethernet.dst_addr;            }
                             break;
                         case 0: 
                             {
-                                headers->outer_ethernet.ebpf_valid = true;
-                                headers->outer_ipv4.ebpf_valid = true;
-                                headers->outer_udp.ebpf_valid = true;
-                                headers->vxlan.ebpf_valid = true;
+
                                 ostd->drop = false;
-                                ostd->egress_port = value->u.ingress_vxlan_decap.port_out;
-                                //if (skb->ifindex == (u32) 8) {
-                                //    ostd->egress_port = value->u.ingress_vxlan_decap.port_out;
-                                //}
-                                //else if (skb->ifindex == (u32) 11) {
-                                //ostd->egress_port = value->u.ingress_vxlan_decap.port_out;
-                                //}
+
+                                if (skb->ifindex == (u32) 8) {
+                                    ostd->egress_port = (u32) 11;
+                                }
+                                else if (skb->ifindex == (u32) 11) {
+                                    ostd->egress_port = (u32) 8);
+                                }
                             }
                             break;
                         default:
