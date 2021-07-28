@@ -93,16 +93,16 @@ static int convert_meter_entry_to_data(psabpf_meter_entry_t *entry, psabpf_meter
     return NO_ERROR;
 }
 
-static int open_meter(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx) {
+static int open_meter(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx, const char *name) {
     char base_path[256];
     snprintf(base_path, sizeof(base_path), "%s/%s%u/maps",
              BPF_FS, PIPELINE_PREFIX, psabpf_context_get_pipeline(psabpf_ctx));
 
-    int ret = open_bpf_map(NULL, ctx->base_name, base_path, &(ctx->table_fd), &(ctx->index_size), &(ctx->value_size),
+    int ret = open_bpf_map(NULL, name, base_path, &(ctx->table_fd), &(ctx->index_size), &(ctx->value_size),
                            NULL, NULL, NULL);
 
     if (ret != NO_ERROR) {
-        fprintf(stderr, "couldn't open meter %s: %s\n", ctx->base_name, strerror(ret));
+        fprintf(stderr, "couldn't open meter %s: %s\n", name, strerror(ret));
         return ret;
     }
 
@@ -116,6 +116,20 @@ static int open_meter(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx) {
     return NO_ERROR;
 }
 
+static int check_index(const psabpf_meter_ctx_t *ctx, const psabpf_meter_entry_t *entry) {
+    if (entry->index == NULL) {
+        fprintf(stderr, "Index is not provided!");
+        return EINVAL;
+    }
+
+    if (ctx->index_size < entry->index_size) {
+        fprintf(stderr, "Provided index(size: %zu) is too big for this meter(index size: %u)\n",
+                entry->index_size, ctx->index_size);
+        return EINVAL;
+    }
+
+    return NO_ERROR;
+}
 
 void psabpf_meter_entry_init(psabpf_meter_entry_t *entry) {
     if (entry == NULL)
@@ -137,10 +151,10 @@ void psabpf_meter_entry_free(psabpf_meter_entry_t *entry) {
 int psabpf_meter_entry_index(psabpf_meter_entry_t *entry, const char *data, size_t size) {
     if (entry == NULL || data == NULL)
         return ENODATA;
+    if (entry->index != NULL)
+        return EEXIST;
 
-    if (entry->index == NULL) {
-        entry->index = malloc(size);
-    }
+    entry->index = malloc(size);
     memcpy(entry->index, data, size);
     entry->index_size = size;
 
@@ -175,12 +189,10 @@ void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx) {
 }
 
 int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx, const char *name) {
-    if (ctx == NULL)
+    if (ctx == NULL || psabpf_ctx == NULL || name == NULL)
         return EPERM;
 
-    snprintf(ctx->base_name, sizeof(ctx->base_name), "%s", name);
-
-    return open_meter(ctx, psabpf_ctx);
+    return open_meter(ctx, psabpf_ctx, name);
 }
 
 int psabpf_meter_ctx_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry) {
@@ -189,11 +201,9 @@ int psabpf_meter_ctx_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry) {
     char *value_buffer = NULL;
     char *index_buffer = NULL;
 
-    if (ctx->index_size < entry->index_size) {
-        fprintf(stderr, "Provided index(size: %zu) is too big for this meter(index size: %u)\n",
-                entry->index_size, ctx->index_size);
-        return EINVAL;
-    }
+    return_code = check_index(ctx, entry);
+    if (return_code != NO_ERROR)
+        return return_code;
 
     index_buffer = malloc(ctx->index_size);
     value_buffer = malloc(ctx->value_size);
@@ -235,11 +245,9 @@ int psabpf_meter_ctx_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry
     char *index_buffer = NULL;
     psabpf_meter_data_t data;
 
-    if (ctx->index_size < entry->index_size) {
-        fprintf(stderr, "Provided index(size: %zu) is too big for this meter(index size: %u)\n",
-                entry->index_size, ctx->index_size);
-        return EINVAL;
-    }
+    return_code = check_index(ctx, entry);
+    if (return_code != NO_ERROR)
+        return return_code;
 
     return_code = convert_meter_entry_to_data(entry, &data);
     if (return_code != NO_ERROR)

@@ -103,7 +103,7 @@ static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name, c
 
 int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name)
 {
-    if (ctx == NULL)
+    if (ctx == NULL || psabpf_ctx == NULL || name == NULL)
         return EPERM;
 
     char base_path[256];

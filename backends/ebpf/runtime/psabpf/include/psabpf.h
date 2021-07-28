@@ -273,7 +273,6 @@ typedef struct {
     int table_fd;
     uint32_t index_size;
     uint32_t value_size;
-    char base_name[256];
 } psabpf_meter_ctx_t;
 
 void psabpf_meter_entry_init(psabpf_meter_entry_t *entry);
