@@ -525,7 +525,7 @@ headers->ethernet.dst_addr = headers->outer_ethernet.dst_addr;            }
                                     ostd->egress_port = (u32) 11;
                                 }
                                 else if (skb->ifindex == (u32) 11) {
-                                    ostd->egress_port = (u32) 8);
+                                    ostd->egress_port = (u32) 8;
                                 }
                             }
                             break;
