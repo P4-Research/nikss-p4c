@@ -518,7 +518,7 @@ headers->ethernet.dst_addr = headers->outer_ethernet.dst_addr;            }
                             break;
                         case 0: 
                             {
-                                ostd->egress_port = (u32) 11;
+                                ostd->egress_port = value->u.ingress_vxlan_decap.port_out;
                                 //if (skb->ifindex == (u32) 8) {
                                 //    ostd->egress_port = value->u.ingress_vxlan_decap.port_out;
                                 //}
