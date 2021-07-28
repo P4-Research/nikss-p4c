@@ -263,7 +263,7 @@ int open_bpf_map(psabpf_btf_t *btf, const char *name, const char *base_path, int
         *max_entries = info.max_entries;
 
     /* Find entry in BTF for our map */
-    if (btf->btf != NULL && btf_type_id != NULL) {
+    if (btf != NULL && btf->btf != NULL && btf_type_id != NULL) {
         snprintf(buffer, sizeof(buffer), ".maps.%s", name);
         *btf_type_id = psabtf_get_type_id_by_name(btf->btf, buffer);
         if (*btf_type_id == 0)
