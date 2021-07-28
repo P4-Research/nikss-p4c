@@ -39,7 +39,7 @@ typedef struct {
  * @param unit_per_period In byte or packet
  */
 static void convert_rate(const psabpf_meter_value_t *rate, psabpf_meter_value_t *period,
-                  psabpf_meter_value_t *unit_per_period) {
+                         psabpf_meter_value_t *unit_per_period) {
     if (*rate == 0) {
         *unit_per_period = 0;
         *period = 0;

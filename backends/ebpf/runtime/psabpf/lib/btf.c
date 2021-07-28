@@ -183,7 +183,7 @@ size_t psabtf_get_type_size_by_id(struct btf * btf, uint32_t type_id)
     return 0;
 }
 
-int try_load_btf(psabpf_btf_t *btf, const char *program_name)
+static int try_load_btf(psabpf_btf_t *btf, const char *program_name)
 {
     btf->associated_prog = bpf_obj_get(program_name);
     if (btf->associated_prog < 0)
@@ -201,12 +201,12 @@ int try_load_btf(psabpf_btf_t *btf, const char *program_name)
 
     return NO_ERROR;
 
-    free_btf:
+free_btf:
     if (btf->btf != NULL)
         btf__free(btf->btf);
     btf->btf = NULL;
 
-    free_program:
+free_program:
     if (btf->associated_prog >= 0)
         close(btf->associated_prog);
     btf->associated_prog = -1;
@@ -263,7 +263,7 @@ int open_bpf_map(psabpf_btf_t *btf, const char *name, const char *base_path, int
         *max_entries = info.max_entries;
 
     /* Find entry in BTF for our map */
-    if (btf_type_id != NULL) {
+    if (btf->btf != NULL && btf_type_id != NULL) {
         snprintf(buffer, sizeof(buffer), ".maps.%s", name);
         *btf_type_id = psabtf_get_type_id_by_name(btf->btf, buffer);
         if (*btf_type_id == 0)
