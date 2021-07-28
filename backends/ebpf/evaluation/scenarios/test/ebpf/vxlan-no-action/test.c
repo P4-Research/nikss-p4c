@@ -518,13 +518,13 @@ headers->ethernet.dst_addr = headers->outer_ethernet.dst_addr;            }
                             break;
                         case 0: 
                             {
-
-                                if (skb->ifindex == (u32) 8) {
-                                    ostd->egress_port = value->u.ingress_vxlan_decap.port_out;
-                                }
-                                else if (skb->ifindex == (u32) 11) {
-                                    ostd->egress_port = value->u.ingress_vxlan_decap.port_out;
-                                }
+                                ostd->egress_port = (u32) 11;
+                                //if (skb->ifindex == (u32) 8) {
+                                //    ostd->egress_port = value->u.ingress_vxlan_decap.port_out;
+                                //}
+                                //else if (skb->ifindex == (u32) 11) {
+                                //ostd->egress_port = value->u.ingress_vxlan_decap.port_out;
+                                //}
                             }
                             break;
                         default:
