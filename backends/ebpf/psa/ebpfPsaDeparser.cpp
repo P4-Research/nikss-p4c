@@ -45,11 +45,8 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     for (auto a : controlBlock->container->controlLocals)
         emitDeclaration(builder, a);
 
-    if (!emitOnly) {
-        controlBlock->container->body->apply(*codeGen);
-        builder->newline();
-    }
-
+    emitDeparserExternCalls(builder);
+    builder->newline();
     emitPreDeparser(builder);
 
     const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);

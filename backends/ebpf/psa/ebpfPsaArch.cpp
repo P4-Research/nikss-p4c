@@ -863,9 +863,6 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
     if (this->type == TC_INGRESS) {
         codegen->asPointerVariables.insert(parserHeaders->name.name);
     }
-    if (this->type == TC_TRAFFIC_MANAGER) {
-        deparser->emitOnly = true;
-    }
 
     deparser->codeGen = codegen;
     if (!deparser->build()) {

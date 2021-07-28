@@ -28,7 +28,6 @@ class EBPFDeparserPSA : public EBPFControlPSA {
     const IR::Parameter* packet_out;
     const IR::Parameter* istd;
 
-    bool emitOnly = false;
     EBPFType* headerType;
     std::vector<cstring> headersExpressions;
     std::vector<const IR::Type_Header *> headersToEmit;
@@ -51,6 +50,10 @@ class EBPFDeparserPSA : public EBPFControlPSA {
     // require to have an original packet.
     virtual void emitPreDeparser(CodeBuilder *builder) {}
     virtual void emitResizeHead(CodeBuilder *builder) {}
+    virtual void emitDeparserExternCalls(CodeBuilder* builder) {
+        controlBlock->container->body->apply(*codeGen);
+        builder->newline();
+    }
     void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                     cstring &headerExpression) const;
     void emitField(CodeBuilder* builder, cstring headerExpression,
@@ -92,6 +95,10 @@ class TCIngressDeparserForTrafficManagerPSA : public TCIngressDeparserPSA {
                                           const IR::Parameter *istd) :
             TCIngressDeparserPSA(program, control, parserHeaders, istd) {}
     void emitPreDeparser(CodeBuilder *builder) override;
+    void emitDeparserExternCalls(CodeBuilder* builder) override {
+        (void) builder;
+        // do not emit deparser extern calls for TCIngressDeparserForTrafficManagerPSA
+    }
 };
 
 class TCEgressDeparserPSA : public TCDeparserPSA {
