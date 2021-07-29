@@ -336,7 +336,7 @@ void TCIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
     // In multicast mode, unicast packet is not send
     builder->target->emitTraceMessage(builder, "IngressTM: Multicast done, dropping source packet");
     builder->emitIndent();
-    builder->appendFormat("return %s", builder->target->dropReturnCode());
+    builder->appendFormat("return %s", dropReturnCode());
     builder->endOfStatement(true);
     builder->blockEnd(true);
 
@@ -409,7 +409,7 @@ void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->blockStart();
     builder->target->emitTraceMessage(builder, "EgressTM: Packet dropped due to metadata");
     builder->emitIndent();
-    builder->appendFormat("return %s", builder->target->dropReturnCode().c_str());
+    builder->appendFormat("return %s;", dropReturnCode());
     builder->endOfStatement(true);
     builder->blockEnd(true);
 
@@ -441,8 +441,8 @@ void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->emitIndent();
 
     builder->newline();
-
-    builder->appendFormat("return %s", builder->target->forwardReturnCode());
+    builder->emitIndent();
+    builder->appendFormat("return %s", forwardReturnCode());
     builder->endOfStatement(true);
 }
 
@@ -458,7 +458,6 @@ void XDPPipeline::emitTimestamp(CodeBuilder *builder) {
 // =====================XDPIngressPipeline=============================
 void XDPIngressPipeline::emit(CodeBuilder *builder) {
     cstring msgStr, varStr;
-
     control->codeGen->asPointerVariables.clear();
     deparser->codeGen->asPointerVariables.clear();
     builder->target->emitCodeSection(builder, sectionName);
@@ -471,7 +470,6 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     builder->emitIndent();
     deparser->to<XDPIngressDeparserPSA>()->emitSharedMetadataInitializer(builder);
     builder->newline();
-
 
     emitHeaderInstances(builder);
     builder->newline();
@@ -534,20 +532,8 @@ void XDPIngressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
     builder->newline();
 }
 
-/*
- * The Traffic Manager for Ingress pipeline SHOULD implements:
- * - Multicast handling
- * - send to port
- */
 void XDPIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
-    cstring mcast_grp = Util::printf_format("ostd.multicast_group");
-    builder->emitIndent();
-    builder->appendFormat("if (%s != 0) ", mcast_grp.c_str());
-    builder->blockStart();
-    builder->emitIndent();
-    builder->appendFormat("return %s;\n", builder->target->abortReturnCode().c_str());
-    builder->blockEnd(true);
-
+    // do not handle multicast; it has been handled earlier by PreDeparser.
     builder->emitIndent();
     builder->appendLine("return bpf_redirect_map(&tx_port, ostd.egress_port, 0);");
 }
@@ -638,7 +624,7 @@ void XDPEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder,
                                     "EgressTM: Packet dropped due to metadata");
     builder->emitIndent();
-    builder->appendFormat("return %s", builder->target->dropReturnCode().c_str());
+    builder->appendFormat("return %s", dropReturnCode());
     builder->endOfStatement(true);
     builder->blockEnd(true);
 
@@ -650,8 +636,118 @@ void XDPEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
                                         "EgressTM: output packet to port %d",
                                       1, varStr.c_str());
     builder->emitIndent();
-    builder->appendFormat("return %s", builder->target->forwardReturnCode());
+    builder->appendFormat("return %s", forwardReturnCode());
     builder->endOfStatement(true);
 }
 
+// =====================TCTrafficManagerForXDP=============================
+void TCTrafficManagerForXDP::emitReadXDP2TCMetadataFromHead(CodeBuilder *builder) {
+        builder->emitIndent();
+        builder->append("    void *data = (void *)(long)skb->data;\n"
+            "    void *data_end = (void *)(long)skb->data_end;\n"
+            "    if (((char *) data + 14 + sizeof(struct xdp2tc_metadata)) > (char *) data_end) {\n"
+            "        return TC_ACT_SHOT;\n"
+            "    }\n");
+        builder->emitIndent();
+        builder->appendLine("struct xdp2tc_metadata xdp2tc_md = {};");
+        builder->emitIndent();
+        builder->appendFormat("bpf_skb_load_bytes(%s, 14, &xdp2tc_md, "
+                              "sizeof(struct xdp2tc_metadata))",
+                              model.CPacketName.str());
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        builder->append("    __u16 *ether_type = (__u16 *) ((void *) (long)skb->data + 12);\n"
+                        "    if ((void *) ((__u16 *) ether_type + 1) > "
+                        "    (void *) (long) skb->data_end) {\n"
+                        "        return TC_ACT_SHOT;\n"
+                        "    }\n"
+                        "    *ether_type = xdp2tc_md.pkt_ether_type;\n");
+        builder->emitIndent();
+        builder->appendLine("struct psa_ingress_output_metadata_t ostd = xdp2tc_md.ostd;");
+        builder->emitIndent();
+        // declaring header instance as volatile optimizes stack size and improves throughput
+        builder->append("volatile ");
+        parser->headerType->declare(builder, parser->headers->name.name, false);
+        builder->appendLine(" = xdp2tc_md.headers;");
+        builder->emitIndent();
+        builder->appendFormat("%s = xdp2tc_md.packetOffsetInBits;", offsetVar.c_str());
+
+        builder->emitIndent();
+        builder->appendFormat("int ret = bpf_skb_adjust_room(%s, -(int)%s, 1, 0)",
+                              model.CPacketName.str(),
+                              "sizeof(struct xdp2tc_metadata)");
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        builder->append("if (ret) ");
+        builder->blockStart();
+        builder->target->emitTraceMessage(builder,
+                      "Deparser: failed to remove XDP2TC metadata from packet, ret=%d",
+                      1, "ret");
+        builder->emitIndent();
+        builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
+        builder->newline();
+        builder->blockEnd(true);
+}
+
+void TCTrafficManagerForXDP::emitReadXDP2TCMetadataFromCPUMAP(CodeBuilder *builder) {
+    builder->emitIndent();
+    builder->target->emitTableLookup(builder, "xdp2tc_shared_map", this->zeroKey.c_str(),
+                                     "struct xdp2tc_metadata *md");
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->append("if (!md) ");
+    builder->blockStart();
+    builder->appendFormat("return %s;", dropReturnCode());
+    builder->newline();
+    builder->blockEnd(true);
+    builder->emitIndent();
+
+    builder->emitIndent();
+    // declaring header instance as volatile optimizes stack size and improves throughput
+    builder->append("volatile ");
+    parser->headerType->declare(builder, parser->headers->name.name, false);
+    builder->appendLine(" = md->headers;");
+    builder->emitIndent();
+    builder->appendLine("struct psa_ingress_output_metadata_t ostd = md->ostd;");
+    builder->emitIndent();
+    builder->appendFormat("%s = md->packetOffsetInBits;", offsetVar.c_str());
+
+    builder->emitIndent();
+    builder->append("    __u16 *ether_type = (__u16 *) ((void *) (long)skb->data + 12);\n"
+                    "    if ((void *) ((__u16 *) ether_type + 1) > "
+                    "    (void *) (long) skb->data_end) {\n"
+                    "        return TC_ACT_SHOT;\n"
+                    "    }\n"
+                    "    *ether_type = md->pkt_ether_type;\n");
+
+    builder->emitIndent();
+}
+
+void TCTrafficManagerForXDP::emit(CodeBuilder *builder) {
+    cstring msgStr;
+    builder->target->emitCodeSection(builder, sectionName);
+    builder->emitIndent();
+    builder->target->emitMain(builder, functionName, model.CPacketName.str());
+    builder->spc();
+    builder->blockStart();
+    builder->emitIndent();
+    emitLocalVariables(builder);
+
+    if (options.xdp2tcMode == XDP2TC_HEAD) {
+        emitReadXDP2TCMetadataFromHead(builder);
+    } else if (options.xdp2tcMode == XDP2TC_CPUMAP) {
+        emitReadXDP2TCMetadataFromCPUMAP(builder);
+    }
+
+    msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    builder->emitIndent();
+    deparser->emit(builder);
+    msgStr = Util::printf_format("%s deparser: packet deparsing finished", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    this->emitTrafficManager(builder);
+
+    builder->emitIndent();
+    builder->blockEnd(true);
+}
 }  // namespace EBPF

@@ -61,18 +61,43 @@ EBPFTable::EBPFTable(const EBPFProgram* program, const IR::TableBlock* table,
                      CodeGenInspector* codeGen) :
         EBPFTableBase(program, EBPFObject::externalName(table->container), codeGen), table(table) {
     cstring base = instanceName + "_defaultAction";
-    defaultActionMapName = program->refMap->newName(base);
+    defaultActionMapName = base;
 
     base = table->container->name.name + "_actions";
     actionEnumName = program->refMap->newName(base);
 
     keyGenerator = table->container->getKey();
     actionList = table->container->getActionList();
+
+    initKey();
 }
 
 EBPFTable::EBPFTable(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name) :
         EBPFTableBase(program, name, codeGen),
         keyGenerator(nullptr), actionList(nullptr), table(nullptr) {
+}
+
+void EBPFTable::initKey() {
+    if (keyGenerator != nullptr) {
+        unsigned fieldNumber = 0;
+        for (auto c : keyGenerator->keyElements) {
+            if (c->matchType->path->name.name == "selector")
+                continue;  // this match type is intended for ActionSelector, not table itself
+
+            auto type = program->typeMap->getType(c->expression);
+            auto ebpfType = EBPFTypeFactory::instance->create(type);
+            if (!ebpfType->is<IHasWidth>()) {
+                ::error(ErrorType::ERR_TYPE_ERROR,
+                        "%1%: illegal type %2% for key field", c, type);
+                return;
+            }
+
+            cstring fieldName = cstring("field") + Util::toString(fieldNumber);
+            keyTypes.emplace(c, ebpfType);
+            keyFieldNames.emplace(c, fieldName);
+            fieldNumber++;
+        }
+    }
 }
 
 void EBPFTable::validateKeys() const {
@@ -113,19 +138,12 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
             builder->endOfStatement(true);
         }
 
-        unsigned fieldNumber = 0;
         for (auto c : keyGenerator->keyElements) {
             auto mtdecl = program->refMap->getDeclaration(c->matchType->path, true);
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
-            auto type = program->typeMap->getType(c->expression);
-            auto ebpfType = EBPFTypeFactory::instance->create(type);
-            cstring fieldName = cstring("field") + Util::toString(fieldNumber);
 
-            if (!ebpfType->is<IHasWidth>()) {
-                ::error(ErrorType::ERR_TYPE_ERROR,
-                        "%1%: illegal type %2% for key field", c, type);
-                return;
-            }
+            auto ebpfType = ::get(keyTypes, c);
+            cstring fieldName = ::get(keyFieldNames, c);
 
             if (!isMatchTypeSupported(matchType)) {
                 ::error(ErrorType::ERR_UNSUPPORTED,
@@ -140,10 +158,6 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
                 builder->newline();
                 continue;
             }
-
-            keyTypes.emplace(c, ebpfType);
-            keyFieldNames.emplace(c, fieldName);
-            fieldNumber++;
 
             builder->emitIndent();
             ebpfType->declare(builder, fieldName, false);

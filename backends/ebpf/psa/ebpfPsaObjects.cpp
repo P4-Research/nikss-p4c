@@ -475,26 +475,16 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
 
     unsigned int structAlignment = 4;  // 4 by default
     if (keyGenerator != nullptr) {
-        unsigned fieldNumber = 0;
         for (auto c : keyGenerator->keyElements) {
             if (c->matchType->path->name.name == "selector")
                 continue;  // this match type is intended for ActionSelector, not table itself
 
-            auto type = program->typeMap->getType(c->expression);
-            auto ebpfType = EBPFTypeFactory::instance->create(type);
-            cstring fieldName = cstring("field") + Util::toString(fieldNumber);
-            if (!ebpfType->is<IHasWidth>()) {
-                ::error(ErrorType::ERR_TYPE_ERROR,
-                        "%1%: illegal type %2% for key field", c->expression, type);
-                return;
-            }
+            auto ebpfType = ::get(keyTypes, c);
+            cstring fieldName = ::get(keyFieldNames, c);
+
             if (ebpfType->to<EBPFScalarType>()->alignment() > structAlignment) {
                 structAlignment = 8;
             }
-
-            keyTypes.emplace(c, ebpfType);
-            keyFieldNames.emplace(c, fieldName);
-            fieldNumber++;
 
             builder->emitIndent();
             ebpfType->declare(builder, fieldName, false);

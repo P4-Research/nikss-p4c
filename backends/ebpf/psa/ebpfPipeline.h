@@ -36,6 +36,14 @@ class EBPFPipeline : public EBPFProgram {
         timestampVar = cstring("tstamp");
     }
 
+    virtual cstring dropReturnCode() {
+        // TC is the default hookpoint
+        return "TC_ACT_SHOT";
+    }
+    virtual cstring forwardReturnCode() {
+        // TC is the default hookpoint
+        return "TC_ACT_OK";
+    }
     virtual void emitTrafficManager(CodeBuilder *builder) = 0;
     void emitHeaderInstances(CodeBuilder *builder) override;
     void emitLocalVariables(CodeBuilder* builder) override;
@@ -87,6 +95,12 @@ class XDPPipeline : public EBPFPipeline {
 
     void emitPacketLength(CodeBuilder *builder) override;
     void emitTimestamp(CodeBuilder *builder) override;
+    cstring forwardReturnCode() override {
+        return "XDP_PASS";
+    }
+    cstring dropReturnCode() override {
+        return "XDP_DROP";
+    }
 };
 
 class XDPIngressPipeline : public XDPPipeline {
@@ -113,6 +127,19 @@ class XDPEgressPipeline : public XDPPipeline {
     void emit(CodeBuilder *builder) override;
     void emitTrafficManager(CodeBuilder *builder) override;
     void emitPSAControlDataTypes(CodeBuilder *builder) override;
+};
+
+class TCTrafficManagerForXDP : public TCIngressPipeline {
+    void emitReadXDP2TCMetadataFromHead(CodeBuilder *builder);
+    void emitReadXDP2TCMetadataFromCPUMAP(CodeBuilder *builder);
+
+ public:
+    TCTrafficManagerForXDP(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
+                           P4::TypeMap* typeMap) :
+            TCIngressPipeline(name, options, refMap, typeMap) {
+    }
+
+    void emit(CodeBuilder *builder) override;
 };
 
 }  // namespace EBPF
