@@ -15,18 +15,7 @@ struct {
 SEC("xdp/xdp-ingress")
 int xdp_func(struct xdp_md *ctx)
 {
-    void *data_end = (void *)(long)ctx->data_end;
-    void *data = (void *)(long)ctx->data;
-    struct ethhdr *eth = data;
- 
-    __u64 nh_off;
-
-    nh_off = sizeof(*eth);
-    if (data + nh_off > data_end)
-        return XDP_DROP;
-
     int port = ctx->ingress_ifindex;
-
     return bpf_redirect_map(&tx_port, port, 0);
 }
 

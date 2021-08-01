@@ -70,7 +70,7 @@ static int xdp_port_add(__u32 pipeline_id, __u32 ifindex)
         return -1;
     }
     devmap_val.ifindex = ifindex;
-    devmap_val.bpf_prog.fd = eg_prog_fd;
+//    devmap_val.bpf_prog.fd = eg_prog_fd;
     ret = bpf_map_update_elem(devmap_fd, &ifindex, &devmap_val, 0);
     if (ret) {
         return ret;

@@ -29,8 +29,10 @@ function cleanup() {
         tc qdisc del dev "$intf" clsact
     done
     make -f ../runtime/kernel.mk BPFOBJ=out.o clean
-    rm -f /sys/fs/bpf/tc/globals/*
-    rm -r /sys/fs/bpf/prog
+    psabpf-ctl pipeline unload id 99
+    #rm -f /sys/fs/bpf/tc/globals/*
+    #rm -r /sys/fs/bpf/prog
+    rm -rf /sys/fs/bpf/
 }
 
 if (( $# != 2 )); then
@@ -61,7 +63,9 @@ declare -a ARGS="-DPSA_PORT_RECIRCULATE=$RECIRC_PORT_ID"
 if [ -n "$P4PROGRAM" ]; then
   echo "Found P4 program: $P4PROGRAM"
   make -f ../runtime/kernel.mk BPFOBJ=out.o \
-      P4FILE=$P4PROGRAM ARGS="$ARGS" psa
+      P4FILE=$P4PROGRAM ARGS="$ARGS" P4ARGS="$P4ARGS" psa
+  exit_on_error
+  psabpf-ctl pipeline load id 99 out.o
   exit_on_error
 else
   declare -a CFILE=$(find "$2" -maxdepth 1 -type f -name "*.c")
@@ -71,10 +75,9 @@ else
   fi
   echo "Found C file: $CFILE"
   make -f ../runtime/kernel.mk BPFOBJ=out.o ARGS="$ARGS" ebpf CFILE=$CFILE
+  bpftool prog loadall out.o /sys/fs/bpf/prog
+  exit_on_error
 fi
-
-bpftool prog loadall out.o /sys/fs/bpf/prog
-exit_on_error
 
 for intf in ${INTERFACES//,/ } ; do
   # Disable trash traffic
@@ -83,12 +86,19 @@ for intf in ${INTERFACES//,/ } ; do
   sysctl -w net.ipv6.conf."$intf".accept_ra=0
   
   ifconfig "$intf" promisc
+  ethtool -L "$intf" combined 1
+  ethtool -G "$intf" tx 4096
+  ethtool -G "$intf" rx 4096
+  ethtool -K "$intf" txvlan off
+  ethtool -K "$intf" txvlan off
 
   # TODO: move this to psabpf-ctl
-  bpftool net attach xdp pinned /sys/fs/bpf/prog/xdp_xdp-ingress dev "$intf" overwrite
-  tc qdisc add dev "$intf" clsact
-  tc filter add dev "$intf" ingress bpf da fd /sys/fs/bpf/prog/classifier_tc-ingress
-  tc filter add dev "$intf" egress bpf da fd /sys/fs/bpf/prog/classifier_tc-egress
+  #bpftool net attach xdp pinned /sys/fs/bpf/prog/xdp_xdp-ingress dev "$intf" overwrite
+  #tc qdisc add dev "$intf" clsact
+  #tc filter add dev "$intf" ingress bpf da fd /sys/fs/bpf/prog/classifier_tc-ingress
+  #tc filter add dev "$intf" egress bpf da fd /sys/fs/bpf/prog/classifier_tc-egress
+
+  psabpf-ctl pipeline add-port id 99 "$intf"
 
   # by default, pin IRQ to 3rd CPU core
   bash scripts/set_irq_affinity.sh 2 "$intf"
