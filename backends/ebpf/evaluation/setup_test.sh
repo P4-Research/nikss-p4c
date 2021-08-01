@@ -30,8 +30,6 @@ function cleanup() {
     done
     make -f ../runtime/kernel.mk BPFOBJ=out.o clean
     psabpf-ctl pipeline unload id 99
-    #rm -f /sys/fs/bpf/tc/globals/*
-    #rm -r /sys/fs/bpf/prog
     rm -rf /sys/fs/bpf/
 }
 
@@ -90,7 +88,7 @@ for intf in ${INTERFACES//,/ } ; do
   ethtool -G "$intf" tx 4096
   ethtool -G "$intf" rx 4096
   ethtool -K "$intf" txvlan off
-  ethtool -K "$intf" txvlan off
+  ethtool -K "$intf" rxvlan off
 
   # TODO: move this to psabpf-ctl
   #bpftool net attach xdp pinned /sys/fs/bpf/prog/xdp_xdp-ingress dev "$intf" overwrite

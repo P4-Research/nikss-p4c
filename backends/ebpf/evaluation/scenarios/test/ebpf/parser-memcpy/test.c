@@ -86,7 +86,14 @@ int tc_ingress_func(struct __sk_buff *ctx)
     struct psa_ingress_output_metadata_t ostd = {
             .drop = true,
     };
-    volatile struct hdr_t hdr = {};
+    volatile struct hdr_t hdr = {
+            .eth_valid = false,
+            .ip_valid = false,
+            .udp_valid = false,
+            .vxlan_valid = false,
+            .outer_eth_valid = false,
+            .outer_ip_valid = false,
+    };
 
     bpf_trace_message("classifier/tc-ingress parser: parsing new packet\n");
 
