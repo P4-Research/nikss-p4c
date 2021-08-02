@@ -272,6 +272,8 @@ class PPPoEDownstreamTest(BNGTest):
         self.setup_line_v4(
             s_tag=s_tag, c_tag=c_tag, line_id=line_id, ipv4_addr=CLIENT_IP,
             pppoe_session_id=pppoe_session_id, enabled=True)
+        self.meter_update(name="ingress_m_besteff", index=line_id,
+                          pir=250000, pbs=2500, cir=250000, cbs=2500)
 
         print("")
         for pkt_type in ["tcp", "udp", "icmp"]:
