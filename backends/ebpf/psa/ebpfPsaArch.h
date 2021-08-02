@@ -13,8 +13,11 @@
 namespace EBPF {
 
 enum pipeline_type {
-    INGRESS = 0,
-    EGRESS = 1,
+    TC_INGRESS,
+    TC_EGRESS,
+    XDP_INGRESS,
+    XDP_EGRESS,
+    TC_TRAFFIC_MANAGER
 };
 
 class PSAArch {
@@ -27,6 +30,8 @@ class PSAArch {
     static const unsigned MaxClones = 64;
     static const unsigned MaxCloneSessions = 1024;
 
+    bool                   hasMeters;
+    const EbpfOptions&     options;
     std::vector<EBPFType*> ebpfTypes;
     XDPHelpProgram*        xdp;
     EBPFPipeline*          tcIngress;
@@ -34,33 +39,42 @@ class PSAArch {
 
     EBPFPipeline*          xdpIngress;
     EBPFPipeline*          xdpEgress;
+    // TC Ingress program used to support packet cloning in the XDP mode.
+    EBPFPipeline*          tcIngressForXDP;
+    // If the XDP mode is used, we need to have TC Egress pipeline to handle cloned packets.
+    EBPFPipeline*          tcEgressForXDP;
 
-    PSAArch(std::vector<EBPFType*> ebpfTypes, XDPHelpProgram* xdp, EBPFPipeline* tcIngress,
-            EBPFPipeline* tcEgress) :
+    PSAArch(const EbpfOptions &options, std::vector<EBPFType*> ebpfTypes,
+            XDPHelpProgram* xdp, EBPFPipeline* tcIngress, EBPFPipeline* tcEgress) :
+            options(options),
             ebpfTypes(ebpfTypes), xdp(xdp), tcIngress(tcIngress),
             tcEgress(tcEgress) { }
 
-    PSAArch(std::vector<EBPFType*> ebpfTypes, EBPFPipeline* xdpIngress,
-            EBPFPipeline* xdpEgress) : ebpfTypes(ebpfTypes),
-            xdpIngress(xdpIngress), xdpEgress(xdpEgress) { }
+    PSAArch(const EbpfOptions &options, std::vector<EBPFType*> ebpfTypes, EBPFPipeline* xdpIngress,
+            EBPFPipeline* xdpEgress, EBPFPipeline* tcTrafficManager, EBPFPipeline* tcEgress) :
+            options(options), ebpfTypes(ebpfTypes),
+            xdpIngress(xdpIngress), xdpEgress(xdpEgress), tcIngressForXDP(tcTrafficManager),
+            tcEgressForXDP(tcEgress) { }
 
     void emitCommonPreamble(CodeBuilder *builder) const;
     void emitPSAIncludes(CodeBuilder *builder) const;
     void emitTypes(CodeBuilder *builder) const;
+    void emitInternalStructures(CodeBuilder* pBuilder) const;
+    void emitHelperFunctions(CodeBuilder *builder) const;
+    void emitPacketReplicationTables(CodeBuilder *builder) const;
+    void emitPreamble(CodeBuilder* builder) const;
 
     void emit2TC(CodeBuilder* builder) const;  // emits C file for eBPF program - at TC layer
-    void emitPreamble2TC(CodeBuilder* builder) const;
-    void emitInternalStructures2TC(CodeBuilder* pBuilder) const;
+
     void emitInstances2TC(CodeBuilder *builder) const;
-    void emitHelperFunctions2TC(CodeBuilder *builder) const;
     void emitInitializer2TC(CodeBuilder *p_builder) const;
 
     void emit2XDP(CodeBuilder* builder) const;
-    void emitPreamble2XDP(CodeBuilder* builder) const;
     void emitInstances2XDP(CodeBuilder *builder) const;
     void emitHelperFunctions2XDP(CodeBuilder *builder) const;
     void emitInitializer2XDP(CodeBuilder *p_builder) const;
     void emitDummy2XDP(CodeBuilder *builder) const;
+    void emitXDP2TCInternalStructures(CodeBuilder *builder) const;
 };
 
 class ConvertToEbpfPSA : public Transform {
@@ -120,16 +134,8 @@ class ConvertToEBPFParserPSA : public Inspector {
 
  public:
     ConvertToEBPFParserPSA(EBPF::EBPFProgram* program, P4::ReferenceMap* refmap,
-            P4::TypeMap* typemap, const EbpfOptions &options) :
-            program(program), typemap(typemap), refmap(refmap), options(options) {
-        if (program->is<TCIngressPipeline>() || program->is<XDPIngressPipeline>()) {
-            type = INGRESS;
-        } else if (program->is<TCEgressPipeline>() || program->is<XDPEgressPipeline>()) {
-            type = EGRESS;
-        } else {
-            BUG("undefined pipeline type, cannot build parser");
-        }
-    }
+            P4::TypeMap* typemap, const EbpfOptions &options, pipeline_type type) :
+            program(program), typemap(typemap), refmap(refmap), options(options), type(type) { }
 
     bool preorder(const IR::ParserBlock *prsr) override;
     bool preorder(const IR::ParserState *s) override;
@@ -153,16 +159,10 @@ class ConvertToEBPFControlPSA : public Inspector {
     ConvertToEBPFControlPSA(EBPF::EBPFProgram *program, const IR::Parameter* parserHeaders,
                             P4::ReferenceMap *refmap,
                             P4::TypeMap *typemap,
-                            const EbpfOptions &options) : program(program),
+                            const EbpfOptions &options,
+                            pipeline_type type) : program(program),
                             parserHeaders(parserHeaders),
-                            typemap(typemap), refmap(refmap), options(options) {
-        if (program->is<TCIngressPipeline>() || program->is<XDPIngressPipeline>()) {
-            type = INGRESS;
-        } else if (program->is<TCEgressPipeline>() || program->is<XDPEgressPipeline>()) {
-            type = EGRESS;
-        } else {
-            BUG("undefined pipeline type, cannot build control block");
-        }
+                            typemap(typemap), refmap(refmap), options(options), type(type) {
     }
 
     bool preorder(const IR::P4Action *) override;
@@ -192,19 +192,11 @@ class ConvertToEBPFDeparserPSA : public Inspector {
     ConvertToEBPFDeparserPSA(EBPFProgram* program, const IR::Parameter* parserHeaders,
                              const IR::Parameter* istd,
                              P4::ReferenceMap* refmap, P4::TypeMap* typemap,
-                             const EbpfOptions &options) : program(program),
+                             const EbpfOptions &options, pipeline_type type) : program(program),
                                                      parserHeaders(parserHeaders), istd(istd),
                                                      typemap(typemap), refmap(refmap),
                                                      p4lib(P4::P4CoreLibrary::instance),
-                                                     options(options) {
-        if (program->is<TCIngressPipeline>() || program->is<XDPIngressPipeline>()) {
-            type = INGRESS;
-        } else if (program->is<TCEgressPipeline>() || program->is<XDPEgressPipeline>()) {
-            type = EGRESS;
-        } else {
-            BUG("undefined pipeline type, cannot build deparser");
-        }
-    }
+                                                     options(options), type(type) { }
 
     bool preorder(const IR::ControlBlock *) override;
     bool preorder(const IR::MethodCallExpression* expression) override;
