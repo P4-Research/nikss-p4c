@@ -482,7 +482,8 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
             auto ebpfType = ::get(keyTypes, c);
             cstring fieldName = ::get(keyFieldNames, c);
 
-            if (ebpfType->to<EBPFScalarType>()->alignment() > structAlignment) {
+            if (ebpfType->is<EBPFScalarType>() &&
+                ebpfType->to<EBPFScalarType>()->alignment() > structAlignment) {
                 structAlignment = 8;
             }
 
