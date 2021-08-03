@@ -126,6 +126,22 @@ void EBPFPipeline::emitTimestamp(CodeBuilder *builder) {
     builder->appendFormat("%s->tstamp", this->contextVar.c_str());
 }
 
+void EBPFPipeline::emitIngressPSAControlDataTypes(CodeBuilder *builder) {
+    builder->emitIndent();
+    builder->appendFormat("struct psa_ingress_input_metadata_t %s = {\n"
+                          "            .ingress_port = %s,\n"
+                          "            .packet_path = meta->packet_path,\n"
+                          "            .parser_error = %s,\n"
+                          "    };", control->inputStandardMetadata->name.name, ifindexVar.c_str(), errorVar.c_str());
+    builder->newline();
+    if (shouldEmitTimestamp()) {
+        builder->emitIndent();
+        builder->appendFormat("%s.ingress_timestamp = ", control->inputStandardMetadata->name.name);
+        emitTimestamp(builder);
+        builder->endOfStatement(true);
+    }
+}
+
 // =====================TCIngressPipeline=============================
 void TCIngressPipeline::emitTCWorkaroundUsingMeta(CodeBuilder *builder) {
     builder->append("struct internal_metadata *md = "
@@ -311,10 +327,14 @@ void TCIngressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
     builder->appendFormat("struct psa_ingress_input_metadata_t %s = {\n"
                         "            .ingress_port = skb->ifindex,\n"
                         "            .packet_path = meta->packet_path,\n"
-                        "            .ingress_timestamp = skb->tstamp,\n"
                         "            .parser_error = %s,\n"
                         "    };", control->inputStandardMetadata->name.name, errorVar.c_str());
     builder->newline();
+    if (shouldEmitTimestamp()) {
+        builder->emitIndent();
+        builder->appendFormat("%s.ingress_timestamp = ;", control->inputStandardMetadata->name.name);
+        builder->newline();
+    }
 }
 
 /*
@@ -526,10 +546,15 @@ void XDPIngressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("struct psa_ingress_input_metadata_t %s = {\n"
                         "        .ingress_port = skb->ingress_ifindex,\n"
-                        "        .ingress_timestamp = bpf_ktime_get_ns(),\n"
                         "        .parser_error = %s,\n"
                         "    };", control->inputStandardMetadata->name.name, errorVar.c_str());
     builder->newline();
+    if (shouldEmitTimestamp()) {
+        builder->emitIndent();
+        builder->appendFormat("%s.ingress_timestamp = ", control->inputStandardMetadata->name.name);
+        emitTimestamp(builder);
+        builder->endOfStatement(true);
+    }
 }
 
 void XDPIngressPipeline::emitTrafficManager(CodeBuilder *builder) {

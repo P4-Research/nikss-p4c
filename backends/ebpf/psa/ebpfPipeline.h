@@ -17,7 +17,7 @@ class EBPFPipeline : public EBPFProgram {
     const cstring name;
     cstring sectionName;
     cstring contextVar;
-    cstring timestampVar;
+    cstring timestampVar, ifindexVar;
 
     EBPFControlPSA* control;
     EBPFDeparserPSA* deparser;
@@ -34,6 +34,7 @@ class EBPFPipeline : public EBPFProgram {
         lengthVar = cstring("pkt_len");
         endLabel = cstring("deparser");
         timestampVar = cstring("tstamp");
+        ifindexVar = cstring("skb->ifindex");
     }
 
     virtual cstring dropReturnCode() {
@@ -51,8 +52,15 @@ class EBPFPipeline : public EBPFProgram {
     void emitUserMetadataInstance(CodeBuilder *builder);
     virtual void emitPacketLength(CodeBuilder *builder);
     virtual void emitTimestamp(CodeBuilder *builder);
-    virtual void emitPSAControlDataTypes(CodeBuilder* builder) = 0;
+    virtual void emitIngressPSAControlDataTypes(CodeBuilder* builder);
+    virtual void emitPSAControlDataTypes(CodeBuilder* builder);
     virtual void emit(CodeBuilder* builder);
+    bool shouldEmitTimestamp() {
+        if (!control->meters.empty()) {
+            return true;
+        }
+        return false;
+    }
 };
 
 class TCIngressPipeline : public EBPFPipeline {
