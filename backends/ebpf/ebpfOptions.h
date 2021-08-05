@@ -35,6 +35,10 @@ class EbpfOptions : public CompilerOptions {
     bool emitExterns = false;
     // Tracing eBPF code execution
     bool emitTraceMessages = false;
+
+    bool generateHdrInMap = false;
+
+    // XDP-related opts
     bool generateToXDP = false;
     enum XDP2TC xdp2tcMode = XDP2TC_NONE;
     EbpfOptions();

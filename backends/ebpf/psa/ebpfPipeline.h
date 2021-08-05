@@ -59,11 +59,27 @@ class EBPFPipeline : public EBPFProgram {
     }
 
     virtual void emitTrafficManager(CodeBuilder *builder) = 0;
+
     virtual void emitPSAControlDataTypes(CodeBuilder* builder) = 0;
+
+    void emitLocalHeaderInstances(CodeBuilder *builder);
+    void emitLocalHeaderInstancesAsPointers(CodeBuilder *builder);
+    void emitCPUMAPHeadersInitializers(CodeBuilder *builder);
+    void emitCPUMAPHeaderInstances(CodeBuilder *builder);
+
     void emitHeaderInstances(CodeBuilder *builder) override;
+
     void emitLocalVariables(CodeBuilder* builder) override;
     void emitGlobalMetadataInitializer(CodeBuilder *builder);
+
+    void emitLocalUserMetadataInstances(CodeBuilder *builder);
+    void emitCPUMapUserMetadataInstance(CodeBuilder *builder);
     void emitUserMetadataInstance(CodeBuilder *builder);
+
+    void emitCPUMAPInitializers(CodeBuilder *builder);
+    void emitHeadersFromCPUMAP(CodeBuilder* builder);
+    void emitMetadataFromCPUMAP(CodeBuilder *builder);
+
     virtual void emitPacketLength(CodeBuilder *builder);
     virtual void emitTimestamp(CodeBuilder *builder);
     virtual void emit(CodeBuilder* builder);
