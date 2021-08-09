@@ -30,7 +30,7 @@ function cleanup() {
     done
     make -f ../runtime/kernel.mk BPFOBJ=out.o clean
     psabpf-ctl pipeline unload id 99
-    rm -rf /sys/fs/bpf/
+    rm -rf /sys/fs/bpf/*
 }
 
 if (( $# != 2 )); then
@@ -90,7 +90,8 @@ for intf in ${INTERFACES//,/ } ; do
   ethtool -K "$intf" txvlan off
   ethtool -K "$intf" rxvlan off
 
-  # TODO: move this to psabpf-ctl
+  # TODO: these commands are used if an eBPF program written in C is being tested.
+  #  We should refactor this script.
   #bpftool net attach xdp pinned /sys/fs/bpf/prog/xdp_xdp-ingress dev "$intf" overwrite
   #tc qdisc add dev "$intf" clsact
   #tc filter add dev "$intf" ingress bpf da fd /sys/fs/bpf/prog/classifier_tc-ingress
