@@ -76,7 +76,7 @@ $(BPFNAME).o: %.o : %.bc
 
 .PHONY: ebpf
 ebpf:
-	$(CLANG) $(ARGS) $(CFLAGS) $(INCLUDES) -DBTF -emit-llvm -c -o  $(BPFNAME).bc $(CFILE)
+	$(CLANG) $(ARGS) $(CFLAGS) $(INCLUDES) -emit-llvm -c -o  $(BPFNAME).bc $(CFILE)
 	$(LLC) -march=bpf -mcpu=probe -filetype=obj -o $(BPFNAME).o $(BPFNAME).bc
 
 # Code generated in a one stage compilation C -> bpf is more friendly to eBPF verifier.
