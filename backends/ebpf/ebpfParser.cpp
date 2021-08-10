@@ -285,18 +285,15 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
     // we must ensure that the larger word is not outside of packet buffer.
     // FIXME: this can fail if a packet does not contain additional payload after header.
     //  However, we don't have better solution in case of using load_X functions to parse packet.
-    unsigned total_padding = 0;
+    unsigned curr_padding = 0;
     for (auto f : ht->fields) {
         auto ftype = state->parser->typeMap->getType(f);
         auto etype = EBPFTypeFactory::instance->create(ftype);
         if (etype->is<EBPFScalarType>()) {
             auto scalarType = etype->to<EBPFScalarType>();
             unsigned padding = scalarType->alignment() * 8 - scalarType->widthInBits();
-            if (padding > 0) {
-                total_padding += padding;
-            } else {
-                // if equal to zero
-                total_padding -= std::min(total_padding, scalarType->widthInBits());
+            if (scalarType->widthInBits() + padding >= curr_padding) {
+                curr_padding = padding;
             }
         }
     }
@@ -305,7 +302,7 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
     builder->appendFormat("if (%s < %s + BYTES(%s + %d + %u)) ",
                           program->packetEndVar.c_str(),
                           program->packetStartVar.c_str(),
-                          program->offsetVar.c_str(), width, total_padding);
+                          program->offsetVar.c_str(), width, curr_padding);
     builder->blockStart();
 
     builder->target->emitTraceMessage(builder, "Parser: invalid packet (packet too short)");
