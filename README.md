@@ -131,10 +131,54 @@ $ psabpf-ctl pipeline load id <ID> out.o
 $ psabpf-ctl pipeline add-port id <ID> <INTF>
 ```
 
+# Running PTF tests
+
+We use the PTF framework to test every new feature of PSA-eBPF. Follow the commands below to run PTF tests:
+
+```bash
+$ cd backends/ebpf/tests
+# to run PTF tests in the TC mode
+$ sudo ./test.sh
+# to run PTF tests in the XDP mode
+$ sudo ./test.sh --xdp
+```
+
+You can also run a single PTF test or a group of tests defined in a file:
+
+```bash
+# run a single PTF test defined in test.py
+$ sudo ./test.sh test.VerifyPSATest
+# or for XDP:
+$ sudo ./test.sh --xdp test.VerifyPSATest
+# run a group of PTF tests defined in l2l3_switch.py
+$ sudo ./test.sh l2l3_switch
+# or..
+$ sudo ./test.sh --xdp l2l3_switch
+```
+
+# Running performance tests
+
+The performance tests should be run on a physical server. We have prepared the `setup_test.sh` script that sets up 
+the test environment. The script compiles a P4 program, installs flow rules, injects compiled eBPF programs to the 
+eBPF subsystem and attaches them to network interfaces, as well as configures NICs. 
+
+To run the script follow the commands below:
+
+```bash
+$ cd backends/ebpf/evaluation
+$ sudo -E ./setup_test.sh ens1f0,ens1f1 scenarios/basic/p4/vxlan/
+```
+
+The first argument to the script is a comma-separated list of interfaces, to which the eBPF programs should be attached. 
+The second argument is a directory, where the `*.p4` and `commands.txt` file is located. The `commands.txt` file should contain
+flow rules to be installed. 
+
+After you set up the test environment on a server, you can use a traffic generator of your choice to test performance of PSA-eBPF.
+
 # TODOs / Limitations
 
 - Multiple pipelines may not work properly even though `psabpf-ctl` allows to inject many pipelines.
-- Larget bit fields (e.g. IPv6 addresses) may not work properly
+- Larger bit fields (e.g. IPv6 addresses) may not work properly
 - The `xdp2tc=head` mode works properly only for packets larger then 34 bytes (the size of Ethernet and IPv4 header). 
 - Packet recirculation does not work properly if the `xdp2tc=head` mode is used.
 - The packet recirculation and packet resubmission is not supported, if the XDP acceleration is used (`--xdp`). 
