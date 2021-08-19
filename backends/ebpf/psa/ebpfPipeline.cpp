@@ -559,12 +559,7 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
     emitHeaderInstances(builder);
     builder->newline();
 
-    builder->emitIndent();
-    builder->appendFormat("struct psa_egress_output_metadata_t %s = {\n",
-                          control->outputStandardMetadata->name.name.c_str());
-    builder->appendLine("        .clone = false,\n"
-                        "        .drop = false,\n"
-                        "    };");
+    emitPSAControlDataTypes(builder);
 
     // we do not support NM, CI2E, CE2E in XDP, so we hardcode NU as packet path
     msgStr = Util::printf_format("%s parser: parsing new packet, path=0",
@@ -576,8 +571,12 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
     builder->append(":");
     builder->newline();
     builder->emitIndent();
+    builder->appendFormat("%s.parser_error = %s",
+                          control->inputStandardMetadata->name.name.c_str(), errorVar.c_str());
+    builder->endOfStatement(true);
+    builder->newline();
+    builder->emitIndent();
     builder->blockStart();
-    emitPSAControlDataTypes(builder);
     builder->newline();
     msgStr = Util::printf_format("%s control: packet processing started",
                                     sectionName);
