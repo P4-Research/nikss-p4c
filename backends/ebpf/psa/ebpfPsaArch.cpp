@@ -735,6 +735,11 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
     auto keyGenerator = tblblk->container->getKey();
     if (keyGenerator != nullptr) {
         for (auto it : keyGenerator->keyElements) {
+            // optimization: check if we should generate timestamp
+            if (it->expression->toString().endsWith("timestamp")) {
+                control->timestampIsUsed = true;
+            }
+
             auto mtdecl = refmap->getDeclaration(it->matchType->path, true);
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
             if (matchType->name.name != P4::P4CoreLibrary::instance.exactMatch.name &&
@@ -784,6 +789,25 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::P4Action *a) {
+    return true;
+}
+
+bool ConvertToEBPFControlPSA::preorder(const IR::AssignmentStatement *a) {
+    // the condition covers both ingress and egress timestamp
+    if (a->right->toString().endsWith("timestamp")) {
+        control->timestampIsUsed = true;
+    }
+    return true;
+}
+
+bool ConvertToEBPFControlPSA::preorder(const IR::IfStatement *ifState) {
+    if (ifState->condition->is<IR::Equ>()) {
+        auto i = ifState->condition->to<IR::Equ>();
+        if (i->right->toString().endsWith("timestamp") ||
+            i->left->toString().endsWith("timestamp")) {
+            control->timestampIsUsed = true;
+        }
+    }
     return true;
 }
 
