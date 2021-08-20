@@ -712,6 +712,8 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
         builder->newline();
     }
 
+    emitPSAControlDataTypes(builder);
+
     // we do not support NM, CI2E, CE2E in XDP, so we hardcode NU as packet path
     msgStr = Util::printf_format("%s parser: parsing new packet, path=0",
                                     sectionName);

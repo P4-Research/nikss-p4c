@@ -26,7 +26,7 @@ make -f ../../runtime/kernel.mk BPFOBJ=out-tc.o \
 	P4FILE=../scenarios/use-cases/p4/l2l3_switch.p4 P4ARGS="--hdr2Map" ARGS="$ARGS" psa
 
 # make -f ../../runtime/kernel.mk BPFOBJ=out-tc.o \
-# 	P4FILE=../scenarios/basic/p4/l2fwd/l2fwd.p4 P4ARGS= ARGS="$ARGS" psa
+# 	P4FILE=../scenarios/basic/p4/l2fwd/l2fwd.p4 P4ARGS="--hdr2Map" ARGS="$ARGS" psa
 
 # make -f ../../runtime/kernel.mk BPFOBJ=out-tc.o \
 # 	P4FILE=../../tests/samples/p4testdata/stack_limit_test.p4 P4ARGS="--hdr2Map" ARGS="$ARGS" psa
