@@ -170,6 +170,8 @@ class ConvertToEBPFControlPSA : public Inspector {
     bool preorder(const IR::ControlBlock *) override;
     bool preorder(const IR::Declaration_Instance*) override;
     bool preorder(const IR::Declaration_Variable*) override;
+    bool preorder(const IR::AssignmentStatement *a) override;
+    bool preorder(const IR::IfStatement *a) override;
     bool preorder(const IR::ExternBlock *) override;
 
     EBPF::EBPFControlPSA *getEBPFControl() { return control; }

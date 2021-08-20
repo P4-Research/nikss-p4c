@@ -12,6 +12,7 @@ namespace EBPF {
 
 class EBPFControlPSA : public EBPFControl {
  public:
+    bool timestampIsUsed = false;
     // FIXME: this should not be part of EBPFControlPSA object.
     // It should be moved to ConvertToEBPFPsaControl.
     const IR::P4Control* p4Control;
