@@ -36,6 +36,7 @@ class EbpfOptions : public CompilerOptions {
     // Tracing eBPF code execution
     bool emitTraceMessages = false;
 
+    // Generate headers and user metadata in/from CPUMAP
     bool generateHdrInMap = false;
 
     // XDP-related opts

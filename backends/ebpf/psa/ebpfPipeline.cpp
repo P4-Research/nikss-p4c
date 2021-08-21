@@ -703,8 +703,6 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
     emitHeaderInstances(builder);
     builder->newline();
 
-    emitPSAControlDataTypes(builder);
-
     if (options.generateHdrInMap) {
         emitCPUMAPInitializers(builder);
         builder->newline();
