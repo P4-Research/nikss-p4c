@@ -148,11 +148,7 @@ void EBPFPipeline::emitLocalHeaderInstances(CodeBuilder *builder) {
 }
 void EBPFPipeline::emitLocalHeaderInstancesAsPointers(CodeBuilder *builder) {
     builder->emitIndent();
-    builder->appendFormat("struct %s hdr_init, *%s;\n"
-                        "    __builtin_memset(&hdr_init, 0, sizeof(struct %s));\n"
-                        "    %s = &hdr_init;",
-                        parser->headerType->to<EBPFStructType>()->name,
-                        parser->headers->name.name,
+    builder->appendFormat("struct %s *%s;",
                         parser->headerType->to<EBPFStructType>()->name,
                         parser->headers->name.name);
     builder->newline();
