@@ -69,6 +69,8 @@ class PSAArch {
     void emitInstances2TC(CodeBuilder *builder) const;
     void emitInitializer2TC(CodeBuilder *p_builder) const;
 
+    void emitGlobalHeadersMetadata(CodeBuilder *builder) const;
+
     void emit2XDP(CodeBuilder* builder) const;
     void emitInstances2XDP(CodeBuilder *builder) const;
     void emitHelperFunctions2XDP(CodeBuilder *builder) const;

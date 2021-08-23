@@ -7,7 +7,6 @@ KERN_TARGETS := out-xdp
 KERN_SRC = ${KERN_TARGETS:=.c}
 KERN_OBJ = ${KERN_SRC:.c=.o}
 
-
 LIBBPF_DIR ?= ../../runtime/contrib/libbpf
 
 OBJECT_LIBBPF = $(LIBBPF_DIR)/src/libbpf.a
@@ -33,10 +32,14 @@ clean:
 	rm -f *.ll
 	rm -f *~
 
+# Note: -DBTF is required
+# TODO: -DPSA_PORT_RECIRCULATE should not be static
 $(KERN_OBJ): %.o: %.c Makefile #$(EXTRA_DEPS)
 	$(CLANG) -S 					\
 		-target bpf 				\
+		-DBTF 						\
 		-D __BPF_TRACING__ 			\
+		-DPSA_PORT_RECIRCULATE=1    \
 		$(BPF_FLAGS) 				\
 		-Wall 					\
 		-Wno-unused-value 			\
