@@ -397,7 +397,10 @@ void TCIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder, "PreDeparser: resubmitting packet, "
                                                "skipping deparser..");
     builder->emitIndent();
-    builder->appendLine("meta->packet_path = RESUBMIT;");
+    const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
+    builder->appendFormat("%s->packet_path = RESUBMIT;",
+                    pipelineProgram->compilerGlobalMetadata);
+    builder->newline();
     builder->emitIndent();
     builder->appendLine("return TC_ACT_UNSPEC;");
     builder->blockEnd(true);
