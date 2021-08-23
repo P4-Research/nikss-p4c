@@ -74,6 +74,11 @@ void compile(EbpfOptions& options) {
         if (::errorCount() > 0)
             return;
     }
+
+    P4::serializeP4RuntimeIfRequired(program, options);
+    if (::errorCount() > 0)
+        return;
+
     EBPF::MidEnd midend;
     midend.addDebugHook(hook);
     auto toplevel = midend.run(options, program);
