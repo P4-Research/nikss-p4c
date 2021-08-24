@@ -41,4 +41,7 @@ EbpfOptions::EbpfOptions() {
         registerOption("--hdr2Map", nullptr,
                 [this](const char*) { generateHdrInMap = true; return true; },
                 "Compile and generate the P4 prog headers and metadata in PERCPU_MAP");
+        registerOption("--xdp-egress-opt", nullptr,
+               [this](const char*) { xdpEgressOptimization = true; return true; },
+               "Optimize the egress pipeline of XDP by merging it with Ingress");
 }

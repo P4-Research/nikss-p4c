@@ -146,6 +146,23 @@ class ConvertToEBPFParserPSA : public Inspector {
     void findValueSets(const IR::ParserBlock *prsr);
 };
 
+class DoMakeStandardMetadataNamesUnique : public Transform {
+ public:
+    DoMakeStandardMetadataNamesUnique() {}
+    const IR::Node *preorder(IR::Parameter *p) override {
+        if (p->type != nullptr) {
+            return nullptr;
+        }
+        return p;
+    }
+//    const IR::Node *preorder(IR::ParameterList *pl) override {
+//        if (pl->parameters.size() != 0) {
+//            return nullptr;
+//        }
+//        return pl;
+//    }
+};
+
 class ConvertToEBPFControlPSA : public Inspector {
     EBPF::EBPFProgram *program;
     pipeline_type type;

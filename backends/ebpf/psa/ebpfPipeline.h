@@ -100,7 +100,7 @@ class EBPFPipeline : public EBPFProgram {
 class EBPFIngressPipeline : public EBPFPipeline {
  public:
     EBPFIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
-                        P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) {}
+                        P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) { }
 
     void emitPSAControlDataTypes(CodeBuilder* builder) override;
 };
@@ -108,7 +108,9 @@ class EBPFIngressPipeline : public EBPFPipeline {
 class EBPFEgressPipeline : public EBPFPipeline {
  public:
     EBPFEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
-                       P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) {}
+                       P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) {
+
+    }
 
     void emitPSAControlDataTypes(CodeBuilder* builder) override;
 };
@@ -155,6 +157,7 @@ class XDPIngressPipeline : public EBPFIngressPipeline {
 
     void emit(CodeBuilder *builder) override;
     void emitTrafficManager(CodeBuilder *builder) override;
+    void emitWithEgress(CodeBuilder *builder, EBPFPipeline* egress);
 };
 
 class XDPEgressPipeline : public EBPFEgressPipeline {

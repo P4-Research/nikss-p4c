@@ -85,6 +85,7 @@ void emitPSAModel(const EbpfOptions& options, Target* target, const IR::Toplevel
     PassManager psaPasses = {
             new BMV2::DiscoverStructure(&structure),
             new BMV2::InspectPsaProgram(refMap, typeMap, &structure),
+            new DoMakeStandardMetadataNamesUnique(),
             // convert to EBPF objects
             convertToEbpfPSA,
     };

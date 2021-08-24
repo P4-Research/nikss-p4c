@@ -44,7 +44,7 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     builder->newline();
     builder->emitIndent();
     builder->appendFormat("%s.parser_error = %s",
-                          control->inputStandardMetadata->name.name.c_str(), errorVar.c_str());
+                          control->inputStandardMetadata->name.name, errorVar.c_str());
     builder->endOfStatement(true);
     builder->emitIndent();
     builder->blockStart();
@@ -100,10 +100,12 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     emitPacketLength(builder);
     builder->endOfStatement(true);
 
-    builder->emitIndent();
-    builder->appendFormat("u64 %s = ", timestampVar.c_str());
-    emitTimestamp(builder);
-    builder->endOfStatement(true);
+    if (shouldEmitTimestamp()) {
+        builder->emitIndent();
+        builder->appendFormat("u64 %s = ", timestampVar.c_str());
+        emitTimestamp(builder);
+        builder->endOfStatement(true);
+    }
 }
 
 void EBPFPipeline::emitLocalUserMetadataInstances(CodeBuilder *builder) {
@@ -238,10 +240,6 @@ void EBPFIngressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
 
 // =====================EBPFEgressPipeline============================
 void EBPFEgressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
-    cstring outputMdVar, inputMdVar;
-    outputMdVar = control->outputStandardMetadata->name.name;
-    inputMdVar = control->inputStandardMetadata->name.name;
-
     builder->emitIndent();
     builder->appendFormat("struct psa_egress_input_metadata_t %s = {\n"
                           "            .class_of_service = %s,\n"
@@ -250,26 +248,30 @@ void EBPFEgressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
                           "            .instance = %s,\n"
                           "            .parser_error = %s,\n"
                           "        };",
-                          inputMdVar.c_str(),  priorityVar.c_str(), ifindexVar.c_str(),
+                          control->inputStandardMetadata->name.name,  priorityVar.c_str(), ifindexVar.c_str(),
                           packetPathVar.c_str(), pktInstanceVar.c_str(), errorVar.c_str());
     builder->newline();
     if (shouldEmitTimestamp()) {
         builder->emitIndent();
-        builder->appendFormat("%s.egress_timestamp = %s", inputMdVar.c_str(),
+        builder->appendFormat("%s.egress_timestamp = %s",
+                              control->inputStandardMetadata->name.name,
                               timestampVar.c_str());
         builder->endOfStatement(true);
     }
     builder->emitIndent();
-    builder->appendFormat("if (%s.egress_port == PSA_PORT_RECIRCULATE) ", inputMdVar.c_str());
+    builder->appendFormat("if (%s.egress_port == PSA_PORT_RECIRCULATE) ",
+                          control->inputStandardMetadata->name.name);
     builder->blockStart();
     builder->emitIndent();
     // To be conformant with psa.p4, where PSA_PORT_RECIRCULATE is constant
-    builder->appendFormat("%s.egress_port = P4C_PSA_PORT_RECIRCULATE", inputMdVar.c_str());
+    builder->appendFormat("%s.egress_port = P4C_PSA_PORT_RECIRCULATE",
+                          control->inputStandardMetadata->name.name);
     builder->endOfStatement(true);
     builder->blockEnd(true);
 
     builder->emitIndent();
-    builder->appendFormat("struct psa_egress_output_metadata_t %s = {\n", outputMdVar.c_str());
+    builder->appendFormat("struct psa_egress_output_metadata_t %s = {\n",
+                          control->outputStandardMetadata->name.name);
     builder->appendLine("            .clone = false,\n"
                         "            .drop = false,\n"
                         "        };");
@@ -427,9 +429,10 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
     builder->blockStart();
     builder->emitIndent();
 
-    builder->appendLine("struct psa_ingress_output_metadata_t ostd = {\n"
+    builder->appendFormat("struct psa_ingress_output_metadata_t %s = {\n"
                         "            .drop = true,\n"
-                        "    };");
+                        "    };", control->outputStandardMetadata->name.name);
+    builder->newline();
     builder->newline();
 
     builder->emitIndent();
@@ -526,19 +529,16 @@ void TCIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
 
 // =====================TCEgressPipeline=============================
 void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
-    cstring varStr, outputMdVar, inputMdVar;
-    outputMdVar = control->outputStandardMetadata->name.name;
-    inputMdVar = control->inputStandardMetadata->name.name;
-
+    cstring varStr;
     // clone support
     builder->emitIndent();
-    builder->appendFormat("if (%s.clone) ", outputMdVar.c_str());
+    builder->appendFormat("if (%s.clone) ", control->outputStandardMetadata->name.name);
     builder->blockStart();
 
     builder->emitIndent();
     builder->appendFormat("do_packet_clones(%s, &clone_session_tbl, %s.clone_session_id, "
                           "CLONE_E2E, 3)",
-                          contextVar.c_str(), outputMdVar.c_str());
+                          contextVar.c_str(), control->outputStandardMetadata->name.name);
     builder->endOfStatement(true);
     builder->blockEnd(true);
 
@@ -546,7 +546,7 @@ void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
 
     // drop support
     builder->emitIndent();
-    builder->appendFormat("if (%s.drop) ", outputMdVar.c_str());
+    builder->appendFormat("if (%s.drop) ", control->outputStandardMetadata->name.name);
     builder->blockStart();
     builder->target->emitTraceMessage(builder, "EgressTM: Packet dropped due to metadata");
     builder->emitIndent();
@@ -561,7 +561,8 @@ void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     // TODO: there is parameter type `psa_egress_deparser_input_metadata_t` to the deparser,
     //  maybe it should be used instead of `istd`?
     builder->emitIndent();
-    builder->appendFormat("if (%s.egress_port == P4C_PSA_PORT_RECIRCULATE) ", inputMdVar.c_str());
+    builder->appendFormat("if (%s.egress_port == P4C_PSA_PORT_RECIRCULATE) ",
+                          control->inputStandardMetadata->name.name);
     builder->blockStart();
     builder->target->emitTraceMessage(builder, "EgressTM: recirculating packet");
     builder->emitIndent();
@@ -630,9 +631,9 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     }
 
     builder->emitIndent();
-    builder->appendLine("struct psa_ingress_output_metadata_t ostd = {\n"
+    builder->appendFormat("struct psa_ingress_output_metadata_t %s = {\n"
                         "        .drop = true,\n"
-                        "    };");
+                        "    };", control->outputStandardMetadata->name.name);
     builder->newline();
 
     // PRS
@@ -675,6 +676,108 @@ void XDPIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
     // do not handle multicast; it has been handled earlier by PreDeparser.
     builder->emitIndent();
     builder->appendLine("return bpf_redirect_map(&tx_port, ostd.egress_port, 0);");
+}
+
+void XDPIngressPipeline::emitWithEgress(CodeBuilder *builder, EBPFPipeline *egress) {
+    cstring msgStr, varStr;
+    control->codeGen->asPointerVariables.clear();
+    deparser->codeGen->asPointerVariables.clear();
+
+    if (options.generateHdrInMap) {
+        control->codeGen->asPointerVariables.insert(control->headers->name.name);
+        control->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
+        parser->visitor->asPointerVariables.insert(control->user_metadata->name.name);
+        deparser->codeGen->asPointerVariables.insert(control->headers->name.name);
+        deparser->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
+    }
+
+    builder->target->emitCodeSection(builder, sectionName);
+    builder->emitIndent();
+    builder->appendFormat("int %s(struct xdp_md *%s)", functionName, model.CPacketName.str());
+    builder->spc();
+
+    builder->blockStart();
+
+    builder->emitIndent();
+    deparser->to<XDPIngressDeparserPSA>()->emitSharedMetadataInitializer(builder);
+    builder->newline();
+
+    emitHeaderInstances(builder);
+    builder->newline();
+
+    emitUserMetadataInstance(builder);
+    builder->newline();
+
+    emitLocalVariables(builder);
+
+    if (options.generateHdrInMap) {
+        emitCPUMAPInitializers(builder);
+        builder->newline();
+        emitHeadersFromCPUMAP(builder);
+        builder->newline();
+        emitMetadataFromCPUMAP(builder);
+        builder->newline();
+    }
+
+    builder->emitIndent();
+    builder->appendFormat("struct psa_ingress_output_metadata_t %s = {\n"
+                        "        .drop = true,\n"
+                        "    };", control->outputStandardMetadata->name.name);
+    builder->newline();
+
+    // INGRESS PRS
+    // we do not support NM, CI2E, CE2E in XDP, so we hardcode NU as packet path
+    msgStr = Util::printf_format("%s parser: parsing new packet, path=0", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    parser->emit(builder);
+    builder->newline();
+
+    // INGRESS CTRL
+    builder->emitIndent();
+    builder->append(IR::ParserState::accept);
+    builder->append(":");
+    builder->spc();
+    builder->blockStart();
+    emitPSAControlDataTypes(builder);
+    msgStr = Util::printf_format("%s control: packet processing started", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    control->emit(builder);
+    builder->blockEnd(true);
+    msgStr = Util::printf_format("%s control: packet processing finished", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+
+    // INGRESS DEPRS
+    builder->emitIndent();
+    builder->blockStart();
+    msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    deparser->emit(builder);
+    builder->blockEnd(true);
+    msgStr = Util::printf_format("%s deparser: packet deparsing finished", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+
+    // EGRESS CTRL
+    builder->emitIndent();
+    egress->emitPSAControlDataTypes(builder);
+    msgStr = Util::printf_format("%s control: packet processing started", egress->sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    egress->control->emit(builder);
+    msgStr = Util::printf_format("%s control: packet processing finished", egress->sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+
+    // EGRESS DEPRS
+    builder->emitIndent();
+    builder->blockStart();
+    msgStr = Util::printf_format("%s deparser: packet deparsing started", egress->sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    egress->deparser->emit(builder);
+    builder->blockEnd(true);
+    msgStr = Util::printf_format("%s deparser: packet deparsing finished", egress->sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+
+    this->emitTrafficManager(builder);
+    builder->blockEnd(true);
+    builder->newline();
 }
 
 // =====================XDPEgressPipeline=============================
@@ -724,7 +827,7 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
     builder->newline();
     builder->emitIndent();
     builder->appendFormat("%s.parser_error = %s",
-                          control->inputStandardMetadata->name.name.c_str(), errorVar.c_str());
+                          control->inputStandardMetadata->name.name, errorVar.c_str());
     builder->endOfStatement(true);
     builder->newline();
     builder->emitIndent();
@@ -754,13 +857,13 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
 }
 
 void XDPEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
-    cstring varStr, outputMdVar, inputMdVar;
-    outputMdVar = control->outputStandardMetadata->name.name;
-    inputMdVar = control->inputStandardMetadata->name.name;
+    cstring varStr;
 
     builder->newline();
     builder->emitIndent();
-    builder->appendFormat("if (%s.clone || %s.drop) ", outputMdVar.c_str(), outputMdVar.c_str());
+    builder->appendFormat("if (%s.clone || %s.drop) ",
+                          control->outputStandardMetadata->name.name,
+                          control->outputStandardMetadata->name.name);
     builder->blockStart();
     builder->target->emitTraceMessage(builder,
                                     "EgressTM: Packet dropped due to metadata");
@@ -906,4 +1009,5 @@ void TCTrafficManagerForXDP::emit(CodeBuilder *builder) {
     builder->emitIndent();
     builder->blockEnd(true);
 }
+
 }  // namespace EBPF

@@ -41,6 +41,7 @@ class EbpfOptions : public CompilerOptions {
 
     // XDP-related opts
     bool generateToXDP = false;
+    bool xdpEgressOptimization = false;
     enum XDP2TC xdp2tcMode = XDP2TC_NONE;
     EbpfOptions();
 

@@ -409,8 +409,14 @@ void PSAArch::emit2XDP(CodeBuilder *builder) const {
     emitHelperFunctions(builder);
 
     emitInitializer2XDP(builder);
-    xdpIngress->emit(builder);
-    xdpEgress->emit(builder);
+
+    if (!options.xdpEgressOptimization) {
+        xdpIngress->emit(builder);
+        xdpEgress->emit(builder);
+    } else {
+        xdpIngress->to<XDPIngressPipeline>()->emitWithEgress(builder, xdpEgress);
+    }
+
     builder->newline();
 
     emitDummy2XDP(builder);
@@ -770,9 +776,29 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     control->inputStandardMetadata = *it; ++it;
     control->outputStandardMetadata = *it;
 
+    if (type == TC_EGRESS || type == XDP_EGRESS) {
+        control->inputStandardMetadata = new IR::Parameter(
+                IR::ID("egress_" + control->inputStandardMetadata->name.name),
+                control->inputStandardMetadata->direction,
+                control->inputStandardMetadata->type);
+        control->outputStandardMetadata = new IR::Parameter(
+                IR::ID("egress_" + control->outputStandardMetadata->name.name),
+                control->outputStandardMetadata->direction,
+                control->outputStandardMetadata->type);
+    } else if (type == TC_INGRESS || type == XDP_INGRESS) {
+        control->inputStandardMetadata = new IR::Parameter(
+                IR::ID("ingress_" + control->inputStandardMetadata->name.name),
+                control->inputStandardMetadata->direction,
+                control->inputStandardMetadata->type);
+        control->outputStandardMetadata = new IR::Parameter(
+                IR::ID("ingress_" + control->outputStandardMetadata->name.name),
+                control->outputStandardMetadata->direction,
+                control->outputStandardMetadata->type);
+    }
+
     auto codegen = new ControlBodyTranslatorPSA(control);
     codegen->substitute(control->headers, parserHeaders);
-    codegen->asPointerVariables.insert(control->outputStandardMetadata->name.name);
+    codegen->asPointerVariables.insert(control->inputStandardMetadata->name.name);
     if (this->type == TC_INGRESS || options.generateHdrInMap) {
         codegen->asPointerVariables.insert(control->headers->name.name);
     }
