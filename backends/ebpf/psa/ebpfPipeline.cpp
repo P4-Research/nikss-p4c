@@ -197,8 +197,10 @@ void EBPFPipeline::emitMetadataFromCPUMAP(CodeBuilder *builder) {
 
 void EBPFPipeline::emitGlobalMetadataInitializer(CodeBuilder *builder) {
     builder->emitIndent();
-    builder->appendLine(
-            "struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->cb;");
+     builder->appendFormat(
+            "struct psa_global_metadata *%s = (struct psa_global_metadata *) skb->cb;",
+            compilerGlobalMetadata);
+    builder->newline();
 }
 
 void EBPFPipeline::emitPacketLength(CodeBuilder *builder) {
@@ -330,6 +332,7 @@ void TCIngressPipeline::emitTCWorkaroundUsingCPUMAP(CodeBuilder *builder) {
 
 void TCIngressPipeline::emit(CodeBuilder *builder) {
     cstring msgStr;
+    cstring varStr;
     // firstly emit process() in-lined function and then the actual BPF section.
     builder->append("static __always_inline");
     builder->spc();
@@ -358,7 +361,8 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
     // workaround to make TC protocol-independent, DO NOT REMOVE
     builder->emitIndent();
     // replace ether_type only if a packet comes from XDP
-    builder->append("if (meta->packet_path == NORMAL) ");
+    builder->appendFormat("if (%s->packet_path == NORMAL) ",
+                        compilerGlobalMetadata);
     builder->blockStart();
     builder->emitIndent();
     if (options.xdp2tcMode == XDP2TC_META) {
@@ -389,8 +393,9 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
 
     msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d",
                                  sectionName);
+    varStr = Util::printf_format("%s->packet_path", compilerGlobalMetadata);
     builder->target->emitTraceMessage(builder, msgStr.c_str(), 2,
-                                      "meta->packet_path", lengthVar.c_str());
+                                      varStr, lengthVar.c_str());
     parser->emit(builder);
     builder->emitIndent();
     builder->append(IR::ParserState::accept);
@@ -560,7 +565,7 @@ void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->blockStart();
     builder->target->emitTraceMessage(builder, "EgressTM: recirculating packet");
     builder->emitIndent();
-    builder->appendFormat("meta->packet_path = RECIRCULATE");
+    builder->appendFormat("%s->packet_path = RECIRCULATE", compilerGlobalMetadata);
     builder->endOfStatement(true);
     builder->emitIndent();
     builder->appendFormat("return bpf_redirect(PSA_PORT_RECIRCULATE, BPF_F_INGRESS)",

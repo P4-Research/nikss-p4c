@@ -19,6 +19,7 @@ class EBPFPipeline : public EBPFProgram {
     cstring contextVar;
     cstring timestampVar, ifindexVar;
     cstring priorityVar, packetPathVar, pktInstanceVar;
+    cstring compilerGlobalMetadata;
 
     EBPFControlPSA* control;
     EBPFDeparserPSA* deparser;
@@ -36,8 +37,9 @@ class EBPFPipeline : public EBPFProgram {
         endLabel = cstring("deparser");
         timestampVar = cstring("tstamp");
         ifindexVar = cstring("skb->ifindex");
-        packetPathVar = cstring("meta->packet_path");
-        pktInstanceVar = cstring("meta->instance");
+        compilerGlobalMetadata = cstring("compiler_meta__");
+        packetPathVar = compilerGlobalMetadata + cstring("->packet_path");
+        pktInstanceVar = compilerGlobalMetadata + cstring("->instance");
         priorityVar = cstring("skb->priority");
     }
 

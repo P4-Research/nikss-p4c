@@ -346,7 +346,7 @@ void PSAArch::emitGlobalHeadersMetadata(CodeBuilder *builder) const {
 
     if (tcIngressForXDP) {
         /*
-         * Note: here, we could also use any pipe in {xdpIngress, xdpEgress tcEgressForXDP }
+         * Note: here, we could also use any pipe in { xdpIngress, xdpEgress tcEgressForXDP }
          */
         tcIngressForXDP->parser->headerType->declare(builder, "cpumap_hdr", false);
         builder->endOfStatement(true);
