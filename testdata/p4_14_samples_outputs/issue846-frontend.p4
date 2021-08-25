@@ -56,17 +56,17 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
     }
     @name(".do_nothing") action do_nothing_6() {
     }
-    @name(".action_0") action action_0(bit<8> p) {
+    @name(".action_0") action action_0(@name("p") bit<8> p_3) {
         meta.meta.x = 16w1;
         meta.meta.y = 16w2;
     }
-    @name(".action_1") action action_1(bit<8> p) {
+    @name(".action_1") action action_1(@name("p") bit<8> p_4) {
         meta.meta.z = meta.meta.y + meta.meta.x;
     }
-    @name(".action_1") action action_2(bit<8> p) {
+    @name(".action_1") action action_2(@name("p") bit<8> p_5) {
         meta.meta.z = meta.meta.y + meta.meta.x;
     }
-    @name(".action_2") action action_7(bit<8> p) {
+    @name(".action_2") action action_7(@name("p") bit<8> p_6) {
         hdr.hdr0.a = meta.meta.z;
     }
     @name(".t0") table t0_0 {
@@ -122,7 +122,9 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         if (hdr.hdr0.isValid()) {
             t0_0.apply();
         }
-        if (!hdr.hdr0.isValid()) {
+        if (hdr.hdr0.isValid()) {
+            ;
+        } else {
             t1_0.apply();
         }
         if (hdr.hdr0.isValid() || hdr.hdr0.isValid()) {
@@ -151,4 +153,3 @@ control computeChecksum(inout headers hdr, inout metadata meta) {
 }
 
 V1Switch<headers, metadata>(ParserImpl(), verifyChecksum(), ingress(), egress(), computeChecksum(), DeparserImpl()) main;
-

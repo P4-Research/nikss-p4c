@@ -33,7 +33,9 @@ control ingress(inout Headers h, inout Meta m, inout standard_metadata_t sm) {
         } else {
             hasReturned = true;
         }
-        if (!hasReturned) {
+        if (hasReturned) {
+            ;
+        } else {
             {
                 @name("ingress.val1_0") bit<16> val1_0 = h.eth_hdr.eth_type;
                 @name("ingress.val2_0") bit<48> val2_0 = h.eth_hdr.src_addr;
@@ -75,4 +77,3 @@ control deparser(packet_out pkt, in Headers h) {
 }
 
 V1Switch<Headers, Meta>(p(), vrfy(), ingress(), egress(), update(), deparser()) main;
-

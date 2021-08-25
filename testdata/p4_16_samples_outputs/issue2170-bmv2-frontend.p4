@@ -60,8 +60,9 @@ control ingress(inout Parsed_packet hdr, inout Metadata meta, inout standard_met
             default: {
             }
         }
-
-        if (!hasReturned) {
+        if (hasReturned) {
+            ;
+        } else {
             hdr.h.a = 8w0;
         }
     }
@@ -83,4 +84,3 @@ control update(inout Parsed_packet hdr, inout Metadata meta) {
 }
 
 V1Switch<Parsed_packet, Metadata>(p(), vrfy(), ingress(), egress(), update(), deparser()) main;
-

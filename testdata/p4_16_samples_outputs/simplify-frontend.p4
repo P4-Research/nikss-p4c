@@ -29,11 +29,11 @@ control c(out bool x) {
     apply {
         x = true;
         tmp = t1_0.apply().hit;
-        if (!tmp) {
-            tmp_0 = false;
-        } else {
+        if (tmp) {
             tmp_1 = t2_0.apply().hit;
             tmp_0 = tmp_1;
+        } else {
+            tmp_0 = false;
         }
         if (tmp_0) {
             x = false;
@@ -44,4 +44,3 @@ control c(out bool x) {
 control proto(out bool x);
 package top(proto p);
 top(c()) main;
-

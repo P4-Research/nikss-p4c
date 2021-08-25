@@ -50,7 +50,7 @@ control pipe(inout Headers_t headers, inout metadata meta, inout standard_metada
     @name("pipe.hasReturned") bool hasReturned;
     @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
-    @name("pipe.Reject") action Reject(IPv4Address add) {
+    @name("pipe.Reject") action Reject(@name("add") IPv4Address add) {
         mark_to_drop();
         headers.ipv4.srcAddr = add;
     }
@@ -88,10 +88,14 @@ control pipe(inout Headers_t headers, inout metadata meta, inout standard_metada
     }
     apply {
         tbl_act.apply();
-        if (!headers.ipv4.isValid()) {
+        if (headers.ipv4.isValid()) {
+            ;
+        } else {
             tbl_lpm_ubpf59.apply();
         }
-        if (!hasReturned) {
+        if (hasReturned) {
+            ;
+        } else {
             Check_src_ip_0.apply();
         }
     }
@@ -114,4 +118,3 @@ control dprs(packet_out packet, in Headers_t headers) {
 }
 
 ubpf<Headers_t, metadata>(prs(), pipe(), dprs()) main;
-

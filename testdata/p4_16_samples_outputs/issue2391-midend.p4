@@ -17,6 +17,7 @@ struct Headers {
 parser prs(packet_in p, out Headers h) {
     @name("prs.e") Ethernet e_0;
     state start {
+        e_0.setInvalid();
         p.extract<Ethernet>(e_0);
         transition select(e_0.type) {
             16w0x800: accept;
@@ -66,15 +67,17 @@ control c(inout Headers h) {
     }
     apply {
         tbl_act.apply();
-        if (!h.eth.isValid()) {
+        if (h.eth.isValid()) {
+            ;
+        } else {
             tbl_issue2391l47.apply();
         }
-        if (!hasReturned) {
-            if (h.eth.type == 16w0x800) {
-                tbl_issue2391l49.apply();
-            } else {
-                tbl_issue2391l51.apply();
-            }
+        if (hasReturned) {
+            ;
+        } else if (h.eth.type == 16w0x800) {
+            tbl_issue2391l49.apply();
+        } else {
+            tbl_issue2391l51.apply();
         }
     }
 }
@@ -83,4 +86,3 @@ parser p<H>(packet_in _p, out H h);
 control ctr<H>(inout H h);
 package top<H>(p<H> _p, ctr<H> _c);
 top<Headers>(prs(), c()) main;
-

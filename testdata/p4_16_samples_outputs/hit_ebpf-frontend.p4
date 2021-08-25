@@ -46,9 +46,9 @@ parser prs(packet_in p, out Headers_t headers) {
 control pipe(inout Headers_t headers, out bool pass) {
     @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
-    @name("pipe.Reject") action Reject(IPv4Address add) {
+    @name("pipe.Reject") action Reject(@name("add") IPv4Address add_1) {
         pass = false;
-        headers.ipv4.srcAddr = add;
+        headers.ipv4.srcAddr = add_1;
     }
     @name("pipe.Check_src_ip") table Check_src_ip_0 {
         key = {
@@ -64,17 +64,18 @@ control pipe(inout Headers_t headers, out bool pass) {
     apply {
         @name("pipe.hasReturned") bool hasReturned = false;
         pass = true;
-        if (!headers.ipv4.isValid()) {
+        if (headers.ipv4.isValid()) {
+            ;
+        } else {
             pass = false;
             hasReturned = true;
         }
-        if (!hasReturned) {
-            if (Check_src_ip_0.apply().hit) {
-                pass = pass;
-            }
+        if (hasReturned) {
+            ;
+        } else if (Check_src_ip_0.apply().hit) {
+            pass = pass;
         }
     }
 }
 
 ebpfFilter<Headers_t>(prs(), pipe()) main;
-

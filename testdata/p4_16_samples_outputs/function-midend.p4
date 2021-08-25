@@ -31,7 +31,9 @@ control c(out bit<16> b) {
     }
     apply {
         tbl_act.apply();
-        if (!hasReturned) {
+        if (hasReturned) {
+            ;
+        } else {
             tbl_function4.apply();
         }
         tbl_function9.apply();
@@ -41,4 +43,3 @@ control c(out bit<16> b) {
 control ctr(out bit<16> b);
 package top(ctr _c);
 top(c()) main;
-
