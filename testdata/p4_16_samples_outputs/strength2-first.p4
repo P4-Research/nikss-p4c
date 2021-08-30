@@ -4,10 +4,14 @@ control strength() {
         bit<4> y;
         bit<4> z;
         z = x ^ y;
-        if (x >= y) {
+        if (x < y) {
+            ;
+        } else {
             z = x ^ (y | z);
         }
-        if (x <= y) {
+        if (x > y) {
+            ;
+        } else {
             z = x ^ y & z;
         }
     }

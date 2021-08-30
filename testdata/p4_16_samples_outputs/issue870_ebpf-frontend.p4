@@ -44,12 +44,11 @@ parser prs(packet_in p, out Headers_t headers) {
 }
 
 control pipe(inout Headers_t headers, out bool pass) {
-    @name("pipe.hasReturned") bool hasReturned;
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
-    @name("pipe.Reject") action Reject(@name("add") IPv4Address add_1) {
+    @name("pipe.Reject") action Reject(IPv4Address add) {
         pass = false;
-        headers.ipv4.srcAddr = add_1[31:16] ++ add_1[15:0];
+        headers.ipv4.srcAddr = add[31:16] ++ add[15:0];
     }
     @name("pipe.Check_src_ip") table Check_src_ip_0 {
         key = {
@@ -57,13 +56,13 @@ control pipe(inout Headers_t headers, out bool pass) {
         }
         actions = {
             Reject();
-            NoAction_1();
+            NoAction_0();
         }
         implementation = hash_table(32w1024);
-        const default_action = NoAction_1();
+        const default_action = NoAction_0();
     }
     apply {
-        hasReturned = false;
+        @name("pipe.hasReturned") bool hasReturned = false;
         pass = true;
         if (headers.ipv4.isValid()) {
             ;
@@ -76,6 +75,7 @@ control pipe(inout Headers_t headers, out bool pass) {
         } else {
             Check_src_ip_0.apply();
         }
+
     }
 }
 
