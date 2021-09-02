@@ -100,10 +100,12 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     emitPacketLength(builder);
     builder->endOfStatement(true);
 
-    builder->emitIndent();
-    builder->appendFormat("u64 %s = ", timestampVar.c_str());
-    emitTimestamp(builder);
-    builder->endOfStatement(true);
+    if (shouldEmitTimestamp()) {
+        builder->emitIndent();
+        builder->appendFormat("u64 %s = ", timestampVar.c_str());
+        emitTimestamp(builder);
+        builder->endOfStatement(true);
+    }
 }
 
 void EBPFPipeline::emitLocalUserMetadataInstances(CodeBuilder *builder) {
