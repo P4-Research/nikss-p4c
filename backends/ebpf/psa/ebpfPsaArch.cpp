@@ -544,7 +544,7 @@ EBPFMeterPSA *PSAArch::getAnyMeter() const {
     return meter;
 }
 
-const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
+const PSAArch * ConvertToEbpfPSA::build(const IR::ToplevelBlock *tlb) {
     /*
      * TYPES
      */
@@ -669,7 +669,7 @@ const PSAArch * ConvertToEbpfPSA::build(IR::ToplevelBlock *tlb) {
     }
 }
 
-const IR::Node * ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
+const IR::Node *ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
     ebpf_psa_arch = build(tlb);
     return tlb;
 }
@@ -720,7 +720,12 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
 // =====================EBPFParser=============================
 bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     auto pl = prsr->container->type->applyParams;
-    parser = new EBPFPsaParser(program, prsr->container, typemap);
+
+    if (options.xdpEgressOptimization && type == XDP_EGRESS) {
+        parser = new EBPFOptimizedEgressParserPSA(program, prsr->container, typemap);
+    } else {
+        parser = new EBPFPsaParser(program, prsr->container, typemap);
+    }
 
     auto it = pl->parameters.begin();
     parser->packet = *it; ++it;
@@ -776,28 +781,48 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     control->inputStandardMetadata = *it; ++it;
     control->outputStandardMetadata = *it;
 
-    if (type == TC_EGRESS || type == XDP_EGRESS) {
-        control->inputStandardMetadata = new IR::Parameter(
-                IR::ID("egress_" + control->inputStandardMetadata->name.name),
-                control->inputStandardMetadata->direction,
-                control->inputStandardMetadata->type);
-        control->outputStandardMetadata = new IR::Parameter(
-                IR::ID("egress_" + control->outputStandardMetadata->name.name),
-                control->outputStandardMetadata->direction,
-                control->outputStandardMetadata->type);
-    } else if (type == TC_INGRESS || type == XDP_INGRESS) {
-        control->inputStandardMetadata = new IR::Parameter(
-                IR::ID("ingress_" + control->inputStandardMetadata->name.name),
-                control->inputStandardMetadata->direction,
-                control->inputStandardMetadata->type);
-        control->outputStandardMetadata = new IR::Parameter(
-                IR::ID("ingress_" + control->outputStandardMetadata->name.name),
-                control->outputStandardMetadata->direction,
-                control->outputStandardMetadata->type);
-    }
-
     auto codegen = new ControlBodyTranslatorPSA(control);
     codegen->substitute(control->headers, parserHeaders);
+
+    // FIXME: this should be done using Transform/Modifier visitor.
+    if (type == TC_EGRESS || type == XDP_EGRESS) {
+        codegen->substitute(control->inputStandardMetadata,
+                    new IR::Parameter(IR::ID("egress_" + control->inputStandardMetadata->name.name),
+                      control->inputStandardMetadata->direction,
+                      control->inputStandardMetadata->type));
+        codegen->substitute(control->outputStandardMetadata,
+                            new IR::Parameter(IR::ID("egress_" + control->outputStandardMetadata->name.name),
+                                              control->outputStandardMetadata->direction,
+                                              control->outputStandardMetadata->type));
+        control->inputStandardMetadata = new IR::Parameter(
+        IR::ID("egress_" + control->inputStandardMetadata->name.name),
+            control->inputStandardMetadata->direction,
+            control->inputStandardMetadata->type);
+        control->outputStandardMetadata = new IR::Parameter(
+        IR::ID("egress_" + control->outputStandardMetadata->name.name),
+                        control->outputStandardMetadata->direction,
+                        control->outputStandardMetadata->type);
+    } else if (type == TC_INGRESS || type == XDP_INGRESS) {
+        codegen->substitute(control->inputStandardMetadata,
+                            new IR::Parameter(IR::ID("ingress_" + control->inputStandardMetadata->name.name),
+                                              control->inputStandardMetadata->direction,
+                                              control->inputStandardMetadata->type));
+        codegen->substitute(control->outputStandardMetadata,
+                            new IR::Parameter(IR::ID("ingress_" + control->outputStandardMetadata->name.name),
+                                              control->outputStandardMetadata->direction,
+                                              control->outputStandardMetadata->type));
+        control->inputStandardMetadata = new IR::Parameter(
+        IR::ID("ingress_" + control->inputStandardMetadata->name.name),
+            control->inputStandardMetadata->direction,
+            control->inputStandardMetadata->type);
+        control->outputStandardMetadata = new IR::Parameter(
+        IR::ID("ingress_" + control->outputStandardMetadata->name.name),
+            control->outputStandardMetadata->direction,
+            control->outputStandardMetadata->type);
+    }
+
+
+
     codegen->asPointerVariables.insert(control->inputStandardMetadata->name.name);
     if (this->type == TC_INGRESS || options.generateHdrInMap) {
         codegen->asPointerVariables.insert(control->headers->name.name);
@@ -957,7 +982,6 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
         ::error(ErrorType::ERR_UNEXPECTED, "Unexpected block %s nested within control",
                 instance->toString());
     }
-
     return false;
 }
 
@@ -1047,6 +1071,5 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expressi
     }
     return false;
 }
-
 }  // namespace EBPF
 

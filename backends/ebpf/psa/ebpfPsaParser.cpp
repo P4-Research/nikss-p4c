@@ -163,6 +163,7 @@ EBPFPsaParser::EBPFPsaParser(const EBPFProgram* program, const IR::P4Parser* blo
     visitor = new PsaStateTranslationVisitor(program->refMap, program->typeMap, this);
 }
 
+// dead code
 bool EBPFPsaParser::build() {
     auto pl = parserBlock->type->applyParams;
     if (pl->size() != 6) {
@@ -227,6 +228,15 @@ void EBPFPsaParser::emitValueSetInstances(CodeBuilder* builder) {
 }
 
 void EBPFPsaParser::emitRejectState(CodeBuilder* builder) {
+    // Create a synthetic reject state
+    builder->emitIndent();
+    builder->appendFormat("%s:", IR::ParserState::reject.c_str());
+    builder->spc();
+    builder->blockStart();
+
+    // This state may be called from deparser, so do not explicitly tell source of this event.
+    builder->target->emitTraceMessage(builder, "Packet rejected");
+
     builder->emitIndent();
     builder->appendFormat("if (%s == 0) ", program->errorVar.c_str());
     builder->blockStart();
@@ -240,6 +250,72 @@ void EBPFPsaParser::emitRejectState(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("goto %s", IR::ParserState::accept.c_str());
     builder->endOfStatement(true);
+
+    builder->blockEnd(true);
+    builder->newline();
+}
+
+
+void EBPFOptimizedEgressParserPSA::emitRejectState(CodeBuilder *builder) {
+    // Create a synthetic reject state
+    builder->emitIndent();
+    builder->appendFormat("egress_%s:", IR::ParserState::reject.c_str());
+    builder->spc();
+    builder->blockStart();
+
+    // This state may be called from deparser, so do not explicitly tell source of this event.
+    builder->target->emitTraceMessage(builder, "Packet rejected");
+
+    builder->emitIndent();
+    builder->appendFormat("if (%s == 0) ", program->errorVar.c_str());
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder,
+                                      "Parser: Explicit transition to reject state, dropping packet..");
+    builder->emitIndent();
+    builder->appendFormat("return %s", builder->target->abortReturnCode().c_str());
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
+
+    builder->emitIndent();
+    builder->appendFormat("goto egress_%s", IR::ParserState::accept.c_str());
+    builder->endOfStatement(true);
+
+    builder->blockEnd(true);
+    builder->newline();
+}
+
+bool OptimizedEgressParserStateVisitor::preorder(const IR::ParserState *parserState) {
+    if (parserState->isBuiltin()) return false;
+
+    builder->emitIndent();
+    builder->append("egress_" + parserState->name.name);
+    builder->append(":");
+    builder->spc();
+    builder->blockStart();
+
+    cstring msgStr = Util::printf_format("Parser: state %s", parserState->name.name);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+
+    visit(parserState->components, "components");
+    if (parserState->selectExpression == nullptr) {
+        builder->emitIndent();
+        builder->append("goto ");
+        builder->append("egress_" + IR::ParserState::reject);
+        builder->endOfStatement(true);
+    } else if (parserState->selectExpression->is<IR::SelectExpression>()) {
+        visit(parserState->selectExpression);
+    } else {
+        // must be a PathExpression which is a state name
+        if (!parserState->selectExpression->is<IR::PathExpression>())
+            BUG("Expected a PathExpression, got a %1%", parserState->selectExpression);
+        builder->emitIndent();
+        builder->append("goto egress_");
+        visit(parserState->selectExpression);
+        builder->endOfStatement(true);
+    }
+
+    builder->blockEnd(true);
+    return false;
 }
 
 }  // namespace EBPF

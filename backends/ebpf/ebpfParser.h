@@ -29,6 +29,7 @@ class EBPFParserState;
 
 class StateTranslationVisitor : public CodeGenInspector {
  protected:
+    cstring state_prefix;
     bool hasDefault;
     P4::P4CoreLibrary& p4lib;
     const EBPFParserState* state;
@@ -67,7 +68,7 @@ class EBPFParserState : public EBPFObject {
     const EBPFParser* parser;
 
     EBPFParserState(const IR::ParserState* state, EBPFParser* parser) :
-            state(state), parser(parser) {}
+            state(state), parser(parser) { }
     void emit(CodeBuilder* builder);
 };
 
@@ -82,6 +83,8 @@ class EBPFParser : public EBPFObject {
     EBPFType*                     headerType;
 
     StateTranslationVisitor*      visitor;
+
+    cstring nms = "";
 
     explicit EBPFParser(const EBPFProgram* program, const IR::P4Parser* block,
                         const P4::TypeMap* typeMap);

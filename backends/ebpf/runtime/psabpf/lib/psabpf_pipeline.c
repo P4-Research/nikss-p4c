@@ -57,9 +57,7 @@ static int xdp_port_add(__u32 pipeline_id, char *intf)
     snprintf(pinned_file, sizeof(pinned_file), "%s/%s%d/%s", BPF_FS,
              PIPELINE_PREFIX, pipeline_id, XDP_EGRESS_PROG);
     eg_prog_fd = bpf_obj_get(pinned_file);
-    if (eg_prog_fd < 0) {
-        return -1;
-    }
+
     __u32 flags = XDP_FLAGS_DRV_MODE;
     ret = bpf_set_link_xdp_fd(ifindex, ig_prog_fd, flags);
     if (ret) {
@@ -74,7 +72,11 @@ static int xdp_port_add(__u32 pipeline_id, char *intf)
         return -1;
     }
     devmap_val.ifindex = ifindex;
-    devmap_val.bpf_prog.fd = eg_prog_fd;
+    devmap_val.bpf_prog.fd = 0;
+    // install egress program only if it's found
+    if (eg_prog_fd >= 0) {
+        devmap_val.bpf_prog.fd = eg_prog_fd;
+    }
     ret = bpf_map_update_elem(devmap_fd, &ifindex, &devmap_val, 0);
     if (ret) {
         return ret;

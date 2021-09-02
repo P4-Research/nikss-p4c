@@ -62,7 +62,7 @@ set (P4C_EBPF_SRCS
   psa/externs/ebpfPsaRegister.cpp
   psa/externs/ebpfPsaTableImplementation.cpp
   psa/externs/ebpfPsaMeter.cpp
-  )
+  psa/backend.cpp)
 
 set (P4C_EBPF_HDRS
   codeGen.h
@@ -100,6 +100,7 @@ set (P4C_EBPF_HDRS
   ../bmv2/common/programStructure.h
   ../bmv2/common/sharedActionSelectorCheck.h
   ../bmv2/psa_switch/psaSwitch.h
+  psa/backend.h
   psa/xdpTarget.h
   psa/ebpfPsaArch.h
   psa/xdpHelpProgram.h

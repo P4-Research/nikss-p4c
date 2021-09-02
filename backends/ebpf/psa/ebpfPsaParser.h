@@ -8,6 +8,7 @@
 namespace EBPF {
 
 class EBPFPsaParser;
+class EBPFOptimizedEgressParserPSA;
 
 class PsaStateTranslationVisitor : public StateTranslationVisitor {
  public:
@@ -56,6 +57,33 @@ class EBPFPsaParser : public EBPFParser {
     void emitTypes(CodeBuilder* builder) override;
     void emitValueSetInstances(CodeBuilder* builder) override;
     void emitRejectState(CodeBuilder* builder) override;
+};
+
+
+class OptimizedEgressParserStateVisitor : public PsaStateTranslationVisitor {
+ public:
+    EBPFOptimizedEgressParserPSA * parser;
+
+    explicit OptimizedEgressParserStateVisitor(P4::ReferenceMap* refMap, P4::TypeMap* typeMap,
+            EBPFPsaParser * prsr) :
+            PsaStateTranslationVisitor(refMap, typeMap, prsr) {}
+
+    bool preorder(const IR::ParserState* parserState) override;
+
+
+};
+
+
+class EBPFOptimizedEgressParserPSA : public EBPFPsaParser {
+ public:
+    EBPFOptimizedEgressParserPSA(const EBPFProgram* program, const IR::P4Parser* block,
+                                 const P4::TypeMap* typeMap) : EBPFPsaParser(program, block, typeMap) {
+        visitor = new OptimizedEgressParserStateVisitor(program->refMap, program->typeMap, this);
+        this->nms = "egress_";
+    }
+
+    void emitRejectState(CodeBuilder* builder) override;
+
 };
 
 }  // namespace EBPF

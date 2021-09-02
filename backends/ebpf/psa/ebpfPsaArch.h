@@ -79,6 +79,49 @@ class PSAArch {
     void emitXDP2TCInternalStructures(CodeBuilder *builder) const;
 };
 
+class RewriteP4Program : public Transform {
+ public:
+    RewriteP4Program() {}
+
+//    bool preorder(IR::P4Parser *p) override {
+//        p->states.clear();
+//        for (auto state : p->states) {
+//            p->states.push_back(new IR::ParserState(
+//                    IR::ID("ingress_" + state->name),
+//                    state->annotations,
+//                    state->components,
+//                    state->selectExpression));
+//        }
+//        return true;
+//    }
+
+//    const IR::Node *preorder(IR::ParserState *p) override {
+//        return new IR::ParserState(IR::ID("ingress_" + p->name), p->annotations, p->components, p->selectExpression);
+//    }
+
+    const IR::Node *preorder(IR::Type_Parser *parser) override {
+        std::cout << parser->name.name << std::endl;
+        return parser;
+    }
+
+    const IR::Node *preorder(IR::SelectCase *c) override {
+        return new IR::SelectCase(c->keyset, new IR::PathExpression(c->state->type,
+                                                                    new IR::Path(IR::ID("ingress_" + c->state->path->name.name))));
+    }
+
+    const IR::Node *preorder(IR::ParserState *p) override {
+        auto selectExpr = p->selectExpression;
+        if (selectExpr->is<IR::PathExpression>()) {
+            auto pathExpr = selectExpr->to<IR::PathExpression>();
+            selectExpr = new IR::PathExpression(pathExpr->type,
+                                                new IR::Path(IR::ID("ingress_" + pathExpr->path->name.name)));
+        }
+
+        return new IR::ParserState(IR::ID("ingress_" + p->name), p->annotations, p->components, selectExpr);
+    }
+
+};
+
 class ConvertToEbpfPSA : public Transform {
     const EbpfOptions& options;
     BMV2::PsaProgramStructure& structure;
@@ -93,8 +136,9 @@ class ConvertToEbpfPSA : public Transform {
                      : options(options), structure(structure), typemap(typemap), refmap(refmap) {
     }
 
-    const PSAArch *build(IR::ToplevelBlock *prog);
+    const PSAArch *build(const IR::ToplevelBlock *prog);
     const IR::Node *preorder(IR::ToplevelBlock *p) override;
+
     const PSAArch *getPSAArchForEBPF() { return ebpf_psa_arch; }
 };
 
@@ -144,23 +188,6 @@ class ConvertToEBPFParserPSA : public Inspector {
     EBPF::EBPFParser* getEBPFParser() { return parser; }
 
     void findValueSets(const IR::ParserBlock *prsr);
-};
-
-class DoMakeStandardMetadataNamesUnique : public Transform {
- public:
-    DoMakeStandardMetadataNamesUnique() {}
-    const IR::Node *preorder(IR::Parameter *p) override {
-        if (p->type != nullptr) {
-            return nullptr;
-        }
-        return p;
-    }
-//    const IR::Node *preorder(IR::ParameterList *pl) override {
-//        if (pl->parameters.size() != 0) {
-//            return nullptr;
-//        }
-//        return pl;
-//    }
 };
 
 class ConvertToEBPFControlPSA : public Inspector {

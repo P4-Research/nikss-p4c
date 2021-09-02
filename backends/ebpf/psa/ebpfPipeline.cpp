@@ -675,7 +675,9 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
 void XDPIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
     // do not handle multicast; it has been handled earlier by PreDeparser.
     builder->emitIndent();
-    builder->appendLine("return bpf_redirect_map(&tx_port, ostd.egress_port, 0);");
+    builder->appendFormat("return bpf_redirect_map(&tx_port, %s.egress_port, 0);",
+                          control->outputStandardMetadata->name.name);
+    builder->newline();
 }
 
 void XDPIngressPipeline::emitWithEgress(CodeBuilder *builder, EBPFPipeline *egress) {
@@ -746,22 +748,38 @@ void XDPIngressPipeline::emitWithEgress(CodeBuilder *builder, EBPFPipeline *egre
     msgStr = Util::printf_format("%s control: packet processing finished", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
 
-    // INGRESS DEPRS
+//    // INGRESS DEPRS
+//    builder->emitIndent();
+//    builder->blockStart();
+//    msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
+//    builder->target->emitTraceMessage(builder, msgStr.c_str());
+//    deparser->emit(builder);
+//    builder->blockEnd(true);
+//    msgStr = Util::printf_format("%s deparser: packet deparsing finished", sectionName);
+//    builder->target->emitTraceMessage(builder, msgStr.c_str());
+
+    // EGRESS PRS
     builder->emitIndent();
-    builder->blockStart();
-    msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
+    builder->appendFormat("%s = 0;", this->offsetVar.c_str());
+    builder->newline();
+    builder->emitIndent();
+    msgStr = Util::printf_format("%s parser: parsing new packet, path=0", egress->sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
-    deparser->emit(builder);
-    builder->blockEnd(true);
-    msgStr = Util::printf_format("%s deparser: packet deparsing finished", sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    egress->parser->emit(builder);
+    builder->newline();
 
     // EGRESS CTRL
     builder->emitIndent();
+    egress->ifindexVar = control->outputStandardMetadata->name.name + ".egress_port";
+    builder->append("egress_" + IR::ParserState::accept);
+    builder->append(":");
+    builder->spc();
+    builder->blockStart();
     egress->emitPSAControlDataTypes(builder);
     msgStr = Util::printf_format("%s control: packet processing started", egress->sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
     egress->control->emit(builder);
+    builder->blockEnd(true);
     msgStr = Util::printf_format("%s control: packet processing finished", egress->sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
 
