@@ -86,9 +86,16 @@ class EBPFPipeline : public EBPFProgram {
     virtual void emitTimestamp(CodeBuilder *builder);
     virtual void emit(CodeBuilder* builder);
     virtual bool shouldEmitTimestamp() {
-        if (!control->meters.empty() || control->timestampIsUsed) {
+        auto directMeter = std::find_if(control->tables.begin(),
+                                        control->tables.end(),
+                                        [](std::pair<const cstring, EBPFTable*> elem) {
+                                            return !elem.second->to<EBPFTablePSA>()->meters.empty();
+                                        });
+        bool anyDirectMeter = directMeter != control->tables.end();
+        if (!control->meters.empty() || anyDirectMeter || control->timestampIsUsed) {
             return true;
         }
+
         return false;
     }
 };
