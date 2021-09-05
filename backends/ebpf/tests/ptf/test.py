@@ -39,11 +39,7 @@ class IfNotTest(P4EbpfTest):
     def runTest(self):
         pkt = testutils.simple_ip_packet()
         testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_packet(self, pkt, PORT1)
-
-    def tearDown(self):
-        self.remove_maps(["ingress_tbl_fwd", "ingress_tbl_fwd_defaultAction"])
-        super(IfNotTest, self).tearDown()
+        testutils.verify_no_packet(self, pkt, PORT1)
 
 
 @tc_only

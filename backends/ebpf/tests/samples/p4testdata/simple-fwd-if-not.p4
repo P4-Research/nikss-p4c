@@ -92,18 +92,22 @@ control ingress(inout headers hdr,
         send_to_port(ostd, egress_port);
     }
 
+    action drop() {
+        ingress_drop(ostd);
+    }
+
     table tbl_fwd {
         key = {
             istd.ingress_port : exact;
         }
-        actions = { do_forward; NoAction; }
+        actions = { do_forward; drop; }
         default_action = do_forward((PortId_t) 5);
         size = 100;
     }
 
     apply {
         if(!tbl_fwd.apply().hit) {
-		NoAction();
+		drop();
 	}
     }
 }
