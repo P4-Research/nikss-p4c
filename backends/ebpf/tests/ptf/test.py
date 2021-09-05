@@ -32,6 +32,19 @@ class SimpleForwardingPSATest(P4EbpfTest):
         self.remove_maps(["ingress_tbl_fwd", "ingress_tbl_fwd_defaultAction"])
         super(SimpleForwardingPSATest, self).tearDown()
 
+class IfNotTest(P4EbpfTest):
+
+    p4_file_path = "samples/p4testdata/simple-fwd-if-not.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
+
+    def tearDown(self):
+        self.remove_maps(["ingress_tbl_fwd", "ingress_tbl_fwd_defaultAction"])
+        super(IfNotTest, self).tearDown()
+
 
 @tc_only
 class PSAResubmitTest(P4EbpfTest):
