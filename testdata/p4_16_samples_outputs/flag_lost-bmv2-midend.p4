@@ -98,7 +98,9 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         if (hdr.ipv4.isValid()) {
             ipv4_lpm_0.apply();
         }
-        if (!meta.test_bool) {
+        if (meta.test_bool) {
+            ;
+        } else {
             tbl_drop.apply();
         }
     }
@@ -122,4 +124,3 @@ control DeparserImpl(packet_out packet, in headers hdr) {
 }
 
 V1Switch<headers, metadata>(ParserImpl(), verifyChecksum(), ingress(), egress(), computeChecksum(), DeparserImpl()) main;
-
