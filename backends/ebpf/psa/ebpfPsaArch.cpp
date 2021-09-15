@@ -281,7 +281,7 @@ void PSAArch::emitPreamble(CodeBuilder *builder) const {
     builder->appendLine("#define CLONE_MAX_CLONES (CLONE_MAX_PORTS * CLONE_MAX_INSTANCES)");
     builder->appendLine("#define CLONE_MAX_SESSIONS 1024");
     if (options.generateToXDP) {
-        builder->appendLine("#define DEVMAP_SIZE 64");
+        builder->appendLine("#define DEVMAP_SIZE 256");
     }
     builder->newline();
 

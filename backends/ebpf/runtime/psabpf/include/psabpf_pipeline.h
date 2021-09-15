@@ -1,7 +1,7 @@
 #include "psabpf.h"
 
 /* The maximum size of the generated DEVMAP tx_port */
-#define DEVMAP_SIZE 64
+#define DEVMAP_SIZE 256
 
 ////// ForwardingConfig
 typedef struct psabpf_pipeline {
