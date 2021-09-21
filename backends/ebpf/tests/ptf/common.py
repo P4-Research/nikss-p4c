@@ -227,3 +227,9 @@ class P4EbpfTest(EbpfTest):
             for k in keys:
                 cmd = cmd + "{} ".format(k)
         self.exec_ns_cmd(cmd, "Table delete failed")
+
+    def meter_update(self, name, index, pir, pbs, cir, cbs):
+        cmd = "psabpf-ctl meter update pipe {} {} " \
+              "index {} {}:{} {}:{}".format(TEST_PIPELINE_ID, name,
+                                            index, pir, pbs, cir, cbs)
+        self.exec_ns_cmd(cmd, "Meter update failed")

@@ -205,7 +205,6 @@ class MACLearningTest(L2L3SwitchTest):
                 self.fail("Digest not generated")
 
 
-@tc_only
 class BroadcastTest(L2L3SwitchTest):
 
     def runTest(self):

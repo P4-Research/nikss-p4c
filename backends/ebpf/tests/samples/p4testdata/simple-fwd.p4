@@ -41,7 +41,7 @@ struct headers {
 
 parser IngressParserImpl(packet_in buffer,
                          out headers parsed_hdr,
-                         inout metadata user_meta,
+                         inout metadata meta,
                          in psa_ingress_parser_input_metadata_t istd,
                          in empty_t resubmit_meta,
                          in empty_t recirculate_meta)
@@ -62,7 +62,7 @@ parser IngressParserImpl(packet_in buffer,
 
 parser EgressParserImpl(packet_in buffer,
                         out headers parsed_hdr,
-                        inout metadata user_meta,
+                        inout metadata meta,
                         in psa_egress_parser_input_metadata_t istd,
                         in empty_t normal_meta,
                         in empty_t clone_i2e_meta,
@@ -83,7 +83,7 @@ parser EgressParserImpl(packet_in buffer,
 }
 
 control ingress(inout headers hdr,
-                inout metadata user_meta,
+                inout metadata meta,
                 in    psa_ingress_input_metadata_t  istd,
                 inout psa_ingress_output_metadata_t ostd)
 {
@@ -102,12 +102,12 @@ control ingress(inout headers hdr,
     }
 
     apply {
-         tbl_fwd.apply();
+        tbl_fwd.apply();
     }
 }
 
 control egress(inout headers hdr,
-               inout metadata user_meta,
+               inout metadata meta,
                in    psa_egress_input_metadata_t  istd,
                inout psa_egress_output_metadata_t ostd)
 {

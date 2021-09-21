@@ -21,6 +21,7 @@ limitations under the License.
 #include "frontends/common/options.h"
 
 enum XDP2TC {
+    XDP2TC_NONE,
     XDP2TC_META,
     XDP2TC_HEAD,
     XDP2TC_CPUMAP
@@ -34,9 +35,34 @@ class EbpfOptions : public CompilerOptions {
     bool emitExterns = false;
     // Tracing eBPF code execution
     bool emitTraceMessages = false;
+
+    // Generate headers and user metadata in/from CPUMAP
+    bool generateHdrInMap = false;
+
+    // XDP-related opts
     bool generateToXDP = false;
-    enum XDP2TC xdp2tcMode = XDP2TC_META;
+    enum XDP2TC xdp2tcMode = XDP2TC_NONE;
     EbpfOptions();
+
+    void calculateXDP2TCMode() {
+        if (arch != "psa") {
+            return;
+        }
+
+        if (generateToXDP && xdp2tcMode == XDP2TC_META) {
+            ::warning(ErrorType::WARN_INVALID,
+                      "XDP2TC 'meta' mode cannot be used if XDP is enabled. "
+                      "Falling back to 'head' mode.");
+            xdp2tcMode = XDP2TC_HEAD;
+        } else if (generateToXDP && xdp2tcMode == XDP2TC_NONE) {
+            // use 'head' mode by default; it's the most safe option.
+            xdp2tcMode = XDP2TC_HEAD;
+        } else if (!generateToXDP && xdp2tcMode == XDP2TC_NONE) {
+            // For TC, use 'meta' mode by default.
+            xdp2tcMode = XDP2TC_META;
+        }
+        BUG_CHECK(xdp2tcMode != XDP2TC_NONE, "xdp2tc mode should not be set to NONE, bug?");
+    }
 };
 
 using EbpfContext = P4CContextWithOptions<EbpfOptions>;

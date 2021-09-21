@@ -74,6 +74,11 @@ void compile(EbpfOptions& options) {
         if (::errorCount() > 0)
             return;
     }
+
+    P4::serializeP4RuntimeIfRequired(program, options);
+    if (::errorCount() > 0)
+        return;
+
     EBPF::MidEnd midend;
     midend.addDebugHook(hook);
     auto toplevel = midend.run(options, program);
@@ -100,6 +105,7 @@ int main(int argc, char *const argv[]) {
     if (::errorCount() > 0)
         exit(1);
 
+    options.calculateXDP2TCMode();
     try {
         compile(options);
     } catch (const std::exception &bug) {

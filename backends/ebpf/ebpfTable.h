@@ -58,8 +58,8 @@ class EBPFTableBase : public EBPFObject {
                   CodeGenInspector* codeGen) :
             program(program), instanceName(instanceName), codeGen(codeGen) {
         CHECK_NULL(codeGen); CHECK_NULL(program);
-        keyTypeName = program->refMap->newName(instanceName + "_key");
-        valueTypeName = program->refMap->newName(instanceName + "_value");
+        keyTypeName = instanceName + "_key";
+        valueTypeName = instanceName + "_value";
         dataMapName = instanceName;
     }
 };
@@ -67,13 +67,20 @@ class EBPFTableBase : public EBPFObject {
 class EBPFTable : public EBPFTableBase {
     const int prefixLenFieldWidth = 32;
 
+    void initKey();
+
  protected:
     const cstring prefixFieldName = "prefixlen";
 
     bool isLPMTable();
     bool isTernaryTable();
+    void declareTmpLpmKey(CodeBuilder *builder, const IR::KeyElement *c, std::string &tmpVar);
+    void emitLpmKeyField(CodeBuilder *builder,
+                         const cstring &swap,
+                         const std::string &tmpVar) const;
+    virtual void validateKeys() const;
     virtual ActionTranslationVisitor*
-        createActionTranslationVisitor(cstring valueName, const EBPFProgram* program) const {
+    createActionTranslationVisitor(cstring valueName, const EBPFProgram* program) const {
         return new ActionTranslationVisitor(valueName, program);
     }
 
@@ -115,13 +122,6 @@ class EBPFTable : public EBPFTableBase {
     cstring getByteSwapMethod(unsigned int width) const;
     virtual bool dropOnNoMatchingEntryFound() const { return true; }
     virtual bool singleActionRun() const { return true; }
-
- protected:
-    void declareTmpLpmKey(CodeBuilder *builder, const IR::KeyElement *c, std::string &tmpVar);
-    void emitLpmKeyField(CodeBuilder *builder,
-                         const cstring &swap,
-                         const std::string &tmpVar) const;
-    virtual void validateKeys() const;
 };
 
 class EBPFCounterTable : public EBPFTableBase {

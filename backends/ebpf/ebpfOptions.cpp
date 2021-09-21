@@ -38,4 +38,7 @@ EbpfOptions::EbpfOptions() {
                     return true;
                 },
                 "[psa] Select the mode used to pass metadata from XDP to TC.");
+        registerOption("--hdr2Map", nullptr,
+                [this](const char*) { generateHdrInMap = true; return true; },
+                "Compile and generate the P4 prog headers and metadata in PERCPU_MAP");
 }

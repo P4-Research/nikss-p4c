@@ -1,8 +1,10 @@
 #!/bin/bash
 
-p4c-ebpf --arch psa --xdp -v -o out-xdp.c ../scenarios/basic/p4/l2fwd/l2fwd.p4
+#p4c-ebpf --arch psa --xdp --hdr2Map -v -o out-xdp.c ../scenarios/use-cases/p4/l2l3_switch.p4
+# p4c-ebpf --arch psa --xdp --hdr2Map -v -o out-xdp.c ../../tests/samples/p4testdata/stack_limit_test.p4
+p4c-ebpf --arch psa --xdp --hdr2Map -v -o out-xdp.c ../scenarios/basic/p4/l2fwd/l2fwd.p4
 
-make # compile xdp_loader and out-xdp.c to out-xdp.o
+make # compile out-xdp.c to out-xdp.o
 
 sudo ip netns add ns0
 
