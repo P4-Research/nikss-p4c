@@ -39,7 +39,9 @@ control cIngress(inout Parsed_packet hdr, inout mystruct1 meta, inout standard_m
             meta.b = meta.b ^ 4w5;
             hasReturned = true;
         }
-        if (!hasReturned) {
+        if (hasReturned) {
+            ;
+        } else {
             meta.b = meta.b + 4w5;
         }
     }
@@ -73,4 +75,3 @@ control uc(inout Parsed_packet hdr, inout mystruct1 meta) {
 }
 
 V1Switch<Parsed_packet, mystruct1>(parserI(), vc(), cIngress(), cEgress(), uc(), DeparserI()) main;
-

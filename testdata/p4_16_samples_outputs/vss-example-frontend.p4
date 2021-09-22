@@ -157,25 +157,33 @@ control TopPipe(inout Parsed_packet headers, in error parseError, in InControl i
             Drop_action_6();
             hasReturned = true;
         }
-        if (!hasReturned) {
+        if (hasReturned) {
+            ;
+        } else {
             ipv4_match_0.apply();
             if (outCtrl.outputPort == 4w0xf) {
                 hasReturned = true;
             }
         }
-        if (!hasReturned) {
+        if (hasReturned) {
+            ;
+        } else {
             check_ttl_0.apply();
             if (outCtrl.outputPort == 4w0xe) {
                 hasReturned = true;
             }
         }
-        if (!hasReturned) {
+        if (hasReturned) {
+            ;
+        } else {
             dmac_0.apply();
             if (outCtrl.outputPort == 4w0xf) {
                 hasReturned = true;
             }
         }
-        if (!hasReturned) {
+        if (hasReturned) {
+            ;
+        } else {
             smac_0.apply();
         }
     }
@@ -196,4 +204,3 @@ control TopDeparser(inout Parsed_packet p, packet_out b) {
 }
 
 VSS<Parsed_packet>(TopParser(), TopPipe(), TopDeparser()) main;
-

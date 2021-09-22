@@ -397,7 +397,10 @@ void TCIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder, "PreDeparser: resubmitting packet, "
                                                "skipping deparser..");
     builder->emitIndent();
-    builder->appendLine("meta->packet_path = RESUBMIT;");
+    const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
+    builder->appendFormat("%s->packet_path = RESUBMIT;",
+                    pipelineProgram->compilerGlobalMetadata);
+    builder->newline();
     builder->emitIndent();
     builder->appendLine("return TC_ACT_UNSPEC;");
     builder->blockEnd(true);
@@ -462,7 +465,7 @@ bool XDPIngressDeparserPSA::build() {
     headerType = EBPFTypeFactory::instance->create(ht);
 
     codeGen->asPointerVariables.insert(resubmit_meta->name.name);
-    codeGen->substitute(headers, parserHeaders);
+    codeGen->substitute(this->headers, parserHeaders);
     return true;
 }
 
@@ -480,7 +483,12 @@ void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendLine("struct xdp2tc_metadata xdp2tc_md = {};");
     builder->emitIndent();
-    builder->appendFormat("xdp2tc_md.headers = %s", this->headers->name.name);
+    if (program->options.generateHdrInMap) {
+        builder->appendFormat("xdp2tc_md.headers = *%s", this->headers->name.name);
+    } else {
+        builder->appendFormat("xdp2tc_md.headers = %s", this->headers->name.name);
+    }
+
     builder->endOfStatement(true);
     builder->emitIndent();
     builder->appendFormat("xdp2tc_md.ostd = %s", this->istd->name.name);

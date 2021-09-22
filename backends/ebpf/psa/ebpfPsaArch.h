@@ -69,6 +69,8 @@ class PSAArch {
     void emitInstances2TC(CodeBuilder *builder) const;
     void emitInitializer2TC(CodeBuilder *p_builder) const;
 
+    void emitGlobalHeadersMetadata(CodeBuilder *builder) const;
+
     void emit2XDP(CodeBuilder* builder) const;
     void emitInstances2XDP(CodeBuilder *builder) const;
     void emitHelperFunctions2XDP(CodeBuilder *builder) const;
@@ -170,6 +172,8 @@ class ConvertToEBPFControlPSA : public Inspector {
     bool preorder(const IR::ControlBlock *) override;
     bool preorder(const IR::Declaration_Instance*) override;
     bool preorder(const IR::Declaration_Variable*) override;
+    bool preorder(const IR::AssignmentStatement *a) override;
+    bool preorder(const IR::IfStatement *a) override;
     bool preorder(const IR::ExternBlock *) override;
 
     EBPF::EBPFControlPSA *getEBPFControl() { return control; }

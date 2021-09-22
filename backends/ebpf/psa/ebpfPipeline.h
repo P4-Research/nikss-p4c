@@ -17,7 +17,9 @@ class EBPFPipeline : public EBPFProgram {
     const cstring name;
     cstring sectionName;
     cstring contextVar;
-    cstring timestampVar;
+    cstring timestampVar, ifindexVar;
+    cstring priorityVar, packetPathVar, pktInstanceVar;
+    cstring compilerGlobalMetadata;
 
     EBPFControlPSA* control;
     EBPFDeparserPSA* deparser;
@@ -34,35 +36,98 @@ class EBPFPipeline : public EBPFProgram {
         lengthVar = cstring("pkt_len");
         endLabel = cstring("deparser");
         timestampVar = cstring("tstamp");
+        ifindexVar = cstring("skb->ifindex");
+        compilerGlobalMetadata = cstring("compiler_meta__");
+        packetPathVar = compilerGlobalMetadata + cstring("->packet_path");
+        pktInstanceVar = compilerGlobalMetadata + cstring("->instance");
+        priorityVar = cstring("skb->priority");
     }
 
     virtual cstring dropReturnCode() {
+        if (sectionName.startsWith("xdp")) {
+            return "XDP_DROP";
+        }
+
         // TC is the default hookpoint
         return "TC_ACT_SHOT";
     }
     virtual cstring forwardReturnCode() {
+        if (sectionName.startsWith("xdp")) {
+            return "XDP_PASS";
+        }
+
         // TC is the default hookpoint
         return "TC_ACT_OK";
     }
+
     virtual void emitTrafficManager(CodeBuilder *builder) = 0;
+
+    virtual void emitPSAControlDataTypes(CodeBuilder* builder) = 0;
+
+    void emitLocalHeaderInstances(CodeBuilder *builder);
+    void emitLocalHeaderInstancesAsPointers(CodeBuilder *builder);
+    void emitCPUMAPHeadersInitializers(CodeBuilder *builder);
+    void emitCPUMAPHeaderInstances(CodeBuilder *builder);
+
     void emitHeaderInstances(CodeBuilder *builder) override;
+
     void emitLocalVariables(CodeBuilder* builder) override;
     void emitGlobalMetadataInitializer(CodeBuilder *builder);
+
+    void emitLocalUserMetadataInstances(CodeBuilder *builder);
+    void emitCPUMapUserMetadataInstance(CodeBuilder *builder);
     void emitUserMetadataInstance(CodeBuilder *builder);
+
+    void emitCPUMAPInitializers(CodeBuilder *builder);
+    void emitHeadersFromCPUMAP(CodeBuilder* builder);
+    void emitMetadataFromCPUMAP(CodeBuilder *builder);
+
     virtual void emitPacketLength(CodeBuilder *builder);
     virtual void emitTimestamp(CodeBuilder *builder);
-    virtual void emitPSAControlDataTypes(CodeBuilder* builder) = 0;
     virtual void emit(CodeBuilder* builder);
+    virtual bool shouldEmitTimestamp() {
+        auto directMeter = std::find_if(control->tables.begin(),
+                                        control->tables.end(),
+                                        [](std::pair<const cstring, EBPFTable*> elem) {
+                                            return !elem.second->to<EBPFTablePSA>()->meters.empty();
+                                        });
+        bool anyDirectMeter = directMeter != control->tables.end();
+        if (!control->meters.empty() || anyDirectMeter || control->timestampIsUsed) {
+            return true;
+        }
+
+        return false;
+    }
 };
 
-class TCIngressPipeline : public EBPFPipeline {
+/*
+ * EBPFIngressPipeline represents a hook-independent EBPF-based ingress pipeline.
+ * It includes common definitions for TC and XDP.
+ */
+class EBPFIngressPipeline : public EBPFPipeline {
+ public:
+    EBPFIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
+                        P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) {}
+
+    void emitPSAControlDataTypes(CodeBuilder* builder) override;
+};
+
+class EBPFEgressPipeline : public EBPFPipeline {
+ public:
+    EBPFEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
+                       P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) {}
+
+    void emitPSAControlDataTypes(CodeBuilder* builder) override;
+};
+
+class TCIngressPipeline : public EBPFIngressPipeline {
  public:
     cstring processFunctionName;
     unsigned int maxResubmitDepth;
 
     TCIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                         P4::TypeMap* typeMap) :
-            EBPFPipeline(name, options, refMap, typeMap) {
+            EBPFIngressPipeline(name, options, refMap, typeMap) {
         processFunctionName = "process";
         // FIXME: hardcded
         maxResubmitDepth = 4;
@@ -70,63 +135,50 @@ class TCIngressPipeline : public EBPFPipeline {
 
     void emitTrafficManager(CodeBuilder *builder) override;
     void emit(CodeBuilder *builder) override;
-    void emitPSAControlDataTypes(CodeBuilder *builder) override;
  private:
     void emitTCWorkaroundUsingMeta(CodeBuilder *builder);
     void emitTCWorkaroundUsingHead(CodeBuilder *builder);
     void emitTCWorkaroundUsingCPUMAP(CodeBuilder *builder);
 };
 
-class TCEgressPipeline : public EBPFPipeline {
+class TCEgressPipeline : public EBPFEgressPipeline {
  public:
     TCEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                        P4::TypeMap* typeMap) :
-            EBPFPipeline(name, options, refMap, typeMap) { }
+            EBPFEgressPipeline(name, options, refMap, typeMap) { }
 
     void emitTrafficManager(CodeBuilder *builder) override;
-    void emitPSAControlDataTypes(CodeBuilder *builder) override;
 };
 
-class XDPPipeline : public EBPFPipeline {
- public:
-    XDPPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
-    P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) {
-    }
-
-    void emitPacketLength(CodeBuilder *builder) override;
-    void emitTimestamp(CodeBuilder *builder) override;
-    cstring forwardReturnCode() override {
-        return "XDP_PASS";
-    }
-    cstring dropReturnCode() override {
-        return "XDP_DROP";
-    }
-};
-
-class XDPIngressPipeline : public XDPPipeline {
+class XDPIngressPipeline : public EBPFIngressPipeline {
  public:
     XDPIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                     P4::TypeMap* typeMap) :
-            XDPPipeline(name, options, refMap, typeMap) {
+            EBPFIngressPipeline(name, options, refMap, typeMap) {
         sectionName = "xdp_ingress/" + name;
+        ifindexVar = cstring("skb->ingress_ifindex");
+        packetPathVar = cstring("0");
     }
 
     void emit(CodeBuilder *builder) override;
     void emitTrafficManager(CodeBuilder *builder) override;
-    void emitPSAControlDataTypes(CodeBuilder *builder) override;
 };
 
-class XDPEgressPipeline : public XDPPipeline {
+class XDPEgressPipeline : public EBPFEgressPipeline {
  public:
     XDPEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                         P4::TypeMap* typeMap):
-            XDPPipeline(name, options, refMap, typeMap) {
+            EBPFEgressPipeline(name, options, refMap, typeMap) {
         sectionName = "xdp_devmap/" + name;
+        ifindexVar = cstring("skb->egress_ifindex");
+        // we do not support packet path, instance & priority in the XDP egress.
+        packetPathVar = cstring("0");
+        pktInstanceVar = cstring("0");
+        priorityVar = cstring("0");
     }
 
     void emit(CodeBuilder *builder) override;
     void emitTrafficManager(CodeBuilder *builder) override;
-    void emitPSAControlDataTypes(CodeBuilder *builder) override;
 };
 
 class TCTrafficManagerForXDP : public TCIngressPipeline {

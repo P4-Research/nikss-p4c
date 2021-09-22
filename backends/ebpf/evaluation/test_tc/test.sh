@@ -23,7 +23,13 @@ declare -a ARGS="-DPSA_PORT_RECIRCULATE=$RECIRC_PORT_ID -DBTF"
 
 # compile tc progs
 make -f ../../runtime/kernel.mk BPFOBJ=out-tc.o \
-	P4FILE=../scenarios/basic/p4/l2fwd/l2fwd.p4 ARGS="$ARGS" psa
+	P4FILE=../scenarios/use-cases/p4/l2l3_switch.p4 P4ARGS="--hdr2Map" ARGS="$ARGS" psa
+
+# make -f ../../runtime/kernel.mk BPFOBJ=out-tc.o \
+# 	P4FILE=../scenarios/basic/p4/l2fwd/l2fwd.p4 P4ARGS="--hdr2Map" ARGS="$ARGS" psa
+
+# make -f ../../runtime/kernel.mk BPFOBJ=out-tc.o \
+# 	P4FILE=../../tests/samples/p4testdata/stack_limit_test.p4 P4ARGS="--hdr2Map" ARGS="$ARGS" psa
 
 sudo nsenter --net=/var/run/netns/ns0 psabpf-ctl pipeline load id 1 out-tc.o
 sudo nsenter --net=/var/run/netns/ns0 psabpf-ctl pipeline add-port id 1 eth0

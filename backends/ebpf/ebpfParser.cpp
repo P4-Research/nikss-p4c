@@ -390,7 +390,7 @@ bool StateTranslationVisitor::preorder(const IR::MethodCallExpression* expressio
     }
     builder->append(")");
     if (commentDescriptionDepth == 1) {
-        builder->append("*/");
+        builder->append(" */");
         builder->newline();
     }
     commentDescriptionDepth--;

@@ -79,6 +79,9 @@ void PSAArch::emit2TC(CodeBuilder *builder) const {
      */
     emitInternalStructures(builder);
     emitTypes(builder);
+    if (options.generateHdrInMap) {
+        emitGlobalHeadersMetadata(builder);
+    }
 
     /*
      * 5. BPF map definitions.
@@ -277,6 +280,9 @@ void PSAArch::emitPreamble(CodeBuilder *builder) const {
     builder->appendLine("#define CLONE_MAX_INSTANCES 1");
     builder->appendLine("#define CLONE_MAX_CLONES (CLONE_MAX_PORTS * CLONE_MAX_INSTANCES)");
     builder->appendLine("#define CLONE_MAX_SESSIONS 1024");
+    if (options.generateToXDP) {
+        builder->appendLine("#define DEVMAP_SIZE 256");
+    }
     builder->newline();
 
     builder->appendLine("#ifndef PSA_PORT_RECIRCULATE\n"
@@ -309,6 +315,12 @@ void PSAArch::emitInstances2TC(CodeBuilder *builder) const {
     tcEgress->parser->emitValueSetInstances(builder);
     tcEgress->control->emitTableInstances(builder);
 
+    if (options.generateHdrInMap) {
+        builder->target->emitTableDecl(builder, "hdr_md_cpumap",
+                                       TablePerCPUArray, "u32",
+                                       "struct hdr_md", 1);
+    }
+
     builder->appendLine("REGISTER_END()");
     builder->newline();
 }
@@ -330,6 +342,47 @@ void PSAArch::emitInitializer2TC(CodeBuilder *builder) const {
     builder->blockEnd(true);
 }
 
+void PSAArch::emitGlobalHeadersMetadata(CodeBuilder *builder) const {
+    builder->append("struct hdr_md ");
+    builder->blockStart();
+    builder->emitIndent();
+
+    if (tcIngressForXDP) {
+        /*
+         * Note: here, we could also use any pipe in { xdpIngress, xdpEgress tcEgressForXDP }
+         */
+        tcIngressForXDP->parser->headerType->declare(builder, "cpumap_hdr", false);
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        auto user_md_type =
+        tcIngressForXDP->typeMap->getType(tcIngressForXDP->control->user_metadata);
+        if (user_md_type == nullptr) {
+            ::error("cannot declare user metadata");
+        }
+        auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
+        userMetadataType->declare(builder, "cpumap_usermeta", false);
+    } else {
+        /*
+         * Note: here, we could also use tcEgress pipe
+         */
+        tcIngress->parser->headerType->declare(builder, "cpumap_hdr", false);
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        auto user_md_type =
+        tcIngress->typeMap->getType(tcIngress->control->user_metadata);
+        if (user_md_type == nullptr) {
+            ::error("cannot declare user metadata");
+        }
+        auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
+        userMetadataType->declare(builder, "cpumap_usermeta", false);
+    }
+
+    builder->endOfStatement(true);
+
+    builder->blockEnd(false);
+    builder->endOfStatement(true);
+}
+
 void PSAArch::emitHelperFunctions2XDP(CodeBuilder *builder) const {
     EBPFHashAlgorithmTypeFactoryPSA::instance()->emitGlobals(builder);
 
@@ -349,6 +402,9 @@ void PSAArch::emit2XDP(CodeBuilder *builder) const {
 
     emitInternalStructures(builder);
     emitTypes(builder);
+    if (options.generateHdrInMap) {
+        emitGlobalHeadersMetadata(builder);
+    }
     emitXDP2TCInternalStructures(builder);
 
     emitInstances2XDP(builder);
@@ -361,8 +417,10 @@ void PSAArch::emit2XDP(CodeBuilder *builder) const {
     builder->newline();
 
     emitDummy2XDP(builder);
+    builder->newline();
 
     tcIngressForXDP->emit(builder);
+    builder->newline();
 
     tcEgressForXDP->emit(builder);
 
@@ -391,7 +449,7 @@ void PSAArch::emitInstances2XDP(CodeBuilder *builder) const {
     builder->appendFormat(".value_size    = sizeof(struct bpf_devmap_val),");
     builder->newline();
     builder->emitIndent();
-    builder->appendFormat(".max_entries   = 64,");
+    builder->appendFormat(".max_entries   = DEVMAP_SIZE,");
     builder->newline();
     builder->blockEnd(false);
     builder->endOfStatement(true);
@@ -412,6 +470,12 @@ void PSAArch::emitInstances2XDP(CodeBuilder *builder) const {
 
     builder->target->emitTableDecl(builder, "xdp2tc_shared_map", TablePerCPUArray,
                                    "u32", "struct xdp2tc_metadata", 1);
+
+    if (options.generateHdrInMap) {
+        builder->target->emitTableDecl(builder, "hdr_md_cpumap",
+                                       TablePerCPUArray, "u32",
+                                       "struct hdr_md", 1);
+    }
     builder->appendLine("REGISTER_END()");
     builder->newline();
 }
@@ -671,7 +735,7 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     parser->headerType = EBPFTypeFactory::instance->create(ht);
 
     parser->visitor->asPointerVariables.insert(resubmit_meta->name.name);
-    if (type == TC_INGRESS) {
+    if (type == TC_INGRESS || options.generateHdrInMap) {
         parser->visitor->asPointerVariables.insert(parser->headers->name.name);
     }
 
@@ -712,9 +776,14 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     auto codegen = new ControlBodyTranslatorPSA(control);
     codegen->substitute(control->headers, parserHeaders);
     codegen->asPointerVariables.insert(control->outputStandardMetadata->name.name);
-    if (this->type == TC_INGRESS) {
+    if (this->type == TC_INGRESS || options.generateHdrInMap) {
         codegen->asPointerVariables.insert(control->headers->name.name);
     }
+
+    if (options.generateHdrInMap) {
+        codegen->asPointerVariables.insert(control->user_metadata->name.name);
+    }
+
     control->codeGen = codegen;
 
     for (auto a : ctrl->constantValue) {
@@ -735,6 +804,11 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
     auto keyGenerator = tblblk->container->getKey();
     if (keyGenerator != nullptr) {
         for (auto it : keyGenerator->keyElements) {
+            // optimization: check if we should generate timestamp
+            if (it->expression->toString().endsWith("timestamp")) {
+                control->timestampIsUsed = true;
+            }
+
             auto mtdecl = refmap->getDeclaration(it->matchType->path, true);
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
             if (matchType->name.name != P4::P4CoreLibrary::instance.exactMatch.name &&
@@ -787,16 +861,37 @@ bool ConvertToEBPFControlPSA::preorder(const IR::P4Action *a) {
     return true;
 }
 
+bool ConvertToEBPFControlPSA::preorder(const IR::AssignmentStatement *a) {
+    // the condition covers both ingress and egress timestamp
+    if (a->right->toString().endsWith("timestamp")) {
+        control->timestampIsUsed = true;
+    }
+    return true;
+}
+
+bool ConvertToEBPFControlPSA::preorder(const IR::IfStatement *ifState) {
+    if (ifState->condition->is<IR::Equ>()) {
+        auto i = ifState->condition->to<IR::Equ>();
+        if (i->right->toString().endsWith("timestamp") ||
+            i->left->toString().endsWith("timestamp")) {
+            control->timestampIsUsed = true;
+        }
+    }
+    return true;
+}
+
 bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Instance* instance) {
     return true;
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Variable* decl) {
-    if (decl->type->is<IR::Type_Name>() &&
+    bool isTCPipeline = (type == TC_INGRESS || type == TC_EGRESS);
+    if (!options.generateHdrInMap || isTCPipeline) {
+        if (decl->type->is<IR::Type_Name>() &&
             decl->type->to<IR::Type_Name>()->path->name.name == "psa_ingress_output_metadata_t") {
-        control->codeGen->asPointerVariables.insert(decl->name.name);
+                control->codeGen->asPointerVariables.insert(decl->name.name);
+        }
     }
-
     return true;
 }
 
@@ -860,7 +955,7 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
     }
 
     auto codegen = new DeparserBodyTranslator(deparser);
-    if (this->type == TC_INGRESS) {
+    if (this->type == TC_INGRESS || options.generateHdrInMap) {
         codegen->asPointerVariables.insert(parserHeaders->name.name);
     }
 
@@ -920,7 +1015,8 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expressi
                 auto exprMemb = expr->to<IR::Member>();
                 auto headerName = exprMemb->member.name;
                 auto headersStructName = deparser->parserHeaders->name.name;
-                cstring op = this->type == TC_INGRESS ? "->" : ".";
+                cstring op = (this->type == TC_INGRESS
+                            || options.generateHdrInMap) ? "->" : ".";
                 deparser->headersExpressions.push_back(headersStructName + op + headerName);
                 return false;
             }
