@@ -23,6 +23,7 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
     builder->spc();
     builder->blockStart();
     emitGlobalMetadataInitializer(builder);
+    emitUserMetadataInstance(builder);
     emitLocalVariables(builder);
     emitHeaderInstances(builder);
     if (options.generateHdrInMap) {
@@ -699,6 +700,9 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
                             functionName, model.CPacketName.str());
     builder->spc();
     builder->blockStart();
+
+    emitUserMetadataInstance(builder);
+    builder->newline();
 
     emitLocalVariables(builder);
     builder->newline();
