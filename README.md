@@ -190,5 +190,6 @@ After you set up the test environment on a server, you can use a traffic generat
 - After `bpf_clone_redirect()` the `skb->data_meta` is lost. Therefore, a global metadata is not preserved after packet cloning
   is performed. It limits the usage of `bpf_clone_redirect()`. As a workaround for this limitation, we use `skb->cb` (control buffer)
   to store a global metadata.
+- Setting the size of table defining ternary match kind does not work properly.
 - DirectMeter in a table with LPM match key is not possible. Spinlocks are not supported for LPM_TRIE tables.
 - DirectMeter in a table with ternary match key is also not possible. We cannot use spinlocks in [inner maps](https://patchwork.ozlabs.org/project/netdev/patch/20190124041403.2100609-2-ast@kernel.org/).
