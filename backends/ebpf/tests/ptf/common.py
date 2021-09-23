@@ -169,6 +169,9 @@ class P4EbpfTest(EbpfTest):
         p4args = "--trace --xdp2tc=" + xdp2tc_mode
         if self.is_xdp_test():
             p4args += " --xdp"
+        # TODO: find a better way to override  p4 compiler flags on a per-file basis
+        if self.p4_file_path.endswith('upf.p4'):
+            p4args = p4args.replace('--trace','--hdr2Map')
         self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "
                       "ARGS=\"{cargs}\" P4C=p4c-ebpf P4ARGS=\"{p4args}\" psa".format(
                             output=self.test_prog_image,
