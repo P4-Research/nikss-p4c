@@ -239,7 +239,9 @@ StateTranslationVisitor::compileExtractField(
     // eBPF can pass 64 bits of data as one argument, so value of the field is
     // printed only when its fits into register
     if (widthToExtract <= 64) {
-        cstring exprStr = expr->toString();
+        cstring exprStr = expr->is<IR::PathExpression>() ?
+                expr->to<IR::PathExpression>()->path->name.name : expr->toString();
+
         if (expr->is<IR::Member>() && expr->to<IR::Member>()->expr->is<IR::PathExpression>() &&
             asPointerVariables.count(
                     expr->to<IR::Member>()->expr->to<IR::PathExpression>()->path->name.name) > 0) {
@@ -278,11 +280,29 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
                               (program->packetEndVar + " - " + program->packetStartVar).c_str(),
                               offsetStr.c_str());
 
+    // to load some fields the compiler will use larger words
+    // than actual width of a field (e.g. 48-bit field loaded using load_dword())
+    // we must ensure that the larger word is not outside of packet buffer.
+    // FIXME: this can fail if a packet does not contain additional payload after header.
+    //  However, we don't have better solution in case of using load_X functions to parse packet.
+    unsigned curr_padding = 0;
+    for (auto f : ht->fields) {
+        auto ftype = state->parser->typeMap->getType(f);
+        auto etype = EBPFTypeFactory::instance->create(ftype);
+        if (etype->is<EBPFScalarType>()) {
+            auto scalarType = etype->to<EBPFScalarType>();
+            unsigned padding = scalarType->alignment() * 8 - scalarType->widthInBits();
+            if (scalarType->widthInBits() + padding >= curr_padding) {
+                curr_padding = padding;
+            }
+        }
+    }
+
     builder->emitIndent();
-    builder->appendFormat("if (%s < %s + BYTES(%s + %d)) ",
+    builder->appendFormat("if (%s < %s + BYTES(%s + %d + %u)) ",
                           program->packetEndVar.c_str(),
                           program->packetStartVar.c_str(),
-                          program->offsetVar.c_str(), width);
+                          program->offsetVar.c_str(), width, curr_padding);
     builder->blockStart();
 
     builder->target->emitTraceMessage(builder, "Parser: invalid packet (packet too short)");
