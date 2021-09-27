@@ -121,7 +121,7 @@ struct upf_meta_t {
     bit<16>           ipv4_len;
     bit<32>           teid;
     bit<32>           gtpu_remote_ip;
-    bit<32>           gtpu_local_ip;    
+    bit<32>           gtpu_local_ip;
 }
 
 struct metadata {
@@ -171,7 +171,7 @@ parser IngressParserImpl(packet_in packet,
         transition select(hdr.ipv4.protocol) {
             PROTO_UDP: parse_udp;
             PROTO_TCP: parse_tcp;
-            PROTO_ICMP: accept;    
+            PROTO_ICMP: accept;
         }
     }
 
@@ -179,7 +179,7 @@ parser IngressParserImpl(packet_in packet,
         packet.extract(hdr.udp);
         transition select(hdr.udp.dport) {
              UDP_PORT_GTPU: parse_gtpu;
-             default: accept;        
+             default: accept;
         }
     }
 
@@ -190,7 +190,7 @@ parser IngressParserImpl(packet_in packet,
 
     state parse_gtpu {
         packet.extract(hdr.gtpu);
-        transition parse_inner_ipv4;    
+        transition parse_inner_ipv4;
     }
 
     state parse_inner_ipv4 {
@@ -202,7 +202,7 @@ parser IngressParserImpl(packet_in packet,
         transition select(hdr.inner_ipv4.protocol) {
             PROTO_UDP: parse_inner_udp;
             PROTO_TCP: parse_tcp;
-            PROTO_ICMP: accept;       
+            PROTO_ICMP: accept;  
         }
     }
 
@@ -276,14 +276,14 @@ control upf_process_ingress_l4port(inout headers hdr, inout metadata meta) {
 
 control ip_forward(inout headers hdr,
                   inout metadata meta,
-		  in    psa_ingress_input_metadata_t  istd,
+                  in    psa_ingress_input_metadata_t  istd,
                   inout psa_ingress_output_metadata_t ostd) {
     action drop() {
-	ingress_drop(ostd);
+        ingress_drop(ostd);
     }
 
     action forward(macAddr_t srcAddr,macAddr_t dstAddr, PortId_t port) {
-	send_to_port(ostd,port);
+        send_to_port(ostd,port);
         hdr.ethernet.srcAddr = srcAddr;
         hdr.ethernet.dstAddr = dstAddr;
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
@@ -315,7 +315,7 @@ control upf_ingress(
         inout ipv4_t              ipv4,
         inout udp_t               udp,
         inout metadata            meta,
-	in    psa_ingress_input_metadata_t  istd,
+        in    psa_ingress_input_metadata_t  istd,
         inout psa_ingress_output_metadata_t ostd) {
 
 
@@ -343,31 +343,31 @@ control upf_ingress(
                        bit<32> teid,
                        bit<32> gtpu_remote_ip,
                        bit<32> gtpu_local_ip)  {
-        meta.upf.dest=dest;                       
+        meta.upf.dest=dest;   
         meta.upf.teid = teid;
         meta.upf.gtpu_remote_ip = gtpu_remote_ip;
         meta.upf.gtpu_local_ip = gtpu_local_ip;
-        meta.upf.outer_dst_addr=gtpu_remote_ip;                       
+        meta.upf.outer_dst_addr=gtpu_remote_ip;  
     }
 
     action far_forward(destination_t dest)  {
-        meta.upf.dest=dest;    
+        meta.upf.dest=dest;
     }
 
     action set_source_interface(destination_t src) {
-            meta.upf.src=src;
+        meta.upf.src=src;
     }
 
 
     table source_interface_lookup_by_port {
-            key = {
-                istd.ingress_port: exact;
-            }
-            actions = {
-                    set_source_interface;
-                    @defaultonly nop();
-            }
-            const default_action = nop();
+        key = {
+            istd.ingress_port: exact;
+        }
+        actions = {
+            set_source_interface;
+            @defaultonly nop();
+        }
+        const default_action = nop();
     }
 
     table session_lookup_by_ue_ip {
@@ -387,7 +387,7 @@ control upf_ingress(
             gtpu.teid : exact;
         }
         actions = {
-            set_seid();    
+            set_seid();
             nop();
         }
         const default_action = nop();
@@ -461,13 +461,13 @@ control upf_ingress(
 
 
     apply {
-        source_interface_lookup_by_port.apply();    
+        source_interface_lookup_by_port.apply();
         if (gtpu.isValid()) {
             if (session_lookup_by_teid.apply().hit) {
-            	gtpu_decap();
+                gtpu_decap();
             } else {
                 ingress_drop(ostd);
-	    }
+            }
         } else if (!session_lookup_by_ue_ip.apply().hit) {
             return;
         }
