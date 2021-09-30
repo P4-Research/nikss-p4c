@@ -58,6 +58,8 @@ class EBPFDeparserPSA : public EBPFControlPSA {
         controlBlock->container->body->apply(*codeGen);
         builder->newline();
     }
+
+    virtual void emitPreparePacketBuffer(CodeBuilder *builder);
     void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                     cstring &headerExpression) const;
     void emitField(CodeBuilder* builder, cstring headerExpression,
@@ -142,6 +144,23 @@ class XDPEgressDeparserPSA : public XDPDeparserPSA {
 
     bool build() override;
     void emitPreDeparser(CodeBuilder *builder) override;
+};
+
+
+class OptimizedCombinedDeparser {
+ public:
+    XDPIngressDeparserPSA* ig_dprs;
+    XDPEgressDeparserPSA*  eg_dprs;
+    OptimizedCombinedDeparser(XDPIngressDeparserPSA* ingressDeparser,
+                              XDPEgressDeparserPSA* egressDeparser) :
+                              ig_dprs(ingressDeparser), eg_dprs(egressDeparser) {
+        ig_dprs->outerHdrLengthVar = "ingress_" + ig_dprs->outerHdrLengthVar;
+        ig_dprs->outerHdrOffsetVar = "ingress_" + ig_dprs->outerHdrOffsetVar;
+        eg_dprs->outerHdrLengthVar = "egress_" + eg_dprs->outerHdrLengthVar;
+        eg_dprs->outerHdrOffsetVar = "egress_" + eg_dprs->outerHdrOffsetVar;
+    }
+    void emit(CodeBuilder *builder);
+
 };
 
 }  // namespace EBPF

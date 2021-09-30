@@ -682,8 +682,8 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
 void XDPIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
     // do not handle multicast; it has been handled earlier by PreDeparser.
     builder->emitIndent();
-    builder->appendFormat("return bpf_redirect_map(&tx_port, %s.egress_port%DEVMAP_SIZE, 0);",
-                        control->outputStandardMetadata->name.name);
+    builder->appendFormat("return bpf_redirect_map(&tx_port, %s.egress_port%s, 0);",
+                        control->outputStandardMetadata->name.name, "%DEVMAP_SIZE");
     builder->newline();
 }
 
@@ -749,8 +749,12 @@ void XDPIngressPipeline::emitWithEgress(CodeBuilder *builder, EBPFPipeline *egre
     builder->target->emitTraceMessage(builder, msgStr.c_str());
     control->emit(builder);
     builder->blockEnd(true);
-    msgStr = Util::printf_format("%s control: packet processing finished", sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    msgStr = Util::printf_format("%s control: packet processing finished (drop=%u, egress_port=%u)",
+                                 sectionName);
+    builder->target->emitTraceMessage(builder,
+          msgStr.c_str(), 2,
+          Util::printf_format("%s.drop", control->outputStandardMetadata->name.name.c_str()),
+          Util::printf_format("%s.egress_port", control->outputStandardMetadata->name.name.c_str()));
 
     // INGRESS DEPRS
     msgStr = Util::printf_format("%s deparser: skipped as egress optimization is enabled", sectionName);
@@ -819,32 +823,46 @@ void XDPIngressPipeline::emitWithEgress(CodeBuilder *builder, EBPFPipeline *egre
     builder->target->emitTraceMessage(builder, msgStr.c_str());
     egress->control->emit(builder);
     builder->blockEnd(true);
-    msgStr = Util::printf_format("%s control: packet processing finished", egress->sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    msgStr = Util::printf_format("%s control: packet processing finished (drop=%u)",
+                                 egress->sectionName);
+    builder->target->emitTraceMessage(builder,
+      msgStr.c_str(), 1,
+      Util::printf_format("%s.drop", egress->control->outputStandardMetadata->name.name.c_str()));
 
     builder->emitIndent();
     builder->appendFormat("unsigned egress_ebpf_packetOffsetInBits = %s", offsetVar.c_str());
     builder->endOfStatement(true);
 
-    // INGRESS DEPRS
+    auto combinedDeparser = new OptimizedCombinedDeparser(deparser->to<XDPIngressDeparserPSA>(),
+                                                          egress->deparser->to<XDPEgressDeparserPSA>());
     builder->emitIndent();
     builder->blockStart();
-    msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
+    msgStr = Util::printf_format("Combined deparser: packet deparsing started");
     builder->target->emitTraceMessage(builder, msgStr.c_str());
-    deparser->emit(builder);
+    combinedDeparser->emit(builder);
     builder->blockEnd(true);
-    msgStr = Util::printf_format("%s deparser: packet deparsing finished", sectionName);
+    msgStr = Util::printf_format("Combined deparser: packet deparsing finished");
     builder->target->emitTraceMessage(builder, msgStr.c_str());
 
-    // EGRESS DEPRS
-    builder->emitIndent();
-    builder->blockStart();
-    msgStr = Util::printf_format("%s deparser: packet deparsing started", egress->sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
-    egress->deparser->emit(builder);
-    builder->blockEnd(true);
-    msgStr = Util::printf_format("%s deparser: packet deparsing finished", egress->sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
+//    // INGRESS DEPRS
+//    builder->emitIndent();
+//    builder->blockStart();
+//    msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
+//    builder->target->emitTraceMessage(builder, msgStr.c_str());
+//    deparser->emit(builder);
+//    builder->blockEnd(true);
+//    msgStr = Util::printf_format("%s deparser: packet deparsing finished", sectionName);
+//    builder->target->emitTraceMessage(builder, msgStr.c_str());
+//
+//    // EGRESS DEPRS
+//    builder->emitIndent();
+//    builder->blockStart();
+//    msgStr = Util::printf_format("%s deparser: packet deparsing started", egress->sectionName);
+//    builder->target->emitTraceMessage(builder, msgStr.c_str());
+//    egress->deparser->emit(builder);
+//    builder->blockEnd(true);
+//    msgStr = Util::printf_format("%s deparser: packet deparsing finished", egress->sectionName);
+//    builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     this->emitTrafficManager(builder);
     builder->blockEnd(true);

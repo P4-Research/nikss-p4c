@@ -39,17 +39,7 @@ void DeparserBodyTranslator::processMethod(const P4::ExternMethod *method) {
     ControlBodyTranslator::processMethod(method);
 }
 
-void EBPFDeparserPSA::emit(CodeBuilder* builder) {
-    codeGen->setBuilder(builder);
-
-    for (auto a : controlBlock->container->controlLocals)
-        emitDeclaration(builder, a);
-
-    emitDeparserExternCalls(builder);
-    builder->newline();
-    emitPreDeparser(builder);
-
-    const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
+void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("int %s = 0", this->outerHdrLengthVar.c_str());
     builder->endOfStatement(true);
@@ -78,11 +68,11 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
 
     cstring offsetVar = "";
     if (program->options.xdpEgressOptimization && this->is<XDPIngressDeparserPSA>()) {
-        offsetVar = "ingress_" + pipelineProgram->offsetVar;
+        offsetVar = "ingress_" + program->offsetVar;
     } else if (program->options.xdpEgressOptimization && this->is<XDPEgressDeparserPSA>()) {
-        offsetVar = "egress_" + pipelineProgram->offsetVar;
+        offsetVar = "egress_" + program->offsetVar;
     } else {
-        offsetVar = pipelineProgram->offsetVar;
+        offsetVar = program->offsetVar;
     }
     builder->appendFormat("int %s = BYTES(%s) - BYTES(%s)",
                           this->outerHdrOffsetVar.c_str(),
@@ -112,6 +102,21 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     builder->blockEnd(true);
     builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusted");
     builder->blockEnd(true);
+}
+
+void EBPFDeparserPSA::emit(CodeBuilder* builder) {
+    codeGen->setBuilder(builder);
+
+    emitPreDeparser(builder);
+    emitDeparserExternCalls(builder);
+    builder->newline();
+    emitPreparePacketBuffer(builder);
+
+    for (auto a : controlBlock->container->controlLocals)
+        emitDeclaration(builder, a);
+
+    // TODO: move packet re-validation to packet buffer preparation;
+    //  re-validate only if packet buffer size has been changed
     builder->emitIndent();
     builder->appendFormat("%s = %s;",
                           program->packetStartVar,
@@ -124,7 +129,7 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     builder->newline();
 
     builder->emitIndent();
-    builder->appendFormat("%s = 0", pipelineProgram->offsetVar.c_str());
+    builder->appendFormat("%s = 0", program->offsetVar.c_str());
     builder->endOfStatement(true);
 
     for (unsigned long i = 0; i < this->headersToEmit.size(); i++) {
@@ -598,6 +603,141 @@ void XDPEgressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("return %s;\n", builder->target->abortReturnCode().c_str());
     builder->blockEnd(true);
+}
+
+// =====================OptimizedCombinedDeparser=============================
+void OptimizedCombinedDeparser::emit(CodeBuilder *builder) {
+    // emit firstly ingress deparser
+    ig_dprs->codeGen->setBuilder(builder);
+
+    ig_dprs->emitPreDeparser(builder);
+    ig_dprs->emitDeparserExternCalls(builder);
+    builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat("int %s = 0", ig_dprs->outerHdrLengthVar.c_str());
+    builder->endOfStatement(true);
+
+    for (unsigned long i = 0; i < ig_dprs->headersToEmit.size(); i++) {
+        auto headerToEmit = ig_dprs->headersToEmit[i];
+        auto headerExpression = ig_dprs->headersExpressions[i];
+        unsigned width = headerToEmit->width_bits();
+        builder->emitIndent();
+        builder->append("if (");
+        builder->append(headerExpression);
+        builder->append(".ingress_ebpf_valid) ");
+        builder->blockStart();
+        builder->emitIndent();
+        builder->appendFormat("%s += %d;", ig_dprs->outerHdrLengthVar.c_str(), width);
+        builder->newline();
+        builder->blockEnd(true);
+    }
+
+    builder->newline();
+    builder->emitIndent();
+
+    cstring offsetVar =  "ingress_" + ig_dprs->program->offsetVar;
+    builder->appendFormat("int %s = BYTES(%s) - BYTES(%s)",
+                          ig_dprs->outerHdrOffsetVar.c_str(),
+                          ig_dprs->outerHdrLengthVar.c_str(),
+                          offsetVar.c_str());
+    builder->endOfStatement(true);
+
+    builder->emitIndent();
+    builder->appendFormat("int %s = 0", eg_dprs->outerHdrLengthVar.c_str());
+    builder->endOfStatement(true);
+
+    for (unsigned long i = 0; i < eg_dprs->headersToEmit.size(); i++) {
+        auto headerToEmit = eg_dprs->headersToEmit[i];
+        auto headerExpression = eg_dprs->headersExpressions[i];
+        unsigned width = headerToEmit->width_bits();
+        builder->emitIndent();
+        builder->append("if (");
+        builder->append(headerExpression);
+        builder->append(".ebpf_valid) ");
+        builder->blockStart();
+        builder->emitIndent();
+        builder->appendFormat("%s += %d;", eg_dprs->outerHdrLengthVar.c_str(), width);
+        builder->newline();
+        builder->blockEnd(true);
+    }
+
+    builder->newline();
+    builder->emitIndent();
+
+    offsetVar =  "egress_" + eg_dprs->program->offsetVar;
+    builder->appendFormat("int %s = BYTES(%s) - BYTES(%s)",
+                          eg_dprs->outerHdrOffsetVar.c_str(),
+                          eg_dprs->outerHdrLengthVar.c_str(),
+                          offsetVar.c_str());
+    builder->endOfStatement(true);
+
+    builder->emitIndent();
+    builder->appendFormat("int total_outHeaderOffset = %s + %s",
+                          ig_dprs->outerHdrOffsetVar, eg_dprs->outerHdrOffsetVar);
+    builder->endOfStatement(true);
+    builder->emitIndent();
+
+    builder->append("if (total_outHeaderOffset != 0) ");
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusting by %d B",
+                                      1, "total_outHeaderOffset");
+    builder->emitIndent();
+    builder->appendFormat("int %s = 0", ig_dprs->returnCode.c_str());
+    builder->endOfStatement(true);
+
+
+    builder->emitIndent();
+    builder->appendFormat("%s = bpf_xdp_adjust_head(%s, -%s)",
+                          eg_dprs->returnCode.c_str(),
+                          eg_dprs->program->model.CPacketName.str(),
+                          eg_dprs->outerHdrOffsetVar.c_str());
+    builder->endOfStatement(true);
+
+    builder->emitIndent();
+    builder->appendFormat("if (%s) ", eg_dprs->returnCode.c_str());
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjust failed");
+    builder->emitIndent();
+    // We immediately return instead of jumping to reject state.
+    // It avoids reaching BPF_COMPLEXITY_LIMIT_JMP_SEQ.
+    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
+    builder->newline();
+    builder->blockEnd(true);
+    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusted");
+    builder->emitIndent();
+    builder->appendFormat("%s = %s;",
+                          ig_dprs->program->packetStartVar,
+                          builder->target->dataOffset(ig_dprs->program->model.CPacketName.str()));
+    builder->newline();
+    builder->emitIndent();
+    builder->appendFormat("%s = %s;",
+                          ig_dprs->program->packetEndVar,
+                          builder->target->dataEnd(ig_dprs->program->model.CPacketName.str()));
+    builder->newline();
+    builder->blockEnd(true);
+
+    builder->emitIndent();
+    builder->appendFormat("%s = 0", ig_dprs->program->offsetVar.c_str());
+    builder->endOfStatement(true);
+
+    for (unsigned long i = 0; i < ig_dprs->headersToEmit.size(); i++) {
+        auto headerToEmit = ig_dprs->headersToEmit[i];
+        auto headerExpression = ig_dprs->headersExpressions[i];
+        ig_dprs->emitHeader(builder, headerToEmit, headerExpression);
+    }
+    builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat("%s = 0", ig_dprs->program->offsetVar.c_str());
+    builder->endOfStatement(true);
+
+    for (unsigned long i = 0; i < eg_dprs->headersToEmit.size(); i++) {
+        auto headerToEmit = eg_dprs->headersToEmit[i];
+        auto headerExpression = eg_dprs->headersExpressions[i];
+        eg_dprs->emitHeader(builder, headerToEmit, headerExpression);
+    }
+    builder->newline();
 }
 
 }  // namespace EBPF
