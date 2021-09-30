@@ -48,8 +48,12 @@ class EBPFDeparserPSA : public EBPFControlPSA {
     // A "PreDeparser" is emitted just before set of hdr.emit() functions.
     // It is useful in case of resubmit or clone operation, as these operations
     // require to have an original packet.
-    virtual void emitPreDeparser(CodeBuilder *builder) {}
-    virtual void emitResizeHead(CodeBuilder *builder) {}
+    virtual void emitPreDeparser(CodeBuilder *builder) {
+        (void) builder;
+    }
+    virtual void emitResizeHead(CodeBuilder *builder) {
+        (void) builder;
+    }
     virtual void emitDeparserExternCalls(CodeBuilder* builder) {
         controlBlock->container->body->apply(*codeGen);
         builder->newline();

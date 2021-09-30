@@ -9,8 +9,6 @@ namespace EBPF {
 
 /*
  * EBPFPipeline represents a single eBPF program in the TC/XDP hook.
- * A single pipeline is composed of Parser, Control block and Deparser.
- * EBPFPipeline inherits from EBPFProgram, but extends it with deparser and other PSA-specific objects.
  */
 class EBPFPipeline : public EBPFProgram {
  public:
@@ -60,32 +58,38 @@ class EBPFPipeline : public EBPFProgram {
         return "TC_ACT_OK";
     }
 
+    virtual void emit(CodeBuilder* builder) = 0;
     virtual void emitTrafficManager(CodeBuilder *builder) = 0;
-
     virtual void emitPSAControlInputMetadata(CodeBuilder* builder) = 0;
     virtual void emitPSAControlOutputMetadata(CodeBuilder* builder) = 0;
 
+    /* Generates an instance of struct Headers_t and allocates it on the BPF program's stack. */
     void emitLocalHeaderInstances(CodeBuilder *builder);
+    /* Generates a pointer to struct Headers_t and puts it on the BPF program's stack. */
     void emitLocalHeaderInstancesAsPointers(CodeBuilder *builder);
+    /* Generates a pointer to struct hdr_md. The pointer is used to access data from per-CPU map. */
     void emitCPUMAPHeadersInitializers(CodeBuilder *builder);
     void emitCPUMAPHeaderInstances(CodeBuilder *builder);
-
+    /* Generates an instance of struct Headers_t,
+     * allocated either on stack or in the per-CPU map. */
     void emitHeaderInstances(CodeBuilder *builder) override;
-
+    /* Generates a set of helper variables that are used during packet processing. */
     void emitLocalVariables(CodeBuilder* builder) override;
+    /* Generates a pointer to skb->cb and maps it to
+     * psa_global_metadata to access global metadata shared between pipelines. */
     void emitGlobalMetadataInitializer(CodeBuilder *builder);
 
     void emitLocalUserMetadataInstances(CodeBuilder *builder);
     void emitCPUMapUserMetadataInstance(CodeBuilder *builder);
+    /* Generates and instance of user metadata for a pipeline,
+     * allocated either on stack or in the per-CPU map. */
     void emitUserMetadataInstance(CodeBuilder *builder);
-
     void emitCPUMAPInitializers(CodeBuilder *builder);
     void emitHeadersFromCPUMAP(CodeBuilder* builder);
     void emitMetadataFromCPUMAP(CodeBuilder *builder);
 
     virtual void emitPacketLength(CodeBuilder *builder);
     virtual void emitTimestamp(CodeBuilder *builder);
-    virtual void emit(CodeBuilder* builder);
     virtual bool shouldEmitTimestamp() {
         if (!control->meters.empty() || control->timestampIsUsed) {
             return true;
@@ -145,6 +149,7 @@ class TCEgressPipeline : public EBPFEgressPipeline {
                        P4::TypeMap* typeMap) :
             EBPFEgressPipeline(name, options, refMap, typeMap) { }
 
+    void emit(CodeBuilder *builder) override;
     void emitTrafficManager(CodeBuilder *builder) override;
 };
 

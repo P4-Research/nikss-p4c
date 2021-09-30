@@ -3,71 +3,6 @@
 
 namespace EBPF {
 
-void EBPFPipeline::emit(CodeBuilder* builder) {
-    cstring msgStr, pathStr;
-    // Ingress and egress has different variables which are pointers,
-    // clearing is needed to not preserving them between pipelines
-    control->codeGen->asPointerVariables.clear();
-
-    if (options.generateHdrInMap) {
-        control->codeGen->asPointerVariables.insert(control->headers->name.name);
-        control->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
-
-        parser->visitor->asPointerVariables.insert(control->user_metadata->name.name);
-        deparser->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
-    }
-
-    builder->target->emitCodeSection(builder, sectionName);
-    builder->emitIndent();
-    builder->target->emitMain(builder, functionName, model.CPacketName.str());
-    builder->spc();
-    builder->blockStart();
-    emitGlobalMetadataInitializer(builder);
-    emitLocalVariables(builder);
-    emitHeaderInstances(builder);
-    if (options.generateHdrInMap) {
-        emitCPUMAPInitializers(builder);
-        builder->newline();
-        emitHeadersFromCPUMAP(builder);
-    }
-    builder->newline();
-    emitPSAControlOutputMetadata(builder);
-    emitPSAControlInputMetadata(builder);
-    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d",
-                                 sectionName);
-    pathStr = Util::printf_format("%s.packet_path", control->inputStandardMetadata->name.name);
-    builder->target->emitTraceMessage(builder, msgStr.c_str(), 2, pathStr.c_str(),
-                                      lengthVar.c_str());
-    parser->emit(builder);
-    builder->emitIndent();
-    builder->append(IR::ParserState::accept);
-    builder->append(":");
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat("%s.parser_error = %s",
-                          control->inputStandardMetadata->name.name, errorVar.c_str());
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->blockStart();
-    // TODO: add more info: packet length, ingress port
-    msgStr = Util::printf_format("%s control: packet processing started", sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
-    control->emit(builder);
-    builder->blockEnd(true);
-    msgStr = Util::printf_format("%s control: packet processing finished", sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
-    builder->emitIndent();
-    builder->blockStart();
-    msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
-    deparser->emit(builder);
-    builder->blockEnd(true);
-    msgStr = Util::printf_format("%s deparser: packet deparsing finished", sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
-    this->emitTrafficManager(builder);
-    builder->blockEnd(true);
-}
-
 void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("unsigned %s = 0;", offsetVar.c_str());
@@ -543,6 +478,67 @@ void TCIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
 }
 
 // =====================TCEgressPipeline=============================
+void TCEgressPipeline::emit(CodeBuilder *builder) {
+    cstring msgStr, pathStr;
+    control->codeGen->asPointerVariables.clear();
+    if (options.generateHdrInMap) {
+        control->codeGen->asPointerVariables.insert(control->headers->name.name);
+        control->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
+        parser->visitor->asPointerVariables.insert(control->user_metadata->name.name);
+        deparser->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
+    }
+
+    builder->target->emitCodeSection(builder, sectionName);
+    builder->emitIndent();
+    builder->target->emitMain(builder, functionName, model.CPacketName.str());
+    builder->spc();
+    builder->blockStart();
+    emitGlobalMetadataInitializer(builder);
+    emitLocalVariables(builder);
+    emitHeaderInstances(builder);
+    if (options.generateHdrInMap) {
+        emitCPUMAPInitializers(builder);
+        builder->newline();
+        emitHeadersFromCPUMAP(builder);
+    }
+    builder->newline();
+    emitPSAControlOutputMetadata(builder);
+    emitPSAControlInputMetadata(builder);
+    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d",
+                                 sectionName);
+    pathStr = Util::printf_format("%s.packet_path", control->inputStandardMetadata->name.name);
+    builder->target->emitTraceMessage(builder, msgStr.c_str(), 2, pathStr.c_str(),
+                                      lengthVar.c_str());
+    parser->emit(builder);
+    builder->emitIndent();
+    builder->append(IR::ParserState::accept);
+    builder->append(":");
+    builder->newline();
+    builder->emitIndent();
+    builder->appendFormat("%s.parser_error = %s",
+                          control->inputStandardMetadata->name.name, errorVar.c_str());
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->blockStart();
+    // TODO: add more info: packet length, ingress port
+    msgStr = Util::printf_format("%s control: packet processing started", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    control->emit(builder);
+    builder->blockEnd(true);
+    msgStr = Util::printf_format("%s control: packet processing finished", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    builder->emitIndent();
+    builder->blockStart();
+    msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    deparser->emit(builder);
+    builder->blockEnd(true);
+    msgStr = Util::printf_format("%s deparser: packet deparsing finished", sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    this->emitTrafficManager(builder);
+    builder->blockEnd(true);
+}
+
 void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     cstring varStr;
     // clone support
