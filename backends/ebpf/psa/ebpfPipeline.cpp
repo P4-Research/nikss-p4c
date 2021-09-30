@@ -682,7 +682,9 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
 void XDPIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
     // do not handle multicast; it has been handled earlier by PreDeparser.
     builder->emitIndent();
-    builder->appendLine("return bpf_redirect_map(&tx_port, ostd.egress_port%DEVMAP_SIZE, 0);");
+    builder->appendFormat("return bpf_redirect_map(&tx_port, %s.egress_port%DEVMAP_SIZE, 0);",
+                        control->outputStandardMetadata->name.name);
+    builder->newline();
 }
 
 void XDPIngressPipeline::emitWithEgress(CodeBuilder *builder, EBPFPipeline *egress) {
