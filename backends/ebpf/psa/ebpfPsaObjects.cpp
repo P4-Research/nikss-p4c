@@ -482,7 +482,8 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
             auto ebpfType = ::get(keyTypes, c);
             cstring fieldName = ::get(keyFieldNames, c);
 
-            if (ebpfType->to<EBPFScalarType>()->alignment() > structAlignment) {
+            if (ebpfType->is<EBPFScalarType>() &&
+                ebpfType->to<EBPFScalarType>()->alignment() > structAlignment) {
                 structAlignment = 8;
             }
 
@@ -502,9 +503,13 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
 
     // generate mask key
     builder->emitIndent();
-    // we set 256 as maximum number of ternary masks due to BPF_COMPLEXITY_LIMIT_JMP_SEQ.
+    // Tracing significantly reduces the number of maximum instructions.
+    // As tracing is only used for testing, decrease the maximum number
+    // of ternary masks to 3, if enabled.
+    // Otherwise, set 128 as maximum number of ternary masks due to BPF_COMPLEXITY_LIMIT_JMP_SEQ.
     // TODO: find better solution to workaround BPF_COMPLEXITY_LIMIT_JMP_SEQ.
-    builder->appendFormat("#define MAX_%s_MASKS %d", keyTypeName.toUpper(), 256);
+    unsigned maxTernaryMasks = program->options.emitTraceMessages ? 3 : 128;
+    builder->appendFormat("#define MAX_%s_MASKS %d", keyTypeName.toUpper(), maxTernaryMasks);
     builder->newline();
 
     builder->emitIndent();

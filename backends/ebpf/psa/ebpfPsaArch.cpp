@@ -280,6 +280,9 @@ void PSAArch::emitPreamble(CodeBuilder *builder) const {
     builder->appendLine("#define CLONE_MAX_INSTANCES 1");
     builder->appendLine("#define CLONE_MAX_CLONES (CLONE_MAX_PORTS * CLONE_MAX_INSTANCES)");
     builder->appendLine("#define CLONE_MAX_SESSIONS 1024");
+    if (options.generateToXDP) {
+        builder->appendLine("#define DEVMAP_SIZE 256");
+    }
     builder->newline();
 
     builder->appendLine("#ifndef PSA_PORT_RECIRCULATE\n"
@@ -452,7 +455,7 @@ void PSAArch::emitInstances2XDP(CodeBuilder *builder) const {
     builder->appendFormat(".value_size    = sizeof(struct bpf_devmap_val),");
     builder->newline();
     builder->emitIndent();
-    builder->appendFormat(".max_entries   = 64,");
+    builder->appendFormat(".max_entries   = DEVMAP_SIZE,");
     builder->newline();
     builder->blockEnd(false);
     builder->endOfStatement(true);

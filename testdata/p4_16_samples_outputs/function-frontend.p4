@@ -9,7 +9,9 @@ control c(out bit<16> b) {
                 hasReturned = true;
                 retval = left_0;
             }
-            if (!hasReturned) {
+            if (hasReturned) {
+                ;
+            } else {
                 hasReturned = true;
                 retval = right_0;
             }
@@ -21,4 +23,3 @@ control c(out bit<16> b) {
 control ctr(out bit<16> b);
 package top(ctr _c);
 top(c()) main;
-

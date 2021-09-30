@@ -28,10 +28,14 @@ def xdp2tc_head_not_supported(cls):
         cls.skip_reason = "not supported for xdp2tc=head"
     return cls
 
+def hdr2map_required(cls):
+    cls.hdr2map_required = True
+    return cls
 
 class EbpfTest(BaseTest):
     skip = False
     skip_reason = ''
+    hdr2map_required = False
     switch_ns = 'test'
     test_prog_image = 'generic.o'  # default, if test case not specify program
     ctool_file_path = ""
@@ -169,6 +173,8 @@ class P4EbpfTest(EbpfTest):
         p4args = "--trace --xdp2tc=" + xdp2tc_mode
         if self.is_xdp_test():
             p4args += " --xdp"
+        if self.hdr2map_required:
+            p4args += " --hdr2Map"
         self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "
                       "ARGS=\"{cargs}\" P4C=p4c-ebpf P4ARGS=\"{p4args}\" psa".format(
                             output=self.test_prog_image,
@@ -233,3 +239,4 @@ class P4EbpfTest(EbpfTest):
               "index {} {}:{} {}:{}".format(TEST_PIPELINE_ID, name,
                                             index, pir, pbs, cir, cbs)
         self.exec_ns_cmd(cmd, "Meter update failed")
+

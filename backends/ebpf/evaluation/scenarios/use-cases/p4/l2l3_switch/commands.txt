@@ -1,0 +1,14 @@
+psabpf-ctl table add pipe 99 ingress_tbl_switching id 1 key 00:12:01:00:00:01 0 data 8
+psabpf-ctl table add pipe 99 ingress_tbl_switching id 1 key 00:00:00:00:00:02 0 data 8
+psabpf-ctl table add pipe 99 ingress_tbl_switching id 1 key 00:12:02:00:00:01 0 data 11
+
+#psabpf-ctl table add pipe 99 ingress_tbl_mac_learning  id 0 key 00:12:02:00:00:01
+#psabpf-ctl table add pipe 99 ingress_tbl_mac_learning  id 0 key 00:12:01:00:00:01
+
+psabpf-ctl table add pipe 99 ingress_tbl_routable id 0 key 00:12:01:00:00:01 0
+bpftool map update pinned /sys/fs/bpf/pipeline99/maps/ingress_as_actions key 2 0 0 0 value  1 0 0 0 0 0 0 0 02 01 00 00 00 00 00 00 02 00 00 00 00 00 00 0 00 00 00 00 0 0 0 0
+bpftool map create /sys/fs/bpf/pipeline99/maps/as_group_g2 type array key 4 value 4 entries 129 name as_group_g2
+bpftool map update pinned /sys/fs/bpf/pipeline99/maps/ingress_as_groups key hex 2 0 0 0 value pinned /sys/fs/bpf/pipeline99/maps/as_group_g2
+bpftool map update pinned /sys/fs/bpf/pipeline99/maps/as_group_g2 key 0 0 0 0 value 1 0 0 0
+bpftool map update pinned /sys/fs/bpf/pipeline99/maps/as_group_g2 key 1 0 0 0 value 2 0 0 0
+psabpf-ctl table add pipe 99 ingress_tbl_routing ref key 10.0.2.0/24 data group 2

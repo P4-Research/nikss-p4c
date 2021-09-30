@@ -77,7 +77,13 @@ static int xdp_port_add(__u32 pipeline_id, char *intf)
     if (eg_prog_fd >= 0) {
         devmap_val.bpf_prog.fd = eg_prog_fd;
     }
-    ret = bpf_map_update_elem(devmap_fd, &ifindex, &devmap_val, 0);
+    if (ifindex > DEVMAP_SIZE) {
+        fprintf(stderr,
+            "Warning: the index(=%d) of the interface %s is higher than the DEVMAP size (=%d)\n"
+            "Applying modulo ... \n", ifindex, intf, DEVMAP_SIZE);
+    }
+    int index = ifindex % DEVMAP_SIZE;
+    ret = bpf_map_update_elem(devmap_fd, &index, &devmap_val, 0);
     if (ret) {
         return ret;
     }

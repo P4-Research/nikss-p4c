@@ -66,13 +66,17 @@ control pipe(inout Headers_t headers, inout metadata meta, inout standard_metada
     }
     apply {
         @name("pipe.hasReturned") bool hasReturned = false;
-        if (!headers.ipv4.isValid()) {
+        if (headers.ipv4.isValid()) {
+            ;
+        } else {
             headers.ipv4.setInvalid();
             headers.ipv4.setValid();
             mark_to_drop();
             hasReturned = true;
         }
-        if (!hasReturned) {
+        if (hasReturned) {
+            ;
+        } else {
             Check_src_ip_0.apply();
         }
     }
@@ -86,4 +90,3 @@ control dprs(packet_out packet, in Headers_t headers) {
 }
 
 ubpf<Headers_t, metadata>(prs(), pipe(), dprs()) main;
-

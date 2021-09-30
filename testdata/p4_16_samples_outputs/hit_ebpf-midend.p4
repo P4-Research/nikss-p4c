@@ -84,16 +84,17 @@ control pipe(inout Headers_t headers, out bool pass) {
     }
     apply {
         tbl_hit_ebpf60.apply();
-        if (!headers.ipv4.isValid()) {
+        if (headers.ipv4.isValid()) {
+            ;
+        } else {
             tbl_hit_ebpf63.apply();
         }
-        if (!hasReturned) {
-            if (Check_src_ip_0.apply().hit) {
-                ;
-            }
+        if (hasReturned) {
+            ;
+        } else if (Check_src_ip_0.apply().hit) {
+            ;
         }
     }
 }
 
 ebpfFilter<Headers_t>(prs(), pipe()) main;
-
