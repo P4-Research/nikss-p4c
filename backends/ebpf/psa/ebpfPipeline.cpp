@@ -31,7 +31,8 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
         emitHeadersFromCPUMAP(builder);
     }
     builder->newline();
-    emitPSAControlDataTypes(builder);
+    emitPSAControlOutputMetadata(builder);
+    emitPSAControlInputMetadata(builder);
     msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d",
                                  sectionName);
     pathStr = Util::printf_format("%s.packet_path", control->inputStandardMetadata->name.name);
@@ -219,7 +220,7 @@ void EBPFPipeline::emitTimestamp(CodeBuilder *builder) {
 }
 
 // =====================EBPFIngressPipeline===========================
-void EBPFIngressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
+void EBPFIngressPipeline::emitPSAControlInputMetadata(CodeBuilder *builder) {
         builder->emitIndent();
         builder->appendFormat("struct psa_ingress_input_metadata_t %s = {\n"
                               "            .ingress_port = %s,\n"
@@ -236,17 +237,20 @@ void EBPFIngressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
                                   timestampVar.c_str());
             builder->endOfStatement(true);
         }
+}
 
-        builder->emitIndent();
-        builder->appendFormat("struct psa_ingress_output_metadata_t %s = {\n",
-                              control->outputStandardMetadata->name.name);
-        builder->appendLine("            .drop = false,\n"
-                            "        };");
-        builder->newline();
+void EBPFIngressPipeline::emitPSAControlOutputMetadata(CodeBuilder *builder) {
+    builder->emitIndent();
+
+    builder->appendFormat("struct psa_ingress_output_metadata_t %s = {\n"
+                          "            .drop = true,\n"
+                          "    };", control->outputStandardMetadata->name.name);
+    builder->newline();
+    builder->newline();
 }
 
 // =====================EBPFEgressPipeline============================
-void EBPFEgressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
+void EBPFEgressPipeline::emitPSAControlInputMetadata(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("struct psa_egress_input_metadata_t %s = {\n"
                           "            .class_of_service = %s,\n"
@@ -275,13 +279,15 @@ void EBPFEgressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
                           control->inputStandardMetadata->name.name);
     builder->endOfStatement(true);
     builder->blockEnd(true);
+}
 
+void EBPFEgressPipeline::emitPSAControlOutputMetadata(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("struct psa_egress_output_metadata_t %s = {\n",
-                                                             control->outputStandardMetadata->name.name);
+                          control->outputStandardMetadata->name.name);
     builder->appendLine("       .clone = false,\n"
                         "            .drop = false,\n"
-                     "        };");
+                        "        };");
 
     builder->newline();
 }
@@ -412,7 +418,7 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
     builder->newline();
     builder->emitIndent();
     builder->blockStart();
-    emitPSAControlDataTypes(builder);
+    emitPSAControlInputMetadata(builder);
     // TODO: add more info: packet length, ingress port
     msgStr = Util::printf_format("%s control: packet processing started", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
@@ -434,13 +440,8 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
     builder->target->emitMain(builder, functionName, model.CPacketName.str());
     builder->spc();
     builder->blockStart();
-    builder->emitIndent();
 
-    builder->appendFormat("struct psa_ingress_output_metadata_t %s = {\n"
-                        "            .drop = true,\n"
-                        "    };", control->outputStandardMetadata->name.name);
-    builder->newline();
-    builder->newline();
+    emitPSAControlOutputMetadata(builder);
 
     builder->emitIndent();
     deparser->to<TCIngressDeparserPSA>()->emitSharedMetadataInitializer(builder);
@@ -644,11 +645,7 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
         builder->newline();
     }
 
-    builder->emitIndent();
-    builder->appendFormat("struct psa_ingress_output_metadata_t %s = {\n"
-                        "        .drop = true,\n"
-                        "    };", control->outputStandardMetadata->name.name);
-    builder->newline();
+    emitPSAControlOutputMetadata(builder);
 
     // PRS
     // we do not support NM, CI2E, CE2E in XDP, so we hardcode NU as packet path
@@ -663,7 +660,7 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     builder->append(":");
     builder->spc();
     builder->blockStart();
-    emitPSAControlDataTypes(builder);
+    emitPSAControlOutputMetadata(builder);
     msgStr = Util::printf_format("%s control: packet processing started", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
     control->emit(builder);
@@ -735,14 +732,8 @@ void XDPIngressPipeline::emitWithEgress(CodeBuilder *builder, EBPFPipeline *egre
         builder->newline();
     }
 
-//    builder->emitIndent();
-//    builder->appendFormat("struct psa_ingress_output_metadata_t %s = {\n"
-//                        "        .drop = true,\n"
-//                        "    };", control->outputStandardMetadata->name.name);
-//    builder->newline();
-
-    emitPSAControlDataTypes(builder);
-    egress->emitPSAControlDataTypes(builder);
+    emitPSAControlOutputMetadata(builder);
+    egress->emitPSAControlOutputMetadata(builder);
 
     // INGRESS PRS
     // we do not support NM, CI2E, CE2E in XDP, so we hardcode NU as packet path
@@ -757,7 +748,7 @@ void XDPIngressPipeline::emitWithEgress(CodeBuilder *builder, EBPFPipeline *egre
     builder->append(":");
     builder->spc();
     builder->blockStart();
-    emitPSAControlDataTypes(builder);
+    emitPSAControlInputMetadata(builder);
     msgStr = Util::printf_format("%s control: packet processing started", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
     control->emit(builder);
@@ -827,7 +818,7 @@ void XDPIngressPipeline::emitWithEgress(CodeBuilder *builder, EBPFPipeline *egre
         }
     }
 
-    egress->emitPSAControlDataTypes(builder);
+    egress->emitPSAControlInputMetadata(builder);
     msgStr = Util::printf_format("%s control: packet processing started", egress->sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
     egress->control->emit(builder);
@@ -898,7 +889,7 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
         builder->newline();
     }
 
-    emitPSAControlDataTypes(builder);
+    emitPSAControlOutputMetadata(builder);
 
     // we do not support NM, CI2E, CE2E in XDP, so we hardcode NU as packet path
     msgStr = Util::printf_format("%s parser: parsing new packet, path=0",

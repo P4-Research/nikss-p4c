@@ -62,7 +62,8 @@ class EBPFPipeline : public EBPFProgram {
 
     virtual void emitTrafficManager(CodeBuilder *builder) = 0;
 
-    virtual void emitPSAControlDataTypes(CodeBuilder* builder) = 0;
+    virtual void emitPSAControlInputMetadata(CodeBuilder* builder) = 0;
+    virtual void emitPSAControlOutputMetadata(CodeBuilder* builder) = 0;
 
     void emitLocalHeaderInstances(CodeBuilder *builder);
     void emitLocalHeaderInstancesAsPointers(CodeBuilder *builder);
@@ -102,7 +103,8 @@ class EBPFIngressPipeline : public EBPFPipeline {
     EBPFIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                         P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) { }
 
-    void emitPSAControlDataTypes(CodeBuilder* builder) override;
+    void emitPSAControlInputMetadata(CodeBuilder* builder) override;
+    void emitPSAControlOutputMetadata(CodeBuilder* builder) override;
 };
 
 class EBPFEgressPipeline : public EBPFPipeline {
@@ -112,7 +114,8 @@ class EBPFEgressPipeline : public EBPFPipeline {
 
     }
 
-    void emitPSAControlDataTypes(CodeBuilder* builder) override;
+    void emitPSAControlInputMetadata(CodeBuilder* builder) override;
+    void emitPSAControlOutputMetadata(CodeBuilder* builder) override;
 };
 
 class TCIngressPipeline : public EBPFIngressPipeline {

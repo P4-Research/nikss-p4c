@@ -135,68 +135,6 @@ void emitPSAModel(const EbpfOptions& options, Target* target, const IR::Toplevel
     cstream->flush();
 }
 
-
-
-
-
-//void emitPSAModel(const EbpfOptions& options, Target* target, const IR::ToplevelBlock* toplevel,
-//                  P4::ReferenceMap* refMap, P4::TypeMap* typeMap) {
-//    auto main = toplevel->getMain();
-//    if (main->type->name != "PSA_Switch") {
-//        ::warning(ErrorType::WARN_INVALID,
-//                  "%1%: the main package should be called PSA_Switch"
-//                  "; are you using the wrong architecture?",
-//                  main->type->name);
-//        return;
-//    }
-//
-//    BMV2::PsaProgramStructure structure(refMap, typeMap);
-//    auto parsePsaArch = new BMV2::ParsePsaArchitecture(&structure);
-//    main->apply(*parsePsaArch);
-//
-//    IR::ToplevelBlock* tlb = nullptr;
-//    auto program = toplevel->getProgram();
-//    auto evaluator = new P4::EvaluatorPass(refMap, typeMap);
-//    PassManager rewrite = {
-//        new RewriteP4Program(),
-//        evaluator,
-//    };
-//    rewrite.setName("RewriteP4Program");
-//    rewrite.addDebugHook(options.getDebugHook(), true);
-//    program = program->apply(rewrite);
-//    auto tlb = evaluator->getToplevelBlock();
-//
-//    EBPFTypeFactory::createFactory(typeMap);
-//    auto convertToEbpfPSA = new ConvertToEbpfPSA(options, structure, refMap, typeMap);
-//    PassManager psaPasses = {
-//            new BMV2::DiscoverStructure(&structure),
-//            new BMV2::InspectPsaProgram(refMap, typeMap, &structure),
-//            // convert to EBPF objects
-//            convertToEbpfPSA,
-//    };
-//    psaPasses.addDebugHook(options.getDebugHook(), true);
-//    program = program->apply(psaPasses);
-//
-//    if (options.outputFile.isNullOrEmpty())
-//        return;
-//
-//    cstring cfile = options.outputFile;
-//    auto cstream = openFile(cfile, false);
-//    if (cstream == nullptr)
-//        return;
-//
-//    CodeBuilder c(target);
-//    auto psaArchForEbpf = convertToEbpfPSA->getPSAArchForEBPF();
-//    // instead of generating two files, put all the code in a single file
-//    if (!options.generateToXDP) {
-//        psaArchForEbpf->emit2TC(&c);
-//    } else {
-//        psaArchForEbpf->emit2XDP(&c);
-//    }
-//    *cstream << c.toString();
-//    cstream->flush();
-//}
-
 void run_ebpf_backend(const EbpfOptions& options, const IR::ToplevelBlock* toplevel,
                       P4::ReferenceMap* refMap, P4::TypeMap* typeMap) {
     if (toplevel == nullptr)
