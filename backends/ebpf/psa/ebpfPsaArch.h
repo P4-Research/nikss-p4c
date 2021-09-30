@@ -165,7 +165,7 @@ class ConvertToEBPFParserPSA : public Inspector {
  public:
     ConvertToEBPFParserPSA(EBPF::EBPFProgram* program, P4::ReferenceMap* refmap,
             P4::TypeMap* typemap, const EbpfOptions &options, pipeline_type type) :
-            program(program), typemap(typemap), refmap(refmap), type(type), options(options) { }
+            program(program), type(type), typemap(typemap), refmap(refmap), options(options) { }
 
     bool preorder(const IR::ParserBlock *prsr) override;
     bool preorder(const IR::ParserState *s) override;
@@ -192,7 +192,7 @@ class ConvertToEBPFControlPSA : public Inspector {
                             const EbpfOptions &options,
                             pipeline_type type) : program(program),
                             parserHeaders(parserHeaders),
-                            typemap(typemap), refmap(refmap), type(type), options(options) {
+                            typemap(typemap), type(type), refmap(refmap), options(options) {
     }
 
     bool preorder(const IR::P4Action *) override;
@@ -225,10 +225,10 @@ class ConvertToEBPFDeparserPSA : public Inspector {
                              const IR::Parameter* istd,
                              P4::ReferenceMap* refmap, P4::TypeMap* typemap,
                              const EbpfOptions &options, pipeline_type type) : program(program),
-                                                     parserHeaders(parserHeaders), istd(istd),
-                                                     typemap(typemap), refmap(refmap),
+                                                     type(type), parserHeaders(parserHeaders),
+                                                     istd(istd), typemap(typemap), refmap(refmap),
                                                      p4lib(P4::P4CoreLibrary::instance),
-                                                     type(type), options(options) { }
+                                                     options(options) { }
 
     bool preorder(const IR::ControlBlock *) override;
     bool preorder(const IR::MethodCallExpression* expression) override;
