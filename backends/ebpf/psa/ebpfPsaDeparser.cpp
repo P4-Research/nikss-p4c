@@ -61,7 +61,11 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
         builder->emitIndent();
         builder->append("if (");
         builder->append(headerExpression);
-        builder->append(".ebpf_valid) ");
+        if (program->options.xdpEgressOptimization && this->is<XDPIngressDeparserPSA>()) {
+            builder->append(".ingress_ebpf_valid) ");
+        } else {
+            builder->append(".ebpf_valid) ");
+        }
         builder->blockStart();
         builder->emitIndent();
         builder->appendFormat("%s += %d;", this->outerHdrLengthVar.c_str(), width);
@@ -71,10 +75,19 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
 
     builder->newline();
     builder->emitIndent();
+
+    cstring offsetVar = "";
+    if (program->options.xdpEgressOptimization && this->is<XDPIngressDeparserPSA>()) {
+        offsetVar = "ingress_" + pipelineProgram->offsetVar;
+    } else if (program->options.xdpEgressOptimization && this->is<XDPEgressDeparserPSA>()) {
+        offsetVar = "egress_" + pipelineProgram->offsetVar;
+    } else {
+        offsetVar = pipelineProgram->offsetVar;
+    }
     builder->appendFormat("int %s = BYTES(%s) - BYTES(%s)",
                           this->outerHdrOffsetVar.c_str(),
                           this->outerHdrLengthVar.c_str(),
-                          pipelineProgram->offsetVar.c_str());
+                          offsetVar.c_str());
     builder->endOfStatement(true);
     builder->emitIndent();
     builder->appendFormat("if (%s != 0) ", this->outerHdrOffsetVar.c_str());
@@ -128,7 +141,11 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
     builder->emitIndent();
     builder->append("if (");
     builder->append(headerExpression);
-    builder->append(".ebpf_valid) ");
+    if (program->options.xdpEgressOptimization && this->is<XDPIngressDeparserPSA>()) {
+        builder->append(".ingress_ebpf_valid) ");
+    } else {
+        builder->append(".ebpf_valid) ");
+    }
     builder->blockStart();
     auto program = EBPFControl::program;
     unsigned width = headerToEmit->width_bits();
@@ -208,7 +225,7 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
     unsigned bytes = ROUNDUP(widthToEmit, 8);
     unsigned shift = widthToEmit < 8 ?
                      (loadSize - alignment - widthToEmit) : (loadSize - widthToEmit);
-    if (!swap.isNullOrEmpty()) {
+    if (!swap.isNullOrEmpty() && this->is<XDPIngressDeparserPSA>()) {
         builder->emitIndent();
         builder->append(headerExpression);
         builder->appendFormat(".%s = %s(", field.c_str(), swap);
@@ -570,6 +587,17 @@ bool XDPEgressDeparserPSA::build() {
     headerType = EBPFTypeFactory::instance->create(ht);
 
     return true;
+}
+
+void XDPEgressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
+    builder->emitIndent();
+    builder->appendFormat("if (%s.drop) ",
+                          istd->name.name);
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder, "PreDeparser: dropping packet..");
+    builder->emitIndent();
+    builder->appendFormat("return %s;\n", builder->target->abortReturnCode().c_str());
+    builder->blockEnd(true);
 }
 
 }  // namespace EBPF

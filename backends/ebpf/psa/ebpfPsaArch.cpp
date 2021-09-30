@@ -802,6 +802,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
         IR::ID("egress_" + control->outputStandardMetadata->name.name),
                         control->outputStandardMetadata->direction,
                         control->outputStandardMetadata->type);
+        codegen->asPointerVariables.insert("egress_" + control->inputStandardMetadata->name.name);
     } else if (type == TC_INGRESS || type == XDP_INGRESS) {
         codegen->substitute(control->inputStandardMetadata,
                             new IR::Parameter(IR::ID("ingress_" + control->inputStandardMetadata->name.name),
@@ -819,11 +820,9 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
         IR::ID("ingress_" + control->outputStandardMetadata->name.name),
             control->outputStandardMetadata->direction,
             control->outputStandardMetadata->type);
+        codegen->asPointerVariables.insert("ingress_" + control->inputStandardMetadata->name.name);
     }
 
-
-
-    codegen->asPointerVariables.insert(control->inputStandardMetadata->name.name);
     if (this->type == TC_INGRESS || options.generateHdrInMap) {
         codegen->asPointerVariables.insert(control->headers->name.name);
     }

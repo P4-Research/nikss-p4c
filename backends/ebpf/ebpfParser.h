@@ -29,7 +29,7 @@ class EBPFParserState;
 
 class StateTranslationVisitor : public CodeGenInspector {
  protected:
-    cstring state_prefix;
+    cstring rejectState;
     bool hasDefault;
     P4::P4CoreLibrary& p4lib;
     const EBPFParserState* state;
@@ -37,7 +37,7 @@ class StateTranslationVisitor : public CodeGenInspector {
 
     void compileExtractField(const IR::Expression* expr, cstring name,
                              unsigned alignment, EBPFType* type);
-    void compileExtract(const IR::Expression* destination);
+    virtual void compileExtract(const IR::Expression* destination);
     void compileLookahead(const IR::Expression* destination);
 
     virtual void processFunction(const P4::ExternFunction* function);
@@ -47,7 +47,9 @@ class StateTranslationVisitor : public CodeGenInspector {
     explicit StateTranslationVisitor(P4::ReferenceMap* refMap, P4::TypeMap* typeMap) :
             CodeGenInspector(refMap, typeMap),
             hasDefault(false), p4lib(P4::P4CoreLibrary::instance),
-            state(nullptr), commentDescriptionDepth(0) {}
+            state(nullptr), commentDescriptionDepth(0) {
+        rejectState = IR::ParserState::reject;
+    }
 
     void setState(const EBPFParserState* state) {
         this->state = state;

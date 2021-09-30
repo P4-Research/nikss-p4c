@@ -1,6 +1,7 @@
 #ifndef BACKENDS_EBPF_PSA_EBPFPSAPARSER_H_
 #define BACKENDS_EBPF_PSA_EBPFPSAPARSER_H_
 
+#include "backends/ebpf/ebpfType.h"
 #include "backends/ebpf/ebpfParser.h"
 #include "backends/ebpf/psa/ebpfPsaObjects.h"
 #include "backends/ebpf/psa/externs/ebpfPsaChecksum.h"
@@ -65,17 +66,21 @@ class OptimizedEgressParserStateVisitor : public PsaStateTranslationVisitor {
     EBPFOptimizedEgressParserPSA * parser;
 
     explicit OptimizedEgressParserStateVisitor(P4::ReferenceMap* refMap, P4::TypeMap* typeMap,
-            EBPFPsaParser * prsr) :
-            PsaStateTranslationVisitor(refMap, typeMap, prsr) {}
+                                               EBPFPsaParser * prsr) :
+            PsaStateTranslationVisitor(refMap, typeMap, prsr), parser(prsr->to<EBPFOptimizedEgressParserPSA>()) {
+        rejectState = "egress_" + IR::ParserState::reject;
+    }
 
     bool preorder(const IR::ParserState* parserState) override;
 
-
+    void compileExtract(const IR::Expression* destination) override;
 };
 
 
 class EBPFOptimizedEgressParserPSA : public EBPFPsaParser {
  public:
+    std::set<cstring> headersToInvalidate;
+
     EBPFOptimizedEgressParserPSA(const EBPFProgram* program, const IR::P4Parser* block,
                                  const P4::TypeMap* typeMap) : EBPFPsaParser(program, block, typeMap) {
         visitor = new OptimizedEgressParserStateVisitor(program->refMap, program->typeMap, this);

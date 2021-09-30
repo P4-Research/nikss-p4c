@@ -153,7 +153,7 @@ void PsaStateTranslationVisitor::compileVerify(const IR::MethodCallExpression * 
     builder->target->emitTraceMessage(builder, msg.c_str(), 1, parser->program->errorVar.c_str());
 
     builder->emitIndent();
-    builder->appendFormat("goto %s", IR::ParserState::reject.c_str());
+    builder->appendFormat("goto %s", rejectState);
     builder->endOfStatement(true);
     builder->blockEnd(true);
 }
@@ -282,6 +282,34 @@ void EBPFOptimizedEgressParserPSA::emitRejectState(CodeBuilder *builder) {
 
     builder->blockEnd(true);
     builder->newline();
+}
+
+void OptimizedEgressParserStateVisitor::compileExtract(const IR::Expression *destination) {
+    auto type = state->parser->typeMap->getType(destination);
+    auto ht = type->to<IR::Type_StructLike>();
+    if (ht == nullptr) {
+        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                "Cannot extract to a non-struct type %1%", destination);
+        return;
+    }
+
+    unsigned width = ht->width_bits();
+
+    builder->emitIndent();
+    builder->appendFormat("if (!%s.ebpf_valid) ", destination->toString());
+    builder->blockStart();
+    PsaStateTranslationVisitor::compileExtract(destination);
+    builder->blockEnd(false);
+    builder->append(" else ");
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendFormat("%s += %d", parser->program->offsetVar.c_str(), width);
+    builder->endOfStatement(true);
+    builder->blockEnd(true);
+
+    if (parser->headersToInvalidate.find(destination->to<IR::Member>()->member.name) != parser->headersToInvalidate.end()) {
+        parser->headersToInvalidate.erase(destination->to<IR::Member>()->member.name);
+    }
 }
 
 bool OptimizedEgressParserStateVisitor::preorder(const IR::ParserState *parserState) {

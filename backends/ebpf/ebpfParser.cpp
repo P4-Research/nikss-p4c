@@ -293,7 +293,7 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
     builder->newline();
 
     builder->emitIndent();
-    builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
+    builder->appendFormat("goto %s;", rejectState);
     builder->newline();
     builder->blockEnd(true);
 

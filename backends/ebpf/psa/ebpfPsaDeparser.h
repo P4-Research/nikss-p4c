@@ -137,6 +137,7 @@ class XDPEgressDeparserPSA : public XDPDeparserPSA {
             XDPDeparserPSA(program, control, parserHeaders, istd) { }
 
     bool build() override;
+    void emitPreDeparser(CodeBuilder *builder) override;
 };
 
 }  // namespace EBPF
