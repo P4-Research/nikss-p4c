@@ -177,6 +177,9 @@ After you set up the test environment on a server, you can use a traffic generat
 
 # TODOs / Limitations
 
+- The names of standard arguments to P4-programmable blocks must be consistent across those blocks. For instance,
+  if ingress parser takes `struct headers_t hdr` as an argument, all other blocks using headers structure must take
+  `struct headers_t hdr` as the argument. 
 - Multiple pipelines may not work properly even though `psabpf-ctl` allows to inject many pipelines.
 - Larger bit fields (e.g. IPv6 addresses) may not work properly
 - The `xdp2tc=head` mode works properly only for packets larger then 34 bytes (the size of Ethernet and IPv4 header). 

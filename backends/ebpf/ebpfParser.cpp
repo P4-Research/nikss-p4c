@@ -75,8 +75,8 @@ bool StateTranslationVisitor::preorder(const IR::ParserState* parserState) {
     builder->spc();
     builder->blockStart();
 
-    cstring msgStr = Util::printf_format("Parser: state %s", parserState->name.name);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    cstring msgStr = Util::printf_format("Parser: state %s (curr_offset=%%u)", parserState->name.name);
+    builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, state->parser->program->offsetVar);
 
     visit(parserState->components, "components");
     if (parserState->selectExpression == nullptr) {

@@ -4,6 +4,7 @@
 #include "backends/ebpf/ebpfControl.h"
 #include "ebpfPsaControl.h"
 #include "backends/ebpf/psa/externs/ebpfPsaChecksum.h"
+#include "backends/ebpf/psa/ebpfPsaParser.h"
 
 namespace EBPF {
 
@@ -60,7 +61,7 @@ class EBPFDeparserPSA : public EBPFControlPSA {
     }
 
     virtual void emitPreparePacketBuffer(CodeBuilder *builder);
-    void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
+    virtual void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                     cstring &headerExpression) const;
     void emitField(CodeBuilder* builder, cstring headerExpression,
                    cstring field, unsigned alignment, EBPF::EBPFType* type) const;
@@ -146,12 +147,29 @@ class XDPEgressDeparserPSA : public XDPDeparserPSA {
     void emitPreDeparser(CodeBuilder *builder) override;
 };
 
+class OptimizedXDPIngressDeparserPSA : public XDPIngressDeparserPSA {
+ public:
+    OptimizedXDPIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
+                                   const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
+            XDPIngressDeparserPSA(program, control, parserHeaders, istd) {}
+
+    virtual void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
+                            cstring &headerExpression) const override;
+};
 
 class OptimizedCombinedDeparser {
+ private:
+    bool isProcessedByParserStates(const IR::IndexedVector<IR::ParserState> states, cstring hdrName);
+    bool isEmittedByDeparser(EBPFDeparserPSA* deparser, cstring hdrName);
  public:
-    XDPIngressDeparserPSA* ig_dprs;
+    OptimizedXDPIngressDeparserPSA* ig_dprs;
     XDPEgressDeparserPSA*  eg_dprs;
-    OptimizedCombinedDeparser(XDPIngressDeparserPSA* ingressDeparser,
+
+    std::map<cstring, const IR::Type_Header *> removedHeadersToEmit;
+
+    unsigned egressStartPacketOffset = 0;
+
+    OptimizedCombinedDeparser(OptimizedXDPIngressDeparserPSA* ingressDeparser,
                               XDPEgressDeparserPSA* egressDeparser) :
                               ig_dprs(ingressDeparser), eg_dprs(egressDeparser) {
         ig_dprs->outerHdrLengthVar = "ingress_" + ig_dprs->outerHdrLengthVar;
@@ -160,7 +178,14 @@ class OptimizedCombinedDeparser {
         eg_dprs->outerHdrOffsetVar = "egress_" + eg_dprs->outerHdrOffsetVar;
     }
     void emit(CodeBuilder *builder);
-
+    /* This function removes headers that are:
+     * - deparsed in ingress deparser
+     * - parsed in egress parser
+     * - NOT deparsed in egress deparser
+     * from headersToEmit list.
+     * This is safe because such headers will never be put in the outgoing packet
+     * as they are removed by egress pipeline. */
+    void optimizeHeadersToEmit(EBPFOptimizedEgressParserPSA* eg_prs);
 };
 
 }  // namespace EBPF

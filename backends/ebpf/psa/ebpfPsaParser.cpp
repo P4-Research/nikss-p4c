@@ -302,9 +302,13 @@ void OptimizedEgressParserStateVisitor::compileExtract(const IR::Expression *des
     builder->blockEnd(false);
     builder->append(" else ");
     builder->blockStart();
-    builder->emitIndent();
-    builder->appendFormat("%s += %d", parser->program->offsetVar.c_str(), width);
-    builder->endOfStatement(true);
+    if (std::find(parser->headersToSkipMovingOffset.begin(),
+                  parser->headersToSkipMovingOffset.end(),
+                  destination->toString()) == parser->headersToSkipMovingOffset.end()) {
+        builder->emitIndent();
+        builder->appendFormat("%s += %d", parser->program->offsetVar.c_str(), width);
+        builder->endOfStatement(true);
+    }
     builder->blockEnd(true);
 
     if (parser->headersToInvalidate.find(destination->to<IR::Member>()->member.name) != parser->headersToInvalidate.end()) {
@@ -321,8 +325,8 @@ bool OptimizedEgressParserStateVisitor::preorder(const IR::ParserState *parserSt
     builder->spc();
     builder->blockStart();
 
-    cstring msgStr = Util::printf_format("Parser: state %s", parserState->name.name);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    cstring msgStr = Util::printf_format("Parser: state %s (curr_offset=%%u)", parserState->name.name);
+    builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, state->parser->program->offsetVar);
 
     visit(parserState->components, "components");
     if (parserState->selectExpression == nullptr) {

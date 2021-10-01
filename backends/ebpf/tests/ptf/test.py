@@ -490,6 +490,21 @@ class VerifyPSATest(P4EbpfTest):
         testutils.verify_no_other_packets(self)
 
 
+class BridgedMetadataPSATest(P4EbpfTest):
+
+    p4_file_path = "samples/p4testdata/bridged-metadata.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
+
+        pkt[Ether].dst = 'FF:FF:FF:FF:FF:FF'
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_no_other_packets(self)
+
+
 @xdp2tc_head_not_supported
 class RandomPSATest(P4EbpfTest):
     """
