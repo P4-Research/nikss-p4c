@@ -56,6 +56,8 @@ class PSAArch {
             xdpIngress(xdpIngress), xdpEgress(xdpEgress), tcIngressForXDP(tcTrafficManager),
             tcEgressForXDP(tcEgress) { }
 
+    bool isPipelineEmpty(EBPFPipeline* pipeline) const;
+
     void emitCommonPreamble(CodeBuilder *builder) const;
     void emitPSAIncludes(CodeBuilder *builder) const;
     void emitTypes(CodeBuilder *builder) const;

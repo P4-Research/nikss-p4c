@@ -1,5 +1,6 @@
 #include "ebpfPsaArch.h"
 #include "ebpfPsaParser.h"
+#include "ebpfPsaDeparser.h"
 #include "ebpfPsaObjects.h"
 #include "ebpfPsaControl.h"
 #include "ebpfPsaControlTranslators.h"
@@ -112,9 +113,41 @@ void PSAArch::emit2TC(CodeBuilder *builder) const {
     /*
      * 10. TC Egress program.
      */
-    tcEgress->emit(builder);
+    if (!options.xdpEgressOptimization ||
+       (options.xdpEgressOptimization && !isPipelineEmpty(tcEgress))) {
+        tcEgress->emit(builder);
+    }
 
     builder->target->emitLicense(builder, xdp->license);
+}
+
+bool PSAArch::isPipelineEmpty(EBPFPipeline* pipeline) const {
+    // check if parser doesn't have any state
+    auto eg_prs = pipeline->parser;
+    // Why 3? Parser will always have at least start, accept and reject states.
+    if (eg_prs->parserBlock->states.size() > 3) {
+        return false;
+    }
+
+    auto startState = eg_prs->parserBlock->states.at(0);
+    if (!startState->components.empty() ||
+        startState->selectExpression->to<IR::PathExpression>()->path->name.name != "accept") {
+        return false;
+    }
+
+    // check if control is empty
+    auto eg_ctrl = pipeline->control;
+    if (eg_ctrl->p4Control->body->components.size() != 0) {
+        return false;
+    }
+
+    // check if deparser doesn't emit anything
+    auto eg_dprs = pipeline->deparser;
+    if (eg_dprs->headersToEmit.size() != 0) {
+        return false;
+    }
+
+    return true;
 }
 
 void PSAArch::emitPacketReplicationTables(CodeBuilder *builder) const {
@@ -788,7 +821,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     codegen->substitute(control->headers, parserHeaders);
 
     // FIXME: this should be done using Transform/Modifier visitor.
-    if (type == TC_EGRESS || type == XDP_EGRESS) {
+    if (options.xdpEgressOptimization && type == XDP_EGRESS) {
         codegen->substitute(control->inputStandardMetadata,
                     new IR::Parameter(IR::ID("egress_" + control->inputStandardMetadata->name.name),
                       control->inputStandardMetadata->direction,
@@ -806,7 +839,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
                         control->outputStandardMetadata->direction,
                         control->outputStandardMetadata->type);
         codegen->asPointerVariables.insert("egress_" + control->inputStandardMetadata->name.name);
-    } else if (type == TC_INGRESS || type == XDP_INGRESS) {
+    } else if (options.xdpEgressOptimization && type == XDP_INGRESS) {
         codegen->substitute(control->inputStandardMetadata,
                             new IR::Parameter(IR::ID("ingress_" + control->inputStandardMetadata->name.name),
                                               control->inputStandardMetadata->direction,
@@ -824,6 +857,8 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
             control->outputStandardMetadata->direction,
             control->outputStandardMetadata->type);
         codegen->asPointerVariables.insert("ingress_" + control->inputStandardMetadata->name.name);
+    } else if (type == TC_INGRESS) {
+        codegen->asPointerVariables.insert(control->outputStandardMetadata->name.name);
     }
 
     if (this->type == TC_INGRESS || options.generateHdrInMap) {

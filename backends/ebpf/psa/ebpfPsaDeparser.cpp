@@ -107,17 +107,15 @@ void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
 void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     codeGen->setBuilder(builder);
 
-    emitPreDeparser(builder);
-
     for (auto a : controlBlock->container->controlLocals)
         emitDeclaration(builder, a);
 
     emitDeparserExternCalls(builder);
     builder->newline();
+
+    emitPreDeparser(builder);
     emitPreparePacketBuffer(builder);
 
-    // TODO: move packet re-validation to packet buffer preparation;
-    //  re-validate only if packet buffer size has been changed
     builder->emitIndent();
     builder->appendFormat("%s = %s;",
                           program->packetStartVar,
@@ -656,7 +654,6 @@ void OptimizedXDPIngressDeparserPSA::emitHeader(CodeBuilder *builder, const IR::
 void OptimizedCombinedDeparser::emit(CodeBuilder *builder) {
     // emit firstly ingress deparser
     ig_dprs->codeGen->setBuilder(builder);
-    ig_dprs->emitPreDeparser(builder);
 
     for (auto a : ig_dprs->controlBlock->container->controlLocals)
         ig_dprs->emitDeclaration(builder, a);
@@ -665,6 +662,8 @@ void OptimizedCombinedDeparser::emit(CodeBuilder *builder) {
 
     ig_dprs->emitDeparserExternCalls(builder);
     builder->newline();
+
+    ig_dprs->emitPreDeparser(builder);
 
     builder->emitIndent();
     builder->appendFormat("int %s = 0", ig_dprs->outerHdrLengthVar.c_str());
