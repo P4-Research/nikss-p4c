@@ -786,6 +786,31 @@ void OptimizedCombinedDeparser::emit(CodeBuilder *builder) {
     builder->appendFormat("%s = 0", ig_dprs->program->offsetVar.c_str());
     builder->endOfStatement(true);
 
+    // if headers parsed by egress parser has been validated or
+    // invalidated in the egress control block,
+    // we must update header validity.
+    for (auto state : eg_dprs->program->parser->parserBlock->states) {
+        for (auto c : state->components) {
+            if (c->is<IR::MethodCallStatement>()) {
+                auto mce = c->to<IR::MethodCallStatement>()->methodCall;
+                auto mi = P4::MethodInstance::resolve(mce,
+                                                      eg_dprs->program->refMap,
+                                                      eg_dprs->program->typeMap);
+                auto extMethod = mi->to<P4::ExternMethod>();
+                if (extMethod != nullptr && extMethod->method->name.name ==
+                    P4::P4CoreLibrary::instance.packetIn.extract.name) {
+                    auto extractedHdr = extMethod->expr->arguments->at(0)->expression;
+                    builder->emitIndent();
+                    builder->append(extractedHdr->toString());
+                    builder->append(".ingress_ebpf_valid = ");
+                    builder->append(extractedHdr->toString());
+                    builder->append(".ebpf_valid");
+                    builder->endOfStatement(true);
+                }
+            }
+        }
+    }
+
     for (unsigned long i = 0; i < ig_dprs->headersToEmit.size(); i++) {
         auto headerToEmit = ig_dprs->headersToEmit[i];
         auto headerExpression = ig_dprs->headersExpressions[i];

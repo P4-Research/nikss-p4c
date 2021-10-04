@@ -296,7 +296,9 @@ void OptimizedEgressParserStateVisitor::compileExtract(const IR::Expression *des
     unsigned width = ht->width_bits();
 
     builder->emitIndent();
-    builder->appendFormat("if (!%s.ebpf_valid) ", destination->toString());
+    builder->append("if (!");
+    visit(destination);
+    builder->append(".ebpf_valid) ");
     builder->blockStart();
     PsaStateTranslationVisitor::compileExtract(destination);
     builder->blockEnd(false);
@@ -311,7 +313,9 @@ void OptimizedEgressParserStateVisitor::compileExtract(const IR::Expression *des
     }
     builder->blockEnd(true);
 
-    if (parser->headersToInvalidate.find(destination->to<IR::Member>()->member.name) != parser->headersToInvalidate.end()) {
+    if (destination->is<IR::Member>() &&
+        parser->headersToInvalidate.find(destination->to<IR::Member>()->member.name) !=
+        parser->headersToInvalidate.end()) {
         parser->headersToInvalidate.erase(destination->to<IR::Member>()->member.name);
     }
 }
