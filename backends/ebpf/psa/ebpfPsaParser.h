@@ -67,9 +67,8 @@ class OptimizedEgressParserStateVisitor : public PsaStateTranslationVisitor {
 
     explicit OptimizedEgressParserStateVisitor(P4::ReferenceMap* refMap, P4::TypeMap* typeMap,
                                                EBPFPsaParser * prsr) :
-            PsaStateTranslationVisitor(refMap, typeMap, prsr), parser(prsr->to<EBPFOptimizedEgressParserPSA>()) {
-        rejectState = "egress_" + IR::ParserState::reject;
-    }
+            PsaStateTranslationVisitor(refMap, typeMap, prsr),
+            parser(prsr->to<EBPFOptimizedEgressParserPSA>()) { }
 
     bool preorder(const IR::ParserState* parserState) override;
 
@@ -85,7 +84,6 @@ class EBPFOptimizedEgressParserPSA : public EBPFPsaParser {
     EBPFOptimizedEgressParserPSA(const EBPFProgram* program, const IR::P4Parser* block,
                                  const P4::TypeMap* typeMap) : EBPFPsaParser(program, block, typeMap) {
         visitor = new OptimizedEgressParserStateVisitor(program->refMap, program->typeMap, this);
-        this->nms = "egress_";
     }
 
     void emitRejectState(CodeBuilder* builder) override;

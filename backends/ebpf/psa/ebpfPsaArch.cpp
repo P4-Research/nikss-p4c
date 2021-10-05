@@ -446,11 +446,11 @@ void PSAArch::emit2XDP(CodeBuilder *builder) const {
 
     emitInitializer2XDP(builder);
 
-    if (!options.xdpEgressOptimization) {
-        xdpIngress->emit(builder);
+    xdpIngress->emit(builder);
+
+    if (!options.xdpEgressOptimization ||
+        (options.xdpEgressOptimization && !isPipelineEmpty(xdpEgress))) {
         xdpEgress->emit(builder);
-    } else {
-        xdpIngress->to<XDPIngressPipeline>()->emitWithEgress(builder, xdpEgress);
     }
 
     builder->newline();
@@ -509,6 +509,10 @@ void PSAArch::emitInstances2XDP(CodeBuilder *builder) const {
 
     builder->target->emitTableDecl(builder, "xdp2tc_shared_map", TablePerCPUArray,
                                    "u32", "struct xdp2tc_metadata", 1);
+    if (options.xdpEgressOptimization) {
+        builder->target->emitTableDecl(builder, "egress_jmp_table", TableProgArray,
+                                       "u32", "u32", 1);
+    }
 
     if (options.generateHdrInMap) {
         builder->target->emitTableDecl(builder, "hdr_md_cpumap",
@@ -707,6 +711,14 @@ const PSAArch * ConvertToEbpfPSA::build(const IR::ToplevelBlock *tlb) {
 
 const IR::Node *ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
     ebpf_psa_arch = build(tlb);
+
+    if (options.xdpEgressOptimization) {
+        ebpf_psa_arch->xdpEgress->deparser->to<OptimizedXDPEgressDeparserPSA>()->
+                setIngressDeparser(ebpf_psa_arch->xdpIngress->deparser->to<XDPDeparserPSA>());
+        ebpf_psa_arch->xdpEgress->deparser->to<OptimizedXDPEgressDeparserPSA>()->
+                optimizeHeadersToEmit(ebpf_psa_arch->xdpEgress->parser->to<EBPFOptimizedEgressParserPSA>());
+    }
+
     return tlb;
 }
 
@@ -750,6 +762,7 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
     deparserBlock->apply(*deparser_converter);
     pipeline->deparser = deparser_converter->getEBPFPsaDeparser();
     CHECK_NULL(pipeline->deparser);
+
     return true;
 }
 
@@ -860,7 +873,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     } else if (type == TC_INGRESS) {
         codegen->asPointerVariables.insert(control->outputStandardMetadata->name.name);
     }
-
+    
     if (this->type == TC_INGRESS || options.generateHdrInMap) {
         codegen->asPointerVariables.insert(control->headers->name.name);
     }
@@ -1032,6 +1045,8 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
         deparser = new OptimizedXDPIngressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == XDP_INGRESS) {
         deparser = new XDPIngressDeparserPSA(program, ctrl, parserHeaders, istd);
+    } else if (type == XDP_EGRESS && options.xdpEgressOptimization) {
+        deparser = new OptimizedXDPEgressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == XDP_EGRESS) {
         deparser = new XDPEgressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == TC_TRAFFIC_MANAGER) {

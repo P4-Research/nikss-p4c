@@ -180,8 +180,13 @@ class XDPEgressPipeline : public EBPFEgressPipeline {
     XDPEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                         P4::TypeMap* typeMap):
             EBPFEgressPipeline(name, options, refMap, typeMap) {
-        sectionName = "xdp_devmap/" + name;
-        ifindexVar = cstring("skb->egress_ifindex");
+        if (options.xdpEgressOptimization) {
+            sectionName = "xdp/" + name;
+            ifindexVar = cstring("ingress_ostd.egress_port");
+        } else {
+            sectionName = "xdp_devmap/" + name;
+            ifindexVar = cstring("skb->egress_ifindex");
+        }
         // we do not support packet path, instance & priority in the XDP egress.
         packetPathVar = cstring("0");
         pktInstanceVar = cstring("0");

@@ -181,8 +181,6 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
         alignment += et->widthInBits();
         alignment %= 8;
     }
-    msgStr = Util::printf_format("Deparser: emitted %s", headerExpression);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
     builder->blockEnd(true);
 }
 
@@ -306,9 +304,6 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
     builder->appendFormat("%s += %d", program->offsetVar.c_str(),
                           widthToEmit);
     builder->endOfStatement(true);
-
-    msgStr = Util::printf_format("Deparser: emitted %s", field);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     builder->newline();
 }
@@ -486,6 +481,54 @@ bool XDPIngressDeparserPSA::build() {
     return true;
 }
 
+void XDPIngressDeparserPSA::emit(CodeBuilder *builder) {
+    if (program->options.xdpEgressOptimization) {
+        builder->emitIndent();
+
+        codeGen->setBuilder(builder);
+
+        for (auto a :controlBlock->container->controlLocals)
+            emitDeclaration(builder, a);
+
+        this->emitDeparserExternCalls(builder);
+        builder->newline();
+
+        this->emitPreDeparser(builder);
+
+        // put metadata into shared map
+        builder->emitIndent();
+        builder->appendLine("struct xdp2tc_metadata xdp2tc_md = {};");
+        builder->emitIndent();
+        if (program->options.generateHdrInMap) {
+            builder->appendFormat("xdp2tc_md.headers = *%s", this->headers->name.name);
+        } else {
+            builder->appendFormat("xdp2tc_md.headers = %s", this->headers->name.name);
+        }
+
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        builder->appendFormat("xdp2tc_md.ostd = %s", this->istd->name.name);
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        builder->appendFormat("xdp2tc_md.packetOffsetInBits = %s", this->program->offsetVar);
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        builder->emitIndent();
+        builder->target->emitTableUpdate(builder, "xdp2tc_shared_map",
+                                         this->program->zeroKey.c_str(), "xdp2tc_md");
+        builder->newline();
+
+        builder->emitIndent();
+        builder->appendFormat("bpf_tail_call(%s, &egress_jmp_table, 0)",
+                              this->program->model.CPacketName.str());
+        builder->endOfStatement(true);
+        // tail call here
+        return;
+    }
+
+    EBPFDeparserPSA::emit(builder);
+}
+
 /*
  * 
  */
@@ -644,210 +687,29 @@ void OptimizedXDPIngressDeparserPSA::emitHeader(CodeBuilder *builder, const IR::
         alignment += et->widthInBits();
         alignment %= 8;
     }
-    msgStr = Util::printf_format("Deparser: emitted %s", headerExpression);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
     builder->blockEnd(true);
 }
 
-
-// =====================OptimizedCombinedDeparser=============================
-void OptimizedCombinedDeparser::emit(CodeBuilder *builder) {
-    // emit firstly ingress deparser
-    ig_dprs->codeGen->setBuilder(builder);
-
-    for (auto a : ig_dprs->controlBlock->container->controlLocals)
-        ig_dprs->emitDeclaration(builder, a);
-    for (auto a : eg_dprs->controlBlock->container->controlLocals)
-        eg_dprs->emitDeclaration(builder, a);
-
-    ig_dprs->emitDeparserExternCalls(builder);
-    builder->newline();
-
-    ig_dprs->emitPreDeparser(builder);
-
-    builder->emitIndent();
-    builder->appendFormat("int %s = 0", ig_dprs->outerHdrLengthVar.c_str());
-    builder->endOfStatement(true);
-
-    for (unsigned long i = 0; i < ig_dprs->headersToEmit.size(); i++) {
-        auto headerToEmit = ig_dprs->headersToEmit[i];
-        auto headerExpression = ig_dprs->headersExpressions[i];
-        unsigned width = headerToEmit->width_bits();
-        builder->emitIndent();
-        builder->append("if (");
-        builder->append(headerExpression);
-        builder->append(".ingress_ebpf_valid) ");
-        builder->blockStart();
-        builder->emitIndent();
-        builder->appendFormat("%s += %d;", ig_dprs->outerHdrLengthVar.c_str(), width);
-        builder->newline();
-        builder->blockEnd(true);
-    }
-
-    builder->newline();
-    builder->emitIndent();
-
-    cstring offsetVar =  "ingress_" + ig_dprs->program->offsetVar;
-    builder->appendFormat("int %s = BYTES(%s) - BYTES(%s)",
-                          ig_dprs->outerHdrOffsetVar.c_str(),
-                          ig_dprs->outerHdrLengthVar.c_str(),
-                          offsetVar.c_str());
-    builder->endOfStatement(true);
-
-    builder->emitIndent();
-    builder->appendFormat("int %s = 0", eg_dprs->outerHdrLengthVar.c_str());
-    builder->endOfStatement(true);
-
-    for (auto const& el : removedHeadersToEmit) {
-        auto headerToEmit = el.second;
-        auto headerExpression = el.first;
-        unsigned width = headerToEmit->width_bits();
-        builder->emitIndent();
-        builder->append("if (");
-        builder->append(headerExpression);
-        builder->append(".ebpf_valid) ");
-        builder->blockStart();
-        builder->emitIndent();
-        builder->appendFormat("%s += %d;", eg_dprs->outerHdrLengthVar.c_str(), width);
-        builder->newline();
-        builder->blockEnd(true);
-    }
-
-    for (unsigned long i = 0; i < eg_dprs->headersToEmit.size(); i++) {
-        auto headerToEmit = eg_dprs->headersToEmit[i];
-        auto headerExpression = eg_dprs->headersExpressions[i];
-        unsigned width = headerToEmit->width_bits();
-        builder->emitIndent();
-        builder->append("if (");
-        builder->append(headerExpression);
-        builder->append(".ebpf_valid) ");
-        builder->blockStart();
-        builder->emitIndent();
-        builder->appendFormat("%s += %d;", eg_dprs->outerHdrLengthVar.c_str(), width);
-        builder->newline();
-        builder->blockEnd(true);
-    }
-
-    builder->newline();
-
-    offsetVar =  "egress_" + eg_dprs->program->offsetVar;
-    builder->emitIndent();
-    builder->appendFormat("int %s = BYTES(%s) - BYTES(%s)",
-                          eg_dprs->outerHdrOffsetVar.c_str(),
-                          eg_dprs->outerHdrLengthVar.c_str(),
-                          offsetVar.c_str());
-    builder->endOfStatement(true);
-
-    builder->emitIndent();
-    builder->appendFormat("int total_outHeaderOffset = %s + %s",
-                          ig_dprs->outerHdrOffsetVar, eg_dprs->outerHdrOffsetVar);
-    builder->endOfStatement(true);
-    builder->emitIndent();
-
-    builder->append("if (total_outHeaderOffset != 0) ");
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusting by %d B",
-                                      1, "total_outHeaderOffset");
-    builder->emitIndent();
-    builder->appendFormat("int %s = 0", ig_dprs->returnCode.c_str());
-    builder->endOfStatement(true);
-
-
-    builder->emitIndent();
-    builder->appendFormat("%s = bpf_xdp_adjust_head(%s, -total_outHeaderOffset)",
-                          eg_dprs->returnCode.c_str(),
-                          eg_dprs->program->model.CPacketName.str());
-    builder->endOfStatement(true);
-
-    builder->emitIndent();
-    builder->appendFormat("if (%s) ", eg_dprs->returnCode.c_str());
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjust failed");
-    builder->emitIndent();
-    // We immediately return instead of jumping to reject state.
-    // It avoids reaching BPF_COMPLEXITY_LIMIT_JMP_SEQ.
-    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
-    builder->newline();
-    builder->blockEnd(true);
-    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusted");
-    builder->emitIndent();
-    builder->appendFormat("%s = %s;",
-                          ig_dprs->program->packetStartVar,
-                          builder->target->dataOffset(ig_dprs->program->model.CPacketName.str()));
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat("%s = %s;",
-                          ig_dprs->program->packetEndVar,
-                          builder->target->dataEnd(ig_dprs->program->model.CPacketName.str()));
-    builder->newline();
-    builder->blockEnd(true);
-
-    builder->emitIndent();
-    builder->appendFormat("%s = 0", ig_dprs->program->offsetVar.c_str());
-    builder->endOfStatement(true);
-
-    // if headers parsed by egress parser has been validated or
-    // invalidated in the egress control block,
-    // we must update header validity.
-    for (auto state : eg_dprs->program->parser->parserBlock->states) {
-        for (auto c : state->components) {
-            if (c->is<IR::MethodCallStatement>()) {
-                auto mce = c->to<IR::MethodCallStatement>()->methodCall;
-                auto mi = P4::MethodInstance::resolve(mce,
-                                                      eg_dprs->program->refMap,
-                                                      eg_dprs->program->typeMap);
-                auto extMethod = mi->to<P4::ExternMethod>();
-                if (extMethod != nullptr && extMethod->method->name.name ==
-                    P4::P4CoreLibrary::instance.packetIn.extract.name) {
-                    auto extractedHdr = extMethod->expr->arguments->at(0)->expression;
-                    builder->emitIndent();
-                    builder->append(extractedHdr->toString());
-                    builder->append(".ingress_ebpf_valid = ");
-                    builder->append(extractedHdr->toString());
-                    builder->append(".ebpf_valid");
-                    builder->endOfStatement(true);
-                }
-            }
-        }
-    }
-
-    for (unsigned long i = 0; i < ig_dprs->headersToEmit.size(); i++) {
-        auto headerToEmit = ig_dprs->headersToEmit[i];
-        auto headerExpression = ig_dprs->headersExpressions[i];
-        ig_dprs->emitHeader(builder, headerToEmit, headerExpression);
-    }
-    builder->newline();
-
-    eg_dprs->emitPreDeparser(builder);
-
-    builder->emitIndent();
-    builder->appendFormat("%s = %d", eg_dprs->program->offsetVar.c_str(), egressStartPacketOffset);
-    builder->endOfStatement(true);
-
-    for (unsigned long i = 0; i < eg_dprs->headersToEmit.size(); i++) {
-        auto headerToEmit = eg_dprs->headersToEmit[i];
-        auto headerExpression = eg_dprs->headersExpressions[i];
-        eg_dprs->emitHeader(builder, headerToEmit, headerExpression);
-    }
-    builder->newline();
-}
-
-bool OptimizedCombinedDeparser::isProcessedByParserStates(const IR::IndexedVector<IR::ParserState> states, cstring hdrName) {
+// =====================OptimizedXDPEgressDeparserPSA=============================
+bool OptimizedXDPEgressDeparserPSA::isProcessedByParserStates(const IR::IndexedVector<IR::ParserState> states, cstring hdrName) {
     for (auto state : states) {
         for (auto c : state->components) {
             if (c->is<IR::MethodCallStatement>()) {
                 auto mce = c->to<IR::MethodCallStatement>()->methodCall;
                 auto mi = P4::MethodInstance::resolve(mce,
-                                                      eg_dprs->program->refMap,
-                                                      eg_dprs->program->typeMap);
+                                                      program->refMap,
+                                                      program->typeMap);
                 auto extMethod = mi->to<P4::ExternMethod>();
                 if (extMethod != nullptr) {
                     auto extractedHdr = extMethod->expr->arguments->at(0)->expression;
                     if (extractedHdr->is<IR::Member>() &&
                         extractedHdr->to<IR::Member>()->expr->is<IR::PathExpression>()) {
                         auto name = extractedHdr->to<IR::Member>()->member.name;
-                        auto headers = extractedHdr->to<IR::Member>()->expr->to<IR::PathExpression>()->path->name.name;
-                        if (headers + "." + name == hdrName) {
+                        auto headers = extractedHdr->to<IR::Member>()->expr->
+                                to<IR::PathExpression>()->path->name.name;
+                        // this kind of expression is independent of whether hdr is pointer or not.
+                        if (hdrName.find(headers) != hdrName.end() &&
+                            hdrName.find(name) != hdrName.end()) {
                             return true;
                         }
                     }
@@ -858,21 +720,22 @@ bool OptimizedCombinedDeparser::isProcessedByParserStates(const IR::IndexedVecto
     return false;
 }
 
-bool OptimizedCombinedDeparser::isEmittedByDeparser(EBPFDeparserPSA *deparser, cstring hdrName) {
+bool OptimizedXDPEgressDeparserPSA::isEmittedByDeparser(EBPFDeparserPSA *deparser, cstring hdrName) {
     return std::find(deparser->headersExpressions.begin(),
                      deparser->headersExpressions.end(),
                      hdrName) != deparser->headersExpressions.end();
 }
 
-void OptimizedCombinedDeparser::optimizeHeadersToEmit(EBPFOptimizedEgressParserPSA* eg_prs) {
+
+void OptimizedXDPEgressDeparserPSA::optimizeHeadersToEmit(EBPFOptimizedEgressParserPSA *eg_prs) {
     // remove headers from ingress deparser that are deparsed at ingress, but are removed from packet by egress.
-    for (unsigned long i = 0; i < ig_dprs->headersToEmit.size(); i++) {
-        cstring hdr = ig_dprs->headersExpressions[i];
-        if (isEmittedByDeparser(ig_dprs, hdr) && isProcessedByParserStates(eg_prs->parserBlock->states, hdr) &&
-            !isEmittedByDeparser(eg_dprs, hdr)) {
-            eg_prs->headersToSkipMovingOffset.insert(ig_dprs->headersExpressions[i]);
-            ig_dprs->headersToEmit.erase(ig_dprs->headersToEmit.begin() + (unsigned int) i);
-            ig_dprs->headersExpressions.erase(ig_dprs->headersExpressions.begin() + (unsigned int) i);
+    for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
+        cstring hdr = ig_deparser->headersExpressions[i];
+        if (isEmittedByDeparser(ig_deparser, hdr) && isProcessedByParserStates(eg_prs->parserBlock->states, hdr) &&
+            !isEmittedByDeparser(this, hdr)) {
+            eg_prs->headersToSkipMovingOffset.insert(ig_deparser->headersExpressions[i]);
+            ig_deparser->headersToEmit.erase(ig_deparser->headersToEmit.begin() + (unsigned int) i);
+            ig_deparser->headersExpressions.erase(ig_deparser->headersExpressions.begin() + (unsigned int) i);
         }
     }
 
@@ -883,29 +746,228 @@ void OptimizedCombinedDeparser::optimizeHeadersToEmit(EBPFOptimizedEgressParserP
      * Continue removing until we meet inconsistency between ingress and egress deparser.
      * Once we met inconsistency, we cannot do the same for further headers.
      */
-    for (unsigned long i = 0; i < ig_dprs->headersToEmit.size(); i++) {
-        cstring hdr = ig_dprs->headersExpressions[i];
 
-        if (eg_dprs->headersExpressions.size() == 0) {
+    std::vector<cstring> newHeadersExpressions = std::vector<cstring>(headersExpressions);
+    std::vector<const IR::Type_Header *> newHeadersToEmit = std::vector<const IR::Type_Header *>(headersToEmit);
+
+    std::vector<int> indexesToRemove;
+    for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
+        auto hdrToEmit = headersToEmit[i];
+        cstring hdr = ig_deparser->headersExpressions[i];
+
+        if (this->headersExpressions.size() == 0) {
             break;
         }
 
-        if (hdr == eg_dprs->headersExpressions[i]) {
-            removedHeadersToEmit.emplace(hdr, eg_dprs->headersToEmit[i]);
-            egressStartPacketOffset += eg_dprs->headersToEmit[i]->width_bits();
-            eg_dprs->headersToEmit.erase(std::find(
-                    eg_dprs->headersToEmit.begin(),
-                    eg_dprs->headersToEmit.end(),
-                    eg_dprs->headersToEmit[i]));
-            eg_dprs->headersExpressions.erase(std::find(
-                    eg_dprs->headersExpressions.begin(),
-                    eg_dprs->headersExpressions.end(),
-                    eg_dprs->headersExpressions[i]));
+        if (hdr == this->headersExpressions[i]) {
+            removedHeadersToEmit.emplace(hdr, this->headersToEmit[i]);
+            egressStartPacketOffset += this->headersToEmit[i]->width_bits();
+            newHeadersToEmit.erase(std::find(
+                    newHeadersToEmit.begin(),
+                    newHeadersToEmit.end(),
+                    hdrToEmit));
+            newHeadersExpressions.erase(std::find(
+                    newHeadersExpressions.begin(),
+                    newHeadersExpressions.end(),
+                    this->headersExpressions[i]));
         } else {
             break;
         }
     }
 
+    this->headersExpressions = newHeadersExpressions;
+    this->headersToEmit = newHeadersToEmit;
+}
+
+void OptimizedXDPEgressDeparserPSA::emit(CodeBuilder *builder) {
+    for (auto a : this->controlBlock->container->controlLocals)
+        this->emitDeclaration(builder, a);
+
+    builder->emitIndent();
+    builder->appendFormat("int %s = 0", ig_deparser->outerHdrLengthVar.c_str());
+    builder->endOfStatement(true);
+
+    for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
+        auto headerToEmit = ig_deparser->headersToEmit[i];
+        auto headerExpression = ig_deparser->headersExpressions[i];
+        unsigned width = headerToEmit->width_bits();
+        cstring hdrExpr = headerExpression.replace(".", "->");
+        builder->emitIndent();
+        builder->append("if (");
+        builder->append(hdrExpr);
+        builder->append(".ingress_ebpf_valid) ");
+        builder->blockStart();
+        builder->emitIndent();
+        builder->appendFormat("%s += %d;", ig_deparser->outerHdrLengthVar.c_str(), width);
+        builder->newline();
+        builder->blockEnd(true);
+    }
+
+    builder->newline();
+    builder->emitIndent();
+
+    cstring offsetVar =  "ingress_" + ig_deparser->program->offsetVar;
+    builder->appendFormat("int %s = BYTES(%s) - BYTES(%s)",
+                          ig_deparser->outerHdrOffsetVar.c_str(),
+                          ig_deparser->outerHdrLengthVar.c_str(),
+                          offsetVar.c_str());
+    builder->endOfStatement(true);
+
+    builder->emitIndent();
+    builder->appendFormat("int %s = 0", this->outerHdrLengthVar.c_str());
+    builder->endOfStatement(true);
+
+    for (auto const& el : removedHeadersToEmit) {
+        auto headerToEmit = el.second;
+        auto headerExpression = el.first;
+        unsigned width = headerToEmit->width_bits();
+        cstring hdrExpr = headerExpression.replace(".", "->");
+        builder->emitIndent();
+        builder->append("if (");
+        builder->append(hdrExpr);
+        builder->append(".ebpf_valid) ");
+        builder->blockStart();
+        builder->emitIndent();
+        builder->appendFormat("%s += %d;", this->outerHdrLengthVar.c_str(), width);
+        builder->newline();
+        builder->blockEnd(true);
+    }
+
+    for (unsigned long i = 0; i < this->headersToEmit.size(); i++) {
+        auto headerToEmit = this->headersToEmit[i];
+        auto headerExpression = this->headersExpressions[i];
+        unsigned width = headerToEmit->width_bits();
+        cstring hdrExpr = headerExpression.replace(".", "->");
+        builder->emitIndent();
+        builder->append("if (");
+        builder->append(hdrExpr);
+        builder->append(".ebpf_valid) ");
+        builder->blockStart();
+        builder->emitIndent();
+        builder->appendFormat("%s += %d;", this->outerHdrLengthVar.c_str(), width);
+        builder->newline();
+        builder->blockEnd(true);
+    }
+
+    builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat("int %s = BYTES(%s) - BYTES(%s)",
+                          this->outerHdrOffsetVar.c_str(),
+                          this->outerHdrLengthVar.c_str(),
+                          program->offsetVar.c_str());
+    builder->endOfStatement(true);
+
+    builder->emitIndent();
+    builder->appendFormat("int total_outHeaderOffset = %s + %s",
+                          ig_deparser->outerHdrOffsetVar, this->outerHdrOffsetVar);
+    builder->endOfStatement(true);
+    builder->emitIndent();
+
+    builder->append("if (total_outHeaderOffset != 0) ");
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusting by %d B",
+                                      1, "total_outHeaderOffset");
+    builder->emitIndent();
+    builder->appendFormat("int %s = 0", ig_deparser->returnCode.c_str());
+    builder->endOfStatement(true);
+
+
+    builder->emitIndent();
+    builder->appendFormat("%s = bpf_xdp_adjust_head(%s, -total_outHeaderOffset)",
+                          this->returnCode.c_str(),
+                          this->program->model.CPacketName.str());
+    builder->endOfStatement(true);
+
+    builder->emitIndent();
+    builder->appendFormat("if (%s) ", this->returnCode.c_str());
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjust failed");
+    builder->emitIndent();
+    // We immediately return instead of jumping to reject state.
+    // It avoids reaching BPF_COMPLEXITY_LIMIT_JMP_SEQ.
+    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
+    builder->newline();
+    builder->blockEnd(true);
+    builder->emitIndent();
+    builder->appendFormat("%s = %s;",
+                          ig_deparser->program->packetStartVar,
+                          builder->target->dataOffset(ig_deparser->program->model.CPacketName.str()));
+    builder->newline();
+    builder->emitIndent();
+    builder->appendFormat("%s = %s;",
+                          ig_deparser->program->packetEndVar,
+                          builder->target->dataEnd(ig_deparser->program->model.CPacketName.str()));
+    builder->newline();
+    builder->blockEnd(true);
+
+    builder->emitIndent();
+    builder->appendFormat("%s = 0", ig_deparser->program->offsetVar.c_str());
+    builder->endOfStatement(true);
+
+    // if headers parsed by egress parser has been validated or
+    // invalidated in the egress control block,
+    // we must update header validity.
+    for (auto state : this->program->parser->parserBlock->states) {
+        for (auto c : state->components) {
+            if (c->is<IR::MethodCallStatement>()) {
+                auto mce = c->to<IR::MethodCallStatement>()->methodCall;
+                auto mi = P4::MethodInstance::resolve(mce,
+                                                      this->program->refMap,
+                                                      this->program->typeMap);
+                auto extMethod = mi->to<P4::ExternMethod>();
+                if (extMethod != nullptr && extMethod->method->name.name ==
+                                            P4::P4CoreLibrary::instance.packetIn.extract.name) {
+                    auto extractedHdr = extMethod->expr->arguments->at(0)->expression;
+                    cstring hdrExpr = extractedHdr->toString().replace(".", "->");
+                    builder->emitIndent();
+                    builder->append(hdrExpr);
+                    builder->append(".ingress_ebpf_valid = ");
+                    builder->append(hdrExpr);
+                    builder->append(".ebpf_valid");
+                    builder->endOfStatement(true);
+                }
+            }
+        }
+    }
+
+    for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
+        auto headerToEmit = ig_deparser->headersToEmit[i];
+        auto headerExpression = ig_deparser->headersExpressions[i];
+        cstring hdrExpr = headerExpression.replace(".", "->");
+        ig_deparser->emitHeader(builder, headerToEmit, hdrExpr);
+    }
+    builder->newline();
+
+    this->emitPreDeparser(builder);
+
+    builder->emitIndent();
+    builder->appendFormat("%s = %d", this->program->offsetVar.c_str(), egressStartPacketOffset);
+    builder->endOfStatement(true);
+
+    for (unsigned long i = 0; i < this->headersToEmit.size(); i++) {
+        auto headerToEmit = this->headersToEmit[i];
+        auto headerExpression = this->headersExpressions[i];
+        cstring hdrExpr = headerExpression.replace(".", "->");
+        this->emitHeader(builder, headerToEmit, hdrExpr);
+    }
+    builder->newline();
+}
+
+void OptimizedXDPEgressDeparserPSA::emitIngressHeadersValidity(CodeBuilder *builder) {
+    for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
+        auto headerExpression = ig_deparser->headersExpressions[i];
+        builder->emitIndent();
+        builder->append("if (");
+        cstring hdrExpr = headerExpression.replace(".", "->");
+        builder->append(hdrExpr);
+        builder->append(".ebpf_valid) ");
+        builder->blockStart();
+        builder->emitIndent();
+        builder->appendFormat("%s.ingress_ebpf_valid = 1;", hdrExpr);
+        builder->newline();
+        builder->blockEnd(true);
+    }
 }
 
 }  // namespace EBPF

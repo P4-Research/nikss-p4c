@@ -169,6 +169,7 @@ void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* met
     }
 }
 
+// TODO: this method doesn't work properly with --hdr2map.
 cstring EBPFMeterPSA::getIndexString(const P4::ExternMethod *method) const {
     if (method->expr->arguments->at(0)->expression->is<IR::PathExpression>()) {
         auto indexArgExpr = method->expr->arguments->at(0)->expression->to<IR::PathExpression>();

@@ -259,7 +259,7 @@ void EBPFPsaParser::emitRejectState(CodeBuilder* builder) {
 void EBPFOptimizedEgressParserPSA::emitRejectState(CodeBuilder *builder) {
     // Create a synthetic reject state
     builder->emitIndent();
-    builder->appendFormat("egress_%s:", IR::ParserState::reject.c_str());
+    builder->appendFormat("%s:", IR::ParserState::reject.c_str());
     builder->spc();
     builder->blockStart();
 
@@ -277,7 +277,7 @@ void EBPFOptimizedEgressParserPSA::emitRejectState(CodeBuilder *builder) {
     builder->blockEnd(true);
 
     builder->emitIndent();
-    builder->appendFormat("goto egress_%s", IR::ParserState::accept.c_str());
+    builder->appendFormat("goto %s", IR::ParserState::accept.c_str());
     builder->endOfStatement(true);
 
     builder->blockEnd(true);
@@ -324,7 +324,7 @@ bool OptimizedEgressParserStateVisitor::preorder(const IR::ParserState *parserSt
     if (parserState->isBuiltin()) return false;
 
     builder->emitIndent();
-    builder->append("egress_" + parserState->name.name);
+    builder->append(parserState->name.name);
     builder->append(":");
     builder->spc();
     builder->blockStart();
@@ -336,7 +336,7 @@ bool OptimizedEgressParserStateVisitor::preorder(const IR::ParserState *parserSt
     if (parserState->selectExpression == nullptr) {
         builder->emitIndent();
         builder->append("goto ");
-        builder->append("egress_" + IR::ParserState::reject);
+        builder->append(IR::ParserState::reject);
         builder->endOfStatement(true);
     } else if (parserState->selectExpression->is<IR::SelectExpression>()) {
         visit(parserState->selectExpression);
@@ -345,7 +345,7 @@ bool OptimizedEgressParserStateVisitor::preorder(const IR::ParserState *parserSt
         if (!parserState->selectExpression->is<IR::PathExpression>())
             BUG("Expected a PathExpression, got a %1%", parserState->selectExpression);
         builder->emitIndent();
-        builder->append("goto egress_");
+        builder->append("goto ");
         visit(parserState->selectExpression);
         builder->endOfStatement(true);
     }

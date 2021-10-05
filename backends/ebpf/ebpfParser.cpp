@@ -137,7 +137,7 @@ bool StateTranslationVisitor::preorder(const IR::SelectCase* selectCase) {
         visit(selectCase->keyset);
         builder->append(": ");
     }
-    builder->appendFormat("goto %s", this->state->parser->nms);
+    builder->append("goto ");
     visit(selectCase->state);
     builder->endOfStatement(true);
     return false;
@@ -149,9 +149,6 @@ StateTranslationVisitor::compileExtractField(
     unsigned widthToExtract = dynamic_cast<IHasWidth*>(type)->widthInBits();
     auto program = state->parser->program;
     cstring msgStr;
-
-    msgStr = Util::printf_format("Parser: extracting field %s", field);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     if (widthToExtract <= 64) {
         unsigned lastBitIndex = widthToExtract + alignment - 1;
@@ -341,9 +338,6 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
         visit(destination);
         builder->appendLine(".ebpf_valid = 1;");
     }
-
-    msgStr = Util::printf_format("Parser: extracted %s", destination->toString());
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     builder->newline();
 }

@@ -320,7 +320,6 @@ void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
     if (table->keyGenerator != nullptr) {
         builder->emitIndent();
         builder->appendLine("/* perform lookup */");
-        builder->target->emitTraceMessage(builder, "Control: performing table lookup");
         builder->emitIndent();
         table->emitLookup(builder, keyname, valueName);
     }
@@ -369,9 +368,6 @@ void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
     builder->blockEnd(true);
 
     builder->blockEnd(true);
-
-    msgStr = Util::printf_format("Control: %s applied", method->object->getName().name);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
 }
 
 bool ControlBodyTranslator::preorder(const IR::ExitStatement*) {
