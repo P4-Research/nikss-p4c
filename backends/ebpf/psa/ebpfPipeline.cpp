@@ -776,11 +776,25 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
 
     if (options.xdpEgressOptimization) {
         auto dprs = this->deparser->to<OptimizedXDPEgressDeparserPSA>();
-        dprs->emitIngressHeadersValidity(builder);
 
         auto eg_parser = parser->to<EBPFOptimizedEgressParserPSA>();
         auto fields = eg_parser->headerType->to<EBPFStructType>()->fields;
+        for (auto f :fields) {
+            builder->emitIndent();
+            builder->appendFormat("if (%s->%s.ebpf_valid) ",
+                                  parser->headers->name.name, f->field->name.name);
+            builder->blockStart();
+            builder->emitIndent();
+            builder->appendFormat("%s->%s.ingress_ebpf_valid = 1;",
+                                  parser->headers->name.name, f->field->name.name);
+            builder->newline();
+            builder->blockEnd(true);
+        }
+
         for (auto f : fields) {
+            builder->emitIndent();
+            builder->appendFormat("%s->%s.ebpf_valid = 0", parser->headers->name.name, f->field->name.name);
+            builder->endOfStatement(true);
             eg_parser->headersToInvalidate.insert(f->field->name.name);
         }
     }
@@ -799,18 +813,18 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
                           control->inputStandardMetadata->name.name, errorVar.c_str());
     builder->endOfStatement(true);
     builder->newline();
-    if (options.xdpEgressOptimization) {
-        auto eg_parser = parser->to<EBPFOptimizedEgressParserPSA>();
-        auto fields = eg_parser->headerType->to<EBPFStructType>()->fields;
-        for (auto f : fields) {
-            if (eg_parser->headersToInvalidate.find(f->field->name.name) !=
-                eg_parser->headersToInvalidate.end()) {
-                builder->emitIndent();
-                builder->appendFormat("%s->%s.ebpf_valid = 0", parser->headers->name.name, f->field->name.name);
-                builder->endOfStatement(true);
-            }
-        }
-    }
+//    if (options.xdpEgressOptimization) {
+//        auto eg_parser = parser->to<EBPFOptimizedEgressParserPSA>();
+//        auto fields = eg_parser->headerType->to<EBPFStructType>()->fields;
+//        for (auto f : fields) {
+//            if (eg_parser->headersToInvalidate.find(f->field->name.name) !=
+//                eg_parser->headersToInvalidate.end()) {
+//                builder->emitIndent();
+//                builder->appendFormat("%s->%s.ebpf_valid = 0", parser->headers->name.name, f->field->name.name);
+//                builder->endOfStatement(true);
+//            }
+//        }
+//    }
     builder->emitIndent();
     builder->blockStart();
     builder->newline();

@@ -298,18 +298,25 @@ void OptimizedEgressParserStateVisitor::compileExtract(const IR::Expression *des
     builder->emitIndent();
     builder->append("if (!");
     visit(destination);
-    builder->append(".ebpf_valid) ");
+    builder->append(".ingress_ebpf_valid) ");
     builder->blockStart();
     PsaStateTranslationVisitor::compileExtract(destination);
     builder->blockEnd(false);
     builder->append(" else ");
     builder->blockStart();
-    if (std::find(parser->headersToSkipMovingOffset.begin(),
-                  parser->headersToSkipMovingOffset.end(),
-                  destination->toString()) == parser->headersToSkipMovingOffset.end()) {
-        builder->emitIndent();
-        builder->appendFormat("%s += %d", parser->program->offsetVar.c_str(), width);
-        builder->endOfStatement(true);
+    builder->emitIndent();
+    visit(destination);
+    builder->append(".ebpf_valid = 1");
+    builder->endOfStatement(true);
+    if (destination->is<IR::Member>()) {
+        auto hdr = destination->to<IR::Member>()->member.name;
+        for (auto h : parser->headersToSkipMovingOffset) {
+            if (!h.endsWith(hdr)) {
+                builder->emitIndent();
+                builder->appendFormat("%s += %d", parser->program->offsetVar.c_str(), width);
+                builder->endOfStatement(true);
+            }
+        }
     }
     builder->blockEnd(true);
 
