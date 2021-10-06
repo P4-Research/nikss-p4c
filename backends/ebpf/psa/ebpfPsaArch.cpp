@@ -683,7 +683,7 @@ const PSAArch * ConvertToEbpfPSA::build(const IR::ToplevelBlock *tlb) {
 const IR::Node *ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
     ebpf_psa_arch = build(tlb);
 
-    if (options.xdpEgressOptimization) {
+    if (options.generateToXDP && options.xdpEgressOptimization) {
         if (ebpf_psa_arch->xdpEgress->isEmpty()) {
             ebpf_psa_arch->xdpIngress->deparser->to<OptimizedXDPIngressDeparserPSA>()
                     ->forceEmitDeparser = true;
