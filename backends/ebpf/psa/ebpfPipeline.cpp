@@ -772,6 +772,12 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
             emitMetadataFromCPUMAP(builder);
             builder->newline();
         }
+        builder->emitIndent();
+        // declaring header instance as volatile optimizes stack size and improves throughput
+        emitLocalHeaderInstancesAsPointers(builder);
+        builder->emitIndent();
+        builder->appendFormat("%s = &(md->headers);", parser->headers->name.name);
+        builder->newline();
     } else {
         emitHeaderInstances(builder);
         builder->newline();
@@ -785,13 +791,6 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
             builder->newline();
         }
     }
-
-    builder->emitIndent();
-    // declaring header instance as volatile optimizes stack size and improves throughput
-    emitLocalHeaderInstancesAsPointers(builder);
-    builder->emitIndent();
-    builder->appendFormat("%s = &(md->headers);", parser->headers->name.name);
-    builder->newline();
 
 
     emitPSAControlOutputMetadata(builder);
@@ -893,12 +892,18 @@ void XDPEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->newline();
 
     // normal packet to port
+    varStr = Util::printf_format("%s.egress_port",
+                                 control->inputStandardMetadata->name.name);
     builder->target->emitTraceMessage(builder,
                                         "EgressTM: output packet to port %d",
-                                      1, "ingress_ostd.egress_port");
+                                      1, varStr);
     builder->emitIndent();
-    builder->appendFormat("return bpf_redirect_map(&tx_port, ingress_ostd.egress_port%s, 0);",
-                          "%DEVMAP_SIZE");
+    if (options.xdpEgressOptimization) {
+        builder->appendFormat("return bpf_redirect_map(&tx_port, %s.egress_port%s, 0);",
+                              control->inputStandardMetadata->name.name, "%DEVMAP_SIZE");
+    } else {
+        builder->appendFormat("return %s;", this->forwardReturnCode());
+    }
     builder->newline();
 }
 
