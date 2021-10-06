@@ -41,6 +41,10 @@ class EBPFPipeline : public EBPFProgram {
         priorityVar = cstring("skb->priority");
     }
 
+    /* Check if pipeline does any processing.
+     * Return false if not. */
+    bool isEmpty() const;
+
     virtual cstring dropReturnCode() {
         if (sectionName.startsWith("xdp")) {
             return "XDP_DROP";
@@ -172,7 +176,6 @@ class XDPIngressPipeline : public EBPFIngressPipeline {
 
     void emit(CodeBuilder *builder) override;
     void emitTrafficManager(CodeBuilder *builder) override;
-    void emitWithEgress(CodeBuilder *builder, EBPFPipeline* egress);
 };
 
 class XDPEgressPipeline : public EBPFEgressPipeline {

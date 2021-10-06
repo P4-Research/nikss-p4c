@@ -133,7 +133,6 @@ class XDPIngressDeparserPSA : public XDPDeparserPSA {
                 XDPDeparserPSA(program, control, parserHeaders, istd) { }
 
     bool build() override;
-    void emit(CodeBuilder* builder) override;
     void emitPreDeparser(CodeBuilder *builder) override;
     void emitSharedMetadataInitializer(CodeBuilder *builder);
 };
@@ -173,8 +172,6 @@ class OptimizedXDPEgressDeparserPSA : public XDPEgressDeparserPSA {
         ig_deparser->outerHdrOffsetVar = "ingress_" + ig_deparser->outerHdrOffsetVar;
     }
 
-    void emitIngressHeadersValidity(CodeBuilder* builder);
-
     /* This function removes headers that are:
      * - deparsed in ingress deparser
      * - parsed in egress parser
@@ -187,12 +184,14 @@ class OptimizedXDPEgressDeparserPSA : public XDPEgressDeparserPSA {
 
 class OptimizedXDPIngressDeparserPSA : public XDPIngressDeparserPSA {
  public:
+    bool forceEmitDeparser = false;
     OptimizedXDPIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
                                    const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
             XDPIngressDeparserPSA(program, control, parserHeaders, istd) {}
 
-    virtual void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
+    void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                             cstring &headerExpression) const override;
+    void emit(CodeBuilder* builder) override;
 };
 
 }  // namespace EBPF

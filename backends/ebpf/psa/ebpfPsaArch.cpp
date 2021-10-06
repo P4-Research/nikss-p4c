@@ -114,40 +114,11 @@ void PSAArch::emit2TC(CodeBuilder *builder) const {
      * 10. TC Egress program.
      */
     if (!options.xdpEgressOptimization ||
-       (options.xdpEgressOptimization && !isPipelineEmpty(tcEgress))) {
+       (options.xdpEgressOptimization && !tcEgress->isEmpty())) {
         tcEgress->emit(builder);
     }
 
     builder->target->emitLicense(builder, xdp->license);
-}
-
-bool PSAArch::isPipelineEmpty(EBPFPipeline* pipeline) const {
-    // check if parser doesn't have any state
-    auto eg_prs = pipeline->parser;
-    // Why 3? Parser will always have at least start, accept and reject states.
-    if (eg_prs->parserBlock->states.size() > 3) {
-        return false;
-    }
-
-    auto startState = eg_prs->parserBlock->states.at(0);
-    if (!startState->components.empty() ||
-        startState->selectExpression->to<IR::PathExpression>()->path->name.name != "accept") {
-        return false;
-    }
-
-    // check if control is empty
-    auto eg_ctrl = pipeline->control;
-    if (eg_ctrl->p4Control->body->components.size() != 0) {
-        return false;
-    }
-
-    // check if deparser doesn't emit anything
-    auto eg_dprs = pipeline->deparser;
-    if (eg_dprs->headersToEmit.size() != 0) {
-        return false;
-    }
-
-    return true;
 }
 
 void PSAArch::emitPacketReplicationTables(CodeBuilder *builder) const {
@@ -449,7 +420,7 @@ void PSAArch::emit2XDP(CodeBuilder *builder) const {
     xdpIngress->emit(builder);
 
     if (!options.xdpEgressOptimization ||
-        (options.xdpEgressOptimization && !isPipelineEmpty(xdpEgress))) {
+        (options.xdpEgressOptimization && !xdpEgress->isEmpty())) {
         xdpEgress->emit(builder);
     }
 
@@ -713,6 +684,10 @@ const IR::Node *ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
     ebpf_psa_arch = build(tlb);
 
     if (options.xdpEgressOptimization) {
+        if (ebpf_psa_arch->xdpEgress->isEmpty()) {
+            ebpf_psa_arch->xdpIngress->deparser->to<OptimizedXDPIngressDeparserPSA>()
+                    ->forceEmitDeparser = true;
+        }
         ebpf_psa_arch->xdpEgress->deparser->to<OptimizedXDPEgressDeparserPSA>()->
                 setIngressDeparser(ebpf_psa_arch->xdpIngress->deparser->to<XDPDeparserPSA>());
         ebpf_psa_arch->xdpEgress->deparser->to<OptimizedXDPEgressDeparserPSA>()->

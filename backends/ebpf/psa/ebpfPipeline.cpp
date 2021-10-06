@@ -3,6 +3,32 @@
 
 namespace EBPF {
 
+bool EBPFPipeline::isEmpty() const {
+    // check if parser doesn't have any state
+    // Why 3? Parser will always have at least start, accept and reject states.
+    if (parser->parserBlock->states.size() > 3) {
+        return false;
+    }
+
+    auto startState = parser->parserBlock->states.at(0);
+    if (!startState->components.empty() ||
+        startState->selectExpression->to<IR::PathExpression>()->path->name.name != "accept") {
+        return false;
+    }
+
+    // check if control is empty
+    if (control->p4Control->body->components.size() != 0) {
+        return false;
+    }
+
+    // check if deparser doesn't emit anything
+    if (deparser->headersToEmit.size() != 0) {
+        return false;
+    }
+
+    return true;
+}
+
 void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("unsigned %s = 0;", offsetVar.c_str());
@@ -683,9 +709,6 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
 }
 
 void XDPIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
-    if (options.xdpEgressOptimization) {
-        return;
-    }
     // do not handle multicast; it has been handled earlier by PreDeparser.
     builder->emitIndent();
     builder->appendFormat("return bpf_redirect_map(&tx_port, %s.egress_port%s, 0);",

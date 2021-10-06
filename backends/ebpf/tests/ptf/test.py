@@ -29,7 +29,6 @@ class SimpleForwardingPSATest(P4EbpfTest):
         testutils.verify_packet(self, pkt, PORT1)
 
     def tearDown(self):
-        self.remove_maps(["ingress_tbl_fwd", "ingress_tbl_fwd_defaultAction"])
         super(SimpleForwardingPSATest, self).tearDown()
 
 class IfNotTest(P4EbpfTest):

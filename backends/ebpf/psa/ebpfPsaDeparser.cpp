@@ -51,11 +51,7 @@ void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
         builder->emitIndent();
         builder->append("if (");
         builder->append(headerExpression);
-        if (program->options.xdpEgressOptimization && this->is<XDPIngressDeparserPSA>()) {
-            builder->append(".ingress_ebpf_valid) ");
-        } else {
-            builder->append(".ebpf_valid) ");
-        }
+        builder->append(".ebpf_valid) ");
         builder->blockStart();
         builder->emitIndent();
         builder->appendFormat("%s += %d;", this->outerHdrLengthVar.c_str(), width);
@@ -66,14 +62,7 @@ void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
     builder->newline();
     builder->emitIndent();
 
-    cstring offsetVar = "";
-    if (program->options.xdpEgressOptimization && this->is<XDPIngressDeparserPSA>()) {
-        offsetVar = "ingress_" + program->offsetVar;
-    } else if (program->options.xdpEgressOptimization && this->is<XDPEgressDeparserPSA>()) {
-        offsetVar = "egress_" + program->offsetVar;
-    } else {
-        offsetVar = program->offsetVar;
-    }
+    cstring offsetVar = program->offsetVar;
     builder->appendFormat("int %s = BYTES(%s) - BYTES(%s)",
                           this->outerHdrOffsetVar.c_str(),
                           this->outerHdrLengthVar.c_str(),
@@ -481,54 +470,6 @@ bool XDPIngressDeparserPSA::build() {
     return true;
 }
 
-void XDPIngressDeparserPSA::emit(CodeBuilder *builder) {
-    if (program->options.xdpEgressOptimization) {
-        builder->emitIndent();
-
-        codeGen->setBuilder(builder);
-
-        for (auto a :controlBlock->container->controlLocals)
-            emitDeclaration(builder, a);
-
-        this->emitDeparserExternCalls(builder);
-        builder->newline();
-
-        this->emitPreDeparser(builder);
-
-        // put metadata into shared map
-        builder->emitIndent();
-        builder->appendLine("struct xdp2tc_metadata xdp2tc_md = {};");
-        builder->emitIndent();
-        if (program->options.generateHdrInMap) {
-            builder->appendFormat("xdp2tc_md.headers = *%s", this->headers->name.name);
-        } else {
-            builder->appendFormat("xdp2tc_md.headers = %s", this->headers->name.name);
-        }
-
-        builder->endOfStatement(true);
-        builder->emitIndent();
-        builder->appendFormat("xdp2tc_md.ostd = %s", this->istd->name.name);
-        builder->endOfStatement(true);
-        builder->emitIndent();
-        builder->appendFormat("xdp2tc_md.packetOffsetInBits = %s", this->program->offsetVar);
-        builder->endOfStatement(true);
-        builder->emitIndent();
-        builder->emitIndent();
-        builder->target->emitTableUpdate(builder, "xdp2tc_shared_map",
-                                         this->program->zeroKey.c_str(), "xdp2tc_md");
-        builder->newline();
-
-        builder->emitIndent();
-        builder->appendFormat("bpf_tail_call(%s, &egress_jmp_table, 0)",
-                              this->program->model.CPacketName.str());
-        builder->endOfStatement(true);
-        // tail call here
-        return;
-    }
-
-    EBPFDeparserPSA::emit(builder);
-}
-
 /*
  * 
  */
@@ -643,6 +584,52 @@ void XDPEgressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->blockEnd(true);
 }
 
+void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
+    if (this->forceEmitDeparser) {
+        EBPFDeparserPSA::emit(builder);
+        return;
+    }
+
+    builder->emitIndent();
+
+    codeGen->setBuilder(builder);
+
+    for (auto a :controlBlock->container->controlLocals)
+        emitDeclaration(builder, a);
+
+    this->emitDeparserExternCalls(builder);
+    builder->newline();
+
+    this->emitPreDeparser(builder);
+
+    // put metadata into shared map
+    builder->emitIndent();
+    builder->appendLine("struct xdp2tc_metadata xdp2tc_md = {};");
+    builder->emitIndent();
+    if (program->options.generateHdrInMap) {
+        builder->appendFormat("xdp2tc_md.headers = *%s", this->headers->name.name);
+    } else {
+        builder->appendFormat("xdp2tc_md.headers = %s", this->headers->name.name);
+    }
+
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->appendFormat("xdp2tc_md.ostd = %s", this->istd->name.name);
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->appendFormat("xdp2tc_md.packetOffsetInBits = %s", this->program->offsetVar);
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->emitIndent();
+    builder->target->emitTableUpdate(builder, "xdp2tc_shared_map",
+                                     this->program->zeroKey.c_str(), "xdp2tc_md");
+    builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat("bpf_tail_call(%s, &egress_jmp_table, 0)",
+                          this->program->model.CPacketName.str());
+    builder->endOfStatement(true);
+}
 
 void OptimizedXDPIngressDeparserPSA::emitHeader(CodeBuilder *builder, const IR::Type_Header *headerToEmit,
                                                 cstring &headerExpression) const {
@@ -708,8 +695,7 @@ bool OptimizedXDPEgressDeparserPSA::isProcessedByParserStates(const IR::IndexedV
                         auto headers = extractedHdr->to<IR::Member>()->expr->
                                 to<IR::PathExpression>()->path->name.name;
                         // this kind of expression is independent of whether hdr is pointer or not.
-                        if (hdrName.find(headers) != hdrName.end() &&
-                            hdrName.find(name) != hdrName.end()) {
+                        if (hdrName.find(headers) && hdrName.find(name)) {
                             return true;
                         }
                     }
@@ -746,11 +732,11 @@ void OptimizedXDPEgressDeparserPSA::optimizeHeadersToEmit(EBPFOptimizedEgressPar
      * Continue removing until we meet inconsistency between ingress and egress deparser.
      * Once we met inconsistency, we cannot do the same for further headers.
      */
+    if (headersToEmit.size() == 0)
+        return;
 
     std::vector<cstring> newHeadersExpressions = std::vector<cstring>(headersExpressions);
     std::vector<const IR::Type_Header *> newHeadersToEmit = std::vector<const IR::Type_Header *>(headersToEmit);
-
-    std::vector<int> indexesToRemove;
     for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
         auto hdrToEmit = headersToEmit[i];
         cstring hdr = ig_deparser->headersExpressions[i];
@@ -952,22 +938,6 @@ void OptimizedXDPEgressDeparserPSA::emit(CodeBuilder *builder) {
         this->emitHeader(builder, headerToEmit, hdrExpr);
     }
     builder->newline();
-}
-
-void OptimizedXDPEgressDeparserPSA::emitIngressHeadersValidity(CodeBuilder *builder) {
-    for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
-        auto headerExpression = ig_deparser->headersExpressions[i];
-        builder->emitIndent();
-        builder->append("if (");
-        cstring hdrExpr = headerExpression.replace(".", "->");
-        builder->append(hdrExpr);
-        builder->append(".ebpf_valid) ");
-        builder->blockStart();
-        builder->emitIndent();
-        builder->appendFormat("%s.ingress_ebpf_valid = 1;", hdrExpr);
-        builder->newline();
-        builder->blockEnd(true);
-    }
 }
 
 }  // namespace EBPF

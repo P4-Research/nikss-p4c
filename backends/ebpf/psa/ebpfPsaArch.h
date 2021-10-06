@@ -56,8 +56,6 @@ class PSAArch {
             xdpIngress(xdpIngress), xdpEgress(xdpEgress), tcIngressForXDP(tcTrafficManager),
             tcEgressForXDP(tcEgress) { }
 
-    bool isPipelineEmpty(EBPFPipeline* pipeline) const;
-
     void emitCommonPreamble(CodeBuilder *builder) const;
     void emitPSAIncludes(CodeBuilder *builder) const;
     void emitTypes(CodeBuilder *builder) const;
@@ -79,33 +77,6 @@ class PSAArch {
     void emitInitializer2XDP(CodeBuilder *p_builder) const;
     void emitDummy2XDP(CodeBuilder *builder) const;
     void emitXDP2TCInternalStructures(CodeBuilder *builder) const;
-};
-
-class RewriteP4Program : public Transform {
- public:
-    RewriteP4Program() {}
-
-    const IR::Node *preorder(IR::Type_Parser *parser) override {
-        std::cout << parser->name.name << std::endl;
-        return parser;
-    }
-
-    const IR::Node *preorder(IR::SelectCase *c) override {
-        return new IR::SelectCase(c->keyset, new IR::PathExpression(c->state->type,
-                                                                    new IR::Path(IR::ID("ingress_" + c->state->path->name.name))));
-    }
-
-    const IR::Node *preorder(IR::ParserState *p) override {
-        auto selectExpr = p->selectExpression;
-        if (selectExpr->is<IR::PathExpression>()) {
-            auto pathExpr = selectExpr->to<IR::PathExpression>();
-            selectExpr = new IR::PathExpression(pathExpr->type,
-                                                new IR::Path(IR::ID("ingress_" + pathExpr->path->name.name)));
-        }
-
-        return new IR::ParserState(IR::ID("ingress_" + p->name), p->annotations, p->components, selectExpr);
-    }
-
 };
 
 class ConvertToEbpfPSA : public Transform {

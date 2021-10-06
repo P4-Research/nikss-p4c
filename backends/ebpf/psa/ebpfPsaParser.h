@@ -62,6 +62,7 @@ class EBPFPsaParser : public EBPFParser {
 
 
 class OptimizedEgressParserStateVisitor : public PsaStateTranslationVisitor {
+    bool shouldMoveOffset(cstring hdr);
  public:
     EBPFOptimizedEgressParserPSA * parser;
 

@@ -284,6 +284,16 @@ void EBPFOptimizedEgressParserPSA::emitRejectState(CodeBuilder *builder) {
     builder->newline();
 }
 
+bool OptimizedEgressParserStateVisitor::shouldMoveOffset(cstring hdr) {
+    for (auto h : parser->headersToSkipMovingOffset) {
+        if (h.endsWith(hdr)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 void OptimizedEgressParserStateVisitor::compileExtract(const IR::Expression *destination) {
     auto type = state->parser->typeMap->getType(destination);
     auto ht = type->to<IR::Type_StructLike>();
@@ -310,12 +320,10 @@ void OptimizedEgressParserStateVisitor::compileExtract(const IR::Expression *des
     builder->endOfStatement(true);
     if (destination->is<IR::Member>()) {
         auto hdr = destination->to<IR::Member>()->member.name;
-        for (auto h : parser->headersToSkipMovingOffset) {
-            if (!h.endsWith(hdr)) {
-                builder->emitIndent();
-                builder->appendFormat("%s += %d", parser->program->offsetVar.c_str(), width);
-                builder->endOfStatement(true);
-            }
+        if (shouldMoveOffset(hdr)) {
+            builder->emitIndent();
+            builder->appendFormat("%s += %d", parser->program->offsetVar.c_str(), width);
+            builder->endOfStatement(true);
         }
     }
     builder->blockEnd(true);

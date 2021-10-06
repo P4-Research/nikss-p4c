@@ -25,7 +25,6 @@ void PSASwitchBackend::convert(const IR::ToplevelBlock *tlb) {
     auto program = tlb->getProgram();
 
     PassManager rewriteToEBPF = {
-        //new RewriteP4Program(),
         evaluator,
         new VisitFunctor([this, evaluator, structure]() {
             toplevel = evaluator->getToplevelBlock();
@@ -61,9 +60,6 @@ void PSASwitchBackend::convert(const IR::ToplevelBlock *tlb) {
     program = program->apply(toEBPF);
 
     ebpf_program = convertToEbpfPSA->getPSAArchForEBPF();
-    if (!ebpf_program)
-        return;
-
 }
 
 }  // namespace EBPF
