@@ -804,16 +804,13 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
 
         auto eg_parser = parser->to<EBPFOptimizedEgressParserPSA>();
         auto fields = eg_parser->headerType->to<EBPFStructType>()->fields;
-        for (auto f :fields) {
+
+        for (auto f : fields) {
             builder->emitIndent();
-            builder->appendFormat("if (%s->%s.ebpf_valid) ",
+            builder->appendFormat("u8 %s_%s_ingress_ebpf_valid = %s->%s.ebpf_valid",
+                                  parser->headers->name.name, f->field->name.name,
                                   parser->headers->name.name, f->field->name.name);
-            builder->blockStart();
-            builder->emitIndent();
-            builder->appendFormat("%s->%s.ingress_ebpf_valid = 1;",
-                                  parser->headers->name.name, f->field->name.name);
-            builder->newline();
-            builder->blockEnd(true);
+            builder->endOfStatement(true);
         }
 
         for (auto f : fields) {

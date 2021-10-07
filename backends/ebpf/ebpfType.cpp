@@ -224,9 +224,6 @@ void EBPFStructType::emit(CodeBuilder* builder) {
         if (type != nullptr) {
             type->declare(builder, "ebpf_valid", false);
             builder->endOfStatement(true);
-            builder->emitIndent();
-            type->declare(builder, "ingress_ebpf_valid", false);
-            builder->endOfStatement(true);
         }
     }
 

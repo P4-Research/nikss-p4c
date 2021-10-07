@@ -295,8 +295,9 @@ void OptimizedEgressParserStateVisitor::compileExtract(const IR::Expression *des
 
     builder->emitIndent();
     builder->append("if (!");
-    visit(destination);
-    builder->append(".ingress_ebpf_valid) ");
+    cstring hdrName = destination->toString().replace(".", "_");
+    builder->append(hdrName);
+    builder->append("_ingress_ebpf_valid) ");
     builder->blockStart();
     PsaStateTranslationVisitor::compileExtract(destination);
     builder->blockEnd(false);

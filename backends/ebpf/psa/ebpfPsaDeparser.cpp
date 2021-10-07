@@ -642,11 +642,12 @@ void OptimizedXDPIngressDeparserPSA::emitHeader(CodeBuilder *builder, const IR::
     cstring msgStr;
     builder->emitIndent();
     builder->append("if (");
-    builder->append(headerExpression);
     if (forceEmitDeparser) {
+        builder->append(headerExpression);
         builder->append(".ebpf_valid) ");
     } else {
-        builder->append(".ingress_ebpf_valid) ");
+        cstring hdrName = headerExpression.replace("->", "_");
+        builder->appendFormat("%s_ingress_ebpf_valid) ", hdrName);
     }
     builder->blockStart();
     auto program = EBPFControl::program;
@@ -752,11 +753,11 @@ void OptimizedXDPEgressDeparserPSA::emit(CodeBuilder *builder) {
         auto headerToEmit = ig_deparser->headersToEmit[i];
         auto headerExpression = ig_deparser->headersExpressions[i];
         unsigned width = headerToEmit->width_bits();
-        cstring hdrExpr = headerExpression.replace(".", "->");
+        cstring hdrExpr = headerExpression.replace(".", "_");
         builder->emitIndent();
         builder->append("if (");
         builder->append(hdrExpr);
-        builder->append(".ingress_ebpf_valid) ");
+        builder->append("_ingress_ebpf_valid) ");
         builder->blockStart();
         builder->emitIndent();
         builder->appendFormat("%s += %d;", ig_deparser->outerHdrLengthVar.c_str(), width);
@@ -891,6 +892,16 @@ void OptimizedXDPEgressDeparserPSA::emit(CodeBuilder *builder) {
             }
         }
     }
+
+//    auto fields = this->headerType->to<EBPFStructType>()->fields;
+//    for (auto f : fields) {
+//        builder->emitIndent();
+//        builder->appendFormat("%s_%s_ingress_ebpf_valid = ",
+//                              ig_deparser->headers->name.name, f->field->name.name);
+//        builder->appendFormat("%s->%s.ebpf_valid",
+//                              ig_deparser->headers->name.name, f->field->name.name);
+//        builder->endOfStatement(true);
+//    }
 
     for (auto a : this->controlBlock->container->controlLocals)
         this->emitDeclaration(builder, a);
