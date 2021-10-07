@@ -157,34 +157,28 @@ void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* met
         return;
     }
 
-    cstring index = getIndexString(method);
-
     if (type == BYTES) {
-        builder->appendFormat("meter_execute_bytes(&%s, &%s, %s, &%s)", instanceName,
-                              pipeline->lengthVar.c_str(),
-                              index, pipeline->timestampVar.c_str());
+        builder->appendFormat("meter_execute_bytes(&%s, &%s, ", instanceName,
+                              pipeline->lengthVar.c_str());
+        this->emitIndex(builder, method);
+        builder->appendFormat(", &%s)", pipeline->timestampVar.c_str());
     } else {
-        builder->appendFormat("meter_execute_packets(&%s, %s, &%s)", instanceName,
-                              index, pipeline->timestampVar.c_str());
+        builder->appendFormat("meter_execute_packets(&%s, ", instanceName);
+        this->emitIndex(builder, method);
+        builder->appendFormat(", &%s)", pipeline->timestampVar.c_str());
     }
 }
 
-// TODO: this method doesn't work properly with --hdr2map.
-cstring EBPFMeterPSA::getIndexString(const P4::ExternMethod *method) const {
-    if (method->expr->arguments->at(0)->expression->is<IR::PathExpression>()) {
-        auto indexArgExpr = method->expr->arguments->at(0)->expression->to<IR::PathExpression>();
-        return "&" + indexArgExpr->path->name.name;
-    } else if (method->expr->arguments->at(0)->expression->is<IR::Constant>()) {
-        auto indexArgExpr = method->expr->arguments->at(0)->expression->to<IR::Constant>();
-        return Util::printf_format("&(u32){%s}", Util::toString(indexArgExpr->value, 0, false));
-    } else if (method->expr->arguments->at(0)->expression->is<IR::Member>()) {
-        cstring name = method->expr->arguments->at(0)->expression->toString();
-        return "&" + name;
-    } else {
-        ::error(ErrorType::ERR_INVALID, "Invalid meter index expression %1%",
-                method->expr->arguments->at(0)->expression);
-        return cstring::empty;
+void EBPFMeterPSA::emitIndex(CodeBuilder *builder, const P4::ExternMethod* method) const {
+    builder->append("&");
+    if (method->expr->arguments->at(0)->expression->is<IR::Constant>()) {
+        builder->append("(u32){");
+        this->codeGen->visit(method->expr->arguments->at(0)->expression);
+        builder->append("}");
+        return;
     }
+
+    codeGen->visit(method->expr->arguments->at(0)->expression);
 }
 
 void EBPFMeterPSA::emitDirectExecute(CodeBuilder *builder,
