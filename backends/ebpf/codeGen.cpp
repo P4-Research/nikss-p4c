@@ -227,13 +227,9 @@ bool CodeGenInspector::preorder(const IR::MethodCallExpression* expression) {
             return false;
         } else if (bim->name == IR::Type_Header::setValid) {
             visit(bim->appliedTo);
-            builder->append(".ingress_ebpf_valid, ");
-            visit(bim->appliedTo);
             builder->append(".ebpf_valid = true");
             return false;
         } else if (bim->name == IR::Type_Header::setInvalid) {
-            visit(bim->appliedTo);
-            builder->append(".ingress_ebpf_valid, ");
             visit(bim->appliedTo);
             builder->append(".ebpf_valid = false");
             return false;

@@ -87,8 +87,7 @@ class EBPFOptimizedEgressParserPSA : public EBPFPsaParser {
         visitor = new OptimizedEgressParserStateVisitor(program->refMap, program->typeMap, this);
     }
 
-    void emitRejectState(CodeBuilder* builder) override;
-
+    bool isHeaderExtractedByParser(cstring hdr);
 };
 
 }  // namespace EBPF

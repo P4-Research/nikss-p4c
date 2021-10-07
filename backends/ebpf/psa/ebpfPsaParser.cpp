@@ -153,7 +153,7 @@ void PsaStateTranslationVisitor::compileVerify(const IR::MethodCallExpression * 
     builder->target->emitTraceMessage(builder, msg.c_str(), 1, parser->program->errorVar.c_str());
 
     builder->emitIndent();
-    builder->appendFormat("goto %s", rejectState);
+    builder->appendFormat("goto %s", IR::ParserState::reject.c_str());
     builder->endOfStatement(true);
     builder->blockEnd(true);
 }
@@ -228,15 +228,6 @@ void EBPFPsaParser::emitValueSetInstances(CodeBuilder* builder) {
 }
 
 void EBPFPsaParser::emitRejectState(CodeBuilder* builder) {
-    // Create a synthetic reject state
-    builder->emitIndent();
-    builder->appendFormat("%s:", IR::ParserState::reject.c_str());
-    builder->spc();
-    builder->blockStart();
-
-    // This state may be called from deparser, so do not explicitly tell source of this event.
-    builder->target->emitTraceMessage(builder, "Packet rejected");
-
     builder->emitIndent();
     builder->appendFormat("if (%s == 0) ", program->errorVar.c_str());
     builder->blockStart();
@@ -250,38 +241,35 @@ void EBPFPsaParser::emitRejectState(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("goto %s", IR::ParserState::accept.c_str());
     builder->endOfStatement(true);
-
-    builder->blockEnd(true);
-    builder->newline();
 }
 
-
-void EBPFOptimizedEgressParserPSA::emitRejectState(CodeBuilder *builder) {
-    // Create a synthetic reject state
-    builder->emitIndent();
-    builder->appendFormat("%s:", IR::ParserState::reject.c_str());
-    builder->spc();
-    builder->blockStart();
-
-    // This state may be called from deparser, so do not explicitly tell source of this event.
-    builder->target->emitTraceMessage(builder, "Packet rejected");
-
-    builder->emitIndent();
-    builder->appendFormat("if (%s == 0) ", program->errorVar.c_str());
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder,
-                                      "Parser: Explicit transition to reject state, dropping packet..");
-    builder->emitIndent();
-    builder->appendFormat("return %s", builder->target->abortReturnCode().c_str());
-    builder->endOfStatement(true);
-    builder->blockEnd(true);
-
-    builder->emitIndent();
-    builder->appendFormat("goto %s", IR::ParserState::accept.c_str());
-    builder->endOfStatement(true);
-
-    builder->blockEnd(true);
-    builder->newline();
+// =====================EBPFOptimizedEgressParserPSA=============================
+bool EBPFOptimizedEgressParserPSA::isHeaderExtractedByParser(cstring hdrName) {
+    for (auto state : parserBlock->states) {
+        for (auto c : state->components) {
+            if (c->is<IR::MethodCallStatement>()) {
+                auto mce = c->to<IR::MethodCallStatement>()->methodCall;
+                auto mi = P4::MethodInstance::resolve(mce,
+                                                      program->refMap,
+                                                      program->typeMap);
+                auto extMethod = mi->to<P4::ExternMethod>();
+                if (extMethod != nullptr) {
+                    auto extractedHdr = extMethod->expr->arguments->at(0)->expression;
+                    if (extractedHdr->is<IR::Member>() &&
+                        extractedHdr->to<IR::Member>()->expr->is<IR::PathExpression>()) {
+                        auto name = extractedHdr->to<IR::Member>()->member.name;
+                        auto headers = extractedHdr->to<IR::Member>()->expr->
+                                to<IR::PathExpression>()->path->name.name;
+                        // this kind of expression is independent of whether hdr is pointer or not.
+                        if (hdrName.find(headers) && hdrName.find(name)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return false;
 }
 
 bool OptimizedEgressParserStateVisitor::shouldMoveOffset(cstring hdr) {

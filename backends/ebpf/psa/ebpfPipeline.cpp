@@ -703,7 +703,10 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     msgStr = Util::printf_format("%s deparser: packet deparsing finished", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
 
-    this->emitTrafficManager(builder);
+    if (!options.xdpEgressOptimization ||
+        deparser->to<OptimizedXDPIngressDeparserPSA>()->forceEmitDeparser) {
+        this->emitTrafficManager(builder);
+    }
     builder->blockEnd(true);
     builder->newline();
 }

@@ -45,6 +45,8 @@ class EBPFDeparserPSA : public EBPFControlPSA {
       returnCode = cstring("returnCode");
     }
 
+    bool isHeaderEmitted(cstring hdrName) const;
+
     void emit(CodeBuilder* builder) override;
     // A "PreDeparser" is emitted just before a sequence of hdr.emit() functions.
     // It is useful in the case of resubmit or clone operation, as these operations
@@ -149,9 +151,6 @@ class XDPEgressDeparserPSA : public XDPDeparserPSA {
 
 class OptimizedXDPEgressDeparserPSA : public XDPEgressDeparserPSA {
     XDPDeparserPSA* ig_deparser;
-
-    bool isProcessedByParserStates(const IR::IndexedVector<IR::ParserState> states, cstring hdrName);
-    bool isEmittedByDeparser(EBPFDeparserPSA* deparser, cstring hdrName);
  public:
     std::map<cstring, const IR::Type_Header *> removedHeadersToEmit;
     unsigned egressStartPacketOffset = 0;

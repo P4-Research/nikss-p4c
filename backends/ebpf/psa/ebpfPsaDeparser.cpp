@@ -39,6 +39,12 @@ void DeparserBodyTranslator::processMethod(const P4::ExternMethod *method) {
     ControlBodyTranslator::processMethod(method);
 }
 
+bool EBPFDeparserPSA::isHeaderEmitted(cstring hdrName) const {
+    return std::find(headersExpressions.begin(),
+                     headersExpressions.end(),
+                     hdrName) != headersExpressions.end();
+}
+
 void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("int %s = 0", this->outerHdrLengthVar.c_str());
@@ -637,7 +643,11 @@ void OptimizedXDPIngressDeparserPSA::emitHeader(CodeBuilder *builder, const IR::
     builder->emitIndent();
     builder->append("if (");
     builder->append(headerExpression);
-    builder->append(".ingress_ebpf_valid) ");
+    if (forceEmitDeparser) {
+        builder->append(".ebpf_valid) ");
+    } else {
+        builder->append(".ingress_ebpf_valid) ");
+    }
     builder->blockStart();
     auto program = EBPFControl::program;
     unsigned width = headerToEmit->width_bits();
@@ -678,47 +688,12 @@ void OptimizedXDPIngressDeparserPSA::emitHeader(CodeBuilder *builder, const IR::
 }
 
 // =====================OptimizedXDPEgressDeparserPSA=============================
-bool OptimizedXDPEgressDeparserPSA::isProcessedByParserStates(const IR::IndexedVector<IR::ParserState> states, cstring hdrName) {
-    for (auto state : states) {
-        for (auto c : state->components) {
-            if (c->is<IR::MethodCallStatement>()) {
-                auto mce = c->to<IR::MethodCallStatement>()->methodCall;
-                auto mi = P4::MethodInstance::resolve(mce,
-                                                      program->refMap,
-                                                      program->typeMap);
-                auto extMethod = mi->to<P4::ExternMethod>();
-                if (extMethod != nullptr) {
-                    auto extractedHdr = extMethod->expr->arguments->at(0)->expression;
-                    if (extractedHdr->is<IR::Member>() &&
-                        extractedHdr->to<IR::Member>()->expr->is<IR::PathExpression>()) {
-                        auto name = extractedHdr->to<IR::Member>()->member.name;
-                        auto headers = extractedHdr->to<IR::Member>()->expr->
-                                to<IR::PathExpression>()->path->name.name;
-                        // this kind of expression is independent of whether hdr is pointer or not.
-                        if (hdrName.find(headers) && hdrName.find(name)) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return false;
-}
-
-bool OptimizedXDPEgressDeparserPSA::isEmittedByDeparser(EBPFDeparserPSA *deparser, cstring hdrName) {
-    return std::find(deparser->headersExpressions.begin(),
-                     deparser->headersExpressions.end(),
-                     hdrName) != deparser->headersExpressions.end();
-}
-
-
 void OptimizedXDPEgressDeparserPSA::optimizeHeadersToEmit(EBPFOptimizedEgressParserPSA *eg_prs) {
     // remove headers from ingress deparser that are deparsed at ingress, but are removed from packet by egress.
     for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
         cstring hdr = ig_deparser->headersExpressions[i];
-        if (isEmittedByDeparser(ig_deparser, hdr) && isProcessedByParserStates(eg_prs->parserBlock->states, hdr) &&
-            !isEmittedByDeparser(this, hdr)) {
+        if (ig_deparser->isHeaderEmitted(hdr) && eg_prs->isHeaderExtractedByParser(hdr) &&
+            !this->isHeaderEmitted(hdr)) {
             eg_prs->headersToSkipMovingOffset.insert(ig_deparser->headersExpressions[i]);
             ig_deparser->headersToEmit.erase(ig_deparser->headersToEmit.begin() + (unsigned int) i);
             ig_deparser->headersExpressions.erase(ig_deparser->headersExpressions.begin() + (unsigned int) i);
@@ -766,8 +741,8 @@ void OptimizedXDPEgressDeparserPSA::optimizeHeadersToEmit(EBPFOptimizedEgressPar
 }
 
 void OptimizedXDPEgressDeparserPSA::emit(CodeBuilder *builder) {
-    for (auto a : this->controlBlock->container->controlLocals)
-        this->emitDeclaration(builder, a);
+    codeGen->setBuilder(builder);
+    codeGen->asPointerVariables.insert(this->headers->name.name);
 
     builder->emitIndent();
     builder->appendFormat("int %s = 0", ig_deparser->outerHdrLengthVar.c_str());
@@ -916,6 +891,12 @@ void OptimizedXDPEgressDeparserPSA::emit(CodeBuilder *builder) {
             }
         }
     }
+
+    for (auto a : this->controlBlock->container->controlLocals)
+        this->emitDeclaration(builder, a);
+
+    emitDeparserExternCalls(builder);
+    builder->newline();
 
     for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
         auto headerToEmit = ig_deparser->headersToEmit[i];

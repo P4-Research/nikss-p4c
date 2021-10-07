@@ -87,7 +87,6 @@ void compile(EbpfOptions& options) {
     if (::errorCount() > 0)
         return;
 
-
     EBPF::run_ebpf_backend(options, toplevel, &midend.refMap, &midend.typeMap);
 }
 

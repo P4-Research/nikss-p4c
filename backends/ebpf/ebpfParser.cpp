@@ -310,7 +310,7 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
     builder->newline();
 
     builder->emitIndent();
-    builder->appendFormat("goto %s;", rejectState);
+    builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
     builder->newline();
     builder->blockEnd(true);
 
@@ -462,7 +462,20 @@ void EBPFParser::emit(CodeBuilder* builder) {
     }
 
     builder->newline();
+
+    // Create a synthetic reject state
+    builder->emitIndent();
+    builder->appendFormat("%s:", IR::ParserState::reject.c_str());
+    builder->spc();
+    builder->blockStart();
+
+    // This state may be called from deparser, so do not explicitly tell source of this event.
+    builder->target->emitTraceMessage(builder, "Packet rejected");
+
     emitRejectState(builder);
+
+    builder->blockEnd(true);
+    builder->newline();
 }
 
 bool EBPFParser::build() {
@@ -489,20 +502,8 @@ bool EBPFParser::build() {
 }
 
 void EBPFParser::emitRejectState(CodeBuilder* builder) {
-    // Create a synthetic reject state
-    builder->emitIndent();
-    builder->appendFormat("%s:", IR::ParserState::reject.c_str());
-    builder->spc();
-    builder->blockStart();
-
-    // This state may be called from deparser, so do not explicitly tell source of this event.
-    builder->target->emitTraceMessage(builder, "Packet rejected");
-
     builder->emitIndent();
     builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
-    builder->newline();
-
-    builder->blockEnd(true);
     builder->newline();
 }
 
