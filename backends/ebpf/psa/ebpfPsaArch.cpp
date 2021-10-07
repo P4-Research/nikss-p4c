@@ -113,8 +113,8 @@ void PSAArch::emit2TC(CodeBuilder *builder) const {
     /*
      * 10. TC Egress program.
      */
-    if (!options.xdpEgressOptimization ||
-       (options.xdpEgressOptimization && !tcEgress->isEmpty())) {
+    if (!options.egressOptimization ||
+        (options.egressOptimization && !tcEgress->isEmpty())) {
         tcEgress->emit(builder);
     }
 
@@ -419,8 +419,8 @@ void PSAArch::emit2XDP(CodeBuilder *builder) const {
 
     xdpIngress->emit(builder);
 
-    if (!options.xdpEgressOptimization ||
-        (options.xdpEgressOptimization && !xdpEgress->isEmpty())) {
+    if (!options.egressOptimization ||
+        (options.egressOptimization && !xdpEgress->isEmpty())) {
         xdpEgress->emit(builder);
     }
 
@@ -480,7 +480,7 @@ void PSAArch::emitInstances2XDP(CodeBuilder *builder) const {
 
     builder->target->emitTableDecl(builder, "xdp2tc_shared_map", TablePerCPUArray,
                                    "u32", "struct xdp2tc_metadata", 1);
-    if (options.xdpEgressOptimization) {
+    if (options.egressOptimization) {
         builder->target->emitTableDecl(builder, "egress_jmp_table", TableProgArray,
                                        "u32", "u32", 1);
     }
@@ -683,7 +683,7 @@ const PSAArch * ConvertToEbpfPSA::build(const IR::ToplevelBlock *tlb) {
 const IR::Node *ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
     ebpf_psa_arch = build(tlb);
 
-    if (options.generateToXDP && options.xdpEgressOptimization) {
+    if (options.generateToXDP && options.egressOptimization) {
         if (ebpf_psa_arch->xdpEgress->isEmpty()) {
             ebpf_psa_arch->xdpIngress->deparser->to<OptimizedXDPIngressDeparserPSA>()
                     ->forceEmitDeparser = true;
@@ -745,7 +745,7 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
 bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     auto pl = prsr->container->type->applyParams;
 
-    if (options.xdpEgressOptimization && type == XDP_EGRESS) {
+    if (options.egressOptimization && type == XDP_EGRESS) {
         parser = new EBPFOptimizedEgressParserPSA(program, prsr->container, typemap);
     } else {
         parser = new EBPFPsaParser(program, prsr->container, typemap);
@@ -976,11 +976,11 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
         deparser = new TCIngressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == TC_EGRESS) {
         deparser = new TCEgressDeparserPSA(program, ctrl, parserHeaders, istd);
-    } else if (type == XDP_INGRESS && options.xdpEgressOptimization) {
+    } else if (type == XDP_INGRESS && options.egressOptimization) {
         deparser = new OptimizedXDPIngressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == XDP_INGRESS) {
         deparser = new XDPIngressDeparserPSA(program, ctrl, parserHeaders, istd);
-    } else if (type == XDP_EGRESS && options.xdpEgressOptimization) {
+    } else if (type == XDP_EGRESS && options.egressOptimization) {
         deparser = new OptimizedXDPEgressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == XDP_EGRESS) {
         deparser = new XDPEgressDeparserPSA(program, ctrl, parserHeaders, istd);
