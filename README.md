@@ -43,7 +43,8 @@ $ sudo apt install -y bison build-essential cmake \
 $ pip3 install scapy==2.4.4 ply==3.8 ipaddr pyroute2
 
 $ sudo apt install -y protobuf-compiler
-> Note! Recommended libbost version is 1.71 or higher. For earlier releases of Ubuntu, you'll need to install from source. You can find instructions [here](./backends/ebpf/docs/common_issues.md).
+
+> Note! Recommended libbost version is 1.71 or higher. You can find instructions here /backends/ebpf/docs/common_issues.md.
 
 ```
 
