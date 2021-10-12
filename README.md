@@ -32,7 +32,7 @@ $ git clone --recursive https://github.com/P4-Research/p4c-ebpf-psa.git
 
 ```bash
 $ sudo apt install -y bison build-essential cmake \
-                   curl flex g++ libboost-graph-dev \
+                   curl flex g++ libboost-dev \
                    libfl-dev libgc-dev \
                    libgmp-dev pkg-config python3-pip python3-setuptools \
                    tcpdump libpcap-dev libelf-dev zlib1g-dev llvm \
@@ -43,6 +43,8 @@ $ sudo apt install -y bison build-essential cmake \
 $ pip3 install scapy==2.4.4 ply==3.8 ipaddr pyroute2
 
 $ sudo apt install -y protobuf-compiler
+> Note! Recommended libbost version is 1.71 or higher. For earlier releases of Ubuntu, you'll need to install from source. You can find instructions [here](./backends/ebpf/docs/common_issues.md).
+
 ```
 
 - Install protobuf from source.
