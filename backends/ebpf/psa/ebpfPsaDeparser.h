@@ -179,6 +179,9 @@ class OptimizedXDPEgressDeparserPSA : public XDPEgressDeparserPSA {
      * This is safe because such headers will never be put in the outgoing packet
      * as they are removed by egress pipeline. */
     void optimizeHeadersToEmit(EBPFOptimizedEgressParserPSA* eg_prs);
+
+    void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
+                    cstring &headerExpression) const override;
 };
 
 class OptimizedXDPIngressDeparserPSA : public XDPIngressDeparserPSA {

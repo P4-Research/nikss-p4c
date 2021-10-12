@@ -293,6 +293,11 @@ void OptimizedEgressParserStateVisitor::compileExtract(const IR::Expression *des
 
     unsigned width = ht->width_bits();
 
+    if (destination->is<IR::PathExpression>()) {
+        PsaStateTranslationVisitor::compileExtract(destination);
+        return;
+    }
+
     builder->emitIndent();
     builder->append("if (!");
     cstring hdrName = destination->toString().replace(".", "_");
