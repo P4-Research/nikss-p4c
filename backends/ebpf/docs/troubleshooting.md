@@ -1,18 +1,19 @@
 
 
-##  Troubleshooting problem with libboost-dev. You may run into trouble with build caused unsupported version of libboost. 
+##  Troubleshooting problem with libboost-dev.
+You may run into trouble with build caused unsupported version of libboost. 
 
 ```bash
-# To check-out version of boost:	
+# to check-out version of boost:	
 $ libboost-dev --version 
 ```	
 
 If you've got too old version of boost libraries, you may want to remove them and install newer releases.
 
 ```bash	
-# Find all libraries 
+# find all libraries 
 $ find / -type f -name 'libboost*' 2>/dev/null		
-# Remove them with:
+# remove them with:
 $ sudo rm -f /path/to/libboost/liboost*
 ```
 
@@ -22,10 +23,10 @@ For earlier releases of Ubuntu (for example 18.04), you'll need to install from 
 
 
 ```bash	
-# Download https://www.boost.org/users/history/version_1_71_0.html
+# download https://www.boost.org/users/history/version_1_71_0.html
 $ wget https://www.boost.org/users/history/version_1_71_0.html
-# In the directory where you want to put the Boost installation, execute
+# in the directory where you want to put the Boost installation, execute
 $ tar --bzip2 -xf /path/to/boost_1_71_0.tar.bz2
 $ cd /path/to/boost_1_71_0.tar.bz2
-# Follow the instructions from README.md
+# follow the instructions from README.md
 ```
