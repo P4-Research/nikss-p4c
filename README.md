@@ -44,9 +44,13 @@ $ pip3 install scapy==2.4.4 ply==3.8 ipaddr pyroute2
 
 $ sudo apt install -y protobuf-compiler
 
+<<<<<<< HEAD
 ```
 
 > Note! Recommended libbost version is 1.71 or higher. You can find instructions [here](./backends/ebpf/docs/troubleshooting.md).
+=======
+> Note! Recommended libbost version is 1.71 or higher. You can find instructions here /backends/ebpf/docs/common_issues.md.
+>>>>>>> 105502972830315e38a35c945e3bab9edae16fe2
 
 ```
 
