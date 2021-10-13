@@ -43,9 +43,9 @@ $ sudo apt install -y bison build-essential cmake \
 $ pip3 install scapy==2.4.4 ply==3.8 ipaddr pyroute2
 
 $ sudo apt install -y protobuf-compiler
-
 ```
-**Note!** Recommended libbost version is 1.71 or higher. You can find instructions [here](./backends/ebpf/docs/troubleshooting.md).
+- Install libboost
+>Note! Recommended libbost version is 1.71 or higher. You can find instructions [here](./backends/ebpf/docs/troubleshooting.md).
 
 - Install protobuf from source.
 
