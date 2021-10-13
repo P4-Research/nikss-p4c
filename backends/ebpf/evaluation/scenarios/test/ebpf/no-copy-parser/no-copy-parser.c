@@ -305,13 +305,56 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers, stru
         .outer_ipv4_offset = 0,
         .outer_udp_offset = 0
     };
+    struct tmp_headers_t tmp_header = {};
+    char * ptr = (char *)(&tmp_header);
+    // sprawdzenie czy offset in bits jest większe niż packet end
+    if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits )) {
+
+        return TC_ACT_SHOT;
+    };
+
+    bpf_skb_load_bytes(skb, 0, ptr, 100/*BYTES(ebpf_packetOffsetInBits)*/); //
+    //__builtin_memcpy(ptr, skb->data, BYTES(ebpf_packetOffsetInBits));
+
+    volatile struct headers_t pkt_copy = {};
+    struct ethernet_t outerEthernet = {};
+    pkt_copy.outer_ethernet = &outerEthernet;
+    struct ipv4_t outerIP = {};
+    pkt_copy.outer_ipv4 = &outerIP;
+    struct udp_t outerUDP = {};
+    pkt_copy.outer_udp = &outerUDP;
+    struct vxlan_t outerVXLAN = {};
+    pkt_copy.outer_ethernet = &outerEthernet;
+    struct ethernet_t Ethernet = {};
+    pkt_copy.ethernet = &Ethernet;
+    struct ipv4_t IP = {};
+    pkt_copy.ipv4 = &IP;
+
+    /*if (validFlags.outer_ethernet_valid) {
+        pkt_copy.outer_ethernet = (struct ethernet_t *)(ptr + offsets.outer_ethernet_offset);
+    };
+    if (validFlags.outer_ipv4_valid) {
+        pkt_copy.outer_ipv4 = (struct ipv4_t *)(ptr + offsets.outer_ipv4_offset);
+    };
+    if (validFlags.outer_udp_valid) {
+        pkt_copy.outer_udp = (struct udp_t *)(ptr  + offsets.outer_udp_offset);
+    };
+    if (validFlags.vxlan_valid) {
+        pkt_copy.vxlan = (struct vxlan_t *)(ptr  + offsets.vxlan_offset);
+    };
+    if (validFlags.ethernet_valid) {
+        pkt_copy.ethernet = (struct ethernet_t *)(ptr  + offsets.ethernet_offset);
+    };
+    if (validFlags.ipv4_valid) {
+        pkt_copy.ipv4 = (struct ipv4_t *)(ptr  + offsets.ipv4_offset);
+    };*/
 start: {
 /* extract(headers->ethernet)*/
     if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
         ebpf_errorCode = PacketTooShort;
         goto reject;
     }
-    headers->ethernet = (struct ethernet_t *)(pkt + BYTES(ebpf_packetOffsetInBits)); ///////// ?? co z bitami? przez to błąd przy deprasowaniu ipv4 outer?
+    pkt_copy.ethernet = (struct ethernet_t *)(ptr + BYTES(ebpf_packetOffsetInBits)); ///////// ?? co z bitami? przez to błąd przy deprasowaniu ipv4 outer?
     //headers->ethernet.dst_addr = (u64)((load_dword(pkt, BYTES(ebpf_packetOffsetInBits)) >> 16) & EBPF_MASK(u64, 48));
     ebpf_packetOffsetInBits += 48;
 
@@ -321,14 +364,14 @@ start: {
     //headers->ethernet.ether_type = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
 
-    validFlags.outer_ethernet_valid = 1;
+    validFlags.ethernet_valid = 1;
 
 /* extract(headers->ipv4)*/
     if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
         ebpf_errorCode = PacketTooShort;
         goto reject;
     }
-    headers->ipv4 = (struct ipv4_t *)(pkt + BYTES(ebpf_packetOffsetInBits));
+    pkt_copy.ipv4 = (struct ipv4_t *)(ptr + BYTES(ebpf_packetOffsetInBits));
     offsets.outer_ipv4_offset = BYTES(ebpf_packetOffsetInBits);
     //headers->ipv4.ver_ihl = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
@@ -362,7 +405,7 @@ start: {
 
     validFlags.outer_ipv4_valid = 1;
 
-    switch (headers->ipv4->protocol) {
+    switch (pkt_copy.ipv4->protocol) {
         case 17: goto parse_udp;
         default: goto accept;
     }
@@ -373,7 +416,7 @@ start: {
         ebpf_errorCode = PacketTooShort;
         goto reject;
     }
-    headers->outer_udp = (struct udp_t *)(pkt + BYTES(ebpf_packetOffsetInBits));
+    pkt_copy.outer_udp = (struct udp_t *)(ptr + BYTES(ebpf_packetOffsetInBits));
     offsets.outer_udp_offset = BYTES(ebpf_packetOffsetInBits);
     //headers->outer_udp.src_port = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
@@ -389,7 +432,7 @@ start: {
 
     validFlags.outer_udp_valid = 1;
 
-    switch (headers->outer_udp->dst_port) {
+    switch (pkt_copy.outer_udp->dst_port) {
         case 4789: goto parse_vxlan;
         default: goto accept;
     }
@@ -400,7 +443,7 @@ start: {
         ebpf_errorCode = PacketTooShort;
         goto reject;
     }
-    headers->vxlan = (struct vxlan_t *)(pkt + BYTES(ebpf_packetOffsetInBits));
+    pkt_copy.vxlan = (struct vxlan_t *)(ptr + BYTES(ebpf_packetOffsetInBits));
     offsets.vxlan_offset = BYTES(ebpf_packetOffsetInBits);
     //headers->vxlan.flags = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
@@ -417,15 +460,15 @@ start: {
     validFlags.vxlan_valid = 1;
 
     struct ethernet_t outerEthernet = {};
-    headers->outer_ethernet = &outerEthernet;
-    __builtin_memcpy(headers->outer_ethernet, headers->ethernet, sizeof(outerEthernet)); // ENKAPSULACJA
+    pkt_copy.outer_ethernet = &outerEthernet;
+    __builtin_memcpy(pkt_copy.outer_ethernet, pkt_copy.ethernet, sizeof(outerEthernet)); // ENKAPSULACJA
 
     //headers->outer_ethernet = *headers->ethernet;/* extract(headers->ethernet)*/
     if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
         ebpf_errorCode = PacketTooShort;
         goto reject;
     }
-    headers->ethernet = (struct ethernet_t *)(pkt + BYTES(ebpf_packetOffsetInBits));
+    pkt_copy.ethernet = (struct ethernet_t *)(ptr + BYTES(ebpf_packetOffsetInBits));
     offsets.ethernet_offset = BYTES(ebpf_packetOffsetInBits);
     //headers->ethernet.dst_addr = (u64)((load_dword(pkt, BYTES(ebpf_packetOffsetInBits)) >> 16) & EBPF_MASK(u64, 48));
     ebpf_packetOffsetInBits += 48;
@@ -438,21 +481,21 @@ start: {
 
     validFlags.ethernet_valid = 1;
 
-    switch (headers->ethernet->ether_type) {
+    switch (pkt_copy.ethernet->ether_type) {
         case 2048: goto parse_inner_ipv4;
         default: goto accept;
     }
 }
     parse_inner_ipv4: {
     struct ipv4_t outerIpv4 = {};
-    headers->outer_ipv4 = &outerIpv4;
-    __builtin_memcpy(headers->outer_ipv4, headers->ipv4, sizeof(outerIpv4)); // ENKAPSULACJA
+    pkt_copy.outer_ipv4 = &outerIpv4;
+    __builtin_memcpy(pkt_copy.outer_ipv4, pkt_copy.ipv4, sizeof(outerIpv4)); // ENKAPSULACJA
     //*headers->outer_ipv4 = *headers->ipv4;/* extract(headers->ipv4)*/
     if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
         ebpf_errorCode = PacketTooShort;
         goto reject;
     }
-    headers->ipv4 = (struct ipv4_t *)(pkt + BYTES(ebpf_packetOffsetInBits));
+    pkt_copy.ipv4 = (struct ipv4_t *)(ptr + BYTES(ebpf_packetOffsetInBits));
     offsets.ipv4_offset = BYTES(ebpf_packetOffsetInBits);
     //headers->ipv4.ver_ihl = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
@@ -507,19 +550,20 @@ start: {
         u8 hit_1;
         {
             if (            validFlags.vxlan_valid) {
-                if (ebpf_packetEnd < pkt + offsets.ethernet_offset+6) { // sprawdzenie pozwala przypisac to co poniżej; jak zrobić to sprawdzenie optymalnie?
+                if (ebpf_packetEnd < ptr + offsets.ethernet_offset+6) { // sprawdzenie pozwala przypisac to co poniżej; jak zrobić to sprawdzenie optymalnie?
                     return TC_ACT_SHOT;
                 };
-                /*struct ethernet_t tmp_eth ={};
-                headers->ethernet = &tmp_eth;
-                headers->ethernet->dst_addr[0] = headers->outer_ethernet->dst_addr[0];
+                struct ethernet_t tmp_eth ={};
+                pkt_copy.ethernet = &tmp_eth;
+                /*headers->ethernet->dst_addr[0] = headers->outer_ethernet->dst_addr[0];
                 headers->ethernet->dst_addr[1] = headers->outer_ethernet->dst_addr[1];
                 headers->ethernet->dst_addr[2] = headers->outer_ethernet->dst_addr[2];
                 headers->ethernet->dst_addr[3] = headers->outer_ethernet->dst_addr[3];
                 headers->ethernet->dst_addr[4] = headers->outer_ethernet->dst_addr[4];
                 headers->ethernet->dst_addr[5] = headers->outer_ethernet->dst_addr[5];*/
 
-                __builtin_memcpy(headers->ethernet->dst_addr, headers->outer_ethernet->dst_addr, sizeof(headers->outer_ethernet->dst_addr));
+                __builtin_memcpy(pkt_copy.ethernet->dst_addr, pkt_copy.outer_ethernet->dst_addr, sizeof(pkt_copy.outer_ethernet->dst_addr));
+
             } // enkapsulacja
 
             {
@@ -533,7 +577,7 @@ start: {
                 key.field0[4] = headers->ethernet->dst_addr[4];
                 key.field0[5] = headers->ethernet->dst_addr[5];*/
                 if (headers->ethernet) {
-                    __builtin_memcpy(key.field0, headers->ethernet->dst_addr, sizeof(headers->ethernet->dst_addr));
+                    __builtin_memcpy(key.field0, pkt_copy.ethernet->dst_addr, sizeof(pkt_copy.ethernet->dst_addr));
                 };
 
                 /* value */
@@ -556,9 +600,9 @@ start: {
                             //headers->outer_ethernet.ebpf_valid = true;
                             validFlags.outer_ethernet_valid = 1;
                             struct ethernet_t outerEthernet_2 = {};
-                            headers->outer_ethernet = &outerEthernet_2;
-                            __builtin_memcpy(headers->outer_ethernet->src_addr, value->u.ingress_vxlan_encap.ethernet_src_addr,sizeof(headers->outer_ethernet->src_addr));
-                            __builtin_memcpy(headers->outer_ethernet->dst_addr, value->u.ingress_vxlan_encap.ethernet_dst_addr, sizeof(headers->outer_ethernet->dst_addr));
+                            pkt_copy.outer_ethernet = &outerEthernet_2;
+                            __builtin_memcpy(pkt_copy.outer_ethernet->src_addr, &(value->u.ingress_vxlan_encap.ethernet_src_addr),sizeof(pkt_copy.outer_ethernet->src_addr));
+                            __builtin_memcpy(pkt_copy.outer_ethernet->dst_addr, &(value->u.ingress_vxlan_encap.ethernet_dst_addr), sizeof(pkt_copy.outer_ethernet->dst_addr));
                             /*headers->outer_ethernet->src_addr[0] = value->u.ingress_vxlan_encap.ethernet_src_addr[0];
                             headers->outer_ethernet->src_addr[1] = value->u.ingress_vxlan_encap.ethernet_src_addr[1];
                             headers->outer_ethernet->src_addr[2] = value->u.ingress_vxlan_encap.ethernet_src_addr[2];
@@ -571,49 +615,49 @@ start: {
                             headers->outer_ethernet->dst_addr[3] = value->u.ingress_vxlan_encap.ethernet_dst_addr[3];
                             headers->outer_ethernet->dst_addr[4] = value->u.ingress_vxlan_encap.ethernet_dst_addr[4];
                             headers->outer_ethernet->dst_addr[5] = value->u.ingress_vxlan_encap.ethernet_dst_addr[5];*/
-                            headers->outer_ethernet->ether_type = 2048;
+                            pkt_copy.outer_ethernet->ether_type = 2048;
                             //headers->outer_ipv4.ebpf_valid = true;
                             validFlags.outer_ipv4_valid = 1;
                             struct ipv4_t outerIpv4_2 = {};
-                            headers->outer_ipv4 = &outerIpv4_2;
-                            headers->outer_ipv4->ver_ihl = 69;
-                            headers->outer_ipv4->diffserv = 0;
+                            pkt_copy.outer_ipv4 = &outerIpv4_2;
+                            pkt_copy.outer_ipv4->ver_ihl = 69;
+                            pkt_copy.outer_ipv4->diffserv = 0;
 
-                            headers->outer_ipv4->total_len = headers->ipv4->total_len + 50;
+                            pkt_copy.outer_ipv4->total_len = pkt_copy.ipv4->total_len + 50;
 
 
-                            headers->outer_ipv4->identification = 5395;
-                            headers->outer_ipv4->flags_offset = 0;
-                            headers->outer_ipv4->ttl = 64;
-                            headers->outer_ipv4->protocol = 17;
-                            headers->outer_ipv4->src_addr = value->u.ingress_vxlan_encap.ipv4_src_addr;
-                            headers->outer_ipv4->dst_addr = value->u.ingress_vxlan_encap.ipv4_dst_addr;
+                            pkt_copy.outer_ipv4->identification = 5395;
+                            pkt_copy.outer_ipv4->flags_offset = 0;
+                            pkt_copy.outer_ipv4->ttl = 64;
+                            pkt_copy.outer_ipv4->protocol = 17;
+                            pkt_copy.outer_ipv4->src_addr = value->u.ingress_vxlan_encap.ipv4_src_addr;
+                            pkt_copy.outer_ipv4->dst_addr = value->u.ingress_vxlan_encap.ipv4_dst_addr;
                             //headers->outer_udp.ebpf_valid = true;
                             validFlags.outer_udp_valid = 1;
                             struct udp_t tmp_udp ={};
-                            headers->outer_udp = &tmp_udp;
-                            headers->outer_udp->src_port = 15221;
-                            headers->outer_udp->dst_port = 4789;
+                            pkt_copy.outer_udp = &tmp_udp;
+                            pkt_copy.outer_udp->src_port = 15221;
+                            pkt_copy.outer_udp->dst_port = 4789;
 
-                            headers->outer_udp->length = headers->ipv4->total_len + 30;
+                            pkt_copy.outer_udp->length = pkt_copy.ipv4->total_len + 30;
 
                             //headers->vxlan.ebpf_valid = true;
                             validFlags.vxlan_valid = 1;
                             struct vxlan_t tmp_vxlan ={};
-                            headers->vxlan = &tmp_vxlan;
-                            headers->vxlan->flags = 0;
+                            pkt_copy.vxlan = &tmp_vxlan;
+                            pkt_copy.vxlan->flags = 0;
                                 // tak samo jak dla ethernet... można to załatwić memcpy?
-                            headers->vxlan->reserved[0] = 0;
-                            headers->vxlan->reserved[1] = 0;
-                            headers->vxlan->reserved[2] = 0;
+                            pkt_copy.vxlan->reserved[0] = 0;
+                            pkt_copy.vxlan->reserved[1] = 0;
+                            pkt_copy.vxlan->reserved[2] = 0;
                             /*headers->vxlan->vni[0] = value->u.ingress_vxlan_encap.vxlan_vni[0];
                             headers->vxlan->vni[1] = value->u.ingress_vxlan_encap.vxlan_vni[1];
                             headers->vxlan->vni[2] = value->u.ingress_vxlan_encap.vxlan_vni[2];*/
 
 
 
-                            __builtin_memcpy(headers->vxlan->vni, &(value->u.ingress_vxlan_encap.vxlan_vni), sizeof(headers->vxlan->vni));
-                            headers->vxlan->reserved2 = 0;
+                            __builtin_memcpy(pkt_copy.vxlan->vni, &(value->u.ingress_vxlan_encap.vxlan_vni), sizeof(pkt_copy.vxlan->vni));
+                            pkt_copy.vxlan->reserved2 = 0;
                             ostd->drop = false;
                             ostd->egress_port = value->u.ingress_vxlan_encap.port_out;
                         }
@@ -665,37 +709,7 @@ start: {
             ;
         }
 // ########################### KOPIA ##########################
-        struct tmp_headers_t tmp_header = {};
-        char * ptr = (char *)(&tmp_header);
-        // sprawdzenie czy offset in bits jest większe niż packet end
-        if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits )) {
 
-            return TC_ACT_SHOT;
-        };
-
-        bpf_skb_load_bytes(skb, 0, ptr, /*BYTES(ebpf_packetOffsetInBits)*/100); //
-        //__builtin_memcpy(ptr, headers, BYTES(ebpf_packetOffsetInBits));
-
-        struct headers_t pkt_copy = {};
-
-        if (validFlags.outer_ethernet_valid) {
-            pkt_copy.outer_ethernet = (struct ethernet_t *)(ptr + offsets.outer_ethernet_offset);
-        };
-        if (validFlags.outer_ipv4_valid) {
-           pkt_copy.outer_ipv4 = (struct ipv4_t *)(ptr + offsets.outer_ipv4_offset);
-        };
-        if (validFlags.outer_udp_valid) {
-            pkt_copy.outer_udp = (struct udp_t *)(ptr  + offsets.outer_udp_offset);
-        };
-        if (validFlags.vxlan_valid) {
-            pkt_copy.vxlan = (struct vxlan_t *)(ptr  + offsets.vxlan_offset);
-        };
-        if (validFlags.ethernet_valid) {
-            pkt_copy.ethernet = (struct ethernet_t *)(ptr  + offsets.ethernet_offset);
-        };
-        if (validFlags.ipv4_valid) {
-            pkt_copy.ipv4 = (struct ipv4_t *)(ptr  + offsets.ipv4_offset);
-        };
 
 
 
@@ -740,7 +754,7 @@ start: {
         pkt = ((void*)(long)skb->data);
         ebpf_packetEnd = ((void*)(long)skb->data_end);
         ebpf_packetOffsetInBits = 0;
-        if (validFlags.outer_ethernet_valid) {
+        if (validFlags.outer_ethernet_valid ) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
                 return TC_ACT_SHOT;
             }
@@ -774,6 +788,7 @@ start: {
             ebpf_packetOffsetInBits += 48;
 
             //pkt_copy.outer_ethernet->src_addr = htonll(pkt_copy.outer_ethernet->src_addr /*<< 16*/);
+
             ebpf_byte = ((char*)(&pkt_copy.outer_ethernet->src_addr))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
             ebpf_byte = ((char*)(&pkt_copy.outer_ethernet->src_addr))[1];
@@ -944,6 +959,7 @@ start: {
             }
 
             //pkt_copy.ethernet->dst_addr = htonll(pkt_copy.ethernet->dst_addr /*<< 16*/);
+
             ebpf_byte = ((char*)(&pkt_copy.ethernet->dst_addr))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
             ebpf_byte = ((char*)(&pkt_copy.ethernet->dst_addr))[1];
