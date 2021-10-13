@@ -48,7 +48,6 @@ $ sudo apt install -y protobuf-compiler
 
 > Note! Recommended libbost version is 1.71 or higher. You can find instructions [here](./backends/ebpf/docs/troubleshooting.md).
 
-```
 
 - Install protobuf from source.
 
