@@ -10,7 +10,7 @@ class Issue102(P4EbpfTest):
     """
     If multiple tables use the same action the compiler returns 'Macro redefined' error
     """
-    p4_file_path = "samples/p4testdata/issue102.p4"
+    p4_file_path = "p4testdata/issue102.p4"
 
     def runTest(self):
         pass
@@ -20,7 +20,7 @@ class Issue127(P4EbpfTest):
     """
     Compiler fails to call an indirect extern in an action called from table
     """
-    p4_file_path = "samples/p4testdata/issue127.p4"
+    p4_file_path = "p4testdata/issue127.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -34,7 +34,7 @@ class Issue177(P4EbpfTest):
     When length of keys in a ternary table is not equal to base type (1, 2, 4 or 8 bytes)
     then generated mask for prefix is shorter than prefix itself.
     """
-    p4_file_path = "samples/p4testdata/issue177.p4"
+    p4_file_path = "p4testdata/issue177.p4"
 
     def runTest(self):
         self.table_add(table="ingress_test_tbl", keys=["11:22:33:44:55:66", 0x8100], action=1)
