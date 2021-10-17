@@ -121,12 +121,10 @@ class EbpfTest(BaseTest):
         super(EbpfTest, self).setUp()
         self.dataplane = ptf.dataplane_instance
         self.dataplane.flush()
-
+        logger.info("\nUsing test params: %s", testutils.test_params_get())
         if "namespace" in testutils.test_params_get():
             self.switch_ns = testutils.test_param_get("namespace")
-        logger.info("Using namespace: %s", self.switch_ns)
         self.interfaces = testutils.test_param_get("interfaces").split(",")
-        logger.info("Using interfaces: %s", str(self.interfaces))
 
         self.exec_ns_cmd("psabpf-ctl pipeline load id {} {}".format(TEST_PIPELINE_ID, self.test_prog_image), "Can't load programs into eBPF subsystem")
 
@@ -173,8 +171,13 @@ class P4EbpfTest(EbpfTest):
         p4args = "--trace --xdp2tc=" + xdp2tc_mode
         if self.is_xdp_test():
             p4args += " --xdp"
-        if self.hdr2map_required:
+
+        if testutils.test_param_get("hdr2Map") == 'True':
             p4args += " --hdr2Map"
+        else:
+            if self.hdr2map_required:
+                self.skipTest("hdr2Map required for the PTF test")
+
         self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "
                       "ARGS=\"{cargs}\" P4C=p4c-ebpf P4ARGS=\"{p4args}\" psa".format(
                             output=self.test_prog_image,

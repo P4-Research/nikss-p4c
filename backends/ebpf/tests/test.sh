@@ -48,10 +48,6 @@ set -x
 declare -a INTERFACES=("eth0" "eth1" "eth2" "eth3" "eth4" "eth5")
 # For PTF tests parameter
 interface_list=$( IFS=$','; echo "${INTERFACES[*]}" )
-if [ "$xdpTesting" = false ] ; then
-  interface_list="psa_recirc,""$interface_list"
-fi
-# TODO: similar list with interfaces for ptf
 
 ip netns add switch
 
@@ -87,8 +83,7 @@ silent_echo_conf() {
 silent_echo_conf
 
 TEST_CASE=$@
-TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
-
+TEST_PARAMS="interfaces='$interface_list';namespace='switch'"
 # Add path to our libbpf
 LIBBPF_LD_PATH="`pwd`/../runtime/usr/lib64"
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LIBBPF_LD_PATH
@@ -96,43 +91,25 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LIBBPF_LD_PATH
 # Docker image by default has lower "max locked memory" limit
 ulimit -l 65536
 
-if [ "$xdpTesting" = true ] ; then
-  echo -e "Running XDP tests."
-  TEST_PARAMS+=';xdp=True'
-  TEST_CASE=$2
-fi
+# PTF test params:
+# ;xdp=<True|False>;xdp2tc=<meta|head|cpumap>;hdr2Map=<True|False>
+declare -a XDP=("False" "True")
+declare -a XDP2TC_MODE=("head" "cpumap")
+declare -a HDR2MAP=("False" "True")
 
-
-if [ "$xdpTesting" = false ] ; then
-  echo -e "Running TC tests with xdp2tc=meta."
-  # Start tests
-  ptf \
-    --test-dir ptf/ \
-    --test-params=$TEST_PARAMS \
-    --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
-    --interface 4@s1-eth4 --interface 5@s1-eth5 $TEST_CASE
-  exit_on_error
-fi
-
-rm -rf ptf_out
-CPUMAP_TEST_PARAMS=$TEST_PARAMS
-CPUMAP_TEST_PARAMS+=';xdp2tc="cpumap"'
-echo -e "Running PTF tests with params=${CPUMAP_TEST_PARAMS}."
-ptf \
-  --test-dir ptf/ \
-  --test-params=$CPUMAP_TEST_PARAMS \
-  --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
-  --interface 4@s1-eth4 --interface 5@s1-eth5 $TEST_CASE
-exit_on_error
-
-rm -rf ptf_out
-HEAD_TEST_PARAMS=$TEST_PARAMS
-HEAD_TEST_PARAMS+=';xdp2tc="head"'
-echo -e "Running PTF tests with params=${HEAD_TEST_PARAMS}."
-ptf \
-  --test-dir ptf/ \
-  --test-params=$HEAD_TEST_PARAMS \
-  --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
-  --interface 4@s1-eth4 --interface 5@s1-eth5 $TEST_CASE
-exit_on_error
-
+for xdp_enabled in "${XDP[@]}" ; do
+  TEST_PARAMS+=";xdp='$xdp_enabled'"
+  for xdp2tc_mode in "${XDP2TC_MODE[@]}" ; do
+    TEST_PARAMS+=";xdp2tc='$xdp2tc_mode'"
+    for hdr2map_enabled in "${HDR2MAP[@]}" ; do
+      TEST_PARAMS+=";hdr2Map='$hdr2map_enabled'"
+      # Start tests
+      ptf \
+      --test-dir ptf/ \
+      --test-params="$TEST_PARAMS" \
+      --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
+      --interface 4@s1-eth4 --interface 5@s1-eth5 $TEST_CASE
+      exit_on_error
+    done
+  done
+done
