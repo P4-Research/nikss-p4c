@@ -1,17 +1,19 @@
 #!/bin/bash
 
-xdpTesting=false
-
-if [ "x$1" = "x--help" ]; then
-  echo -e "Usage: \n"
-  echo -e "\t $0 [--help]"
-  echo -e "Will execute PTF test and setup/cleanup environment."
-  exit 0
-fi
-
-if [ "x$1" = "x--xdp" ]; then
-  xdpTesting=true
-fi
+function print_help() {
+  # Display Help
+  echo "Run PTF tests for PSA-eBPF."
+  echo "The script will run all combinations of flags if no options are provided."
+  echo
+  echo "Syntax: ./test.sh [OPTIONS] [TEST_CASE]"
+  echo
+  echo "OPTIONS:"
+  echo "--bpf-hook     A BPF hook that should be used as a main attach point <tc|xdp>"
+  echo "--xdp2tc-mode  A mode to pass metadata from XDP to TC programs <meta|head|cpumap>."
+  echo "--hdr2map      Allocate header structure in per-CPU map <on|off>."
+  echo "--help         Print this message."
+  echo
+}
 
 function exit_on_error() {
       exit_code=$?
@@ -33,6 +35,11 @@ function cleanup() {
       rm -rf /sys/fs/bpf/*
       echo "Cleaning finished"
 }
+
+if [ "x$1" = "x--help" ]; then
+  print_help
+  exit 0
+fi
 
 cleanup
 trap cleanup EXIT
