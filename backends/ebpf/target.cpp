@@ -50,9 +50,9 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
                                         cstring keyType, cstring valueType,
                                         unsigned size) const {
     cstring kind;
-    cstring registerTable = "REGISTER_TABLE(%s, %s, sizeof(%s), sizeof(%s), %d)";
-    cstring registerTableWithFlags = "REGISTER_TABLE_FLAGS(%s, %s, sizeof(%s), "
-                                        "sizeof(%s), %d, %s)";
+    cstring registerTable = "REGISTER_TABLE(%s, %s, %s, %s, %d)";
+    cstring registerTableWithFlags = "REGISTER_TABLE_FLAGS(%s, %s, %s, %s, %d, %s)";
+
     if (tableKind == TableHash) {
         kind = "BPF_MAP_TYPE_HASH";
     } else if (tableKind == TableArray) {
@@ -84,20 +84,11 @@ void KernelSamplesTarget::emitTableDeclSpinlock(Util::SourceCodeBuilder* builder
                                                 cstring tblName, TableKind tableKind,
                                                 cstring keyType, cstring valueType,
                                                 unsigned size) const {
-    cstring kind;
-    cstring registerTableSpinlock = "REGISTER_TABLE_WITH_SPINLOCK(%s, %s, %s, %s, %d)";
-    if (tableKind == TableHash) {
-        kind = "BPF_MAP_TYPE_HASH";
-    } else if (tableKind == TableArray) {
-        kind = "BPF_MAP_TYPE_ARRAY";
+    if (tableKind == TableHash || tableKind == TableArray) {
+        emitTableDecl(builder, tblName, tableKind, keyType, valueType, size);
     } else {
-        BUG("%1%: unsupported table kind", tableKind);
+        BUG("%1%: unsupported table kind with spinlock", tableKind);
     }
-    builder->appendFormat(registerTableSpinlock, tblName,
-                          kind.c_str(), keyType,
-                          valueType, size);
-    builder->newline();
-    annotateTableWithBTF(builder, tblName, keyType, valueType);
 }
 
 void
@@ -110,10 +101,8 @@ KernelSamplesTarget::emitMapInMapDecl(Util::SourceCodeBuilder *builder, cstring 
         BUG("Unsupported type of outer map for map-in-map");
     }
 
-    cstring registerOuterTable = "REGISTER_TABLE_OUTER(%s, %s_OF_MAPS, sizeof(%s), "
-                                 "sizeof(%s), %d, %d, %s)";
-    cstring registerInnerTable = "REGISTER_TABLE_INNER(%s, %s, sizeof(%s), "
-                                 "sizeof(%s), %d, %d, %d)";
+    cstring registerOuterTable = "REGISTER_TABLE_OUTER(%s, %s_OF_MAPS, %s, %s, %d, %d, %s)";
+    cstring registerInnerTable = "REGISTER_TABLE_INNER(%s, %s, %s, %s, %d, %d, %d)";
 
     innerMapIndex++;
 
