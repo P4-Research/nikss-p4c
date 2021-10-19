@@ -308,13 +308,13 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers, stru
     struct tmp_headers_t tmp_header = {};
     char * ptr = (char *)(&tmp_header);
     // sprawdzenie czy offset in bits jest większe niż packet end
-    if (ebpf_packetEnd < pkt + 20) {
+    if (ebpf_packetEnd < pkt + 100) {
 
         return TC_ACT_SHOT;
     };
 
-    //bpf_skb_load_bytes(skb, 0, ptr, 100/*BYTES(ebpf_packetOffsetInBits)*/); //
-    __builtin_memcpy(ptr, skb->data, /*BYTES(ebpf_packetOffsetInBits)*/20);
+    bpf_skb_load_bytes(skb, 0, ptr, 100/*BYTES(ebpf_packetOffsetInBits)*/); //
+    //__builtin_memcpy(ptr, skb->data, /*BYTES(ebpf_packetOffsetInBits)*/20);
 
     volatile struct headers_t pkt_copy = {};
     struct ethernet_t outerEthernet = {};
@@ -679,14 +679,14 @@ start: {
                         case 0:
                         {
 
-                            /*ostd->drop = false;
+                            ostd->drop = false;
 
                             if (skb->ifindex == (u32) 8) {
                                 ostd->egress_port = (u32) 11;
                             }
                             else if (skb->ifindex == (u32) 11) {
                                 ostd->egress_port = (u32) 8;
-                            }*/
+                            }
                         }
                             break;
                         default:
