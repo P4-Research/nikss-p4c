@@ -9,7 +9,7 @@ function print_help() {
   echo
   echo "OPTIONS:"
   echo "--bpf-hook     A BPF hook that should be used as a main attach point <tc|xdp>"
-  echo "--xdp2tc-mode  A mode to pass metadata from XDP to TC programs <meta|head|cpumap>."
+  echo "--xdp2tc       A mode to pass metadata from XDP to TC programs <meta|head|cpumap>."
   echo "--hdr2map      Allocate header structure in per-CPU map <on|off>."
   echo "--help         Print this message."
   echo
@@ -40,6 +40,26 @@ if [ "x$1" = "x--help" ]; then
   print_help
   exit 0
 fi
+
+for i in "$@"; do
+  case $i in
+    --bpf-hook=*)
+      BPF_HOOK="${i#*=}"
+      shift # past argument=value
+      ;;
+    --xdp2tc=*)
+      XDP2TC_ARG="${i#*=}"
+      shift # past argument=value
+      ;;
+    --hdr2map=*)
+      HDR2MAP_ARG="${i#*=}"
+      shift # past argument=value
+      ;;
+    *)
+      # unknown option
+      ;;
+  esac
+done
 
 cleanup
 trap cleanup EXIT
@@ -101,8 +121,37 @@ ulimit -l 65536
 # PTF test params:
 # ;xdp=<True|False>;xdp2tc=<meta|head|cpumap>;hdr2Map=<True|False>
 declare -a XDP=("False" "True")
-declare -a XDP2TC_MODE=("head" "cpumap")
+declare -a XDP2TC_MODE=("head" "cpumap" "meta")
 declare -a HDR2MAP=("False" "True")
+
+if [ ! -z "$BPF_HOOK" ]; then
+  if [ "$BPF_HOOK" == "tc" ]; then
+    XDP=( "False" )
+  elif [ "$BPF_HOOK" == "xdp" ]; then
+    XDP=( "True" )
+  else
+    echo "Wrong --bpf-hook value provided; running script for both hooks."
+  fi
+fi
+
+if [ ! -z "$XDP2TC_ARG" ]; then
+  if [ "$XDP2TC_ARG" == "meta" ] || [ "$XDP2TC_ARG" == "head" ] || [ "$XDP2TC_ARG" == "cpumap" ]; then
+    XDP2TC_MODE=( "$XDP2TC_ARG" )
+  else
+    echo "Wrong --xdp2tc value provided; running script for all XDP2TC modes."
+  fi
+fi
+
+if [ ! -z "$HDR2MAP_ARG" ]; then
+  if [ "$HDR2MAP_ARG" == "on" ]; then
+    HDR2MAP=( "True" )
+  elif [ "$HDR2MAP_ARG" == "off" ]; then
+    HDR2MAP=( "False" )
+  else
+    echo "Wrong --hdr2map value provided; running script for both enabled/disabled."
+  fi
+fi
+
 
 for xdp_enabled in "${XDP[@]}" ; do
   TEST_PARAMS+=";xdp='$xdp_enabled'"
