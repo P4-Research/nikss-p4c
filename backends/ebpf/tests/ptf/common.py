@@ -167,9 +167,11 @@ class P4EbpfTest(EbpfTest):
         head, tail = os.path.split(self.p4_file_path)
         filename = tail.split(".")[0]
         self.test_prog_image = os.path.join("ptf_out", filename + ".o")
-        xdp2tc_mode = "meta" if self.xdp2tc_mode() is None else self.xdp2tc_mode()
-        p4args = "--trace --xdp2tc=" + xdp2tc_mode
-        if self.is_xdp_test():
+        p4args = "--trace"
+        if "xdp2tc" in testutils.test_params_get():
+            p4args += " --xdp2tc=" + testutils.test_param_get("xdp2tc")
+
+        if testutils.test_param_get("xdp") == 'True':
             p4args += " --xdp"
 
         if testutils.test_param_get("hdr2Map") == 'True':
@@ -178,6 +180,7 @@ class P4EbpfTest(EbpfTest):
             if self.hdr2map_required:
                 self.skipTest("hdr2Map required for the PTF test")
 
+        logger.info("P4ARGS=" + p4args)
         self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "
                       "ARGS=\"{cargs}\" P4C=p4c-ebpf P4ARGS=\"{p4args}\" psa".format(
                             output=self.test_prog_image,
