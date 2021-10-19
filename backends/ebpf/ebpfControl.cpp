@@ -346,6 +346,9 @@ void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
     builder->endOfStatement(true);
     builder->blockEnd(true);
 
+    if (table->cacheEnabled())
+        builder->blockEnd(true);
+
     builder->emitIndent();
     builder->appendFormat("if (%s != NULL) ", valueName.c_str());
     builder->blockStart();

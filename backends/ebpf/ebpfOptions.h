@@ -35,7 +35,8 @@ class EbpfOptions : public CompilerOptions {
     bool emitExterns = false;
     // Tracing eBPF code execution
     bool emitTraceMessages = false;
-
+    // Enable table cache for LMP and ternary tables
+    bool enableTableCache = false;
     // Generate headers and user metadata in/from CPUMAP
     bool generateHdrInMap = false;
 

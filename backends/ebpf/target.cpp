@@ -49,33 +49,34 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
                                         cstring tblName, TableKind tableKind,
                                         cstring keyType, cstring valueType,
                                         unsigned size) const {
-    cstring kind;
+    cstring kind, flags;
     cstring registerTable = "REGISTER_TABLE(%s, %s, %s, %s, %d)";
     cstring registerTableWithFlags = "REGISTER_TABLE_FLAGS(%s, %s, %s, %s, %d, %s)";
 
-    if (tableKind == TableHash) {
-        kind = "BPF_MAP_TYPE_HASH";
-    } else if (tableKind == TableArray) {
-        kind = "BPF_MAP_TYPE_ARRAY";
-    } else if (tableKind == TablePerCPUArray) {
-        kind = "BPF_MAP_TYPE_PERCPU_ARRAY";
+    kind = getBPFMapType(tableKind);
+
+    if (tableKind == TablePerCPUArray || tableKind == TableArray) {
         // it's more safe to overwrite user-provided key type,
         // as array map must have u32 key type.
         keyType = "u32";
-    } else if (tableKind == TableLPMTrie) {
-        kind = "BPF_MAP_TYPE_LPM_TRIE";
+    }
+    if (tableKind == TableLPMTrie) {
+        flags = "BPF_F_NO_PREALLOC";
+    }
+    if (tableKind == TableCache) {
+        // this configuration should ensure best performance but might use a lot of memory
+        flags = "BPF_F_NO_COMMON_LRU";
+    }
+
+    if (flags.isNullOrEmpty()) {
+        builder->appendFormat(registerTable, tblName.c_str(),
+                              kind.c_str(), keyType.c_str(),
+                              valueType.c_str(), size);
+    } else {
         builder->appendFormat(registerTableWithFlags, tblName.c_str(),
                               kind.c_str(), keyType.c_str(),
-                              valueType.c_str(), size, "BPF_F_NO_PREALLOC");
-        builder->newline();
-        annotateTableWithBTF(builder, tblName, keyType, valueType);
-        return;
-    } else {
-        BUG("%1%: unsupported table kind", tableKind);
+                              valueType.c_str(), size, flags);
     }
-    builder->appendFormat(registerTable, tblName.c_str(),
-                          kind.c_str(), keyType.c_str(),
-                          valueType.c_str(), size);
     builder->newline();
     annotateTableWithBTF(builder, tblName, keyType, valueType);
 }

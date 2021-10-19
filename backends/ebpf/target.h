@@ -30,7 +30,8 @@ enum TableKind {
     TableHash,
     TableArray,
     TablePerCPUArray,
-    TableLPMTrie  // longest prefix match trie
+    TableLPMTrie,     // longest prefix match trie
+    TableCache        // for LPM and ternary tables
 };
 
 class Target {
@@ -114,8 +115,12 @@ class KernelSamplesTarget : public Target {
             return "BPF_MAP_TYPE_HASH";
         } else if (kind == TableArray) {
             return "BPF_MAP_TYPE_ARRAY";
+        } else if (kind == TablePerCPUArray) {
+            return "BPF_MAP_TYPE_PERCPU_ARRAY";
         } else if (kind == TableLPMTrie) {
             return "BPF_MAP_TYPE_LPM_TRIE";
+        } else if (kind == TableCache) {
+            return "BPF_MAP_TYPE_LRU_PERCPU_HASH";
         }
         BUG("Unknown table kind");
     }

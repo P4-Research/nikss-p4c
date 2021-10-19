@@ -4,6 +4,8 @@
 #include "ebpfPsaControlTranslators.h"
 #include "backends/ebpf/psa/externs/ebpfPsaTableImplementation.h"
 
+#include <algorithm>
+
 namespace EBPF {
 
 // =====================ActionTranslationVisitorPSA=============================
@@ -75,6 +77,8 @@ EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* tab
     initDirectMeters();
 
     initImplementations();
+
+    tryEnableTableCache();
 }
 
 EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name) :
@@ -178,6 +182,23 @@ bool EBPFTablePSA::hasImplementation() const {
     return !implementations.empty();
 }
 
+void EBPFTablePSA::tryEnableTableCache() {
+    if (!program->options.enableTableCache)
+        return;
+    if (!isLPMTable() && !isTernaryTable())
+        return;
+    if (!counters.empty() || !meters.empty()) {
+        ::warning(ErrorType::WARN_UNSUPPORTED,
+                  "%1%: table cache can't be enabled due to direct extern(s)",
+                  table->container->name);
+        return;
+    }
+
+    tableCacheEnabled = true;
+    cacheValueTypeName = valueTypeName + "_cache";
+    cacheTableName = name + "_cache";
+}
+
 void EBPFTablePSA::emitValueActionIDNames(CodeBuilder* builder) {
     // For action_run method we preserve these ID names for actions.
     // Values are the same as for implementation, because the same action
@@ -215,6 +236,8 @@ void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
                       program->arrayIndexType,
                       cstring("struct ") + valueTypeName, 1);
     }
+
+    emitCacheInstance(builder);
 }
 
 void EBPFTablePSA::emitTableDecl(CodeBuilder *builder,
@@ -240,6 +263,7 @@ void EBPFTablePSA::emitTableDecl(CodeBuilder *builder,
 
 void EBPFTablePSA::emitValueType(CodeBuilder* builder) {
     EBPFTable::emitValueType(builder);
+    emitCacheTypes(builder);
 }
 
 /**
@@ -429,6 +453,13 @@ void EBPFTablePSA::emitTableValue(CodeBuilder* builder, const IR::MethodCallExpr
     builder->endOfStatement(true);
 }
 
+void EBPFTablePSA::emitLookup(CodeBuilder* builder, cstring key, cstring value) {
+    if (tableCacheEnabled)
+        emitCacheLookup(builder, key, value);
+
+    EBPFTable::emitLookup(builder, key, value);
+}
+
 void EBPFTablePSA::emitLookupDefault(CodeBuilder* builder, cstring key, cstring value) {
     if (hasImplementation()) {
         builder->appendLine("/* table with implementation has no default action */");
@@ -449,6 +480,75 @@ bool EBPFTablePSA::singleActionRun() const {
     return implementations.size() <= 1;
 }
 
+void EBPFTablePSA::emitCacheTypes(CodeBuilder* builder) {
+    if (!tableCacheEnabled)
+        return;
+
+    builder->emitIndent();
+    builder->appendFormat("struct %s ", cacheValueTypeName.c_str());
+    builder->blockStart();
+
+    builder->emitIndent();
+    builder->appendFormat("struct %s value", valueTypeName.c_str());
+    builder->endOfStatement(true);
+
+    // additional metadata fields add at the end of this structure. This allows
+    // to simpler conversion cache value to value used by table
+
+    builder->emitIndent();
+    builder->append("u8 hit");
+    builder->endOfStatement(true);
+
+    builder->blockEnd(false);
+    builder->endOfStatement(true);
+}
+
+void EBPFTablePSA::emitCacheInstance(CodeBuilder* builder) {
+    if (!tableCacheEnabled)
+        return;
+
+    builder->target->emitTableDecl(builder, cacheTableName, TableCache,
+                                   "struct " + keyTypeName, "struct " + cacheValueTypeName,
+                                   std::max((size_t) 1, size / 2));
+}
+
+void EBPFTablePSA::emitCacheLookup(CodeBuilder* builder, cstring key, cstring value) {
+    cstring cacheVal = "cached_value";
+
+    builder->appendFormat("struct %s* %s = NULL", cacheValueTypeName.c_str(), cacheVal.c_str());
+    builder->endOfStatement(true);
+
+    builder->target->emitTraceMessage(builder, "Control: trying table cache...");
+
+    builder->emitIndent();
+    builder->target->emitTableLookup(builder, cacheTableName, key, cacheVal);
+    builder->endOfStatement(true);
+
+    builder->emitIndent();
+    builder->appendFormat("if (%s != NULL) ", cacheVal.c_str());
+    builder->blockStart();
+
+    builder->target->emitTraceMessage(builder,
+                                      "Control: table cache hit, skipping later lookup(s)");
+    builder->emitIndent();
+    builder->appendFormat("%s = &(%s->value)", value.c_str(), cacheVal.c_str());
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->appendFormat("%s = %s->hit",
+                          program->control->hitVariable.c_str(), cacheVal.c_str());
+    builder->endOfStatement(true);
+
+    builder->blockEnd(false);
+    builder->append(" else ");
+    builder->blockStart();
+
+    builder->target->emitTraceMessage(builder, "Control: table cache miss, nevermind");
+    builder->emitIndent();
+
+    // Do not end block here because we need lookup for (default) value
+    // and set hit variable at this indent level which is done in the control block
+}
+
 // =====================EBPFTernaryTablePSA=============================
 void EBPFTernaryTablePSA::emitInstance(CodeBuilder *builder) {
     builder->target->emitTableDecl(builder, name + "_prefixes", TableHash,
@@ -463,6 +563,8 @@ void EBPFTernaryTablePSA::emitInstance(CodeBuilder *builder) {
                                        program->arrayIndexType,
                                        cstring("struct ") + valueTypeName, 1);
     }
+
+    emitCacheInstance(builder);
 }
 
 void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
@@ -526,7 +628,7 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
 }
 
 void EBPFTernaryTablePSA::emitValueType(CodeBuilder* builder) {
-    EBPFTable::emitValueType(builder);
+    EBPFTablePSA::emitValueType(builder);
 
     if (isTernaryTable()) {
         // emit ternary mask value
@@ -547,6 +649,9 @@ void EBPFTernaryTablePSA::emitValueType(CodeBuilder* builder) {
 }
 
 void EBPFTernaryTablePSA::emitLookup(CodeBuilder *builder, cstring key, cstring value) {
+    if (tableCacheEnabled)
+        emitCacheLookup(builder, key, value);
+
     builder->appendFormat("struct %s_mask head = {0};", keyTypeName);
     builder->newline();
     builder->emitIndent();

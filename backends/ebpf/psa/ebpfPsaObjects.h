@@ -60,6 +60,11 @@ class EBPFTablePSA : public EBPFTable {
     void emitMapUpdateTraceMsg(CodeBuilder *builder, cstring mapName,
                                cstring returnCode) const;
 
+    bool tableCacheEnabled = false;
+    cstring cacheValueTypeName;
+    cstring cacheTableName;
+    void tryEnableTableCache();
+
  public:
     cstring name;
     size_t size;
@@ -79,9 +84,15 @@ class EBPFTablePSA : public EBPFTable {
     void emitAction(CodeBuilder* builder, cstring valueName, cstring actionRunVariable) override;
     void emitInitializer(CodeBuilder* builder) override;
     void emitDirectTypes(CodeBuilder* builder) override;
+    void emitLookup(CodeBuilder* builder, cstring key, cstring value) override;
     void emitLookupDefault(CodeBuilder* builder, cstring key, cstring value) override;
     bool dropOnNoMatchingEntryFound() const override;
     bool singleActionRun() const override;
+
+    void emitCacheTypes(CodeBuilder* builder);
+    void emitCacheInstance(CodeBuilder* builder);
+    void emitCacheLookup(CodeBuilder* builder, cstring key, cstring value);
+    bool cacheEnabled() override { return tableCacheEnabled; }
 
     EBPFCounterPSA* getCounter(cstring name) const {
         auto result = std::find_if(counters.begin(), counters.end(),

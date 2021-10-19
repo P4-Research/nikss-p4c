@@ -122,6 +122,7 @@ class EBPFTable : public EBPFTableBase {
     cstring getByteSwapMethod(unsigned int width) const;
     virtual bool dropOnNoMatchingEntryFound() const { return true; }
     virtual bool singleActionRun() const { return true; }
+    virtual bool cacheEnabled() { return false; }
 };
 
 class EBPFCounterTable : public EBPFTableBase {
