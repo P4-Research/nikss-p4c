@@ -107,7 +107,7 @@ struct local_metadata_t {
 };
 
 struct ingress_vxlan_key {
-    unsigned char field0[6]; /* headers.ethernet.dst_addr */
+    unsigned char field0[8]; /* headers.ethernet.dst_addr */
 } __attribute__((aligned(4)));
 #define INGRESS_VXLAN_ACT_INGRESS_VXLAN_ENCAP 1
 #define INGRESS_VXLAN_ACT_INGRESS_VXLAN_DECAP 2
@@ -308,13 +308,13 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers, stru
     struct tmp_headers_t tmp_header = {};
     char * ptr = (char *)(&tmp_header);
     // sprawdzenie czy offset in bits jest większe niż packet end
-    if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits )) {
+    if (ebpf_packetEnd < pkt + 20) {
 
         return TC_ACT_SHOT;
     };
 
-    bpf_skb_load_bytes(skb, 0, ptr, 100/*BYTES(ebpf_packetOffsetInBits)*/); //
-    //__builtin_memcpy(ptr, skb->data, BYTES(ebpf_packetOffsetInBits));
+    //bpf_skb_load_bytes(skb, 0, ptr, 100/*BYTES(ebpf_packetOffsetInBits)*/); //
+    __builtin_memcpy(ptr, skb->data, /*BYTES(ebpf_packetOffsetInBits)*/20);
 
     volatile struct headers_t pkt_copy = {};
     struct ethernet_t outerEthernet = {};
@@ -350,10 +350,10 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *headers, stru
     };*/
 start: {
 /* extract(headers->ethernet)*/
-    if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
+    /*if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
         ebpf_errorCode = PacketTooShort;
         goto reject;
-    }
+    }*/
     pkt_copy.ethernet = (struct ethernet_t *)(ptr + BYTES(ebpf_packetOffsetInBits)); ///////// ?? co z bitami? przez to błąd przy deprasowaniu ipv4 outer?
     //headers->ethernet.dst_addr = (u64)((load_dword(pkt, BYTES(ebpf_packetOffsetInBits)) >> 16) & EBPF_MASK(u64, 48));
     ebpf_packetOffsetInBits += 48;
@@ -367,10 +367,10 @@ start: {
     validFlags.ethernet_valid = 1;
 
 /* extract(headers->ipv4)*/
-    if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
+    /*if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
         ebpf_errorCode = PacketTooShort;
         goto reject;
-    }
+    }*/
     pkt_copy.ipv4 = (struct ipv4_t *)(ptr + BYTES(ebpf_packetOffsetInBits));
     offsets.outer_ipv4_offset = BYTES(ebpf_packetOffsetInBits);
     //headers->ipv4.ver_ihl = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
@@ -412,10 +412,10 @@ start: {
 }
     parse_udp: {
 /* extract(headers->outer_udp)*/
-    if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 64)) {
+    /*if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 64)) {
         ebpf_errorCode = PacketTooShort;
         goto reject;
-    }
+    }*/
     pkt_copy.outer_udp = (struct udp_t *)(ptr + BYTES(ebpf_packetOffsetInBits));
     offsets.outer_udp_offset = BYTES(ebpf_packetOffsetInBits);
     //headers->outer_udp.src_port = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
@@ -439,10 +439,10 @@ start: {
 }
     parse_vxlan: {
 /* extract(headers->vxlan)*/
-    if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 64)) {
+    /*if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 64)) {
         ebpf_errorCode = PacketTooShort;
         goto reject;
-    }
+    }*/
     pkt_copy.vxlan = (struct vxlan_t *)(ptr + BYTES(ebpf_packetOffsetInBits));
     offsets.vxlan_offset = BYTES(ebpf_packetOffsetInBits);
     //headers->vxlan.flags = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
@@ -464,10 +464,10 @@ start: {
     __builtin_memcpy(pkt_copy.outer_ethernet, pkt_copy.ethernet, sizeof(outerEthernet)); // ENKAPSULACJA
 
     //headers->outer_ethernet = *headers->ethernet;/* extract(headers->ethernet)*/
-    if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
+    /*if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
         ebpf_errorCode = PacketTooShort;
         goto reject;
-    }
+    }*/
     pkt_copy.ethernet = (struct ethernet_t *)(ptr + BYTES(ebpf_packetOffsetInBits));
     offsets.ethernet_offset = BYTES(ebpf_packetOffsetInBits);
     //headers->ethernet.dst_addr = (u64)((load_dword(pkt, BYTES(ebpf_packetOffsetInBits)) >> 16) & EBPF_MASK(u64, 48));
@@ -491,10 +491,10 @@ start: {
     pkt_copy.outer_ipv4 = &outerIpv4;
     __builtin_memcpy(pkt_copy.outer_ipv4, pkt_copy.ipv4, sizeof(outerIpv4)); // ENKAPSULACJA
     //*headers->outer_ipv4 = *headers->ipv4;/* extract(headers->ipv4)*/
-    if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
+    /*if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
         ebpf_errorCode = PacketTooShort;
         goto reject;
-    }
+    }*/
     pkt_copy.ipv4 = (struct ipv4_t *)(ptr + BYTES(ebpf_packetOffsetInBits));
     offsets.ipv4_offset = BYTES(ebpf_packetOffsetInBits);
     //headers->ipv4.ver_ihl = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));

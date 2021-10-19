@@ -110,11 +110,11 @@ struct ingress_vxlan_value {
     unsigned int action;
     union {
         struct {
-            u64 ethernet_dst_addr;
-            u64 ethernet_src_addr;
+            unsigned char ethernet_dst_addr[6];
+            unsigned char ethernet_src_addr[6];
             u32 ipv4_src_addr;
             u32 ipv4_dst_addr;
-            u32 vxlan_vni;
+            unsigned char vxlan_vni[3];
             u32 port_out;
         } ingress_vxlan_encap;
         struct {
