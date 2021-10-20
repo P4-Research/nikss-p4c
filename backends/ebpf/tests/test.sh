@@ -153,11 +153,11 @@ fi
 TEST_CASE=$@
 for xdp_enabled in "${XDP[@]}" ; do
   if [ "$xdp_enabled" == "False" ]; then
-    interface_list="psa_recirc,""$interface_list"
+    ptf_interface_list="psa_recirc,""$interface_list"
   else
-    interface_list="$interface_list"
+    ptf_interface_list="$interface_list"
   fi
-  TEST_PARAMS="interfaces='$interface_list';namespace='switch'"
+  TEST_PARAMS="interfaces='$ptf_interface_list';namespace='switch'"
   TEST_PARAMS+=";xdp='$xdp_enabled'"
   for xdp2tc_mode in "${XDP2TC_MODE[@]}" ; do
     TEST_PARAMS+=";xdp2tc='$xdp2tc_mode'"
