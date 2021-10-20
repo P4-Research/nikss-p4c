@@ -15,7 +15,8 @@ class EBPFMeterPSA : public EBPFTablePSA {
     EBPFType *getIndirectValueType() const;
     cstring getBaseStructName() const;
     cstring getIndirectStructName() const;
-    cstring getIndexString(const P4::ExternMethod *method) const;
+
+    void emitIndex(CodeBuilder* builder, const P4::ExternMethod *method) const;
 
  protected:
     size_t size{};
