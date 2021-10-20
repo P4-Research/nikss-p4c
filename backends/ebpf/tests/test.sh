@@ -168,6 +168,7 @@ for xdp_enabled in "${XDP[@]}" ; do
       --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
       --interface 4@s1-eth4 --interface 5@s1-eth5 $TEST_CASE
       exit_on_error
+      rm -rf ptf_out
     done
   done
 done
