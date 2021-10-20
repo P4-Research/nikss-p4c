@@ -115,7 +115,7 @@ class EbpfTest(BaseTest):
         return testutils.test_param_get("xdp2tc")
 
     def is_xdp_test(self):
-        return "xdp" in testutils.test_params_get()
+        return "xdp" in testutils.test_params_get() and testutils.test_params_get("xdp") == 'True'
 
     def setUp(self):
         super(EbpfTest, self).setUp()
