@@ -156,16 +156,16 @@ void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* met
         ::error(ErrorType::ERR_INVALID, "Meter used outside of pipeline %1%", method->expr);
         return;
     }
-    
+  
     if (type == BYTES) {
-        builder->appendFormat("meter_execute_bytes(&%s, &%s, ", instanceName,
-                              pipeline->lengthVar.c_str());
-        this->emitIndex(builder, method);
-        builder->appendFormat(", &%s)", pipeline->timestampVar.c_str());
+      builder->appendFormat("meter_execute_bytes(&%s, &%s, ", instanceName,
+                            pipeline->lengthVar.c_str());
+      this->emitIndex(builder, method);
+      builder->appendFormat(", &%s)", pipeline->timestampVar.c_str());
     } else {
-        builder->appendFormat("meter_execute_packets(&%s, ", instanceName);
-        this->emitIndex(builder, method);
-        builder->appendFormat(", &%s)", pipeline->timestampVar.c_str());
+      builder->appendFormat("meter_execute_packets(&%s, ", instanceName);
+      this->emitIndex(builder, method);
+      builder->appendFormat(", &%s)", pipeline->timestampVar.c_str());
     }
 }
 
