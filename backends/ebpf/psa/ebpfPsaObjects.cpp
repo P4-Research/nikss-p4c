@@ -1,10 +1,10 @@
+#include <algorithm>
+
 #include "backends/ebpf/ebpfType.h"
 #include "ebpfPsaObjects.h"
 #include "ebpfPipeline.h"
 #include "ebpfPsaControlTranslators.h"
 #include "backends/ebpf/psa/externs/ebpfPsaTableImplementation.h"
-
-#include <algorithm>
 
 namespace EBPF {
 
@@ -507,9 +507,11 @@ void EBPFTablePSA::emitCacheInstance(CodeBuilder* builder) {
     if (!tableCacheEnabled)
         return;
 
+    // TODO: make cache size calculation more smart
+    size_t cacheSize = std::max((size_t) 1, size / 2);
     builder->target->emitTableDecl(builder, cacheTableName, TableCache,
                                    "struct " + keyTypeName, "struct " + cacheValueTypeName,
-                                   std::max((size_t) 1, size / 2));
+                                   cacheSize);
 }
 
 void EBPFTablePSA::emitCacheLookup(CodeBuilder* builder, cstring key, cstring value) {
@@ -547,6 +549,38 @@ void EBPFTablePSA::emitCacheLookup(CodeBuilder* builder, cstring key, cstring va
 
     // Do not end block here because we need lookup for (default) value
     // and set hit variable at this indent level which is done in the control block
+}
+
+void EBPFTablePSA::emitCacheUpdate(CodeBuilder* builder, cstring key, cstring value) {
+    cstring cacheUpdateVarName = "cache_update";
+
+    builder->emitIndent();
+    builder->appendFormat("if (%s != NULL) ", value.c_str());
+    builder->blockStart();
+
+    builder->emitIndent();
+    builder->appendFormat("struct %s %s = ",
+                          cacheValueTypeName.c_str(), cacheUpdateVarName.c_str());
+    builder->blockStart();
+
+    builder->emitIndent();
+    builder->appendFormat(".value = *%s,", value.c_str());
+    builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat(".hit = %s,", program->control->hitVariable.c_str());
+    builder->newline();
+
+    builder->blockEnd(false);
+    builder->endOfStatement(true);
+
+    builder->emitIndent();
+    builder->target->emitTableUpdate(builder, cacheTableName, key, cacheUpdateVarName);
+    builder->newline();
+
+    builder->target->emitTraceMessage(builder, "Control: table cache updated");
+
+    builder->blockEnd(true);
 }
 
 // =====================EBPFTernaryTablePSA=============================

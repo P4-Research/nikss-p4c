@@ -92,6 +92,7 @@ class EBPFTablePSA : public EBPFTable {
     void emitCacheTypes(CodeBuilder* builder);
     void emitCacheInstance(CodeBuilder* builder);
     void emitCacheLookup(CodeBuilder* builder, cstring key, cstring value);
+    void emitCacheUpdate(CodeBuilder* builder, cstring key, cstring value) override;
     bool cacheEnabled() override { return tableCacheEnabled; }
 
     EBPFCounterPSA* getCounter(cstring name) const {
