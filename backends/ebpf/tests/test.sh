@@ -109,8 +109,6 @@ silent_echo_conf() {
 } 2> /dev/null
 silent_echo_conf
 
-TEST_CASE=$@
-TEST_PARAMS="interfaces='$interface_list';namespace='switch'"
 # Add path to our libbpf
 LIBBPF_LD_PATH="`pwd`/../runtime/usr/lib64"
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LIBBPF_LD_PATH
@@ -152,8 +150,12 @@ if [ ! -z "$HDR2MAP_ARG" ]; then
   fi
 fi
 
-
+TEST_CASE=$@
 for xdp_enabled in "${XDP[@]}" ; do
+  if [ "$xdp_enabled" == "False" ]; then
+    interface_list="psa_recirc,""$interface_list"
+  fi
+  TEST_PARAMS="interfaces='$interface_list';namespace='switch'"
   TEST_PARAMS+=";xdp='$xdp_enabled'"
   for xdp2tc_mode in "${XDP2TC_MODE[@]}" ; do
     TEST_PARAMS+=";xdp2tc='$xdp2tc_mode'"
