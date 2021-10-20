@@ -313,7 +313,7 @@ p4c_add_test_with_args("ebpf" ${EBPF_DRIVER_TEST} TRUE "testdata/p4_16_samples/e
 
 # Execute PSA PTF test only when: (1) kernel is supported, (2) libbpf (3) bpftool and (4) PTF are available
 if (SUPPORTS_KERNEL_PSA)
-  set (ebpf-psa-ptf_timeout 500)
+  set (ebpf-psa-ptf_timeout 1000)
   p4c_add_tests("ebpf-psa-ptf" ${EBPF_PTF_DRIVER_TEST} ${EBPF_PSA_PTF_TEST_SUITES} "")
   p4c_add_tests("ebpf-psa-ptf-xdp" ${EBPF_PTF_XDP_DRIVER_TEST} ${EBPF_PSA_PTF_TEST_SUITES} "")
 endif()

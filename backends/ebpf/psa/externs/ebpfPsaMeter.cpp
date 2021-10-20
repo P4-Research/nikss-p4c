@@ -159,7 +159,7 @@ void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* met
 
     if (type == BYTES) {
         builder->appendFormat("meter_execute_bytes(&%s, &%s, ", instanceName,
-                              pipeline->lengthVar.c_str());
+                            pipeline->lengthVar.c_str());
         this->emitIndex(builder, method);
         builder->appendFormat(", &%s)", pipeline->timestampVar.c_str());
     } else {
