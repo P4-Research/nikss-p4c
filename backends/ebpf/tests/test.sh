@@ -154,6 +154,8 @@ TEST_CASE=$@
 for xdp_enabled in "${XDP[@]}" ; do
   if [ "$xdp_enabled" == "False" ]; then
     interface_list="psa_recirc,""$interface_list"
+  else
+    interface_list="$interface_list"
   fi
   TEST_PARAMS="interfaces='$interface_list';namespace='switch'"
   TEST_PARAMS+=";xdp='$xdp_enabled'"
