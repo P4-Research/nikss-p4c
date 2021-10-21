@@ -559,15 +559,13 @@ void EBPFTablePSA::emitCacheUpdate(CodeBuilder* builder, cstring key, cstring va
     builder->blockStart();
 
     builder->emitIndent();
-    builder->appendFormat("struct %s %s = ",
+    builder->appendFormat("struct %s %s = {0}",
                           cacheValueTypeName.c_str(), cacheUpdateVarName.c_str());
-    builder->blockStart();
+    builder->endOfStatement(true);
 
     builder->emitIndent();
-    builder->appendFormat(".hit = %s,", program->control->hitVariable.c_str());
-    builder->newline();
-
-    builder->blockEnd(false);
+    builder->appendFormat("%s.hit = %s",
+                          cacheUpdateVarName.c_str(), program->control->hitVariable.c_str());
     builder->endOfStatement(true);
 
     builder->emitIndent();
