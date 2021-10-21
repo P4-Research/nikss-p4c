@@ -629,7 +629,7 @@ static int fill_action_id(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
     psabtf_struct_member_md_t action_md = {};
     if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "action", &action_md) != NO_ERROR) {
         fprintf(stderr, "action id entry not found\n");
-        return ENOENT;
+        return EAGAIN;  /* Allow fallback to byte by byte mode */
     }
     return write_buffer_btf(buffer, ctx->value_size, action_md.bit_offset / 8,
                             &(entry->action->action_id), sizeof(entry->action->action_id),

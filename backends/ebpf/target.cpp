@@ -64,8 +64,10 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
         flags = "BPF_F_NO_PREALLOC";
     }
     if (tableKind == TableCache) {
-        // this configuration should ensure best performance but might use a lot of memory
-        flags = "BPF_F_NO_COMMON_LRU";
+        // BPF_F_NO_COMMON_LRU ensure separate list for every CPU but might use a lot of memory
+        // BPF_F_NO_PREALLOC - by default entry is created for every CPU instance, other has
+        //   zeroed value, see https://www.spinics.net/lists/bpf/msg28706.html
+//        flags = "BPF_F_NO_COMMON_LRU | BPF_F_NO_PREALLOC";
     }
 
     if (flags.isNullOrEmpty()) {

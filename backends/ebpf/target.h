@@ -120,7 +120,7 @@ class KernelSamplesTarget : public Target {
         } else if (kind == TableLPMTrie) {
             return "BPF_MAP_TYPE_LPM_TRIE";
         } else if (kind == TableCache) {
-            return "BPF_MAP_TYPE_LRU_PERCPU_HASH";
+            return "BPF_MAP_TYPE_LRU_HASH";
         }
         BUG("Unknown table kind");
     }
