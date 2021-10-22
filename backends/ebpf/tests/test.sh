@@ -160,13 +160,10 @@ for xdp_enabled in "${XDP[@]}" ; do
     for hdr2map_enabled in "${HDR2MAP[@]}" ; do
       TEST_PARAMS+=";hdr2Map='$hdr2map_enabled'"
       # FIXME: hdr2map is not working properly for TC, we should fix it in future
-#      if [ "$xdp_enabled" == "False" ] && [ "$hdr2map_enabled" == "True" ]; then
-#        echo "Test skipped because hdr2map doesn't work properly in TC"
-#        continue
-#      elif [ "$xdp_enabled" == "True" ] && [ "$xdp2tc_mode" == "head" ]; then
-#        echo "Test skipped because xdp2tc=head doesn't work properly with XDP"
-#        continue
-#      fi
+      if [ "$xdp_enabled" == "False" ] && [ "$hdr2map_enabled" == "True" ]; then
+        echo "Test skipped because hdr2map doesn't work properly in TC"
+        continue
+      fi
       # Start tests
       ptf \
       --test-dir ptf/ \
