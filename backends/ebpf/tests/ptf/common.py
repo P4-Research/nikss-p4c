@@ -44,6 +44,7 @@ def table_caching_only(cls):
 
 
 def disable_table_caching(cls):
+    # TODO: require hdr2map instead of skipping (for now this not work)
     if cls.is_table_caching_test(cls):
         cls.skip = True
         cls.skip_reason = "too complex program with table caching"
