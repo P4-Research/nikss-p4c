@@ -75,6 +75,7 @@ set -x
 declare -a INTERFACES=("eth0" "eth1" "eth2" "eth3" "eth4" "eth5")
 # For PTF tests parameter
 interface_list=$( IFS=$','; echo "${INTERFACES[*]}" )
+interface_list="psa_recirc,""$interface_list"
 
 ip netns add switch
 
@@ -150,27 +151,22 @@ if [ ! -z "$HDR2MAP_ARG" ]; then
   fi
 fi
 
+TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
 TEST_CASE=$@
 for xdp_enabled in "${XDP[@]}" ; do
-  if [ "$xdp_enabled" == "False" ]; then
-    ptf_interface_list="psa_recirc,""$interface_list"
-  else
-    ptf_interface_list="$interface_list"
-  fi
-  TEST_PARAMS="interfaces='$ptf_interface_list';namespace='switch'"
   TEST_PARAMS+=";xdp='$xdp_enabled'"
   for xdp2tc_mode in "${XDP2TC_MODE[@]}" ; do
     TEST_PARAMS+=";xdp2tc='$xdp2tc_mode'"
     for hdr2map_enabled in "${HDR2MAP[@]}" ; do
       TEST_PARAMS+=";hdr2Map='$hdr2map_enabled'"
       # FIXME: hdr2map is not working properly for TC, we should fix it in future
-      if [ "$xdp_enabled" == "False" ] && [ "$hdr2map_enabled" == "True" ]; then
-        echo "Test skipped because hdr2map doesn't work properly in TC"
-        continue
-      elif [ "$xdp_enabled" == "True" ] && [ "$xdp2tc_mode" == "head" ]; then
-        echo "Test skipped because xdp2tc=head doesn't work properly with XDP"
-	continue
-      fi
+#      if [ "$xdp_enabled" == "False" ] && [ "$hdr2map_enabled" == "True" ]; then
+#        echo "Test skipped because hdr2map doesn't work properly in TC"
+#        continue
+#      elif [ "$xdp_enabled" == "True" ] && [ "$xdp2tc_mode" == "head" ]; then
+#        echo "Test skipped because xdp2tc=head doesn't work properly with XDP"
+#        continue
+#      fi
       # Start tests
       ptf \
       --test-dir ptf/ \

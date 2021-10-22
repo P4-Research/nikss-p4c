@@ -112,10 +112,10 @@ class EbpfTest(BaseTest):
                       .format(name, key, hex(expected_value), hex(value)))
 
     def xdp2tc_mode(self):
-        return testutils.test_param_get("xdp2tc")
+        return testutils.test_param_get('xdp2tc')
 
     def is_xdp_test(self):
-        return "xdp" in testutils.test_params_get() and testutils.test_params_get("xdp") == 'True'
+        return testutils.test_param_get('xdp') == 'True'
 
     def setUp(self):
         super(EbpfTest, self).setUp()
@@ -129,6 +129,8 @@ class EbpfTest(BaseTest):
         self.exec_ns_cmd("psabpf-ctl pipeline load id {} {}".format(TEST_PIPELINE_ID, self.test_prog_image), "Can't load programs into eBPF subsystem")
 
         for intf in self.interfaces:
+            if intf == "psa_recirc" and self.is_xdp_test():
+                continue
             self.add_port(dev=intf)
 
         if self.ctool_file_path:
@@ -171,10 +173,10 @@ class P4EbpfTest(EbpfTest):
         if "xdp2tc" in testutils.test_params_get():
             p4args += " --xdp2tc=" + testutils.test_param_get("xdp2tc")
 
-        if testutils.test_param_get("xdp") == 'True':
+        if self.is_xdp_test():
             p4args += " --xdp"
 
-        if testutils.test_param_get("hdr2Map") == 'True':
+        if testutils.test_param_get('hdr2Map') == 'True':
             p4args += " --hdr2Map"
         else:
             if self.hdr2map_required:
