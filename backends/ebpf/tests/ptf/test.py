@@ -33,16 +33,6 @@ class SimpleForwardingPSATest(P4EbpfTest):
         super(SimpleForwardingPSATest, self).tearDown()
 
 
-class IfNotTest(P4EbpfTest):
-
-    p4_file_path = "p4testdata/simple-fwd-if-not.p4"
-
-    def runTest(self):
-        pkt = testutils.simple_ip_packet()
-        testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_no_packet(self, pkt, PORT1)
-
-
 @tc_only
 class PSAResubmitTest(P4EbpfTest):
 

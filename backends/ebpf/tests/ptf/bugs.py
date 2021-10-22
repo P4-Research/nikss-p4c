@@ -38,3 +38,13 @@ class Issue177(P4EbpfTest):
 
     def runTest(self):
         self.table_add(table="ingress_test_tbl", keys=["11:22:33:44:55:66", 0x8100], action=1)
+
+
+class IfNotTest(P4EbpfTest):
+
+    p4_file_path = "samples/p4testdata/simple-fwd-if-not.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_no_packet(self, pkt, PORT1)

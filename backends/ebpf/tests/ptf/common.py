@@ -43,6 +43,13 @@ def table_caching_only(cls):
     return cls
 
 
+def disable_table_caching(cls):
+    if cls.is_table_caching_test(cls):
+        cls.skip = True
+        cls.skip_reason = "too complex program with table caching"
+    return cls
+
+
 class EbpfTest(BaseTest):
     skip = False
     skip_reason = ''
