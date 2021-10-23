@@ -506,9 +506,9 @@ void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
     // Tracing significantly reduces the number of maximum instructions.
     // As tracing is only used for testing, decrease the maximum number
     // of ternary masks to 3, if enabled.
-    // Otherwise, set 32 as maximum number of ternary masks due to BPF_COMPLEXITY_LIMIT_JMP_SEQ.
+    // Otherwise, set 128 as maximum number of ternary masks due to BPF_COMPLEXITY_LIMIT_JMP_SEQ.
     // TODO: find better solution to workaround BPF_COMPLEXITY_LIMIT_JMP_SEQ.
-    unsigned maxTernaryMasks = program->options.emitTraceMessages ? 3 : 32;
+    unsigned maxTernaryMasks = program->options.emitTraceMessages ? 3 : 128;
     builder->appendFormat("#define MAX_%s_MASKS %d", keyTypeName.toUpper(), maxTernaryMasks);
     builder->newline();
 
