@@ -158,8 +158,6 @@ class OptimizedXDPEgressDeparserPSA : public XDPEgressDeparserPSA {
     OptimizedXDPEgressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
                                   const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
             XDPEgressDeparserPSA(program, control, parserHeaders, istd) {
-        outerHdrLengthVar = "egress_" + outerHdrLengthVar;
-        outerHdrOffsetVar = "egress_" + outerHdrOffsetVar;
     }
 
     void emit(CodeBuilder* builder) override;
@@ -167,8 +165,6 @@ class OptimizedXDPEgressDeparserPSA : public XDPEgressDeparserPSA {
     void setIngressDeparser(XDPDeparserPSA* ig_deparser) {
         this->ig_deparser = ig_deparser;
         ig_deparser->codeGen->asPointerVariables.insert(ig_deparser->headers->name.name);
-        ig_deparser->outerHdrLengthVar = "ingress_" + ig_deparser->outerHdrLengthVar;
-        ig_deparser->outerHdrOffsetVar = "ingress_" + ig_deparser->outerHdrOffsetVar;
     }
 
     /* This function removes headers that are:
@@ -180,8 +176,8 @@ class OptimizedXDPEgressDeparserPSA : public XDPEgressDeparserPSA {
      * as they are removed by egress pipeline. */
     void optimizeHeadersToEmit(EBPFOptimizedEgressParserPSA* eg_prs);
 
-    void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
-                    cstring &headerExpression) const override;
+//    void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
+//                    cstring &headerExpression) const override;
 };
 
 class OptimizedXDPIngressDeparserPSA : public XDPIngressDeparserPSA {

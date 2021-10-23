@@ -763,9 +763,6 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
         builder->newline();
         builder->blockEnd(true);
         builder->emitIndent();
-        builder->appendFormat("unsigned ingress_%s = md->packetOffsetInBits", offsetVar.c_str());
-        builder->endOfStatement(true);
-        builder->emitIndent();
         builder->appendLine("struct psa_ingress_output_metadata_t ingress_ostd = md->ostd;");
         if (options.generateHdrInMap) {
             emitCPUMAPHeadersInitializers(builder);
@@ -857,7 +854,6 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
                                     sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
     this->emitTrafficManager(builder);
-    builder->newline();
     builder->blockEnd(true);
 }
 
