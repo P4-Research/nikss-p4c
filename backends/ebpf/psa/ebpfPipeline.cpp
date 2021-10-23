@@ -30,8 +30,11 @@ void EBPFPipeline::emit(CodeBuilder* builder) {
         emitCPUMAPInitializers(builder);
         builder->newline();
         emitHeadersFromCPUMAP(builder);
+        builder->newline();
+        emitMetadataFromCPUMAP(builder);
+        builder->newline();
     }
-    builder->newline();
+
     emitPSAControlDataTypes(builder);
     msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d",
                                  sectionName);
@@ -714,6 +717,8 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
         emitCPUMAPInitializers(builder);
         builder->newline();
         emitHeadersFromCPUMAP(builder);
+        builder->newline();
+        emitMetadataFromCPUMAP(builder);
         builder->newline();
     }
 
