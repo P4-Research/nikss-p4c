@@ -670,8 +670,6 @@ void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
     builder->append("return XDP_DROP;");
     builder->newline();
     builder->emitIndent();
-    builder->appendLine("__builtin_memset(xdp2tc_md, 0, sizeof(struct xdp2tc_metadata));");
-    builder->emitIndent();
     if (program->options.generateHdrInMap) {
         builder->appendFormat("xdp2tc_md->headers = *%s", this->headers->name.name);
     } else {
@@ -681,9 +679,6 @@ void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
     builder->endOfStatement(true);
     builder->emitIndent();
     builder->appendFormat("xdp2tc_md->ostd = %s", this->istd->name.name);
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->appendFormat("xdp2tc_md->packetOffsetInBits = %s", this->program->offsetVar);
     builder->endOfStatement(true);
 
     builder->emitIndent();
