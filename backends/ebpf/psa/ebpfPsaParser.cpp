@@ -243,8 +243,7 @@ void EBPFPsaParser::emitRejectState(CodeBuilder* builder) {
     builder->endOfStatement(true);
 }
 
-// =====================EBPFOptimizedEgressParserPSA=============================
-bool EBPFOptimizedEgressParserPSA::isHeaderExtractedByParser(cstring hdrName) {
+bool EBPFPsaParser::isHeaderExtractedByParser(cstring hdrName) {
     for (auto state : parserBlock->states) {
         for (auto c : state->components) {
             if (c->is<IR::MethodCallStatement>()) {
@@ -272,6 +271,8 @@ bool EBPFOptimizedEgressParserPSA::isHeaderExtractedByParser(cstring hdrName) {
     return false;
 }
 
+
+// =====================EBPFOptimizedEgressParserPSA=============================
 bool OptimizedEgressParserStateVisitor::shouldMoveOffset(cstring hdr) {
     for (auto h : parser->headersToSkipMovingOffset) {
         if (h.endsWith(hdr)) {

@@ -150,22 +150,13 @@ class XDPEgressDeparserPSA : public XDPDeparserPSA {
 };
 
 class OptimizedXDPEgressDeparserPSA : public XDPEgressDeparserPSA {
-    XDPDeparserPSA* ig_deparser;
  public:
-    std::map<cstring, const IR::Type_Header *> removedHeadersToEmit;
-    unsigned egressStartPacketOffset = 0;
-
     OptimizedXDPEgressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
                                   const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
             XDPEgressDeparserPSA(program, control, parserHeaders, istd) {
     }
 
     void emit(CodeBuilder* builder) override;
-
-    void setIngressDeparser(XDPDeparserPSA* ig_deparser) {
-        this->ig_deparser = ig_deparser;
-        ig_deparser->codeGen->asPointerVariables.insert(ig_deparser->headers->name.name);
-    }
 
     /* This function removes headers that are:
      * - deparsed in ingress deparser
@@ -182,6 +173,9 @@ class OptimizedXDPEgressDeparserPSA : public XDPEgressDeparserPSA {
 
 class OptimizedXDPIngressDeparserPSA : public XDPIngressDeparserPSA {
  public:
+    std::vector<cstring> optimizedHeadersExpressions;
+    std::vector<const IR::Type_Header *> optimizedHeadersToEmit;
+    std::map<cstring, const IR::Type_Header *> removedHeadersToEmit;
     bool forceEmitDeparser = false;
     OptimizedXDPIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
                                    const IR::Parameter *parserHeaders, const IR::Parameter *istd) :

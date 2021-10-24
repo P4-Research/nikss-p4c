@@ -58,6 +58,8 @@ class EBPFPsaParser : public EBPFParser {
     void emitTypes(CodeBuilder* builder) override;
     void emitValueSetInstances(CodeBuilder* builder) override;
     void emitRejectState(CodeBuilder* builder) override;
+
+    bool isHeaderExtractedByParser(cstring hdr);
 };
 
 
@@ -86,8 +88,6 @@ class EBPFOptimizedEgressParserPSA : public EBPFPsaParser {
                                  const P4::TypeMap* typeMap) : EBPFPsaParser(program, block, typeMap) {
         visitor = new OptimizedEgressParserStateVisitor(program->refMap, program->typeMap, this);
     }
-
-    bool isHeaderExtractedByParser(cstring hdr);
 };
 
 }  // namespace EBPF

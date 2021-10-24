@@ -685,6 +685,51 @@ const PSAArch * ConvertToEbpfPSA::build(const IR::ToplevelBlock *tlb) {
     }
 }
 
+void ConvertToEbpfPSA::optimizePipeline() {
+    auto ig_deparser = ebpf_psa_arch->xdpIngress->deparser->to<OptimizedXDPIngressDeparserPSA>();
+    auto eg_deparser = ebpf_psa_arch->xdpEgress->deparser;
+
+    auto eg_parser = ebpf_psa_arch->xdpEgress->parser->to<EBPFOptimizedEgressParserPSA>();
+    auto eg_control = ebpf_psa_arch->xdpEgress->control;
+
+    // remove headers from ingress deparser that are deparsed at ingress, but are removed from packet by egress.
+    for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
+        cstring hdr = ig_deparser->headersExpressions[i];
+        if (ig_deparser->isHeaderEmitted(hdr) && eg_parser->isHeaderExtractedByParser(hdr) &&
+            !eg_deparser->isHeaderEmitted(hdr)) {
+            eg_parser->headersToSkipMovingOffset.insert(ig_deparser->headersExpressions[i]);
+            ig_deparser->headersToEmit.erase(ig_deparser->headersToEmit.begin() + (unsigned int) i);
+            ig_deparser->headersExpressions.erase(ig_deparser->headersExpressions.begin() + (unsigned int) i);
+        }
+    }
+
+    if (ig_deparser->headersToEmit.empty() ||
+        eg_deparser->headersToEmit.empty()) {
+        return;
+    }
+
+    ig_deparser->optimizedHeadersExpressions = std::vector<cstring>(ig_deparser->headersExpressions);
+    ig_deparser->optimizedHeadersToEmit = std::vector<const IR::Type_Header *>(ig_deparser->headersToEmit);
+    for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
+        auto hdrToEmit = ig_deparser->headersToEmit[i];
+        cstring hdr = ig_deparser->headersExpressions[i];
+
+        if (hdr == eg_deparser->headersExpressions[i] && eg_parser->isHeaderExtractedByParser(hdr)) {
+            ig_deparser->removedHeadersToEmit.emplace(hdr, ig_deparser->headersToEmit[i]);
+            ig_deparser->optimizedHeadersToEmit.erase(std::find(
+                    ig_deparser->optimizedHeadersToEmit.begin(),
+                    ig_deparser->optimizedHeadersToEmit.end(),
+                    hdrToEmit));
+            ig_deparser->optimizedHeadersExpressions.erase(std::find(
+                    ig_deparser->optimizedHeadersExpressions.begin(),
+                    ig_deparser->optimizedHeadersExpressions.end(),
+                    hdr));
+        } else {
+            break;
+        }
+    }
+}
+
 const IR::Node *ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
     ebpf_psa_arch = build(tlb);
 
@@ -693,10 +738,7 @@ const IR::Node *ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
             ebpf_psa_arch->xdpIngress->deparser->to<OptimizedXDPIngressDeparserPSA>()
                     ->forceEmitDeparser = true;
         }
-        ebpf_psa_arch->xdpEgress->deparser->to<OptimizedXDPEgressDeparserPSA>()->
-                setIngressDeparser(ebpf_psa_arch->xdpIngress->deparser->to<XDPDeparserPSA>());
-        ebpf_psa_arch->xdpEgress->deparser->to<OptimizedXDPEgressDeparserPSA>()->
-                optimizeHeadersToEmit(ebpf_psa_arch->xdpEgress->parser->to<EBPFOptimizedEgressParserPSA>());
+        this->optimizePipeline();
     }
 
     return tlb;
