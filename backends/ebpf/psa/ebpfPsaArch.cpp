@@ -381,6 +381,11 @@ void PSAArch::emitGlobalHeadersMetadata(CodeBuilder *builder) const {
         userMetadataType->declare(builder, "cpumap_usermeta", false);
     }
 
+
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    // hook is added to avoid compiler errors when both headers and user_metadata are empty.
+    builder->append("__u8 __hook");
     builder->endOfStatement(true);
 
     builder->blockEnd(false);
