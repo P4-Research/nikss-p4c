@@ -704,7 +704,7 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     if (!options.egressOptimization ||
-        deparser->to<OptimizedXDPIngressDeparserPSA>()->forceEmitDeparser) {
+        deparser->to<OptimizedXDPIngressDeparserPSA>()->skipEgress) {
         this->emitTrafficManager(builder);
     }
     builder->blockEnd(true);

@@ -736,7 +736,7 @@ const IR::Node *ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
     if (options.generateToXDP && options.egressOptimization) {
         if (ebpf_psa_arch->xdpEgress->isEmpty()) {
             ebpf_psa_arch->xdpIngress->deparser->to<OptimizedXDPIngressDeparserPSA>()
-                    ->forceEmitDeparser = true;
+                    ->skipEgress = true;
         }
         this->optimizePipeline();
     }

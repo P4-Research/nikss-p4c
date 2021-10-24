@@ -176,7 +176,7 @@ class OptimizedXDPIngressDeparserPSA : public XDPIngressDeparserPSA {
     std::vector<cstring> optimizedHeadersExpressions;
     std::vector<const IR::Type_Header *> optimizedHeadersToEmit;
     std::map<cstring, const IR::Type_Header *> removedHeadersToEmit;
-    bool forceEmitDeparser = false;
+    bool skipEgress = false;
     OptimizedXDPIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
                                    const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
             XDPIngressDeparserPSA(program, control, parserHeaders, istd) {}
