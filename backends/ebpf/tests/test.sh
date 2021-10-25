@@ -151,9 +151,9 @@ if [ ! -z "$HDR2MAP_ARG" ]; then
   fi
 fi
 
-TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
 TEST_CASE=$@
 for xdp_enabled in "${XDP[@]}" ; do
+  TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
   TEST_PARAMS+=";xdp='$xdp_enabled'"
   for xdp2tc_mode in "${XDP2TC_MODE[@]}" ; do
     TEST_PARAMS+=";xdp2tc='$xdp2tc_mode'"
