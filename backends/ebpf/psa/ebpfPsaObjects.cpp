@@ -509,7 +509,7 @@ void EBPFTablePSA::emitCacheInstance(CodeBuilder* builder) {
 
     // TODO: make cache size calculation more smart
     size_t cacheSize = std::max((size_t) 1, size / 2);
-    builder->target->emitTableDecl(builder, cacheTableName, TableCache,
+    builder->target->emitTableDecl(builder, cacheTableName, TableHashLRU,
                                    "struct " + keyTypeName, "struct " + cacheValueTypeName,
                                    cacheSize);
 }
