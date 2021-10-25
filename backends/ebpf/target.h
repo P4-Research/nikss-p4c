@@ -30,7 +30,7 @@ enum TableKind {
     TableHash,
     TableArray,
     TablePerCPUArray,
-    TableLPMTrie, // longest prefix match trie
+    TableLPMTrie,  // longest prefix match trie
     TableHashLRU
 };
 
