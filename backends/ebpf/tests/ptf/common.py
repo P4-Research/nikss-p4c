@@ -36,18 +36,16 @@ def hdr2map_required(cls):
     return cls
 
 
+def hdr2map_required_with_table_caching(cls):
+    if cls.is_table_caching_test(cls):
+        cls.hdr2map_required = True
+    return cls
+
+
 def table_caching_only(cls):
     if not cls.is_table_caching_test(cls):
         cls.skip = True
         cls.skip_reason = "table caching test"
-    return cls
-
-
-def disable_table_caching(cls):
-    # TODO: require hdr2map instead of skipping (for now this not work)
-    if cls.is_table_caching_test(cls):
-        cls.skip = True
-        cls.skip_reason = "too complex program with table caching"
     return cls
 
 

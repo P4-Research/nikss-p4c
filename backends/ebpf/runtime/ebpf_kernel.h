@@ -169,7 +169,7 @@ struct {                                 \
     __uint(pinning, LIBBPF_PIN_BY_NAME); \
     __array(values, struct INNER_NAME);  \
 } NAME SEC(".maps");
-#define REGISTER_TABLE_DIGEST(NAME, TYPE, KEY_SIZE, VALUE_TYPE, MAX_ENTRIES) \
+#define REGISTER_TABLE_NO_KEY_TYPE(NAME, TYPE, KEY_SIZE, VALUE_TYPE, MAX_ENTRIES) \
 struct {                                 \
     __uint(type, TYPE);                  \
     __uint(key_size, KEY_SIZE);          \

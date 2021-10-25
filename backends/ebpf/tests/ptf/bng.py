@@ -203,7 +203,7 @@ class BNGTest(P4EbpfTest):
                            action=2)
 
 
-@disable_table_caching
+@hdr2map_required_with_table_caching
 class PPPoEUpstreamTest(BNGTest):
 
     def doRunTest(self, pkt):
@@ -249,7 +249,7 @@ class PPPoEUpstreamTest(BNGTest):
             self.doRunTest(pkt)
 
 
-@disable_table_caching
+@hdr2map_required_with_table_caching
 class PPPoEDownstreamTest(BNGTest):
 
     def doRunTest(self, pkt):
