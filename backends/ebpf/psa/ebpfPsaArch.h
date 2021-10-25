@@ -96,7 +96,7 @@ class ConvertToEbpfPSA : public Transform {
     const PSAArch *build(const IR::ToplevelBlock *prog);
     const IR::Node *preorder(IR::ToplevelBlock *p) override;
 
-    void optimizePipeline();
+    void optimizePipeline(EBPFPipeline *ingress, EBPFPipeline* egress);
 
     const PSAArch *getPSAArchForEBPF() { return ebpf_psa_arch; }
 };

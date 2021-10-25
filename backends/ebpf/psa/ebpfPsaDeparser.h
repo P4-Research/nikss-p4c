@@ -171,6 +171,21 @@ class OptimizedXDPEgressDeparserPSA : public XDPEgressDeparserPSA {
 //                    cstring &headerExpression) const override;
 };
 
+class OptimizedTCIngressDeparserPSA : public TCIngressDeparserPSA {
+ public:
+    std::vector<cstring> optimizedHeadersExpressions;
+    std::vector<const IR::Type_Header *> optimizedHeadersToEmit;
+    std::map<cstring, const IR::Type_Header *> removedHeadersToEmit;
+    bool skipEgress = false;
+    OptimizedTCIngressDeparserPSA(const EBPFProgram *program,
+                                  const IR::ControlBlock *control,
+                                  const IR::Parameter *parserHeaders,
+                                  const IR::Parameter *istd) :
+            TCIngressDeparserPSA(program, control, parserHeaders, istd) {}
+
+    void emit(CodeBuilder* builder) override;
+};
+
 class OptimizedXDPIngressDeparserPSA : public XDPIngressDeparserPSA {
  public:
     std::vector<cstring> optimizedHeadersExpressions;
