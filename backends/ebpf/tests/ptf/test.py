@@ -553,7 +553,7 @@ class QoSPSATest(P4EbpfTest):
 
 @table_caching_only
 class LPMTableCachePSATest(P4EbpfTest):
-    p4_file_path = "samples/p4testdata/table-cache-lpm.p4"
+    p4_file_path = "p4testdata/table-cache-lpm.p4"
 
     def runTest(self):
         self.table_add(table="ingress_tbl_lpm", keys=["00:11:22:33:44:55"], action=1, data=["11:22:33:44:55:66"])
@@ -578,7 +578,7 @@ class LPMTableCachePSATest(P4EbpfTest):
 
 @table_caching_only
 class TernaryTableCachePSATest(P4EbpfTest):
-    p4_file_path = "samples/p4testdata/table-cache-ternary.p4"
+    p4_file_path = "p4testdata/table-cache-ternary.p4"
 
     def runTest(self):
         self.table_add(table="ingress_tbl_ternary", keys=["00:11:22:33:44:55"], action=1, data=["11:22:33:44:55:66"])
