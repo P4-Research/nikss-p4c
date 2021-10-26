@@ -112,25 +112,25 @@ class EbpfTest(BaseTest):
                       .format(name, key, hex(expected_value), hex(value)))
 
     def xdp2tc_mode(self):
-        return testutils.test_param_get("xdp2tc")
+        return testutils.test_param_get('xdp2tc')
 
     def is_xdp_test(self):
-        return "xdp" in testutils.test_params_get()
+        return testutils.test_param_get('xdp') == 'True'
 
     def setUp(self):
         super(EbpfTest, self).setUp()
         self.dataplane = ptf.dataplane_instance
         self.dataplane.flush()
-
+        logger.info("\nUsing test params: %s", testutils.test_params_get())
         if "namespace" in testutils.test_params_get():
             self.switch_ns = testutils.test_param_get("namespace")
-        logger.info("Using namespace: %s", self.switch_ns)
         self.interfaces = testutils.test_param_get("interfaces").split(",")
-        logger.info("Using interfaces: %s", str(self.interfaces))
 
         self.exec_ns_cmd("psabpf-ctl pipeline load id {} {}".format(TEST_PIPELINE_ID, self.test_prog_image), "Can't load programs into eBPF subsystem")
 
         for intf in self.interfaces:
+            if intf == "psa_recirc" and self.is_xdp_test():
+                continue
             self.add_port(dev=intf)
 
         if self.ctool_file_path:
@@ -169,12 +169,20 @@ class P4EbpfTest(EbpfTest):
         head, tail = os.path.split(self.p4_file_path)
         filename = tail.split(".")[0]
         self.test_prog_image = os.path.join("ptf_out", filename + ".o")
-        xdp2tc_mode = "meta" if self.xdp2tc_mode() is None else self.xdp2tc_mode()
-        p4args = "--trace --xdp2tc=" + xdp2tc_mode
+        p4args = "--trace"
+        if "xdp2tc" in testutils.test_params_get():
+            p4args += " --xdp2tc=" + testutils.test_param_get("xdp2tc")
+
         if self.is_xdp_test():
             p4args += " --xdp"
-        if self.hdr2map_required:
+
+        if testutils.test_param_get('hdr2Map') == 'True':
             p4args += " --hdr2Map"
+        else:
+            if self.hdr2map_required:
+                self.skipTest("hdr2Map required for the PTF test")
+
+        logger.info("P4ARGS=" + p4args)
         self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "
                       "ARGS=\"{cargs}\" P4C=p4c-ebpf P4ARGS=\"{p4args}\" psa".format(
                             output=self.test_prog_image,

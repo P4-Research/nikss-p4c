@@ -41,6 +41,9 @@ void DeparserBodyTranslator::processMethod(const P4::ExternMethod *method) {
 
 void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     codeGen->setBuilder(builder);
+    if (program->options.generateHdrInMap) {
+        codeGen->asPointerVariables.insert(this->headers->name.name);
+    }
 
     for (auto a : controlBlock->container->controlLocals)
         emitDeclaration(builder, a);

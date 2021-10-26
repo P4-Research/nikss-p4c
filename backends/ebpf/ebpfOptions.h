@@ -50,9 +50,8 @@ class EbpfOptions : public CompilerOptions {
         }
 
         if (generateToXDP && xdp2tcMode == XDP2TC_META) {
-            ::warning(ErrorType::WARN_INVALID,
-                      "XDP2TC 'meta' mode cannot be used if XDP is enabled. "
-                      "Falling back to 'head' mode.");
+            std::cerr << "XDP2TC 'meta' mode cannot be used if XDP is enabled. "
+                         "Falling back to 'head' mode." << std::endl;
             xdp2tcMode = XDP2TC_HEAD;
         } else if (generateToXDP && xdp2tcMode == XDP2TC_NONE) {
             // use 'head' mode by default; it's the most safe option.

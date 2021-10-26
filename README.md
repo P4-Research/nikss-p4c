@@ -139,10 +139,10 @@ We use the PTF framework to test every new feature of PSA-eBPF. Follow the comma
 
 ```bash
 $ cd backends/ebpf/tests
-# to run PTF tests in the TC mode
+# the below test will run PTF tests for both BPF hooks and all combinations of compiler's flags.
 $ sudo ./test.sh
-# to run PTF tests in the XDP mode
-$ sudo ./test.sh --xdp
+# in order to run a PTF test for a selected BPF hook and/or combination of flags, follow the usage guide:
+$ sudo ./test.sh --help
 ```
 
 You can also run a single PTF test or a group of tests defined in a file:
@@ -150,12 +150,8 @@ You can also run a single PTF test or a group of tests defined in a file:
 ```bash
 # run a single PTF test defined in test.py
 $ sudo ./test.sh test.VerifyPSATest
-# or for XDP:
-$ sudo ./test.sh --xdp test.VerifyPSATest
 # run a group of PTF tests defined in l2l3_switch.py
 $ sudo ./test.sh l2l3_switch
-# or..
-$ sudo ./test.sh --xdp l2l3_switch
 ```
 
 # Running performance tests

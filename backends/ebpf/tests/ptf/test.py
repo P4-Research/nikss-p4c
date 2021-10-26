@@ -20,7 +20,7 @@ ALL_PORTS = [PORT0, PORT1, PORT2]
 
 class SimpleForwardingPSATest(P4EbpfTest):
 
-    p4_file_path = "samples/p4testdata/simple-fwd.p4"
+    p4_file_path = "p4testdata/simple-fwd.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -34,7 +34,7 @@ class SimpleForwardingPSATest(P4EbpfTest):
 
 class IfNotTest(P4EbpfTest):
 
-    p4_file_path = "samples/p4testdata/simple-fwd-if-not.p4"
+    p4_file_path = "p4testdata/simple-fwd-if-not.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -45,7 +45,7 @@ class IfNotTest(P4EbpfTest):
 @tc_only
 class PSAResubmitTest(P4EbpfTest):
 
-    p4_file_path = "samples/p4testdata/resubmit.p4"
+    p4_file_path = "p4testdata/resubmit.p4"
 
     def runTest(self):
         pkt = testutils.simple_eth_packet()
@@ -56,7 +56,7 @@ class PSAResubmitTest(P4EbpfTest):
 
 class SimpleTunnelingPSATest(P4EbpfTest):
 
-    p4_file_path = "samples/p4testdata/psa-tunneling.p4"
+    p4_file_path = "p4testdata/psa-tunneling.p4"
 
     def runTest(self):
         pkt = Ether(dst="11:11:11:11:11:11") / testutils.simple_ip_only_packet(ip_dst="192.168.1.1")
@@ -102,7 +102,7 @@ class PSACloneI2E(P4EbpfTest):
 
 
 class EgressTrafficManagerDropPSATest(P4EbpfTest):
-    p4_file_path = "samples/p4testdata/etm-drop.p4"
+    p4_file_path = "p4testdata/etm-drop.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55', eth_src='55:44:33:22:11:00')
@@ -123,7 +123,7 @@ class EgressTrafficManagerClonePSATest(P4EbpfTest):
       2.2. Packet was cloned at egress and processed by egress pipeline at interface PORT2 (bpf ifindex = 6).
            The cloned packet should have destination MAC address set to '00:00:00:00:00:11'.
     """
-    p4_file_path = "samples/p4testdata/etm-clone-e2e.p4"
+    p4_file_path = "p4testdata/etm-clone-e2e.p4"
 
     def runTest(self):
         # create clone session table
@@ -154,7 +154,7 @@ class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
     Any packet modification should be done on egress.
     Open question: how to verify here that the eBPF program did above operations?
     """
-    p4_file_path = "samples/p4testdata/etm-recirc.p4"
+    p4_file_path = "p4testdata/etm-recirc.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55', eth_src='55:44:33:22:11:00')
@@ -200,7 +200,7 @@ class MulticastPSATest(P4EbpfTest):
 
 class SimpleLpmP4PSATest(P4EbpfTest):
 
-    p4_file_path = "samples/p4testdata/psa-lpm.p4"
+    p4_file_path = "p4testdata/psa-lpm.p4"
 
     def runTest(self):
         # This command adds LPM entry 10.10.0.0/16 with action forwarding on port 6 (PORT2 in ptf)
@@ -223,7 +223,7 @@ class SimpleLpmP4PSATest(P4EbpfTest):
 
 class SimpleLpmP4TwoKeysPSATest(P4EbpfTest):
 
-    p4_file_path = "samples/p4testdata/psa-lpm-two-keys.p4"
+    p4_file_path = "p4testdata/psa-lpm-two-keys.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(ip_src='1.2.3.4', ip_dst='10.10.11.11')
@@ -247,7 +247,7 @@ class SimpleLpmP4TwoKeysPSATest(P4EbpfTest):
 
 
 class CountersPSATest(P4EbpfTest):
-    p4_file_path = "samples/p4testdata/counters.p4"
+    p4_file_path = "p4testdata/counters.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55',
@@ -278,7 +278,7 @@ class CountersPSATest(P4EbpfTest):
 
 
 class DirectCountersPSATest(P4EbpfTest):
-    p4_file_path = "samples/p4testdata/direct-counters.p4"
+    p4_file_path = "p4testdata/direct-counters.p4"
 
     def runTest(self):
         self.table_add(table="ingress_tbl1", keys=["10.0.0.0"], action=1)
@@ -302,7 +302,7 @@ class DirectCountersPSATest(P4EbpfTest):
 
 class DigestPSATest(P4EbpfTest):
 
-    p4_file_path = "samples/p4testdata/digest.p4"
+    p4_file_path = "p4testdata/digest.p4"
     ctool_file_path = "ptf/tools/read_digest.c"
 
     def double_to_hex(self, f):
@@ -336,7 +336,7 @@ class DigestPSATest(P4EbpfTest):
 
 class PSATernaryTest(P4EbpfTest):
 
-    p4_file_path = "samples/p4testdata/psa-ternary.p4"
+    p4_file_path = "p4testdata/psa-ternary.p4"
 
     def runTest(self):
         # flow rules for 'tbl_ternary_0'
@@ -377,7 +377,7 @@ class ParserValueSetPSATest(P4EbpfTest):
     4. Change IP destination address to the same as in value_set.
     5. Send UDP packet. Should be passed.
     """
-    p4_file_path = "samples/p4testdata/pvs.p4"
+    p4_file_path = "p4testdata/pvs.p4"
 
     def runTest(self):
         pkt = testutils.simple_udp_packet(ip_dst='8.8.8.8', udp_dport=80)
@@ -401,7 +401,7 @@ class ParserValueSetPSATest(P4EbpfTest):
 
 class ConstDefaultActionPSATest(P4EbpfTest):
 
-    p4_file_path = "samples/p4testdata/action-const-default.p4"
+    p4_file_path = "p4testdata/action-const-default.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -419,7 +419,7 @@ class ConstDefaultActionPSATest(P4EbpfTest):
 
 class ConstEntryPSATest(P4EbpfTest):
 
-    p4_file_path = "samples/p4testdata/const-entry.p4"
+    p4_file_path = "p4testdata/const-entry.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -437,7 +437,7 @@ class ConstEntryPSATest(P4EbpfTest):
 
 class ConstEntryAndActionPSATest(P4EbpfTest):
 
-    p4_file_path = "samples/p4testdata/const-entry-and-action.p4"
+    p4_file_path = "p4testdata/const-entry-and-action.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -467,7 +467,7 @@ class ConstEntryAndActionPSATest(P4EbpfTest):
 
 
 class VerifyPSATest(P4EbpfTest):
-    p4_file_path = "samples/p4testdata/verify.p4"
+    p4_file_path = "p4testdata/verify.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -496,7 +496,7 @@ class RandomPSATest(P4EbpfTest):
     Read random data generated by data plane.
     Verify that random values from received packet are in the right range.
     """
-    p4_file_path = "samples/p4testdata/random.p4"
+    p4_file_path = "p4testdata/random.p4"
 
     class RandomHeader(Packet):
         name = "random"
@@ -543,7 +543,7 @@ class RandomPSATest(P4EbpfTest):
 @tc_only
 class QoSPSATest(P4EbpfTest):
 
-    p4_file_path = "samples/p4testdata/cos-psa.p4"
+    p4_file_path = "p4testdata/cos-psa.p4"
 
     def runTest(self):
         ip_pkt = testutils.simple_ip_packet()

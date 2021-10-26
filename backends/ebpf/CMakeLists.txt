@@ -166,7 +166,6 @@ add_dependencies(p4c_driver linkp4cebpf)
 set(EBPF_DRIVER_KERNEL "${CMAKE_CURRENT_SOURCE_DIR}/run-ebpf-test.py -t kernel -c \"${P4C_BINARY_DIR}/p4c-ebpf\"")
 set(EBPF_DRIVER_BCC "${CMAKE_CURRENT_SOURCE_DIR}/run-ebpf-test.py -t bcc -c \"${P4C_BINARY_DIR}/p4c-ebpf\"")
 set(EBPF_DRIVER_TEST "${CMAKE_CURRENT_SOURCE_DIR}/run-ebpf-test.py -t test -c \"${P4C_BINARY_DIR}/p4c-ebpf\"")
-set(EBPF_PTF_XDP_DRIVER_TEST "${CMAKE_CURRENT_SOURCE_DIR}/run-ptf-tests.sh --xdp")
 set(EBPF_PTF_DRIVER_TEST "${CMAKE_CURRENT_SOURCE_DIR}/run-ptf-tests.sh")
 
 set (XFAIL_TESTS_KERNEL
@@ -312,9 +311,8 @@ p4c_add_test_with_args("ebpf" ${EBPF_DRIVER_TEST} TRUE "testdata/p4_16_samples/e
 
 # Execute PSA PTF test only when: (1) kernel is supported, (2) libbpf (3) bpftool and (4) PTF are available
 if (SUPPORTS_KERNEL_PSA)
-  set (ebpf-psa-ptf_timeout 1000)
+  set (ebpf-psa-ptf_timeout 2000)
   p4c_add_tests("ebpf-psa-ptf" ${EBPF_PTF_DRIVER_TEST} ${EBPF_PSA_PTF_TEST_SUITES} "")
-  p4c_add_tests("ebpf-psa-ptf-xdp" ${EBPF_PTF_XDP_DRIVER_TEST} ${EBPF_PSA_PTF_TEST_SUITES} "")
 endif()
 
 message(STATUS "Done with configuring BPF back end")
