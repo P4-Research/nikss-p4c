@@ -16,11 +16,13 @@ TEST_PIPELINE_ID = 999
 TEST_PIPELINE_MOUNT_PATH = "/sys/fs/bpf/pipeline{}".format(TEST_PIPELINE_ID)
 PIPELINE_MAPS_MOUNT_PATH = "{}/maps".format(TEST_PIPELINE_MOUNT_PATH)
 
+
 def tc_only(cls):
     if cls.is_xdp_test(cls):
         cls.skip = True
         cls.skip_reason = "not supported by XDP"
     return cls
+
 
 def xdp2tc_head_not_supported(cls):
     if cls.xdp2tc_mode(cls) == 'head':
@@ -28,9 +30,24 @@ def xdp2tc_head_not_supported(cls):
         cls.skip_reason = "not supported for xdp2tc=head"
     return cls
 
+
 def hdr2map_required(cls):
     cls.hdr2map_required = True
     return cls
+
+
+def hdr2map_required_with_table_caching(cls):
+    if cls.is_table_caching_test(cls):
+        cls.hdr2map_required = True
+    return cls
+
+
+def table_caching_only(cls):
+    if not cls.is_table_caching_test(cls):
+        cls.skip = True
+        cls.skip_reason = "table caching test"
+    return cls
+
 
 class EbpfTest(BaseTest):
     skip = False
@@ -117,6 +134,9 @@ class EbpfTest(BaseTest):
     def is_xdp_test(self):
         return testutils.test_param_get('xdp') == 'True'
 
+    def is_table_caching_test(self):
+        return testutils.test_param_get('table_caching') == 'True'
+
     def setUp(self):
         super(EbpfTest, self).setUp()
         self.dataplane = ptf.dataplane_instance
@@ -182,6 +202,9 @@ class P4EbpfTest(EbpfTest):
             if self.hdr2map_required:
                 self.skipTest("hdr2Map required for the PTF test")
 
+        if self.is_table_caching_test():
+            p4args += " --table-caching"
+
         logger.info("P4ARGS=" + p4args)
         self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "
                       "ARGS=\"{cargs}\" P4C=p4c-ebpf P4ARGS=\"{p4args}\" psa".format(
@@ -196,7 +219,7 @@ class P4EbpfTest(EbpfTest):
         super(P4EbpfTest, self).tearDown()
 
     def clone_session_create(self, id):
-        self.exec_ns_cmd("psabpf-ctl clone-session create pipe {} id {}".format(TEST_PIPELINE_ID, id))\
+        self.exec_ns_cmd("psabpf-ctl clone-session create pipe {} id {}".format(TEST_PIPELINE_ID, id))
 
     def clone_session_add_member(self, clone_session, egress_port, instance=1, cos=0):
         self.exec_ns_cmd("psabpf-ctl clone-session add-member pipe {} id {} egress-port {} instance {} cos {}".format(

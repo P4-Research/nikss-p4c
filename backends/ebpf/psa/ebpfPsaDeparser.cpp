@@ -301,11 +301,11 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
 
 void EBPFDeparserPSA::emitDigestInstances(CodeBuilder* builder) const {
     for (auto digest : digests) {
-        builder->appendFormat("REGISTER_TABLE(%s, %s, 0, sizeof( ",
+        builder->appendFormat("REGISTER_TABLE_NO_KEY_TYPE(%s, %s, 0, ",
                               digest.first, "BPF_MAP_TYPE_QUEUE");
         auto type = EBPFTypeFactory::instance->create(digest.second->to<IR::Type_Type>()->type);
         type->declare(builder, "", false);
-        builder->appendFormat("), %d)", maxDigestQueueSize);
+        builder->appendFormat(", %d)", maxDigestQueueSize);
         builder->newline();
     }
 }

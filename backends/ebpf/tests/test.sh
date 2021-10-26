@@ -8,10 +8,11 @@ function print_help() {
   echo "Syntax: ./test.sh [OPTIONS] [TEST_CASE]"
   echo
   echo "OPTIONS:"
-  echo "--bpf-hook     A BPF hook that should be used as a main attach point <tc|xdp>"
-  echo "--xdp2tc       A mode to pass metadata from XDP to TC programs <meta|head|cpumap>."
-  echo "--hdr2map      Allocate header structure in per-CPU map <on|off>."
-  echo "--help         Print this message."
+  echo "--bpf-hook       A BPF hook that should be used as a main attach point <tc|xdp>"
+  echo "--xdp2tc         A mode to pass metadata from XDP to TC programs <meta|head|cpumap>."
+  echo "--hdr2map        Allocate header structure in per-CPU map <on|off>."
+  echo "--table-caching  Use table cache for tables with LPM and/or ternary key <on|off>."
+  echo "--help           Print this message."
   echo
 }
 
@@ -53,6 +54,10 @@ for i in "$@"; do
       ;;
     --hdr2map=*)
       HDR2MAP_ARG="${i#*=}"
+      shift # past argument=value
+      ;;
+    --table-caching=*)
+      TABLE_CACHING_ARG="${i#*=}"
       shift # past argument=value
       ;;
     *)
@@ -122,6 +127,7 @@ ulimit -l 65536
 declare -a XDP=("False" "True")
 declare -a XDP2TC_MODE=("head" "cpumap" "meta")
 declare -a HDR2MAP=("False" "True")
+declare -a TABLE_CACHING=("False" "True")
 
 if [ ! -z "$BPF_HOOK" ]; then
   if [ "$BPF_HOOK" == "tc" ]; then
@@ -151,27 +157,38 @@ if [ ! -z "$HDR2MAP_ARG" ]; then
   fi
 fi
 
+if [ ! -z "$TABLE_CACHING_ARG" ]; then
+  if [ "$TABLE_CACHING_ARG" == "on" ]; then
+    TABLE_CACHING=( "True" )
+  elif [ "$TABLE_CACHING_ARG" == "off" ]; then
+    TABLE_CACHING=( "False" )
+  else
+    echo "Wrong --table-caching value provided; running script for both enabled/disabled."
+  fi
+fi
+
 TEST_CASE=$@
 for xdp_enabled in "${XDP[@]}" ; do
-  TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
-  TEST_PARAMS+=";xdp='$xdp_enabled'"
   for xdp2tc_mode in "${XDP2TC_MODE[@]}" ; do
-    TEST_PARAMS+=";xdp2tc='$xdp2tc_mode'"
     for hdr2map_enabled in "${HDR2MAP[@]}" ; do
-      TEST_PARAMS+=";hdr2Map='$hdr2map_enabled'"
-      # FIXME: hdr2map is not working properly for TC, we should fix it in future
-      if [ "$xdp_enabled" == "False" ] && [ "$hdr2map_enabled" == "True" ]; then
-        echo "Test skipped because hdr2map doesn't work properly in TC"
-        continue
-      fi
-      # Start tests
-      ptf \
-      --test-dir ptf/ \
-      --test-params="$TEST_PARAMS" \
-      --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
-      --interface 4@s1-eth4 --interface 5@s1-eth5 $TEST_CASE
-      exit_on_error
-      rm -rf ptf_out
+      for table_caching_enabled in "${TABLE_CACHING[@]}" ; do
+        # FIXME: hdr2map is not working properly for TC, we should fix it in future
+        if [ "$xdp_enabled" == "False" ] && [ "$hdr2map_enabled" == "True" ]; then
+          echo "Test skipped because hdr2map doesn't work properly in TC"
+          continue
+        fi
+        TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
+        TEST_PARAMS+=";xdp='$xdp_enabled';xdp2tc='$xdp2tc_mode';hdr2Map='$hdr2map_enabled'"
+        TEST_PARAMS+=";table_caching='$table_caching_enabled'"
+        # Start tests
+        ptf \
+          --test-dir ptf/ \
+          --test-params="$TEST_PARAMS" \
+          --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
+          --interface 4@s1-eth4 --interface 5@s1-eth5 $TEST_CASE
+        exit_on_error
+        rm -rf ptf_out
+      done
     done
   done
 done

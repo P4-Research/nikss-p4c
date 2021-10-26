@@ -32,15 +32,6 @@ class SimpleForwardingPSATest(P4EbpfTest):
         self.remove_maps(["ingress_tbl_fwd", "ingress_tbl_fwd_defaultAction"])
         super(SimpleForwardingPSATest, self).tearDown()
 
-class IfNotTest(P4EbpfTest):
-
-    p4_file_path = "p4testdata/simple-fwd-if-not.p4"
-
-    def runTest(self):
-        pkt = testutils.simple_ip_packet()
-        testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_no_packet(self, pkt, PORT1)
-
 
 @tc_only
 class PSAResubmitTest(P4EbpfTest):
@@ -558,3 +549,55 @@ class QoSPSATest(P4EbpfTest):
 
         testutils.send_packet(self, PORT0, arp_pkt)
         testutils.verify_packet(self, exp_arp_pkt, PORT1)
+
+
+@table_caching_only
+class LPMTableCachePSATest(P4EbpfTest):
+    p4_file_path = "p4testdata/table-cache-lpm.p4"
+
+    def runTest(self):
+        self.table_add(table="ingress_tbl_lpm", keys=["00:11:22:33:44:55"], action=1, data=["11:22:33:44:55:66"])
+        pkt = testutils.simple_ip_packet(eth_dst="00:11:22:33:44:55")
+        exp_pkt = testutils.simple_ip_packet(eth_dst="11:22:33:44:55:66")
+        exp_pkt[Ether].type = 0x8601
+
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, exp_pkt, PORT1)
+
+        # modify cache directly - verify that it is used (modify to NoAction)
+        self.table_update(table="ingress_tbl_lpm_cache",
+                          keys=["64w0x60", "32w0", "32w0x55443322"], action=0, data=["160w0"])
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
+
+        # update table - verify clearing cache
+        self.table_update(table="ingress_tbl_lpm", keys=["00:11:22:33:44:55"], action=1, data=["11:22:33:44:55:66"])
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, exp_pkt, PORT1)
+
+
+@table_caching_only
+class TernaryTableCachePSATest(P4EbpfTest):
+    p4_file_path = "p4testdata/table-cache-ternary.p4"
+
+    def runTest(self):
+        self.table_add(table="ingress_tbl_ternary", keys=["00:11:22:33:44:55"], action=1, data=["11:22:33:44:55:66"])
+        pkt = testutils.simple_ip_packet(eth_dst="00:11:22:33:44:55")
+        exp_pkt = testutils.simple_ip_packet(eth_dst="11:22:33:44:55:66")
+        exp_pkt[Ether].type = 0x8601
+
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, exp_pkt, PORT1)
+
+        # modify cache directly - verify that it is used (make action default)
+        self.table_update(table="ingress_tbl_ternary_cache",
+                          keys=["00:11:22:33:44:55"],
+                          action=1, data=["32w0", "11:22:33:44:55:66", "16w0", "64w0"])
+        testutils.send_packet(self, PORT0, pkt)
+        exp_pkt[Ether].type = 0x0800
+        testutils.verify_packet(self, exp_pkt, PORT1)
+
+        # delete table entry - verify clearing cache
+        self.table_delete(table="ingress_tbl_ternary", keys=["00:11:22:33:44:55"])
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)

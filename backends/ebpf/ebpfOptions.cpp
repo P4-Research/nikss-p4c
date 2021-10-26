@@ -25,7 +25,7 @@ EbpfOptions::EbpfOptions() {
                 "Enable tracing of packet flow");
         registerOption("--xdp", nullptr,
                 [this](const char*) { generateToXDP = true; return true; },
-                "Compile and generate the P4 prog to XDP layer");
+                "[psa] Compile and generate the P4 prog to XDP layer");
         registerOption("--xdp2tc", nullptr,
                 [this](const char* arg) {
                     if (!strcmp(arg, "meta")) {
@@ -40,5 +40,8 @@ EbpfOptions::EbpfOptions() {
                 "[psa] Select the mode used to pass metadata from XDP to TC.");
         registerOption("--hdr2Map", nullptr,
                 [this](const char*) { generateHdrInMap = true; return true; },
-                "Compile and generate the P4 prog headers and metadata in PERCPU_MAP");
+                "[psa] Compile and generate the P4 prog headers and metadata in PERCPU_MAP");
+        registerOption("--table-caching", nullptr,
+                [this](const char *) { enableTableCache = true; return true; },
+                "[psa] Enable caching entries for tables with lpm or ternary key");
 }

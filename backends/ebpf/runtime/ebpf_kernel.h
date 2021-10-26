@@ -96,84 +96,83 @@ struct bpf_elf_map {
 #define REGISTER_START()
 #ifndef BTF
 /* Note: pinning exports the table name globally, do not remove */
-#define REGISTER_TABLE(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES) \
+#define REGISTER_TABLE(NAME, TYPE, KEY_TYPE, VALUE_TYPE, MAX_ENTRIES) \
 struct bpf_elf_map SEC("maps") NAME = {          \
-    .type        = TYPE,             \
-    .size_key    = KEY_SIZE,         \
-    .size_value  = VALUE_SIZE,       \
-    .max_elem    = MAX_ENTRIES,      \
-    .pinning     = 2,                \
-    .flags       = 0,                \
+    .type        = TYPE,               \
+    .size_key    = sizeof(KEY_TYPE),   \
+    .size_value  = sizeof(VALUE_TYPE), \
+    .max_elem    = MAX_ENTRIES,        \
+    .pinning     = 2,                  \
+    .flags       = 0,                  \
 };
-#define REGISTER_TABLE_INNER(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, ID, INNER_IDX) \
+#define REGISTER_TABLE_INNER(NAME, TYPE, KEY_TYPE, VALUE_TYPE, MAX_ENTRIES, ID, INNER_IDX) \
 struct bpf_elf_map SEC("maps") NAME = {          \
-    .type        = TYPE,             \
-    .size_key    = KEY_SIZE,         \
-    .size_value  = VALUE_SIZE,       \
-    .max_elem    = MAX_ENTRIES,      \
-    .pinning     = 2,                \
-    .flags       = 0,                \
-    .id          = ID,               \
-    .inner_idx   = INNER_IDX,        \
+    .type        = TYPE,               \
+    .size_key    = sizeof(KEY_TYPE),   \
+    .size_value  = sizeof(VALUE_TYPE), \
+    .max_elem    = MAX_ENTRIES,        \
+    .pinning     = 2,                  \
+    .flags       = 0,                  \
+    .id          = ID,                 \
+    .inner_idx   = INNER_IDX,          \
 };
-#define REGISTER_TABLE_OUTER(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, INNER_ID, INNER_NAME) \
+#define REGISTER_TABLE_OUTER(NAME, TYPE, KEY_TYPE, VALUE_TYPE, MAX_ENTRIES, INNER_ID, INNER_NAME) \
 struct bpf_elf_map SEC("maps") NAME = {          \
-    .type        = TYPE,             \
-    .size_key    = KEY_SIZE,         \
-    .size_value  = VALUE_SIZE,       \
-    .max_elem    = MAX_ENTRIES,      \
-    .pinning     = 2,                \
-    .flags       = 0,                \
-    .inner_id    = INNER_ID,         \
+    .type        = TYPE,               \
+    .size_key    = sizeof(KEY_TYPE),   \
+    .size_value  = sizeof(VALUE_TYPE), \
+    .max_elem    = MAX_ENTRIES,        \
+    .pinning     = 2,                  \
+    .flags       = 0,                  \
+    .inner_id    = INNER_ID,           \
 };
-#define REGISTER_TABLE_FLAGS(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, FLAGS) \
+#define REGISTER_TABLE_FLAGS(NAME, TYPE, KEY_TYPE, VALUE_TYPE, MAX_ENTRIES, FLAGS) \
 struct bpf_elf_map SEC("maps") NAME = {          \
-    .type        = TYPE,             \
-    .size_key    = KEY_SIZE,         \
-    .size_value  = VALUE_SIZE,       \
-    .max_elem    = MAX_ENTRIES,      \
-    .pinning     = 2,                \
-    .flags       = FLAGS,            \
+    .type        = TYPE,               \
+    .size_key    = sizeof(KEY_TYPE),   \
+    .size_value  = sizeof(VALUE_TYPE), \
+    .max_elem    = MAX_ENTRIES,        \
+    .pinning     = 2,                  \
+    .flags       = FLAGS,              \
 };
 #else
-#define REGISTER_TABLE(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES) \
+#define REGISTER_TABLE(NAME, TYPE, KEY_TYPE, VALUE_TYPE, MAX_ENTRIES) \
 struct {                                 \
     __uint(type, TYPE);                  \
-    __uint(key_size, KEY_SIZE);          \
-    __uint(value_size, VALUE_SIZE);      \
+    KEY_TYPE *key;                       \
+    VALUE_TYPE *value;                   \
     __uint(max_entries, MAX_ENTRIES);    \
     __uint(pinning, LIBBPF_PIN_BY_NAME); \
 } NAME SEC(".maps");
-#define REGISTER_TABLE_FLAGS(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, FLAGS) \
+#define REGISTER_TABLE_FLAGS(NAME, TYPE, KEY_TYPE, VALUE_TYPE, MAX_ENTRIES, FLAGS) \
 struct {                                 \
     __uint(type, TYPE);                  \
-    __uint(key_size, KEY_SIZE);          \
-    __uint(value_size, VALUE_SIZE);      \
+    KEY_TYPE *key;                       \
+    VALUE_TYPE *value;                   \
     __uint(max_entries, MAX_ENTRIES);    \
     __uint(pinning, LIBBPF_PIN_BY_NAME); \
     __uint(map_flags, FLAGS);            \
 } NAME SEC(".maps");
-#define REGISTER_TABLE_INNER(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, ID, INNER_IDX) \
+#define REGISTER_TABLE_INNER(NAME, TYPE, KEY_TYPE, VALUE_TYPE, MAX_ENTRIES, ID, INNER_IDX) \
 struct NAME {                            \
     __uint(type, TYPE);                  \
-    __uint(key_size, KEY_SIZE);          \
-    __uint(value_size, VALUE_SIZE);      \
+    KEY_TYPE *key;                       \
+    VALUE_TYPE *value;                   \
     __uint(max_entries, MAX_ENTRIES);    \
 } NAME SEC(".maps");
-#define REGISTER_TABLE_OUTER(NAME, TYPE, KEY_SIZE, VALUE_SIZE, MAX_ENTRIES, INNER_ID, INNER_NAME) \
-struct {                                 \
-    __uint(type, TYPE);                  \
-    __uint(key_size, KEY_SIZE);          \
-    __uint(value_size, VALUE_SIZE);      \
-    __uint(max_entries, MAX_ENTRIES);    \
-    __uint(pinning, LIBBPF_PIN_BY_NAME); \
-    __array(values, struct INNER_NAME);     \
-} NAME SEC(".maps");
-/* Due to using spin locks different map declaration is needed */
-#define REGISTER_TABLE_WITH_SPINLOCK(NAME, TYPE, KEY_TYPE, VALUE_TYPE, MAX_ENTRIES) \
+#define REGISTER_TABLE_OUTER(NAME, TYPE, KEY_TYPE, VALUE_TYPE, MAX_ENTRIES, INNER_ID, INNER_NAME) \
 struct {                                 \
     __uint(type, TYPE);                  \
     KEY_TYPE *key;                       \
+    VALUE_TYPE *value;                   \
+    __uint(max_entries, MAX_ENTRIES);    \
+    __uint(pinning, LIBBPF_PIN_BY_NAME); \
+    __array(values, struct INNER_NAME);  \
+} NAME SEC(".maps");
+#define REGISTER_TABLE_NO_KEY_TYPE(NAME, TYPE, KEY_SIZE, VALUE_TYPE, MAX_ENTRIES) \
+struct {                                 \
+    __uint(type, TYPE);                  \
+    __uint(key_size, KEY_SIZE);          \
     VALUE_TYPE *value;                   \
     __uint(max_entries, MAX_ENTRIES);    \
     __uint(pinning, LIBBPF_PIN_BY_NAME); \

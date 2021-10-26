@@ -56,6 +56,7 @@ core_router_mac = HOST1_MAC
 PORT0 = 0
 PORT1 = 1
 
+
 def pkt_route(pkt, mac_dst):
     new_pkt = pkt.copy()
     new_pkt[Ether].src = pkt[Ether].dst
@@ -88,10 +89,12 @@ def pkt_add_mpls(pkt, label, ttl, cos=0, s=1):
            MPLS(label=label, cos=cos, s=s, ttl=ttl) / \
            pkt[Ether].payload
 
+
 def pkt_decrement_ttl(pkt):
     if IP in pkt:
         pkt[IP].ttl -= 1
     return pkt
+
 
 class BNGTest(P4EbpfTest):
 
@@ -200,6 +203,7 @@ class BNGTest(P4EbpfTest):
                            action=2)
 
 
+@hdr2map_required_with_table_caching
 class PPPoEUpstreamTest(BNGTest):
 
     def doRunTest(self, pkt):
@@ -244,6 +248,8 @@ class PPPoEUpstreamTest(BNGTest):
             pkt[IP].src = CLIENT_IP
             self.doRunTest(pkt)
 
+
+@hdr2map_required_with_table_caching
 class PPPoEDownstreamTest(BNGTest):
 
     def doRunTest(self, pkt):
@@ -258,7 +264,6 @@ class PPPoEDownstreamTest(BNGTest):
         testutils.send_packet(self, PORT1, pkt)
         testutils.verify_packet(self, exp_pkt, PORT0)
         testutils.verify_no_other_packets(self)
-
 
     def runTest(self):
         # Setup port 1: packets on this port are double tagged packets
