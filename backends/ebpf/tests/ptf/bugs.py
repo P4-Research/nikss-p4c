@@ -42,7 +42,7 @@ class Issue177(P4EbpfTest):
 
 class IfNotTest(P4EbpfTest):
 
-    p4_file_path = "samples/p4testdata/simple-fwd-if-not.p4"
+    p4_file_path = "p4testdata/simple-fwd-if-not.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
