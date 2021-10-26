@@ -135,7 +135,7 @@ class EbpfTest(BaseTest):
         return testutils.test_param_get('xdp') == 'True'
 
     def is_table_caching_test(self):
-        return testutils.test_params_get('table_caching') == 'True'
+        return testutils.test_param_get('table_caching') == 'True'
 
     def setUp(self):
         super(EbpfTest, self).setUp()
@@ -206,7 +206,6 @@ class P4EbpfTest(EbpfTest):
             p4args += " --table-caching"
 
         logger.info("P4ARGS=" + p4args)
-
         self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "
                       "ARGS=\"{cargs}\" P4C=p4c-ebpf P4ARGS=\"{p4args}\" psa".format(
                             output=self.test_prog_image,
