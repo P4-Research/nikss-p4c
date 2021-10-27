@@ -62,8 +62,10 @@ class EBPFTablePSA : public EBPFTable {
 
     bool tableCacheEnabled = false;
     cstring cacheValueTypeName;
+    cstring cacheKeyTypeName;
     cstring cacheTableName;
     void tryEnableTableCache();
+    void enableTableCache(bool customKeyType, bool customValueType);
 
  public:
     cstring name;
@@ -78,7 +80,7 @@ class EBPFTablePSA : public EBPFTable {
     EBPFTablePSA(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name);
 
     void emitInstance(CodeBuilder* builder) override;
-    void emitValueType(CodeBuilder* builder) override;
+    void emitTypes(CodeBuilder* builder) override;
     void emitValueActionIDNames(CodeBuilder* builder) override;
     void emitValueStructStructure(CodeBuilder* builder) override;
     void emitAction(CodeBuilder* builder, cstring valueName, cstring actionRunVariable) override;
@@ -89,9 +91,9 @@ class EBPFTablePSA : public EBPFTable {
     bool dropOnNoMatchingEntryFound() const override;
     bool singleActionRun() const override;
 
-    void emitCacheTypes(CodeBuilder* builder);
+    virtual void emitCacheTypes(CodeBuilder* builder);
     void emitCacheInstance(CodeBuilder* builder);
-    void emitCacheLookup(CodeBuilder* builder, cstring key, cstring value);
+    virtual void emitCacheLookup(CodeBuilder* builder, cstring key, cstring value);
     void emitCacheUpdate(CodeBuilder* builder, cstring key, cstring value) override;
     bool cacheEnabled() override { return tableCacheEnabled; }
 
