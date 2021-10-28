@@ -675,9 +675,14 @@ void EBPFActionSelectorPSA::emitCacheVariables(CodeBuilder* builder) {
         return;
 
     cacheKeyVar = program->refMap->newName("key_cache");
+    cacheDoUpdateVar = program->refMap->newName("do_update_cache");
 
     builder->emitIndent();
     builder->appendFormat("struct %s %s = {0}", cacheKeyTypeName.c_str(), cacheKeyVar.c_str());
+    builder->endOfStatement(true);
+
+    builder->emitIndent();
+    builder->appendFormat("u8 %s = 0", cacheDoUpdateVar.c_str());
     builder->endOfStatement(true);
 }
 
@@ -739,6 +744,10 @@ void EBPFActionSelectorPSA::emitCacheLookup(CodeBuilder* builder, cstring key, c
 
     builder->target->emitTraceMessage(builder, "ActionSelector: cache miss, nevermind");
 
+    builder->emitIndent();
+    builder->appendFormat("%s = 1", cacheDoUpdateVar.c_str());
+    builder->endOfStatement(true);
+
     // do normal lookup at this indent level and then end block
 }
 
@@ -747,8 +756,8 @@ void EBPFActionSelectorPSA::emitCacheUpdate(CodeBuilder* builder, cstring key, c
         return;
 
     builder->emitIndent();
-    builder->appendFormat("if (%s != NULL && %s != 2) ",
-                          value.c_str(), groupStateVarName.c_str());
+    builder->appendFormat("if (%s != NULL && %s != 0) ",
+                          value.c_str(), cacheDoUpdateVar.c_str());
     builder->blockStart();
 
     builder->emitIndent();

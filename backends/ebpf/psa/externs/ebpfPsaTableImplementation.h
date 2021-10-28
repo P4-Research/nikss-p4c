@@ -76,6 +76,7 @@ class EBPFActionSelectorPSA : public EBPFTableImplementationPSA {
     cstring isGroupEntryName;
     cstring groupStateVarName;
     cstring cacheKeyVar;
+    cstring cacheDoUpdateVar;
 
     EBPFHashAlgorithmPSA::argumentsList unpackSelectors();
     selectorsListType getSelectorsFromTable(const EBPFTablePSA * instance);
