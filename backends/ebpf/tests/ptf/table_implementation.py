@@ -224,6 +224,13 @@ class SimpleActionSelectorPSATest(ActionSelectorTest):
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, pkt, output_ports)
 
+        if self.is_table_caching_test():
+            # modify cache directly and verify its usage
+            self.table_update(table="MyIC_as_cache", keys=[7, "22:33:44:55:66:78"],
+                              action=1, data=[5])
+            testutils.send_packet(self, PORT0, pkt)
+            testutils.verify_packet(self, pkt, PORT1)
+
 
 class ActionSelectorTwoTablesSameInstancePSATest(ActionSelectorTest):
     """
