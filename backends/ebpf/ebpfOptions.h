@@ -39,6 +39,8 @@ class EbpfOptions : public CompilerOptions {
     bool enableTableCache = false;
     // Generate headers and user metadata in/from CPUMAP
     bool generateHdrInMap = false;
+    // maximum number of ternary masks
+    unsigned int maxTernaryMasks = 128;
 
     // XDP-related opts
     bool generateToXDP = false;
