@@ -193,10 +193,10 @@ void EBPFTablePSA::tryEnableTableCache() {
                   table->container->name);
         return;
     }
-    enableTableCache(false, true);
+    createCacheTypeNames(false, true);
 }
 
-void EBPFTablePSA::enableTableCache(bool customKeyType, bool customValueType) {
+void EBPFTablePSA::createCacheTypeNames(bool isCacheKeyType, bool isCacheValueType) {
     if (!program->options.enableTableCache)
         return;
 
@@ -204,11 +204,11 @@ void EBPFTablePSA::enableTableCache(bool customKeyType, bool customValueType) {
     cacheTableName = name + "_cache";
 
     cacheKeyTypeName = keyTypeName;
-    if (customKeyType)
+    if (isCacheKeyType)
         cacheKeyTypeName = keyTypeName + "_cache";
 
     cacheValueTypeName = valueTypeName;
-    if (customValueType)
+    if (isCacheValueType)
         cacheValueTypeName = valueTypeName + "_cache";
 }
 

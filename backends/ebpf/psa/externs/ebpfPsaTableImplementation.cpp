@@ -233,7 +233,7 @@ EBPFActionSelectorPSA::EBPFActionSelectorPSA(const EBPFProgram* program, CodeGen
 
     groupsMapSize = 0;
 
-    enableTableCache(true, false);
+    createCacheTypeNames(true, false);
 }
 
 void EBPFActionSelectorPSA::emitInitializer(CodeBuilder *builder) {

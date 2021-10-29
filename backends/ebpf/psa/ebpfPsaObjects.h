@@ -65,7 +65,7 @@ class EBPFTablePSA : public EBPFTable {
     cstring cacheKeyTypeName;
     cstring cacheTableName;
     void tryEnableTableCache();
-    void enableTableCache(bool customKeyType, bool customValueType);
+    void createCacheTypeNames(bool isCacheKeyType, bool isCacheValueType);
 
  public:
     cstring name;
