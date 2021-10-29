@@ -32,6 +32,8 @@ BPFNAME=$(basename $(BPFOBJ))
 
 CFILE=
 
+MCPU="-mcpu=v1"
+
 all: verify_target_bpf $(BPFOBJ)
 
 # Verify LLVM compiler tools are available and bpf target is supported by llc
@@ -85,7 +87,8 @@ ebpf:
 .PHONY: psa
 psa: P4ARGS_TARGET= --arch psa
 psa: $(BPFNAME).c
-	$(CLANG) -target bpf -DBTF $(ARGS) $(CFLAGS) $(INCLUDES) -c -o $(BPFNAME).o $(BPFNAME).c
+	$(CLANG) $(ARGS) $(CFLAGS) $(INCLUDES) -emit-llvm -DBTF -c -o  $(BPFNAME).bc $(BPFNAME).c
+	$(LLC) -march=bpf $(MCPU) -filetype=obj -o $(BPFNAME).o $(BPFNAME).bc
 
 clean:
 	rm -f *.o *.bc $(BPFNAME).c $(BPFNAME).h

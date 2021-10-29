@@ -1,3 +1,9 @@
+0. Compile P4 program
+```bash
+$ make -f <path>/kernel.mk MCPU="-mcpu=v2 -mattr=+alu32" \
+BPFOBJ=<output path>/l2fwd.o P4FILE=<path>/l2fwd.p4 \
+ARGS=-DPSA_PORT_RECIRCULATE=2 P4C=p4c-ebpf P4ARGS="--hdr2Map --xdp2tc=cpumap" psa
+```
 
 1. Check sections of eBPF program:
 

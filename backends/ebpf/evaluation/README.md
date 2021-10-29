@@ -32,3 +32,13 @@ As a second argument you must pass a directory, where a *.p4 or *.c file is loca
 
 The test utility script will also look for `commands.txt` file, in which you can define control plane operations (e.g. adding table entries). It is recommended to use `bpftool`. 
 
+# How to use evaluation number of instructions script?
+Edit PROGRAMS variable to pass program names you want to evaluate.  
+Edit OPTIONS to choose LLVM compilation options.  
+Edit P4ARGS to choose p4c-ebpf compiler options.  
+
+After that jus run:
+```bash
+$ ./eval_instructions.sh
+```
+Results will be available in the same directory under `$RESULTS` path.
