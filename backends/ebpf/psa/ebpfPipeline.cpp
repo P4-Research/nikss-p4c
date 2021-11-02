@@ -532,8 +532,10 @@ void TCEgressPipeline::emit(CodeBuilder *builder) {
         control->codeGen->asPointerVariables.insert(control->headers->name.name);
         deparser->codeGen->asPointerVariables.insert(control->headers->name.name);
         builder->emitIndent();
-        builder->appendFormat("__u64 bmd_key = (__u64) %s", model.CPacketName.name.c_str());
+        builder->appendFormat("__u64 bmd_key = %s->packet_identifier",
+                              this->compilerGlobalMetadata);
         builder->endOfStatement(true);
+        builder->target->emitTraceMessage(builder, "reading packet identifier=%u", 1, "bmd_key");
         emitLocalHeaderInstancesAsPointers(builder);
         builder->emitIndent();
         builder->target->emitTableLookup(builder, "bmd_table", "bmd_key",

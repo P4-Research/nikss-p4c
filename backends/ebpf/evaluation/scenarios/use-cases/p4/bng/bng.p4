@@ -673,7 +673,7 @@ parser egress_parser(packet_in packet, out headers_t hdr, inout local_metadata_t
         packet.extract(hdr.vlan_tag);
         local_metadata.bng.s_tag = hdr.vlan_tag.vlan_id;
         eth_type_t eth_type = packet.lookahead<eth_type_t>();
-        transition select(eth_type.value){
+        transition select(eth_type.value) {
             ETHERTYPE_VLAN: parse_inner_vlan_tag;
             default: parse_eth_type;
         }

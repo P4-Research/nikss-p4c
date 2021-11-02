@@ -749,8 +749,7 @@ const IR::Node *ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
             egress = ebpf_psa_arch->tcEgress;
         }
         if (egress->isEmpty()) {
-            ingress->deparser->to<OptimizedXDPIngressDeparserPSA>()
-                    ->skipEgress = true;
+            ingress->deparser->skipEgress = true;
         }
         this->optimizePipeline(ingress, egress);
     }

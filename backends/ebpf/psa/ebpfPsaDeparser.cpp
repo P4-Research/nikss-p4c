@@ -1,3 +1,4 @@
+#include <boost/algorithm/string.hpp>
 #include "ebpfPsaDeparser.h"
 #include "ebpfPipeline.h"
 
@@ -40,9 +41,22 @@ void DeparserBodyTranslator::processMethod(const P4::ExternMethod *method) {
 }
 
 bool EBPFDeparserPSA::isHeaderEmitted(cstring hdrName) const {
-    return std::find(headersExpressions.begin(),
-                     headersExpressions.end(),
-                     hdrName) != headersExpressions.end();
+    for (unsigned long i = 0; i < this->headersExpressions.size(); i++) {
+        auto headerExpression = headersExpressions[i];
+        std::vector<cstring> components;
+        if (headerExpression.find("->")) {
+            cstring hdr = headerExpression.replace("-", "");
+            boost::split(components, hdr.c_str(), [](char c) { return c == '>'; });
+        } else {
+            boost::split(components, headerExpression.c_str(), [](char c) { return c == '.'; });
+        }
+        // this kind of expression is independent of whether hdr is pointer or not.
+        if (hdrName.find(components[0]) && hdrName.find(components[1])) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
@@ -234,7 +248,7 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
                      (loadSize - alignment - widthToEmit) : (loadSize - widthToEmit);
     cstring hdrField = headerExpression + "." + field;
     if (program->options.egressOptimization &&
-        this->is<OptimizedXDPIngressDeparserPSA>()) {
+        (this->is<OptimizedXDPIngressDeparserPSA>() || this->is<OptimizedTCIngressDeparserPSA>())) {
         hdrField = field + "_val";
         builder->emitIndent();
         type->emit(builder);
@@ -405,6 +419,32 @@ void TCIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     // clone support
     builder->appendFormat("if (%s->clone) ", istd->name.name);
     builder->blockStart();
+
+    if (program->options.egressOptimization) {
+        // put metadata into shared map
+        builder->emitIndent();
+        builder->appendFormat("__u64 bmd_key = (__u64) %s", program->model.CPacketName.name.c_str());
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        builder->appendFormat("%s->packet_identifier = bmd_key",
+                              dynamic_cast<const EBPFPipeline*>(program)->compilerGlobalMetadata);
+        builder->endOfStatement(true);
+        builder->target->emitTraceMessage(builder, "saving packet identifier=%u", 1, "bmd_key");
+        builder->emitIndent();
+        builder->target->emitTableUpdate(builder, "bmd_table",
+                                         "bmd_key",
+                                         "(*" + this->headers->name.name + ")");
+        builder->newline();
+
+        // force egress to
+        auto fields = this->headerType->to<EBPFStructType>()->fields;
+        for (auto f : fields) {
+            builder->emitIndent();
+            builder->appendFormat("%s->%s.ebpf_valid = 0", this->headers->name.name, f->field->name.name);
+            builder->endOfStatement(true);
+        }
+    }
+
     builder->emitIndent();
     builder->appendFormat("do_packet_clones(%s, &clone_session_tbl, %s->clone_session_id,"
                           " CLONE_I2E, 1);", program->model.CPacketName.str(), istd->name.name);
@@ -659,16 +699,6 @@ void OptimizedTCIngressDeparserPSA::emit(CodeBuilder *builder) {
         auto headerExpression = optimizedHeadersExpressions[i];
         emitHeader(builder, headerToEmit, headerExpression);
     }
-    builder->newline();
-
-    // put metadata into shared map
-    builder->emitIndent();
-    builder->appendFormat("__u64 bmd_key = (__u64) %s", program->model.CPacketName.name.c_str());
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->target->emitTableUpdate(builder, "bmd_table",
-                                     "bmd_key",
-                                     this->headers->name.name);
     builder->newline();
 }
 
