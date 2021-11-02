@@ -322,7 +322,7 @@ void PSAArch::emitInstances2TC(CodeBuilder *builder) const {
     if (options.egressOptimization) {
         builder->target->emitTableDecl(builder, "bmd_table", TableHash,
                "u64",
-               "struct " + tcIngress->parser->headerType->to<EBPFStructType>()->name,
+               "struct " + tcIngressForXDP->parser->headerType->to<EBPFStructType>()->name,
                512000);
     }
 
@@ -692,7 +692,10 @@ const PSAArch * ConvertToEbpfPSA::build(const IR::ToplevelBlock *tlb) {
 }
 
 void ConvertToEbpfPSA::optimizePipeline(EBPFPipeline *ingress, EBPFPipeline* egress) {
-    auto ig_deparser = ingress->deparser;
+
+    auto ig_deparser = options.generateToXDP == true ?
+            ingress->deparser->to<OptimizedXDPIngressDeparserPSA>() :
+            ingress->deparser->to<OptimizedTCIngressDeparserPSA>();
     auto eg_deparser = egress->deparser;
 
     auto eg_parser = egress->parser->to<EBPFOptimizedEgressParserPSA>();
@@ -1033,10 +1036,10 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
 
 // =====================EBPFDeparser=============================
 bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
-    if (type == TC_INGRESS && options.egressOptimization) {
-        deparser = new OptimizedTCIngressDeparserPSA(program, ctrl, parserHeaders, istd);
-    } else if (type == TC_INGRESS) {
+    if (type == TC_INGRESS) {
         deparser = new TCIngressDeparserPSA(program, ctrl, parserHeaders, istd);
+    } else if (type == TC_INGRESS && options.egressOptimization) {
+        deparser = new OptimizedTCIngressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == TC_EGRESS) {
         deparser = new TCEgressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == XDP_INGRESS && options.egressOptimization) {
