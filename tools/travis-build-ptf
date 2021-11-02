@@ -76,7 +76,7 @@ function install_ptf() {
 
   # Install Packet Test Framework (aka PTF)
   cd /tmp
-  git clone -b master git://github.com/p4lang/ptf.git
+  git clone -b master https://github.com/p4lang/ptf.git
   cd /tmp/ptf
   python setup.py install
 }
