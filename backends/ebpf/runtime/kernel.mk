@@ -32,7 +32,7 @@ BPFNAME=$(basename $(BPFOBJ))
 
 CFILE=
 
-MCPU="-mcpu=v1"
+MCPU="-mcpu=generic"
 
 all: verify_target_bpf $(BPFOBJ)
 
