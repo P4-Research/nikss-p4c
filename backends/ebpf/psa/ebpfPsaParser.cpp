@@ -271,6 +271,53 @@ bool EBPFPsaParser::isHeaderExtractedByParser(cstring hdrName) {
     return false;
 }
 
+bool EBPFPsaParser::isHeaderExtractedByParserWithNoLookaheadBefore(cstring hdrName) {
+    for (auto state : parserBlock->states) {
+        for (auto c : state->components) {
+            if (c->is<IR::MethodCallStatement>()) {
+                auto mce = c->to<IR::MethodCallStatement>()->methodCall;
+                auto mi = P4::MethodInstance::resolve(mce,
+                                                      program->refMap,
+                                                      program->typeMap);
+                auto extMethod = mi->to<P4::ExternMethod>();
+                if (extMethod != nullptr) {
+                    auto extractedHdr = extMethod->expr->arguments->at(0)->expression;
+                    if (extractedHdr->is<IR::Member>() &&
+                        extractedHdr->to<IR::Member>()->expr->is<IR::PathExpression>()) {
+                        auto name = extractedHdr->to<IR::Member>()->member.name;
+                        auto headers = extractedHdr->to<IR::Member>()->expr->
+                                to<IR::PathExpression>()->path->name.name;
+                        // this kind of expression is independent of whether hdr is pointer or not.
+                        if (hdrName.find(headers) && hdrName.find(name)) {
+                            return true;
+                        }
+                    }
+                }
+            } else if (c->is<IR::AssignmentStatement>()) {
+                // if we met lookahead before the header being checked is extracted,
+                // we return false because header is conditionally extracted.
+                auto as = c->to<IR::AssignmentStatement>();
+                if (auto mce = as->right->to<IR::MethodCallExpression>()) {
+                    auto mi = P4::MethodInstance::resolve(mce,
+                                                          this->program->refMap,
+                                                          this->program->typeMap);
+                    auto extMethod = mi->to<P4::ExternMethod>();
+                    if (extMethod == nullptr)
+                        BUG("Unhandled method %1%", mce);
+
+                    auto decl = extMethod->object;
+                    if (decl == this->packet) {
+                        if (extMethod->method->name.name ==
+                            P4::P4CoreLibrary::instance.packetIn.lookahead.name) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
 
 // =====================EBPFOptimizedEgressParserPSA=============================
 bool OptimizedEgressParserStateVisitor::shouldMoveOffset(cstring hdr) {

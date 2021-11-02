@@ -720,7 +720,7 @@ void ConvertToEbpfPSA::optimizePipeline() {
         cstring hdr = ig_deparser->headersExpressions[i];
 
         if (hdr == eg_deparser->headersExpressions[i] &&
-            eg_parser->isHeaderExtractedByParser(hdr)) {
+            eg_parser->isHeaderExtractedByParserWithNoLookaheadBefore(hdr)) {
             ig_deparser->removedHeadersToEmit.emplace(hdr, ig_deparser->headersToEmit[i]);
             ig_deparser->optimizedHeadersToEmit.erase(std::find(
                     ig_deparser->optimizedHeadersToEmit.begin(),
