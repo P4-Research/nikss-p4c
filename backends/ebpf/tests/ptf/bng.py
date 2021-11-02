@@ -202,7 +202,7 @@ class BNGTest(P4EbpfTest):
             self.table_add(table="ingress_t_line_session_map", keys=[line_id],
                            action=2)
 
-
+@hdr2map_required_with_egress_opt
 @hdr2map_required_with_table_caching
 class PPPoEUpstreamTest(BNGTest):
 
@@ -248,7 +248,7 @@ class PPPoEUpstreamTest(BNGTest):
             pkt[IP].src = CLIENT_IP
             self.doRunTest(pkt)
 
-
+@hdr2map_required_with_egress_opt
 @hdr2map_required_with_table_caching
 class PPPoEDownstreamTest(BNGTest):
 

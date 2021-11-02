@@ -58,7 +58,7 @@ class EBPFPsaParser : public EBPFParser {
     void emitTypes(CodeBuilder* builder) override;
     void emitValueSetInstances(CodeBuilder* builder) override;
     void emitRejectState(CodeBuilder* builder) override;
-    
+
     bool isHeaderExtractedByParser(cstring hdr);
     bool isHeaderExtractedByParserWithNoLookaheadBefore(cstring hdr);
 };

@@ -41,6 +41,10 @@ def hdr2map_required_with_table_caching(cls):
         cls.hdr2map_required = True
     return cls
 
+def hdr2map_required_with_egress_opt(cls):
+    if cls.is_egress_opt_enabled():
+        cls.hdr2map_required = True
+    return cls
 
 def table_caching_only(cls):
     if not cls.is_table_caching_test(cls):
@@ -137,6 +141,9 @@ class EbpfTest(BaseTest):
     def is_table_caching_test(self):
         return testutils.test_param_get('table_caching') == 'True'
 
+    def is_egress_opt_enabled(self):
+        return testutils.test_param_get('egress_optimization') == 'True'
+
     def setUp(self):
         super(EbpfTest, self).setUp()
         self.dataplane = ptf.dataplane_instance
@@ -196,7 +203,7 @@ class P4EbpfTest(EbpfTest):
         if self.is_xdp_test():
             p4args += " --xdp"
 
-        if testutils.test_param_get('egress_optimization') == 'True':
+        if self.is_egress_opt_enabled():
             p4args += " --egress-opt"
 
         if testutils.test_param_get('hdr2Map') == 'True':

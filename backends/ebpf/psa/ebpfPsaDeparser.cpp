@@ -690,54 +690,6 @@ void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
     builder->endOfStatement(true);
 }
 
-void OptimizedXDPIngressDeparserPSA::emitHeader(CodeBuilder *builder,
-                                                const IR::Type_Header *headerToEmit,
-                                                cstring &headerExpression) const {
-    cstring msgStr;
-    builder->emitIndent();
-    builder->append("if (");
-    builder->append(headerExpression);
-    builder->append(".ebpf_valid) ");
-    builder->blockStart();
-    auto program = EBPFControl::program;
-    unsigned width = headerToEmit->width_bits();
-    msgStr = Util::printf_format("Deparser: emitting header %s", headerExpression);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
-
-    builder->emitIndent();
-    builder->appendFormat("if (%s < %s + BYTES(%s + %d)) ",
-                          program->packetEndVar.c_str(),
-                          program->packetStartVar.c_str(),
-                          program->offsetVar.c_str(), width);
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder, "Deparser: invalid packet (packet too short)");
-    builder->emitIndent();
-    // We immediately return instead of jumping to reject state.
-    // It avoids reaching BPF_COMPLEXITY_LIMIT_JMP_SEQ.
-    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
-    builder->newline();
-    builder->blockEnd(true);
-
-    builder->emitIndent();
-    builder->newline();
-    unsigned alignment = 0;
-    for (auto f : headerToEmit->fields) {
-        auto ftype = this->program->typeMap->getType(f);
-        auto etype = EBPFTypeFactory::instance->create(ftype);
-        auto et = dynamic_cast<EBPF::IHasWidth *>(etype);
-        if (et == nullptr) {
-            ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
-                    "Only headers with fixed widths supported %1%", f);
-            return;
-        }
-        emitField(builder, headerExpression, f->name, alignment, etype);
-        alignment += et->widthInBits();
-        alignment %= 8;
-    }
-
-    builder->blockEnd(true);
-}
-
 void OptimizedXDPEgressDeparserPSA::emit(CodeBuilder *builder) {
     codeGen->setBuilder(builder);
     codeGen->asPointerVariables.insert(this->headers->name.name);

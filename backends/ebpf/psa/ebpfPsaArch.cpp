@@ -692,8 +692,9 @@ void ConvertToEbpfPSA::optimizePipeline() {
     auto eg_parser = ebpf_psa_arch->xdpEgress->parser->to<EBPFOptimizedEgressParserPSA>();
     auto eg_control = ebpf_psa_arch->xdpEgress->control;
 
-    // remove headers from ingress deparser that are deparsed at ingress,
-    // but are removed from packet by egress.
+    /* remove headers from ingress deparser that are deparsed at ingress,
+     * but are removed from packet by egress.
+     */
     for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
         cstring hdr = ig_deparser->headersExpressions[i];
         if (ig_deparser->isHeaderEmitted(hdr) && eg_parser->isHeaderExtractedByParser(hdr) &&
@@ -711,6 +712,17 @@ void ConvertToEbpfPSA::optimizePipeline() {
         return;
     }
 
+    /*
+     * Iterate over ingress and egress deparsers.
+     * If:
+     * - both ingress and egress deparsers emit the same header at given position,
+     * - and the header is extracted by egress parser with no lookahead before extract().
+     * we can postpone ingress deparsing of the header to egress deparser.
+     * Iteration is stopped if ingress and egress deparsers are diverged at a given position.
+     * NOTE: if lookahead() is performed before extract() we must deparse the subsequent headers
+     * in the ingress to put actual packet field in the packet buffer. Otherwise, lookahead()
+     * operation may retrieve an old value from the packet buffer.
+     */
     ig_deparser->optimizedHeadersExpressions =
             std::vector<cstring>(ig_deparser->headersExpressions);
     ig_deparser->optimizedHeadersToEmit =
@@ -718,7 +730,6 @@ void ConvertToEbpfPSA::optimizePipeline() {
     for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
         auto hdrToEmit = ig_deparser->headersToEmit[i];
         cstring hdr = ig_deparser->headersExpressions[i];
-
         if (hdr == eg_deparser->headersExpressions[i] &&
             eg_parser->isHeaderExtractedByParserWithNoLookaheadBefore(hdr)) {
             ig_deparser->removedHeadersToEmit.emplace(hdr, ig_deparser->headersToEmit[i]);

@@ -157,18 +157,6 @@ class OptimizedXDPEgressDeparserPSA : public XDPEgressDeparserPSA {
     }
 
     void emit(CodeBuilder* builder) override;
-
-    /* This function removes headers that are:
-     * - deparsed in ingress deparser
-     * - parsed in egress parser
-     * - NOT deparsed in egress deparser
-     * from headersToEmit list.
-     * This is safe because such headers will never be put in the outgoing packet
-     * as they are removed by egress pipeline. */
-    void optimizeHeadersToEmit(EBPFOptimizedEgressParserPSA* eg_prs);
-
-//    void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
-//                    cstring &headerExpression) const override;
 };
 
 class OptimizedXDPIngressDeparserPSA : public XDPIngressDeparserPSA {
@@ -181,8 +169,6 @@ class OptimizedXDPIngressDeparserPSA : public XDPIngressDeparserPSA {
                                    const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
             XDPIngressDeparserPSA(program, control, parserHeaders, istd) {}
 
-    void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
-                            cstring &headerExpression) const override;
     void emit(CodeBuilder* builder) override;
 };
 
