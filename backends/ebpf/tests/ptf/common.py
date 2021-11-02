@@ -196,6 +196,9 @@ class P4EbpfTest(EbpfTest):
         if self.is_xdp_test():
             p4args += " --xdp"
 
+        if testutils.test_param_get('egress_optimization') == 'True':
+            p4args += " --egress-opt"
+
         if testutils.test_param_get('hdr2Map') == 'True':
             p4args += " --hdr2Map"
         else:

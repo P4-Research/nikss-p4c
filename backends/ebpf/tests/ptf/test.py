@@ -482,7 +482,7 @@ class VerifyPSATest(P4EbpfTest):
 
 class BridgedMetadataPSATest(P4EbpfTest):
 
-    p4_file_path = "samples/p4testdata/bridged-metadata.p4"
+    p4_file_path = "p4testdata/bridged-metadata.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
