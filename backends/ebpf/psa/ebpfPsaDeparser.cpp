@@ -610,60 +610,6 @@ void XDPEgressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->blockEnd(true);
 }
 
-void OptimizedTCIngressDeparserPSA::emit(CodeBuilder *builder) {
-    if (this->skipEgress) {
-        EBPFDeparserPSA::emit(builder);
-        return;
-    }
-
-    builder->emitIndent();
-
-    codeGen->setBuilder(builder);
-
-    for (auto a :controlBlock->container->controlLocals)
-        emitDeclaration(builder, a);
-
-    this->emitDeparserExternCalls(builder);
-    builder->newline();
-
-    this->emitPreDeparser(builder);
-    this->emitPreparePacketBuffer(builder);
-
-    builder->emitIndent();
-    builder->appendFormat("%s = %s;",
-                          program->packetStartVar,
-                          builder->target->dataOffset(program->model.CPacketName.str()));
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat("%s = %s;",
-                          program->packetEndVar,
-                          builder->target->dataEnd(program->model.CPacketName.str()));
-    builder->newline();
-
-    builder->emitIndent();
-    builder->appendFormat("%s = 0", program->offsetVar.c_str());
-    builder->endOfStatement(true);
-
-
-    for (auto const& el : removedHeadersToEmit) {
-        builder->emitIndent();
-        builder->appendFormat("%s += %d", program->offsetVar.c_str(), el.second->width_bits());
-        builder->endOfStatement(true);
-    }
-
-    for (unsigned long i = 0; i < this->optimizedHeadersToEmit.size(); i++) {
-        auto headerToEmit = optimizedHeadersToEmit[i];
-        auto headerExpression = optimizedHeadersExpressions[i];
-        emitHeader(builder, headerToEmit, headerExpression);
-    }
-    builder->newline();
-
-    // put metadata into shared map
-    builder->target->emitTableUpdate(builder, "bmd_table",
-                                     program->model.CPacketName.name.c_str(),
-                                     this->headerType->to<EBPFStructType>()->name);
-}
-
 void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
     if (this->skipEgress) {
         EBPFDeparserPSA::emit(builder);
