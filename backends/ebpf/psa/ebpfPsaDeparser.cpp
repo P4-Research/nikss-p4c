@@ -620,7 +620,7 @@ void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
 
     codeGen->setBuilder(builder);
 
-    for (auto a :controlBlock->container->controlLocals)
+    for (auto a : controlBlock->container->controlLocals)
         emitDeclaration(builder, a);
 
     this->emitDeparserExternCalls(builder);
@@ -690,7 +690,8 @@ void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
     builder->endOfStatement(true);
 }
 
-void OptimizedXDPIngressDeparserPSA::emitHeader(CodeBuilder *builder, const IR::Type_Header *headerToEmit,
+void OptimizedXDPIngressDeparserPSA::emitHeader(CodeBuilder *builder,
+                                                const IR::Type_Header *headerToEmit,
                                                 cstring &headerExpression) const {
     cstring msgStr;
     builder->emitIndent();

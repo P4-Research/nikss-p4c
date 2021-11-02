@@ -125,9 +125,7 @@ class EBPFIngressPipeline : public EBPFPipeline {
 class EBPFEgressPipeline : public EBPFPipeline {
  public:
     EBPFEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
-                       P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) {
-
-    }
+                       P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) { }
 
     void emitPSAControlInputMetadata(CodeBuilder* builder) override;
     void emitPSAControlOutputMetadata(CodeBuilder* builder) override;

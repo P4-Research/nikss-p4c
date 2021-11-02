@@ -85,7 +85,8 @@ class EBPFOptimizedEgressParserPSA : public EBPFPsaParser {
     std::set<cstring> headersToSkipMovingOffset;
 
     EBPFOptimizedEgressParserPSA(const EBPFProgram* program, const IR::P4Parser* block,
-                                 const P4::TypeMap* typeMap) : EBPFPsaParser(program, block, typeMap) {
+                                 const P4::TypeMap* typeMap) :
+                                 EBPFPsaParser(program, block, typeMap) {
         visitor = new OptimizedEgressParserStateVisitor(program->refMap, program->typeMap, this);
     }
 };

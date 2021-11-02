@@ -220,7 +220,8 @@ void EBPFEgressPipeline::emitPSAControlInputMetadata(CodeBuilder *builder) {
                           "            .instance = %s,\n"
                           "            .parser_error = %s,\n"
                           "        };",
-                          control->inputStandardMetadata->name.name,  priorityVar.c_str(), ifindexVar.c_str(),
+                          control->inputStandardMetadata->name.name,
+                          priorityVar.c_str(), ifindexVar.c_str(),
                           packetPathVar.c_str(), pktInstanceVar.c_str(), errorVar.c_str());
     builder->newline();
     if (shouldEmitTimestamp()) {
@@ -474,7 +475,8 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
  * - send to port
  */
 void TCIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
-    cstring mcast_grp = Util::printf_format("%s.multicast_group", control->outputStandardMetadata->name.name);
+    cstring mcast_grp = Util::printf_format("%s.multicast_group",
+                                            control->outputStandardMetadata->name.name);
     builder->emitIndent();
     builder->appendFormat("if (%s != 0) ", mcast_grp.c_str());
     builder->blockStart();
@@ -492,15 +494,19 @@ void TCIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->blockEnd(true);
 
     builder->emitIndent();
-    builder->appendFormat("skb->priority = %s.class_of_service;", control->outputStandardMetadata->name.name);
+    builder->appendFormat("skb->priority = %s.class_of_service;",
+                          control->outputStandardMetadata->name.name);
     builder->newline();
 
-    cstring eg_port = Util::printf_format("%s.egress_port", control->outputStandardMetadata->name.name);
-    cstring cos = Util::printf_format("%s.class_of_service", control->outputStandardMetadata->name.name);
+    cstring eg_port = Util::printf_format("%s.egress_port",
+                                          control->outputStandardMetadata->name.name);
+    cstring cos = Util::printf_format("%s.class_of_service",
+                                      control->outputStandardMetadata->name.name);
     builder->target->emitTraceMessage(builder,
             "IngressTM: Sending packet out of port %d with priority %d", 2, eg_port, cos);
     builder->emitIndent();
-    builder->appendFormat("return bpf_redirect(%s.egress_port, 0);", control->outputStandardMetadata->name.name);
+    builder->appendFormat("return bpf_redirect(%s.egress_port, 0);",
+                          control->outputStandardMetadata->name.name);
 }
 
 // =====================TCEgressPipeline=============================
@@ -812,7 +818,8 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
 
         for (auto f : fields) {
             builder->emitIndent();
-            builder->appendFormat("%s->%s.ebpf_valid = 0", parser->headers->name.name, f->field->name.name);
+            builder->appendFormat("%s->%s.ebpf_valid = 0",
+                                  parser->headers->name.name, f->field->name.name);
             builder->endOfStatement(true);
             eg_parser->headersToInvalidate.insert(f->field->name.name);
         }

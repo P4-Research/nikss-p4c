@@ -1,5 +1,5 @@
-#ifndef BACKENDS_EBPF_PSA_BACKEND_H
-#define BACKENDS_EBPF_PSA_BACKEND_H
+#ifndef BACKENDS_EBPF_PSA_BACKEND_H_
+#define BACKENDS_EBPF_PSA_BACKEND_H_
 
 #include "ebpfPsaArch.h"
 
@@ -40,4 +40,4 @@ class PSASwitchBackend {
 
 }  // namespace EBPF
 
-#endif /* BACKENDS_EBPF_PSA_BACKEND_H */
+#endif /* BACKENDS_EBPF_PSA_BACKEND_H_ */
