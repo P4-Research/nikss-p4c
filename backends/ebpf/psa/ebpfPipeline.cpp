@@ -520,19 +520,77 @@ void TCEgressPipeline::emit(CodeBuilder *builder) {
     builder->spc();
     builder->blockStart();
     emitGlobalMetadataInitializer(builder);
-    emitLocalVariables(builder);
+
     emitUserMetadataInstance(builder);
-    emitHeaderInstances(builder);
-    if (options.generateHdrInMap) {
-        emitCPUMAPInitializers(builder);
-        builder->newline();
-        emitHeadersFromCPUMAP(builder);
-        builder->newline();
-        emitMetadataFromCPUMAP(builder);
-    }
     builder->newline();
+
+    emitLocalVariables(builder);
+    builder->newline();
+
+    if (options.egressOptimization) {
+        parser->visitor->asPointerVariables.insert(parser->headers->name.name);
+        control->codeGen->asPointerVariables.insert(control->headers->name.name);
+        deparser->codeGen->asPointerVariables.insert(control->headers->name.name);
+        builder->emitIndent();
+        builder->appendFormat("__u64 bmd_key = (__u64) %s", model.CPacketName.name.c_str());
+        builder->endOfStatement(true);
+        emitLocalHeaderInstancesAsPointers(builder);
+        builder->emitIndent();
+        builder->target->emitTableLookup(builder, "bmd_table", "bmd_key",
+                                         parser->headers->name.name);
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        builder->appendFormat("if (!%s) ", parser->headers->name.name);
+        builder->blockStart();
+        builder->emitIndent();
+        builder->appendFormat("return %s;", dropReturnCode());
+        builder->newline();
+        builder->blockEnd(true);
+        if (options.generateHdrInMap) {
+            emitCPUMAPHeadersInitializers(builder);
+            builder->emitIndent();
+            emitCPUMAPInitializers(builder);
+            builder->newline();
+            emitMetadataFromCPUMAP(builder);
+            builder->newline();
+        }
+    } else {
+        emitHeaderInstances(builder);
+        builder->newline();
+
+        if (options.generateHdrInMap) {
+            emitCPUMAPInitializers(builder);
+            builder->newline();
+            emitHeadersFromCPUMAP(builder);
+            builder->newline();
+            emitMetadataFromCPUMAP(builder);
+            builder->newline();
+        }
+    }
+
     emitPSAControlOutputMetadata(builder);
     emitPSAControlInputMetadata(builder);
+
+    if (options.egressOptimization) {
+        auto eg_parser = parser->to<EBPFOptimizedEgressParserPSA>();
+        auto fields = eg_parser->headerType->to<EBPFStructType>()->fields;
+
+        for (auto f : fields) {
+            builder->emitIndent();
+            builder->appendFormat("u8 %s_%s_ingress_ebpf_valid = %s->%s.ebpf_valid",
+                                  parser->headers->name.name, f->field->name.name,
+                                  parser->headers->name.name, f->field->name.name);
+            builder->endOfStatement(true);
+        }
+
+        for (auto f : fields) {
+            builder->emitIndent();
+            builder->appendFormat("%s->%s.ebpf_valid = 0", parser->headers->name.name, f->field->name.name);
+            builder->endOfStatement(true);
+            eg_parser->headersToInvalidate.insert(f->field->name.name);
+        }
+    }
+
     msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d",
                                  sectionName);
     pathStr = Util::printf_format("%s.packet_path", control->inputStandardMetadata->name.name);
@@ -797,8 +855,6 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
     emitPSAControlInputMetadata(builder);
 
     if (options.egressOptimization) {
-        auto dprs = this->deparser->to<OptimizedXDPEgressDeparserPSA>();
-
         auto eg_parser = parser->to<EBPFOptimizedEgressParserPSA>();
         auto fields = eg_parser->headerType->to<EBPFStructType>()->fields;
 

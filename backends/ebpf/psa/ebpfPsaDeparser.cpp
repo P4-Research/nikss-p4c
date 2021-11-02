@@ -58,7 +58,8 @@ void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
         builder->append("if (");
         cstring hdrName = headerExpression;
         // FIXME: we should use codeGen->visit()
-        if (this->is<OptimizedXDPEgressDeparserPSA>()) {
+        if (this->is<OptimizedXDPEgressDeparserPSA>() ||
+            (this->is<TCEgressDeparserPSA>() && program->options.egressOptimization)) {
             hdrName = headerExpression.replace(".", "->");
         }
         builder->append(hdrName);
@@ -106,7 +107,8 @@ void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
 
 void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     codeGen->setBuilder(builder);
-    if (program->options.generateHdrInMap) {
+    if (program->options.generateHdrInMap ||
+        (this->is<TCEgressDeparserPSA>() && program->options.egressOptimization)) {
         codeGen->asPointerVariables.insert(this->headers->name.name);
     }
 
@@ -144,7 +146,8 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
 
 void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                                  cstring& headerExpression) const {
-    if (this->is<OptimizedXDPEgressDeparserPSA>()) {
+    if (this->is<OptimizedXDPEgressDeparserPSA>() ||
+        (this->is<TCEgressDeparserPSA>() && program->options.egressOptimization)) {
         headerExpression = headerExpression.replace(".", "->");
     }
     cstring msgStr;
@@ -659,9 +662,14 @@ void OptimizedTCIngressDeparserPSA::emit(CodeBuilder *builder) {
     builder->newline();
 
     // put metadata into shared map
+    builder->emitIndent();
+    builder->appendFormat("__u64 bmd_key = (__u64) %s", program->model.CPacketName.name.c_str());
+    builder->endOfStatement(true);
+    builder->emitIndent();
     builder->target->emitTableUpdate(builder, "bmd_table",
-                                     program->model.CPacketName.name.c_str(),
-                                     this->headerType->to<EBPFStructType>()->name);
+                                     "bmd_key",
+                                     this->headers->name.name);
+    builder->newline();
 }
 
 void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
