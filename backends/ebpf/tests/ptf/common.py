@@ -42,7 +42,7 @@ def hdr2map_required_with_table_caching(cls):
     return cls
 
 def hdr2map_required_with_egress_opt(cls):
-    if cls.is_egress_opt_enabled():
+    if cls.is_egress_opt_enabled(cls):
         cls.hdr2map_required = True
     return cls
 
