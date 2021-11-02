@@ -202,7 +202,7 @@ class P4EbpfTest(EbpfTest):
         head, tail = os.path.split(self.p4_file_path)
         filename = tail.split(".")[0]
         self.test_prog_image = os.path.join("ptf_out", filename + ".o")
-        p4args = "--max-ternary-masks 3"
+        p4args = "--trace --max-ternary-masks 3"
         if "xdp2tc" in testutils.test_params_get():
             p4args += " --xdp2tc=" + testutils.test_param_get("xdp2tc")
 
