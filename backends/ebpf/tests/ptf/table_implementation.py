@@ -18,7 +18,7 @@ class SimpleActionProfilePSATest(P4EbpfTest):
     """
     Basic usage of ActionProfile extern
     """
-    p4_file_path = "samples/p4testdata/action-profile1.p4"
+    p4_file_path = "p4testdata/action-profile1.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(eth_src="11:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
@@ -37,7 +37,7 @@ class ActionProfileTwoInstancesPSATest(P4EbpfTest):
     """
     Table might use two ActionProfile implementations
     """
-    p4_file_path = "samples/p4testdata/action-profile2.p4"
+    p4_file_path = "p4testdata/action-profile2.p4"
 
     def runTest(self):
         self.table_add(table="MyIC_ap", keys=[0x11], action=1, data=["AA:BB:CC:DD:EE:FF"])
@@ -55,7 +55,7 @@ class ActionProfileTwoTablesSameInstancePSATest(P4EbpfTest):
     """
     ActionProfile extern instance can be shared between tables under some circumstances
     """
-    p4_file_path = "samples/p4testdata/action-profile3.p4"
+    p4_file_path = "p4testdata/action-profile3.p4"
 
     def runTest(self):
         self.table_add(table="MyIC_ap", keys=[0x10], action=2, data=[0x1122])
@@ -77,7 +77,7 @@ class ActionProfileLPMTablePSATest(P4EbpfTest):
     """
     LPM key match
     """
-    p4_file_path = "samples/p4testdata/action-profile-lpm.p4"
+    p4_file_path = "p4testdata/action-profile-lpm.p4"
 
     def runTest(self):
         # Match all xx:xx:33:44:55:xx MAC addresses
@@ -98,7 +98,7 @@ class ActionProfileTernaryTablePSATest(P4EbpfTest):
     """
     Ternary match key
     """
-    p4_file_path = "samples/p4testdata/action-profile-ternary.p4"
+    p4_file_path = "p4testdata/action-profile-ternary.p4"
 
     def runTest(self):
         self.table_add(table="MyIC_ap", keys=[0x10], action=2, data=[0x1122])
@@ -115,7 +115,7 @@ class ActionProfileActionRunPSATest(P4EbpfTest):
     """
     Test statement table.apply().action_run
     """
-    p4_file_path = "samples/p4testdata/action-profile-action-run.p4"
+    p4_file_path = "p4testdata/action-profile-action-run.p4"
 
     def runTest(self):
         self.table_add(table="MyIC_ap", keys=[0x10], action=2, data=[0x1122])
@@ -140,7 +140,7 @@ class ActionProfileHitPSATest(P4EbpfTest):
     """
     Test statement table.apply().hit
     """
-    p4_file_path = "samples/p4testdata/action-profile-hit.p4"
+    p4_file_path = "p4testdata/action-profile-hit.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(eth_src="11:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
@@ -196,7 +196,7 @@ class SimpleActionSelectorPSATest(ActionSelectorTest):
     """
     Basic usage of ActionSelector: match action directly and from group
     """
-    p4_file_path = "samples/p4testdata/action-selector1.p4"
+    p4_file_path = "p4testdata/action-selector1.p4"
 
     def runTest(self):
         self.create_default_rule_set(table="MyIC_tbl", selector="MyIC_as")
@@ -224,6 +224,13 @@ class SimpleActionSelectorPSATest(ActionSelectorTest):
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, pkt, output_ports)
 
+        if self.is_table_caching_test():
+            # modify cache directly and verify its usage
+            self.table_update(table="MyIC_as_cache", keys=[7, "22:33:44:55:66:78"],
+                              action=1, data=[5])
+            testutils.send_packet(self, PORT0, pkt)
+            testutils.verify_packet(self, pkt, PORT1)
+
 
 class ActionSelectorTwoTablesSameInstancePSATest(ActionSelectorTest):
     """
@@ -231,7 +238,7 @@ class ActionSelectorTwoTablesSameInstancePSATest(ActionSelectorTest):
     Tests basic sharing of ActionSelector instance. For test purpose tables has also defined
     default empty group action "psa_empty_group_action" (not used).
     """
-    p4_file_path = "samples/p4testdata/action-selector2.p4"
+    p4_file_path = "p4testdata/action-selector2.p4"
 
     def runTest(self):
         self.create_default_rule_set(table="MyIC_tbl", selector="MyIC_as")
@@ -251,7 +258,7 @@ class ActionSelectorDefaultEmptyGroupActionPSATest(ActionSelectorTest):
     """
     Tests behaviour of default empty group action, aka table property "psa_empty_group_action".
     """
-    p4_file_path = "samples/p4testdata/action-selector3.p4"
+    p4_file_path = "p4testdata/action-selector3.p4"
 
     def runTest(self):
         # should be dropped (no group)
@@ -270,7 +277,7 @@ class ActionSelectorMultipleSelectorsPSATest(ActionSelectorTest):
     """
     Tests if multiple selectors are allowed and used.
     """
-    p4_file_path = "samples/p4testdata/action-selector4.p4"
+    p4_file_path = "p4testdata/action-selector4.p4"
 
     def runTest(self):
         self.create_default_rule_set(table="MyIC_tbl", selector="MyIC_as")
@@ -303,7 +310,7 @@ class ActionSelectorMultipleSelectorsTwoTablesPSATest(ActionSelectorTest):
     Similar to ActionSelectorTwoTablesSameInstancePSATest, but tables has two selectors
     and the same match key. Tests order of selectors in both tables.
     """
-    p4_file_path = "samples/p4testdata/action-selector5.p4"
+    p4_file_path = "p4testdata/action-selector5.p4"
 
     def runTest(self):
         self.create_default_rule_set(table="MyIC_tbl", selector="MyIC_as")
@@ -322,7 +329,7 @@ class ActionSelectorLPMTablePSATest(ActionSelectorTest):
     """
     Tests table with LPM match key.
     """
-    p4_file_path = "samples/p4testdata/action-selector-lpm.p4"
+    p4_file_path = "p4testdata/action-selector-lpm.p4"
 
     def runTest(self):
         self.create_default_rule_set(table=None, selector="MyIC_as")
@@ -344,7 +351,7 @@ class ActionSelectorTernaryTablePSATest(ActionSelectorTest):
     """
     Tests table with ternary match key.
     """
-    p4_file_path = "samples/p4testdata/action-selector-ternary.p4"
+    p4_file_path = "p4testdata/action-selector-ternary.p4"
 
     def runTest(self):
         self.create_default_rule_set(table=None, selector="MyIC_as")
@@ -360,7 +367,7 @@ class ActionSelectorActionRunPSATest(ActionSelectorTest):
     """
     Tests action_run statement on table apply().
     """
-    p4_file_path = "samples/p4testdata/action-selector-action-run.p4"
+    p4_file_path = "p4testdata/action-selector-action-run.p4"
 
     def runTest(self):
         self.table_add(table="MyIC_as_actions", keys=[2], action=1, data=[5])
@@ -381,7 +388,7 @@ class ActionSelectorHitPSATest(ActionSelectorTest):
     """
     Tests hit statement on table apply().
     """
-    p4_file_path = "samples/p4testdata/action-selector-hit.p4"
+    p4_file_path = "p4testdata/action-selector-hit.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet(eth_src="07:22:33:44:55:66", eth_dst="22:33:44:55:66:77")

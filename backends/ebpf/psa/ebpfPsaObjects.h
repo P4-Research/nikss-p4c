@@ -60,6 +60,13 @@ class EBPFTablePSA : public EBPFTable {
     void emitMapUpdateTraceMsg(CodeBuilder *builder, cstring mapName,
                                cstring returnCode) const;
 
+    bool tableCacheEnabled = false;
+    cstring cacheValueTypeName;
+    cstring cacheKeyTypeName;
+    cstring cacheTableName;
+    void tryEnableTableCache();
+    void createCacheTypeNames(bool isCacheKeyType, bool isCacheValueType);
+
  public:
     cstring name;
     size_t size;
@@ -73,15 +80,22 @@ class EBPFTablePSA : public EBPFTable {
     EBPFTablePSA(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name);
 
     void emitInstance(CodeBuilder* builder) override;
-    void emitValueType(CodeBuilder* builder) override;
+    void emitTypes(CodeBuilder* builder) override;
     void emitValueActionIDNames(CodeBuilder* builder) override;
     void emitValueStructStructure(CodeBuilder* builder) override;
     void emitAction(CodeBuilder* builder, cstring valueName, cstring actionRunVariable) override;
     void emitInitializer(CodeBuilder* builder) override;
     void emitDirectTypes(CodeBuilder* builder) override;
+    void emitLookup(CodeBuilder* builder, cstring key, cstring value) override;
     void emitLookupDefault(CodeBuilder* builder, cstring key, cstring value) override;
     bool dropOnNoMatchingEntryFound() const override;
     bool singleActionRun() const override;
+
+    virtual void emitCacheTypes(CodeBuilder* builder);
+    void emitCacheInstance(CodeBuilder* builder);
+    virtual void emitCacheLookup(CodeBuilder* builder, cstring key, cstring value);
+    void emitCacheUpdate(CodeBuilder* builder, cstring key, cstring value) override;
+    bool cacheEnabled() override { return tableCacheEnabled; }
 
     EBPFCounterPSA* getCounter(cstring name) const {
         auto result = std::find_if(counters.begin(), counters.end(),

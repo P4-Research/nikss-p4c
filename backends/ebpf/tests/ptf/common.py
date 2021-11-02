@@ -16,11 +16,13 @@ TEST_PIPELINE_ID = 999
 TEST_PIPELINE_MOUNT_PATH = "/sys/fs/bpf/pipeline{}".format(TEST_PIPELINE_ID)
 PIPELINE_MAPS_MOUNT_PATH = "{}/maps".format(TEST_PIPELINE_MOUNT_PATH)
 
+
 def tc_only(cls):
     if cls.is_xdp_test(cls):
         cls.skip = True
         cls.skip_reason = "not supported by XDP"
     return cls
+
 
 def xdp2tc_head_not_supported(cls):
     if cls.xdp2tc_mode(cls) == 'head':
@@ -28,9 +30,24 @@ def xdp2tc_head_not_supported(cls):
         cls.skip_reason = "not supported for xdp2tc=head"
     return cls
 
+
 def hdr2map_required(cls):
     cls.hdr2map_required = True
     return cls
+
+
+def hdr2map_required_with_table_caching(cls):
+    if cls.is_table_caching_test(cls):
+        cls.hdr2map_required = True
+    return cls
+
+
+def table_caching_only(cls):
+    if not cls.is_table_caching_test(cls):
+        cls.skip = True
+        cls.skip_reason = "table caching test"
+    return cls
+
 
 class EbpfTest(BaseTest):
     skip = False
@@ -112,25 +129,28 @@ class EbpfTest(BaseTest):
                       .format(name, key, hex(expected_value), hex(value)))
 
     def xdp2tc_mode(self):
-        return testutils.test_param_get("xdp2tc")
+        return testutils.test_param_get('xdp2tc')
 
     def is_xdp_test(self):
-        return "xdp" in testutils.test_params_get()
+        return testutils.test_param_get('xdp') == 'True'
+
+    def is_table_caching_test(self):
+        return testutils.test_param_get('table_caching') == 'True'
 
     def setUp(self):
         super(EbpfTest, self).setUp()
         self.dataplane = ptf.dataplane_instance
         self.dataplane.flush()
-
+        logger.info("\nUsing test params: %s", testutils.test_params_get())
         if "namespace" in testutils.test_params_get():
             self.switch_ns = testutils.test_param_get("namespace")
-        logger.info("Using namespace: %s", self.switch_ns)
         self.interfaces = testutils.test_param_get("interfaces").split(",")
-        logger.info("Using interfaces: %s", str(self.interfaces))
 
         self.exec_ns_cmd("psabpf-ctl pipeline load id {} {}".format(TEST_PIPELINE_ID, self.test_prog_image), "Can't load programs into eBPF subsystem")
 
         for intf in self.interfaces:
+            if intf == "psa_recirc" and self.is_xdp_test():
+                continue
             self.add_port(dev=intf)
 
         if self.ctool_file_path:
@@ -169,12 +189,23 @@ class P4EbpfTest(EbpfTest):
         head, tail = os.path.split(self.p4_file_path)
         filename = tail.split(".")[0]
         self.test_prog_image = os.path.join("ptf_out", filename + ".o")
-        xdp2tc_mode = "meta" if self.xdp2tc_mode() is None else self.xdp2tc_mode()
-        p4args = "--trace --xdp2tc=" + xdp2tc_mode
+        p4args = "--trace --max-ternary-masks 3"
+        if "xdp2tc" in testutils.test_params_get():
+            p4args += " --xdp2tc=" + testutils.test_param_get("xdp2tc")
+
         if self.is_xdp_test():
             p4args += " --xdp"
-        if self.hdr2map_required:
+
+        if testutils.test_param_get('hdr2Map') == 'True':
             p4args += " --hdr2Map"
+        else:
+            if self.hdr2map_required:
+                self.skipTest("hdr2Map required for the PTF test")
+
+        if self.is_table_caching_test():
+            p4args += " --table-caching"
+
+        logger.info("P4ARGS=" + p4args)
         self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "
                       "ARGS=\"{cargs}\" P4C=p4c-ebpf P4ARGS=\"{p4args}\" psa".format(
                             output=self.test_prog_image,
@@ -188,7 +219,7 @@ class P4EbpfTest(EbpfTest):
         super(P4EbpfTest, self).tearDown()
 
     def clone_session_create(self, id):
-        self.exec_ns_cmd("psabpf-ctl clone-session create pipe {} id {}".format(TEST_PIPELINE_ID, id))\
+        self.exec_ns_cmd("psabpf-ctl clone-session create pipe {} id {}".format(TEST_PIPELINE_ID, id))
 
     def clone_session_add_member(self, clone_session, egress_port, instance=1, cos=0):
         self.exec_ns_cmd("psabpf-ctl clone-session add-member pipe {} id {} egress-port {} instance {} cos {}".format(

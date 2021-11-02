@@ -21,7 +21,7 @@ class RegisterActionPSATest(P4EbpfTest):
     7. Verify a value stored in register (15)
     """
 
-    p4_file_path = "samples/p4testdata/register-action.p4"
+    p4_file_path = "p4testdata/register-action.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -54,7 +54,7 @@ class RegisterApplyPSATest(P4EbpfTest):
     5. P4 application will read a 5, add 10 and write it to the register
     6. Verify a value stored in register (15)
     """
-    p4_file_path = "samples/p4testdata/register-apply.p4"
+    p4_file_path = "p4testdata/register-apply.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -79,7 +79,7 @@ class RegisterDefaultPSATest(P4EbpfTest):
     add 10 and write it to the register
     3. Verify a value stored in register (16)
     """
-    p4_file_path = "samples/p4testdata/register-default.p4"
+    p4_file_path = "p4testdata/register-default.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -100,7 +100,7 @@ class RegisterBigKeyPSATest(P4EbpfTest):
     add 10 and write it to the register
     3. Verify a value stored in register (16)
     """
-    p4_file_path = "samples/p4testdata/register-big-key.p4"
+    p4_file_path = "p4testdata/register-big-key.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -121,7 +121,7 @@ class RegisterStructsPSATest(P4EbpfTest):
     add 5 and write it to the register
     3. Verify a value stored in register (5)
     """
-    p4_file_path = "samples/p4testdata/register-structs.p4"
+    p4_file_path = "p4testdata/register-structs.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()

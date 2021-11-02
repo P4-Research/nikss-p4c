@@ -23,7 +23,7 @@ class InternetChecksumPSATest(P4EbpfTest):
     5. Repeat 1-4 a few times with a different packet.
     """
 
-    p4_file_path = "samples/p4testdata/internet-checksum.p4"
+    p4_file_path = "p4testdata/internet-checksum.p4"
 
     def random_ip(self):
         return ".".join(str(random.randint(0, 255)) for _ in range(4))
@@ -54,7 +54,7 @@ class InternetChecksumPSATest(P4EbpfTest):
 
 @xdp2tc_head_not_supported
 class HashCRC16PSATest(P4EbpfTest):
-    p4_file_path ="samples/p4testdata/hash-crc16.p4"
+    p4_file_path ="p4testdata/hash-crc16.p4"
 
     def runTest(self):
         pkt = Ether() / "12345678900"
@@ -65,7 +65,7 @@ class HashCRC16PSATest(P4EbpfTest):
 
 @xdp2tc_head_not_supported
 class HashInActionPSATest(P4EbpfTest):
-    p4_file_path ="samples/p4testdata/hash-action.p4"
+    p4_file_path ="p4testdata/hash-action.p4"
 
     def runTest(self):
         pkt = Ether() / "12345678900"
@@ -76,7 +76,7 @@ class HashInActionPSATest(P4EbpfTest):
 
 @xdp2tc_head_not_supported
 class HashCRC32PSATest(P4EbpfTest):
-    p4_file_path ="samples/p4testdata/hash-crc32.p4"
+    p4_file_path ="p4testdata/hash-crc32.p4"
 
     def runTest(self):
         pkt = Ether() / "1234567890000"
@@ -87,7 +87,7 @@ class HashCRC32PSATest(P4EbpfTest):
 
 @xdp2tc_head_not_supported
 class HashRangePSATest(P4EbpfTest):
-    p4_file_path = "samples/p4testdata/hash-range.p4"
+    p4_file_path = "p4testdata/hash-range.p4"
 
     def runTest(self):
         res = 50 + (0xbb3d % 200)
@@ -99,7 +99,7 @@ class HashRangePSATest(P4EbpfTest):
 
 @xdp2tc_head_not_supported
 class ChecksumCRC32MultipleUpdatesPSATest(P4EbpfTest):
-    p4_file_path ="samples/p4testdata/checksum-updates.p4"
+    p4_file_path ="p4testdata/checksum-updates.p4"
 
     def runTest(self):
         pkt = Ether() / "1234567890000"

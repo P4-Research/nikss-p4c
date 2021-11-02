@@ -16,7 +16,7 @@ class MeterPSATest(P4EbpfTest):
     Send 100 B packet and verify if there is 100 tokens less left.
     """
 
-    p4_file_path = "samples/p4testdata/meters.p4"
+    p4_file_path = "p4testdata/meters.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -53,7 +53,7 @@ class MeterActionPSATest(P4EbpfTest):
     Send 100 B packet and verify if there is 100 tokens less left.
     """
 
-    p4_file_path = "samples/p4testdata/meters-action.p4"
+    p4_file_path = "p4testdata/meters-action.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -93,7 +93,7 @@ class MeterPacketsPSATest(P4EbpfTest):
     Send 1 packet and verify if there is 9 tokens left.
     """
 
-    p4_file_path = "samples/p4testdata/meters-packets.p4"
+    p4_file_path = "p4testdata/meters-packets.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -129,7 +129,7 @@ class DirectMeterPSATest(P4EbpfTest):
     Send 100 B packet and verify if there is 100 tokens less left.
     """
 
-    p4_file_path = "samples/p4testdata/meters-direct.p4"
+    p4_file_path = "p4testdata/meters-direct.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -181,7 +181,7 @@ class DirectAndIndirectMeterPSATest(P4EbpfTest):
     Send 100 B packet and verify if there is 100 tokens less left.
     """
 
-    p4_file_path = "samples/p4testdata/meters-direct-and-indirect.p4"
+    p4_file_path = "p4testdata/meters-direct-and-indirect.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -265,7 +265,7 @@ class DirectAndIndirectActionMeterPSATest(DirectAndIndirectMeterPSATest):
     and execute Indirect Meter in single action.
     """
 
-    p4_file_path = "samples/p4testdata/meters-direct-and-indirect-single-action.p4"
+    p4_file_path = "p4testdata/meters-direct-and-indirect-single-action.p4"
 
 
 class DirectTwoMetersPSATest(P4EbpfTest):
@@ -274,7 +274,7 @@ class DirectTwoMetersPSATest(P4EbpfTest):
     Send 100 B packet and verify if there is 100 tokens less left.
     """
 
-    p4_file_path = "samples/p4testdata/meters-two-direct.p4"
+    p4_file_path = "p4testdata/meters-two-direct.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
@@ -346,7 +346,7 @@ class DirectAndCounterMeterPSATest(P4EbpfTest):
     Send 100 B packet and verify if there is 100 tokens less left.
     """
 
-    p4_file_path = "samples/p4testdata/meters-direct-and-counter.p4"
+    p4_file_path = "p4testdata/meters-direct-and-counter.p4"
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()

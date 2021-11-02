@@ -25,8 +25,8 @@ EbpfOptions::EbpfOptions() {
                 "Enable tracing of packet flow");
         registerOption("--xdp", nullptr,
                 [this](const char*) { generateToXDP = true; return true; },
-                "Compile and generate the P4 prog to XDP layer");
-        registerOption("--xdp2tc", nullptr,
+                "[psa] Compile and generate the P4 prog to XDP layer");
+        registerOption("--xdp2tc", "MODE",
                 [this](const char* arg) {
                     if (!strcmp(arg, "meta")) {
                         xdp2tcMode = XDP2TC_META;
@@ -40,8 +40,19 @@ EbpfOptions::EbpfOptions() {
                 "[psa] Select the mode used to pass metadata from XDP to TC.");
         registerOption("--hdr2Map", nullptr,
                 [this](const char*) { generateHdrInMap = true; return true; },
-                "Compile and generate the P4 prog headers and metadata in PERCPU_MAP");
+                "[psa] Compile and generate the P4 prog headers and metadata in PERCPU_MAP");
+        registerOption("--table-caching", nullptr,
+                [this](const char *) { enableTableCache = true; return true; },
+                "[psa] Enable caching entries for tables with lpm or ternary key");
+        registerOption("--max-ternary-masks", "MAX_MASK",
+                [this](const char *arg) {
+                    unsigned int parsed_val = std::strtoul(arg, nullptr, 0);
+                    if (parsed_val >= 2)
+                        this->maxTernaryMasks = parsed_val;
+                    return true;
+                },
+                "[psa] Set number of maximum possible masks for ternary key in a single table");
         registerOption("--egress-opt", nullptr,
-               [this](const char*) { egressOptimization = true; return true; },
-               "Optimize the egress processing.");
+                       [this](const char*) { egressOptimization = true; return true; },
+                       "Optimize the egress processing.");
 }
