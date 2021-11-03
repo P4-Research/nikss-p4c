@@ -7,10 +7,10 @@ declare -a PROGRAMS=("scenarios/use-cases/p4/bng/bng.p4"
 "scenarios/use-cases/p4/l2l3_switch/l2l3_switch.p4")
 
 declare -a OPTIONS=("-mcpu=v1"
+  "-mcpu=v1 -mattr=+alu32"
   "-mcpu=v2"
   "-mcpu=v2 -mattr=+alu32"
-  "-mcpu=v3"
-  "-mcpu=v3 -mattr=+alu32")
+  "-mcpu=v3")
 
 declare -a P4ARGS=(""
   "--hdr2Map --xdp"
@@ -30,7 +30,7 @@ for p4arg in "${P4ARGS[@]}"; do
       mkdir -p out
       name=$(basename $program .p4)
       echo "Program: ${name}, p4arg: ${p4arg}, option: ${option}"
-      sudo make -f ../runtime/kernel.mk MCPU="${option}" BPFOBJ=out/${name}.o P4FILE="$program" ARGS=-DPSA_PORT_RECIRCULATE=2 P4C=p4c-ebpf P4ARGS="${p4arg}" psa
+      sudo make -f ../runtime/kernel.mk COMPILERFLAGS="${option}" BPFOBJ=out/${name}.o P4FILE="$program" ARGS=-DPSA_PORT_RECIRCULATE=2 P4C=p4c-ebpf P4ARGS="${p4arg}" psa
 
       sudo psabpf-ctl pipeline load id 77 out/${name}.o
 
