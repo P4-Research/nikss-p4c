@@ -53,6 +53,12 @@ def table_caching_only(cls):
     return cls
 
 
+def skip_if_egress_optimization_enabled(cls):
+    if cls.is_egress_opt_enabled(cls):
+        cls.skip = True
+        cls.skip_reason = "Skip if egress optimization enabled"
+    return cls
+
 class EbpfTest(BaseTest):
     skip = False
     skip_reason = ''
