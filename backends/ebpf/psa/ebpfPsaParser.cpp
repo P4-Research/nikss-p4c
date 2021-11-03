@@ -322,7 +322,7 @@ bool EBPFPsaParser::isHeaderExtractedByParserWithNoLookaheadBefore(cstring hdrNa
 // =====================EBPFOptimizedEgressParserPSA=============================
 bool OptimizedEgressParserStateVisitor::shouldMoveOffset(cstring hdr) {
     for (auto h : parser->headersToSkipMovingOffset) {
-        if (h.endsWith(hdr)) {
+        if (h.first.endsWith(hdr)) {
             return false;
         }
     }

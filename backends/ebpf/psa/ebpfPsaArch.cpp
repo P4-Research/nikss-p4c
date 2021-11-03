@@ -699,7 +699,8 @@ void ConvertToEbpfPSA::optimizePipeline() {
         cstring hdr = ig_deparser->headersExpressions[i];
         if (ig_deparser->isHeaderEmitted(hdr) && eg_parser->isHeaderExtractedByParser(hdr) &&
             !eg_deparser->isHeaderEmitted(hdr)) {
-            eg_parser->headersToSkipMovingOffset.insert(ig_deparser->headersExpressions[i]);
+            eg_parser->headersToSkipMovingOffset.emplace(ig_deparser->headersExpressions[i],
+                                                         ig_deparser->headersToEmit[i]);
             ig_deparser->headersToEmit.erase(
                     ig_deparser->headersToEmit.begin() + (unsigned int) i);
             ig_deparser->headersExpressions.erase(

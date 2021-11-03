@@ -757,6 +757,22 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
         control->codeGen->asPointerVariables.insert(control->headers->name.name);
         deparser->codeGen->asPointerVariables.insert(control->headers->name.name);
 
+        /*
+         * If we remove appended headers (e.g. bridged metadata) we should fix pkt_len
+         * and add missing bytes, because pkt_len is used to update byte Counters.
+         */
+        unsigned append_bytes = 0;
+        for (auto el : parser->to<EBPFOptimizedEgressParserPSA>()->headersToSkipMovingOffset) {
+            auto hdr = el.second;
+            append_bytes += hdr->width_bits();
+        }
+
+        if (append_bytes != 0) {
+            builder->emitIndent();
+            builder->appendFormat("%s += %d", this->lengthVar, append_bytes / 8);
+            builder->endOfStatement(true);
+        }
+
         builder->emitIndent();
         builder->target->emitTableLookup(builder, "xdp2tc_shared_map", this->zeroKey.c_str(),
                                          "struct xdp2tc_metadata *md");

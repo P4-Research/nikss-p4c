@@ -83,7 +83,7 @@ class OptimizedEgressParserStateVisitor : public PsaStateTranslationVisitor {
 class EBPFOptimizedEgressParserPSA : public EBPFPsaParser {
  public:
     std::set<cstring> headersToInvalidate;
-    std::set<cstring> headersToSkipMovingOffset;
+    std::map<cstring, const IR::Type_Header *> headersToSkipMovingOffset;
 
     EBPFOptimizedEgressParserPSA(const EBPFProgram* program, const IR::P4Parser* block,
                                  const P4::TypeMap* typeMap) :
