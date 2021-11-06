@@ -202,9 +202,15 @@ void EBPFStructType::emit(CodeBuilder* builder) {
     builder->spc();
     builder->blockStart();
 
+    bool emitHelperVariableForHeaders = false;
     for (auto f : fields) {
         auto type = f->type;
         builder->emitIndent();
+
+        if (type->is<EBPFTypeName>() &&
+            type->to<EBPFTypeName>()->getCanonicalType()->type->is<IR::Type_Header>()) {
+            emitHelperVariableForHeaders = true;
+        }
 
         type->declare(builder, f->field->name, false);
         builder->append("; ");
@@ -216,6 +222,12 @@ void EBPFStructType::emit(CodeBuilder* builder) {
         }
         builder->append(" */");
         builder->newline();
+    }
+
+    if (emitHelperVariableForHeaders) {
+        // this is a struct storing headers
+        // append helper variable that will be used by egress optimization.
+        builder->appendLine("__u32 __helper_variable;");
     }
 
     if (type->is<IR::Type_Header>()) {

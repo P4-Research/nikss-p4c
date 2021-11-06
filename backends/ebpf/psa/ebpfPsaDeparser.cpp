@@ -660,29 +660,19 @@ void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
 
     // put metadata into shared map
     builder->emitIndent();
-    builder->appendLine("struct xdp2tc_metadata *xdp2tc_md;");
-    builder->emitIndent();
-    builder->target->emitTableLookup(builder, "xdp2tc_shared_map",
-                                     program->zeroKey.c_str(), "xdp2tc_md");
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->append("if (!xdp2tc_md)");
-    builder->newline();
-    builder->emitIndent();
-    builder->emitIndent();
-    builder->append("return XDP_DROP;");
-    builder->newline();
-    builder->emitIndent();
+    cstring hdrValue = this->headers->name.name;
     if (program->options.generateHdrInMap) {
-        builder->appendFormat("xdp2tc_md->headers = *%s", this->headers->name.name);
+        builder->appendFormat("%s->__helper_variable", this->headers->name.name);
+        hdrValue = "(*" + this->headers->name.name + ")";
     } else {
-        builder->appendFormat("xdp2tc_md->headers = %s", this->headers->name.name);
+        builder->appendFormat("%s.__helper_variable", this->headers->name.name);
     }
+    builder->appendFormat(" = %s.egress_port", this->istd->name.name);
+    builder->endOfStatement(true);
 
-    builder->endOfStatement(true);
     builder->emitIndent();
-    builder->appendFormat("xdp2tc_md->ostd = %s", this->istd->name.name);
-    builder->endOfStatement(true);
+    builder->target->emitTableUpdate(builder, "bmd_table", program->zeroKey.c_str(), hdrValue);
+    builder->newline();
 
     builder->emitIndent();
     builder->appendFormat("bpf_tail_call(%s, &egress_jmp_table, 0)",

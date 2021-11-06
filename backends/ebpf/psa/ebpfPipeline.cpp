@@ -773,33 +773,32 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
             builder->endOfStatement(true);
         }
 
+        emitLocalHeaderInstancesAsPointers(builder);
         builder->emitIndent();
-        builder->target->emitTableLookup(builder, "xdp2tc_shared_map", this->zeroKey.c_str(),
-                                         "struct xdp2tc_metadata *md");
+        builder->target->emitTableLookup(builder, "bmd_table", this->zeroKey.c_str(),
+                                         parser->headers->name.name);
         builder->endOfStatement(true);
         builder->emitIndent();
-        builder->append("if (!md) ");
+        builder->appendFormat("if (!%s) ", parser->headers->name.name);
         builder->blockStart();
         builder->emitIndent();
         builder->appendFormat("return %s;", dropReturnCode());
         builder->newline();
         builder->blockEnd(true);
+
         builder->emitIndent();
-        builder->appendLine("struct psa_ingress_output_metadata_t ingress_ostd = md->ostd;");
+        builder->appendFormat("__u32 egress_ifindex = %s->__helper_variable",
+                              parser->headers->name.name);
+        builder->endOfStatement(true);
+
         if (options.generateHdrInMap) {
             emitCPUMAPHeadersInitializers(builder);
-            builder->emitIndent();
+            builder->newline();
             emitCPUMAPInitializers(builder);
             builder->newline();
             emitMetadataFromCPUMAP(builder);
             builder->newline();
         }
-        builder->emitIndent();
-        // declaring header instance as volatile optimizes stack size and improves throughput
-        emitLocalHeaderInstancesAsPointers(builder);
-        builder->emitIndent();
-        builder->appendFormat("%s = &(md->headers);", parser->headers->name.name);
-        builder->newline();
     } else {
         emitHeaderInstances(builder);
         builder->newline();

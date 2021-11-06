@@ -183,7 +183,7 @@ class XDPEgressPipeline : public EBPFEgressPipeline {
             EBPFEgressPipeline(name, options, refMap, typeMap) {
         if (options.egressOptimization) {
             sectionName = "xdp/" + name;
-            ifindexVar = cstring("ingress_ostd.egress_port");
+            ifindexVar = cstring("egress_ifindex");
         } else {
             sectionName = "xdp_devmap/" + name;
             ifindexVar = cstring("skb->egress_ifindex");
