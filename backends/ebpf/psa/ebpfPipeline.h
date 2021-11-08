@@ -121,7 +121,6 @@ class EBPFEgressPipeline : public EBPFPipeline {
                        P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) {}
 
     void emitPSAControlDataTypes(CodeBuilder* builder) override;
-//    void emitCPUMAPInitializers(CodeBuilder *builder) override;
     void emitCPUMAPLookup(CodeBuilder *builder) override;
 };
 
