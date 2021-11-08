@@ -230,7 +230,7 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
     unsigned shift = widthToEmit < 8 ?
                      (loadSize - alignment - widthToEmit) : (loadSize - widthToEmit);
     cstring hdrField = headerExpression + "." + field;
-    if (program->options.egressOptimization &&
+    if (program->options.pipelineOptimization &&
         this->is<OptimizedXDPIngressDeparserPSA>()) {
         hdrField = field + "_val";
         builder->emitIndent();
@@ -671,11 +671,11 @@ void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
     builder->endOfStatement(true);
 
     builder->emitIndent();
-    builder->target->emitTableUpdate(builder, "bmd_table", program->zeroKey.c_str(), hdrValue);
+    builder->target->emitTableUpdate(builder, "bridged_headers", program->zeroKey.c_str(), hdrValue);
     builder->newline();
 
     builder->emitIndent();
-    builder->appendFormat("bpf_tail_call(%s, &egress_jmp_table, 0)",
+    builder->appendFormat("bpf_tail_call(%s, &egress_progs_table, 0)",
                           this->program->model.CPacketName.str());
     builder->endOfStatement(true);
 }

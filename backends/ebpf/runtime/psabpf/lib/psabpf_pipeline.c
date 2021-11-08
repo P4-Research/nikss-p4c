@@ -72,7 +72,7 @@ static int xdp_port_add(__u32 pipeline_id, char *intf)
         return -1;
     }
     devmap_val.ifindex = ifindex;
-    devmap_val.bpf_prog.fd = 0;
+    devmap_val.bpf_prog.fd = -1;
     // install egress program only if it's found
     if (eg_prog_fd >= 0) {
         devmap_val.bpf_prog.fd = eg_prog_fd;

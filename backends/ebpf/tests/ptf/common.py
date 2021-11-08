@@ -41,8 +41,8 @@ def hdr2map_required_with_table_caching(cls):
         cls.hdr2map_required = True
     return cls
 
-def hdr2map_required_with_egress_opt(cls):
-    if cls.is_egress_opt_enabled(cls):
+def hdr2map_required_with_pipeline_opt(cls):
+    if cls.is_pipeline_opt_enabled(cls):
         cls.hdr2map_required = True
     return cls
 
@@ -53,10 +53,10 @@ def table_caching_only(cls):
     return cls
 
 
-def skip_if_egress_optimization_enabled(cls):
-    if cls.is_egress_opt_enabled(cls):
+def skip_if_pipeline_optimization_enabled(cls):
+    if cls.is_pipeline_opt_enabled(cls):
         cls.skip = True
-        cls.skip_reason = "Skip if egress optimization enabled"
+        cls.skip_reason = "Skip if pipeline-aware optimization enabled"
     return cls
 
 class EbpfTest(BaseTest):
@@ -147,8 +147,8 @@ class EbpfTest(BaseTest):
     def is_table_caching_test(self):
         return testutils.test_param_get('table_caching') == 'True'
 
-    def is_egress_opt_enabled(self):
-        return testutils.test_param_get('egress_optimization') == 'True'
+    def is_pipeline_opt_enabled(self):
+        return testutils.test_param_get('pipeline_optimization') == 'True'
 
     def setUp(self):
         super(EbpfTest, self).setUp()
@@ -209,8 +209,8 @@ class P4EbpfTest(EbpfTest):
         if self.is_xdp_test():
             p4args += " --xdp"
 
-        if self.is_egress_opt_enabled():
-            p4args += " --egress-opt"
+        if self.is_pipeline_opt_enabled():
+            p4args += " --pipeline-opt"
 
         if testutils.test_param_get('hdr2Map') == 'True':
             p4args += " --hdr2Map"

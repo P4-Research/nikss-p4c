@@ -12,7 +12,7 @@ function print_help() {
   echo "--xdp2tc         A mode to pass metadata from XDP to TC programs <meta|head|cpumap>."
   echo "--hdr2map        Allocate header structure in per-CPU map <on|off>."
   echo "--table-caching  Use table cache for tables with LPM and/or ternary key <on|off>."
-  echo "--egress-opt     Apply egress optimization <on|off>."
+  echo "--pipeline-opt   Apply pipeline-aware optimization <on|off>."
   echo "--help           Print this message."
   echo
 }
@@ -61,8 +61,8 @@ for i in "$@"; do
       TABLE_CACHING_ARG="${i#*=}"
       shift # past argument=value
       ;;
-    --egress-opt=*)
-      EGRESS_OPT_ARG="${i#*=}"
+    --pipeline-opt=*)
+      PIPELINE_OPT_ARG="${i#*=}"
       shift # past argument=value
       ;;
     *)
@@ -133,7 +133,7 @@ declare -a XDP=("False" "True")
 declare -a XDP2TC_MODE=("head" "cpumap" "meta")
 declare -a HDR2MAP=("False" "True")
 declare -a TABLE_CACHING=("False" "True")
-declare -a EGRESS_OPT=("False" "True")
+declare -a PIPELINE_OPT=("False" "True")
 
 if [ ! -z "$BPF_HOOK" ]; then
   if [ "$BPF_HOOK" == "tc" ]; then
@@ -173,13 +173,13 @@ if [ ! -z "$TABLE_CACHING_ARG" ]; then
   fi
 fi
 
-if [ ! -z "$EGRESS_OPT_ARG" ]; then
-  if [ "$EGRESS_OPT_ARG" == "on" ]; then
-    EGRESS_OPT=( "True" )
-  elif [ "$EGRESS_OPT_ARG" == "off" ]; then
-    EGRESS_OPT=( "False" )
+if [ ! -z "$PIPELINE_OPT_ARG" ]; then
+  if [ "$PIPELINE_OPT_ARG" == "on" ]; then
+    PIPELINE_OPT=( "True" )
+  elif [ "$PIPELINE_OPT_ARG" == "off" ]; then
+    PIPELINE_OPT=( "False" )
   else
-    echo "Wrong --egress-opt value provided; running script for both enabled/disabled."
+    echo "Wrong --pipeline-opt value provided; running script for both enabled/disabled."
   fi
 fi
 
@@ -188,19 +188,19 @@ for xdp_enabled in "${XDP[@]}" ; do
   for xdp2tc_mode in "${XDP2TC_MODE[@]}" ; do
     for hdr2map_enabled in "${HDR2MAP[@]}" ; do
       for table_caching_enabled in "${TABLE_CACHING[@]}" ; do
-        for egress_opt_enabled in "${EGRESS_OPT[@]}" ; do
+        for pipeline_opt_enabled in "${PIPELINE_OPT[@]}" ; do
           # FIXME: hdr2map is not working properly for TC, we should fix it in future
           if [ "$xdp_enabled" == "False" ] && [ "$hdr2map_enabled" == "True" ]; then
             echo "Test skipped because hdr2map doesn't work properly in TC"
             continue
-          elif [ "$xdp_enabled" == "False" ] && [ "$egress_opt_enabled" == "True" ]; then
-            echo "Test skipped because egress optimization doesn't work in TC yet"
+          elif [ "$xdp_enabled" == "False" ] && [ "$pipeline_opt_enabled" == "True" ]; then
+            echo "Test skipped because pipeline-aware optimization doesn't work in TC yet"
             continue
           fi
           TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
           TEST_PARAMS+=";xdp='$xdp_enabled';xdp2tc='$xdp2tc_mode';hdr2Map='$hdr2map_enabled'"
           TEST_PARAMS+=";table_caching='$table_caching_enabled'"
-          TEST_PARAMS+=";egress_optimization='$egress_opt_enabled'"
+          TEST_PARAMS+=";pipeline_optimization='$pipeline_opt_enabled'"
           # Start tests
           ptf \
             --test-dir ptf/ \

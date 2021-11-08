@@ -226,7 +226,11 @@ void EBPFStructType::emit(CodeBuilder* builder) {
 
     if (emitHelperVariableForHeaders) {
         // this is a struct storing headers
-        // append helper variable that will be used by egress optimization.
+        // append helper variable that will be used by
+        // pipeline-aware optimization to transfer egress_port from
+        // ingress eBPF program to tail-called egress eBPF program.
+        // This variable has intentionally generic name as it might be
+        // used for another purpose in future.
         builder->appendLine("__u32 __helper_variable;");
     }
 

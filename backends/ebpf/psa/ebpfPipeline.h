@@ -181,7 +181,7 @@ class XDPEgressPipeline : public EBPFEgressPipeline {
     XDPEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                         P4::TypeMap* typeMap):
             EBPFEgressPipeline(name, options, refMap, typeMap) {
-        if (options.egressOptimization) {
+        if (options.pipelineOptimization) {
             sectionName = "xdp/" + name;
             ifindexVar = cstring("egress_ifindex");
         } else {

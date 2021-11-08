@@ -51,8 +51,6 @@ class EBPFPsaParser : public EBPFParser {
     EBPFPsaParser(const EBPFProgram* program, const IR::P4Parser* block,
                   const P4::TypeMap* typeMap);
 
-    bool build() override;
-
     void emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl) override;
 
     void emitTypes(CodeBuilder* builder) override;

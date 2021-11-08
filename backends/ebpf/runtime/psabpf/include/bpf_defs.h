@@ -61,6 +61,6 @@ static const char *XDP_DEVMAP = "maps/tx_port";
 /**
  * The name of BPF map used for tail calls.
  */
-static const char *XDP_JUMP_TBL = "maps/egress_jmp_table";
+static const char *XDP_JUMP_TBL = "maps/egress_progs_table";
 
 #endif  /* P4C_BPF_DEFS_H */

@@ -11,8 +11,8 @@ bool EBPFPipeline::isEmpty() const {
     }
 
     auto startState = parser->parserBlock->states.at(0);
-    if (!startState->components.empty() ||
-        startState->selectExpression->to<IR::PathExpression>()->path->name.name != "accept") {
+    auto pathExpr = startState->selectExpression->to<IR::PathExpression>()->path;
+    if (!startState->components.empty() || pathExpr->name.name != IR::ParserState::accept) {
         return false;
     }
 
@@ -709,7 +709,7 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     msgStr = Util::printf_format("%s deparser: packet deparsing finished", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
 
-    if (!options.egressOptimization ||
+    if (!options.pipelineOptimization ||
         deparser->to<OptimizedXDPIngressDeparserPSA>()->skipEgress) {
         this->emitTrafficManager(builder);
     }
@@ -752,7 +752,7 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
     emitLocalVariables(builder);
     builder->newline();
 
-    if (options.egressOptimization) {
+    if (options.pipelineOptimization) {
         parser->visitor->asPointerVariables.insert(parser->headers->name.name);
         control->codeGen->asPointerVariables.insert(control->headers->name.name);
         deparser->codeGen->asPointerVariables.insert(control->headers->name.name);
@@ -775,7 +775,7 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
 
         emitLocalHeaderInstancesAsPointers(builder);
         builder->emitIndent();
-        builder->target->emitTableLookup(builder, "bmd_table", this->zeroKey.c_str(),
+        builder->target->emitTableLookup(builder, "bridged_headers", this->zeroKey.c_str(),
                                          parser->headers->name.name);
         builder->endOfStatement(true);
         builder->emitIndent();
@@ -817,7 +817,7 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
     emitPSAControlOutputMetadata(builder);
     emitPSAControlInputMetadata(builder);
 
-    if (options.egressOptimization) {
+    if (options.pipelineOptimization) {
         auto dprs = this->deparser->to<OptimizedXDPEgressDeparserPSA>();
 
         auto eg_parser = parser->to<EBPFOptimizedEgressParserPSA>();
@@ -904,7 +904,7 @@ void XDPEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
                                         "EgressTM: output packet to port %d",
                                       1, varStr);
     builder->emitIndent();
-    if (options.egressOptimization) {
+    if (options.pipelineOptimization) {
         builder->appendFormat("return bpf_redirect_map(&tx_port, %s.egress_port%s, 0);",
                               control->inputStandardMetadata->name.name, "%DEVMAP_SIZE");
     } else {
