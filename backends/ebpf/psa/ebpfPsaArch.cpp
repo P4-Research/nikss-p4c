@@ -487,7 +487,8 @@ void PSAArch::emitInstances2XDP(CodeBuilder *builder) const {
                                    "u32", "struct xdp2tc_metadata", 1);
     if (options.egressOptimization) {
         builder->target->emitTableDecl(builder, "bmd_table", TablePerCPUArray,
-                                       "u32", "struct " + xdpIngress->parser->headerType->to<EBPFStructType>()->name, 1);
+                       "u32",
+                       "struct " + xdpIngress->parser->headerType->to<EBPFStructType>()->name, 1);
         builder->target->emitTableDecl(builder, "egress_jmp_table", TableProgArray,
                                        "u32", "u32", 1);
     }

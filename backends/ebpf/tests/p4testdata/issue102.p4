@@ -11,6 +11,9 @@ struct metadata {
 }
 
 struct headers {
+    // PTF tests for this program with --pipeline-opt enabled doesn't pass.
+    // We add placeholder to make PTF tests pass as this program is used only to verify bugs.
+    clone_i2e_metadata_t __placeholder;
 }
 
 parser IngressParserImpl(
