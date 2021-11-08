@@ -96,7 +96,7 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     builder->appendFormat("u32 %s = 0;", zeroKey.c_str());
     builder->newline();
     builder->emitIndent();
-    builder->appendFormat("u32 %s = 0;", oneKey.c_str());
+    builder->appendFormat("u32 %s = 1;", oneKey.c_str());
     builder->newline();
     builder->emitIndent();
     builder->appendFormat("unsigned char %s;", byteVar.c_str());
