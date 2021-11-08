@@ -138,6 +138,7 @@ void EBPFPipeline::emitCPUMapUserMetadataInstance(CodeBuilder *builder) {
     userMetadataType->declare(builder, control->user_metadata->name.name, true);
     builder->endOfStatement(true);
 }
+
 void EBPFPipeline::emitUserMetadataInstance(CodeBuilder *builder) {
     if (!options.generateHdrInMap) {
         emitLocalUserMetadataInstances(builder);
@@ -155,6 +156,7 @@ void EBPFPipeline::emitLocalHeaderInstances(CodeBuilder *builder) {
     parser->headerType->emitInitializer(builder);
     builder->endOfStatement(true);
 }
+
 void EBPFPipeline::emitLocalHeaderInstancesAsPointers(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("struct %s *%s;",
@@ -162,16 +164,19 @@ void EBPFPipeline::emitLocalHeaderInstancesAsPointers(CodeBuilder *builder) {
                         parser->headers->name.name);
     builder->newline();
 }
+
 void EBPFPipeline::emitCPUMAPHeadersInitializers(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendLine("struct hdr_md *hdrMd;");
 }
+
 void EBPFPipeline::emitCPUMAPHeaderInstances(CodeBuilder *builder) {
     emitCPUMAPHeadersInitializers(builder);
     builder->emitIndent();
     parser->headerType->declare(builder, parser->headers->name.name, true);
     builder->endOfStatement(false);
 }
+
 void EBPFPipeline::emitHeaderInstances(CodeBuilder* builder) {
     if (!options.generateHdrInMap) {
         emitLocalHeaderInstances(builder);
@@ -179,11 +184,13 @@ void EBPFPipeline::emitHeaderInstances(CodeBuilder* builder) {
         emitCPUMAPHeaderInstances(builder);
     }
 }
+
 void EBPFPipeline::emitCPUMAPLookup(CodeBuilder *builder) {
     builder->emitIndent();
     builder->target->emitTableLookup(builder, "hdr_md_cpumap", zeroKey.c_str(), "hdrMd");
     builder->endOfStatement(true);
 }
+
 void EBPFPipeline::emitCPUMAPInitializers(CodeBuilder *builder) {
     emitCPUMAPLookup(builder);
     builder->emitIndent();
@@ -196,10 +203,12 @@ void EBPFPipeline::emitCPUMAPInitializers(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendLine("__builtin_memset(hdrMd, 0, sizeof(struct hdr_md));");
 }
+
 void EBPFPipeline::emitHeadersFromCPUMAP(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("%s = &(hdrMd->cpumap_hdr);", parser->headers->name.name);
 }
+
 void EBPFPipeline::emitMetadataFromCPUMAP(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("%s = &(hdrMd->cpumap_usermeta);",
