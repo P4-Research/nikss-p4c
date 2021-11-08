@@ -96,6 +96,9 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     builder->appendFormat("u32 %s = 0;", zeroKey.c_str());
     builder->newline();
     builder->emitIndent();
+    builder->appendFormat("u32 %s = 0;", oneKey.c_str());
+    builder->newline();
+    builder->emitIndent();
     builder->appendFormat("unsigned char %s;", byteVar.c_str());
     builder->newline();
 
@@ -176,11 +179,13 @@ void EBPFPipeline::emitHeaderInstances(CodeBuilder* builder) {
         emitCPUMAPHeaderInstances(builder);
     }
 }
-
-void EBPFPipeline::emitCPUMAPInitializers(CodeBuilder *builder) {
+void EBPFPipeline::emitCPUMAPLookup(CodeBuilder *builder) {
     builder->emitIndent();
     builder->target->emitTableLookup(builder, "hdr_md_cpumap", zeroKey.c_str(), "hdrMd");
     builder->endOfStatement(true);
+}
+void EBPFPipeline::emitCPUMAPInitializers(CodeBuilder *builder) {
+    emitCPUMAPLookup(builder);
     builder->emitIndent();
     builder->append("if (!hdrMd)");
     builder->newline();
@@ -281,6 +286,12 @@ void EBPFEgressPipeline::emitPSAControlDataTypes(CodeBuilder *builder) {
                         "        };");
 
     builder->newline();
+}
+
+void EBPFEgressPipeline::emitCPUMAPLookup(CodeBuilder *builder) {
+    builder->emitIndent();
+    builder->target->emitTableLookup(builder, "hdr_md_cpumap", oneKey.c_str(), "hdrMd");
+    builder->endOfStatement(true);
 }
 
 // =====================TCIngressPipeline=============================
@@ -480,10 +491,10 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
                     parser->headerType->to<EBPFStructType>()->kind,
                     parser->headerType->to<EBPFStructType>()->name);
     } else {
-        builder->appendFormat("__builtin_memset((void *) %s, 0, sizeof(%s %s));",
-                    parser->headers->name.name,
-                    parser->headerType->to<EBPFStructType>()->kind,
-                    parser->headerType->to<EBPFStructType>()->name);
+        // When headerToMap option is used then we face a verifier "invalid memory access"
+        // when using __builtin_memset. It happens just for resubmit.p4.
+        // Fortunately this memset is useless because inside 'process' function
+        // data from CPU map is zeroed.
     }
     builder->newline();
     builder->blockEnd(true);
