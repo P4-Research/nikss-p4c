@@ -494,16 +494,13 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
                     "            break;\n"
                     "        }\n");
     builder->emitIndent();
+    // This memset is useless if hdr2Map is used because the 'process' function
+    // zero-initialize data from CPU map.
     if (!options.generateHdrInMap) {
         builder->appendFormat("__builtin_memset((void *) &%s, 0, sizeof(%s %s));",
                     parser->headers->name.name,
                     parser->headerType->to<EBPFStructType>()->kind,
                     parser->headerType->to<EBPFStructType>()->name);
-    } else {
-        // When headerToMap option is used then we face a verifier "invalid memory access"
-        // when using __builtin_memset. It happens just for resubmit.p4.
-        // Fortunately this memset is useless because inside 'process' function
-        // data from CPU map is zeroed.
     }
     builder->newline();
     builder->blockEnd(true);
