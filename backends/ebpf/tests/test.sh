@@ -172,11 +172,6 @@ for xdp_enabled in "${XDP[@]}" ; do
   for xdp2tc_mode in "${XDP2TC_MODE[@]}" ; do
     for hdr2map_enabled in "${HDR2MAP[@]}" ; do
       for table_caching_enabled in "${TABLE_CACHING[@]}" ; do
-        # FIXME: hdr2map is not working properly for TC, we should fix it in future
-        if [ "$xdp_enabled" == "False" ] && [ "$hdr2map_enabled" == "True" ]; then
-          echo "Test skipped because hdr2map doesn't work properly in TC"
-          continue
-        fi
         TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
         TEST_PARAMS+=";xdp='$xdp_enabled';xdp2tc='$xdp2tc_mode';hdr2Map='$hdr2map_enabled'"
         TEST_PARAMS+=";table_caching='$table_caching_enabled'"

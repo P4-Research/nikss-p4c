@@ -318,7 +318,7 @@ void PSAArch::emitInstances2TC(CodeBuilder *builder) const {
     if (options.generateHdrInMap) {
         builder->target->emitTableDecl(builder, "hdr_md_cpumap",
                                        TablePerCPUArray, "u32",
-                                       "struct hdr_md", 1);
+                                       "struct hdr_md", 2);
     }
 
     builder->appendLine("REGISTER_END()");
@@ -479,7 +479,7 @@ void PSAArch::emitInstances2XDP(CodeBuilder *builder) const {
     if (options.generateHdrInMap) {
         builder->target->emitTableDecl(builder, "hdr_md_cpumap",
                                        TablePerCPUArray, "u32",
-                                       "struct hdr_md", 1);
+                                       "struct hdr_md", 2);
     }
     builder->appendLine("REGISTER_END()");
     builder->newline();

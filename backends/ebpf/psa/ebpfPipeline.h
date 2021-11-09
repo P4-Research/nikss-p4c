@@ -20,6 +20,7 @@ class EBPFPipeline : public EBPFProgram {
     cstring timestampVar, ifindexVar;
     cstring priorityVar, packetPathVar, pktInstanceVar;
     cstring compilerGlobalMetadata;
+    cstring oneKey;
 
     EBPFControlPSA* control;
     EBPFDeparserPSA* deparser;
@@ -41,6 +42,7 @@ class EBPFPipeline : public EBPFProgram {
         packetPathVar = compilerGlobalMetadata + cstring("->packet_path");
         pktInstanceVar = compilerGlobalMetadata + cstring("->instance");
         priorityVar = cstring("skb->priority");
+        oneKey = EBPFModel::reserved("one");
     }
 
     virtual cstring dropReturnCode() {
@@ -78,7 +80,8 @@ class EBPFPipeline : public EBPFProgram {
     void emitCPUMapUserMetadataInstance(CodeBuilder *builder);
     void emitUserMetadataInstance(CodeBuilder *builder);
 
-    void emitCPUMAPInitializers(CodeBuilder *builder);
+    virtual void emitCPUMAPInitializers(CodeBuilder *builder);
+    virtual void emitCPUMAPLookup(CodeBuilder *builder);
     void emitHeadersFromCPUMAP(CodeBuilder* builder);
     void emitMetadataFromCPUMAP(CodeBuilder *builder);
 
@@ -118,6 +121,7 @@ class EBPFEgressPipeline : public EBPFPipeline {
                        P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) {}
 
     void emitPSAControlDataTypes(CodeBuilder* builder) override;
+    void emitCPUMAPLookup(CodeBuilder *builder) override;
 };
 
 class TCIngressPipeline : public EBPFIngressPipeline {
