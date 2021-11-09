@@ -55,6 +55,7 @@ set (P4C_EBPF_SRCS
   psa/ebpfPsaDeparser.cpp
   psa/ebpfPsaControl.cpp
   psa/ebpfPsaObjects.cpp
+  psa/ebpfPsaTypes.cpp
   psa/externs/ebpfPsaChecksum.cpp
   psa/externs/ebpfPsaCounter.cpp
   psa/externs/ebpfPsaHashAlgorithm.cpp
@@ -110,6 +111,7 @@ set (P4C_EBPF_HDRS
   psa/ebpfPsaControl.h
   psa/ebpfPsaControlTranslators.h
   psa/ebpfPsaObjects.h
+  psa/ebpfPsaTypes.h
   psa/externs/ebpfPsaChecksum.h
   psa/externs/ebpfPsaCounter.h
   psa/externs/ebpfPsaHashAlgorithm.h

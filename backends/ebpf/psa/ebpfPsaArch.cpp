@@ -5,6 +5,7 @@
 #include "ebpfPsaControl.h"
 #include "ebpfPsaControlTranslators.h"
 #include "xdpHelpProgram.h"
+#include "ebpfPsaTypes.h"
 #include "externs/ebpfPsaTableImplementation.h"
 #include "externs/ebpfPsaCounter.h"
 #include "externs/ebpfPsaHashAlgorithm.h"
