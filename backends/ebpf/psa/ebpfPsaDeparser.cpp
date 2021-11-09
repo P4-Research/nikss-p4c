@@ -671,7 +671,7 @@ void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
     builder->endOfStatement(true);
 
     builder->emitIndent();
-    builder->target->emitTableUpdate(builder, "bridged_headers", 
+    builder->target->emitTableUpdate(builder, "bridged_headers",
                                      program->zeroKey.c_str(), hdrValue);
     builder->newline();
 
