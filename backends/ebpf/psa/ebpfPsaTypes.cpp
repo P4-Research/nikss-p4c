@@ -40,4 +40,119 @@ void EBPFErrorTypePSA::emitInitializer(CodeBuilder* builder) {
     BUG("Error type cannot be initialized");
 }
 
+//////////////////////////////////////////////////////////
+
+EBPFHeaderTypePSA::EBPFHeaderTypePSA(const IR::Type_Header* header) : EBPFStructType(header) {
+    createFieldsGroups();
+}
+
+void EBPFHeaderTypePSA::createFieldsGroups() {
+    // This algorithm groups fields within byte(s) boundary or separate fields larger than 64 bits
+    FieldsGroup * currentGroup = nullptr;
+    unsigned int currentOffset = 0;
+    unsigned int groupSize = 0;
+
+    for (auto f : fields) {
+        if (currentGroup == nullptr) {
+            currentGroup = new FieldsGroup;
+            currentGroup->groupOffset = currentOffset;
+            groupSize = 0;
+        }
+
+        auto wt = f->type->to<IHasWidth>();
+        if (wt == nullptr)
+            continue;
+        unsigned int width = wt->widthInBits();
+
+        if (width > 64) {
+            if (groupSize != 0) {
+                // error
+            } else if (width % 8 != 0) {
+                // error
+            } else {
+                currentGroup->fields.push_back(f);
+                currentGroup->groupWidth += width;
+                groupedFields.push_back(currentGroup);
+                currentGroup = nullptr;
+            }
+        } else {
+            if (groupSize + width > 64) {
+                // error
+            } else if ((groupSize + width) % 8 == 0) {
+                currentGroup->fields.push_back(f);
+                currentGroup->groupWidth += width;
+                groupedFields.push_back(currentGroup);
+                currentGroup = nullptr;
+            } else {
+                currentGroup->fields.push_back(f);
+                currentGroup->groupWidth += width;
+                groupSize += width;
+            }
+        }
+
+        currentOffset += width;
+    }
+}
+
+void EBPFHeaderTypePSA::emitField(CodeBuilder* builder, EBPFField* field) {
+    builder->emitIndent();
+
+    auto type = field->type;
+    auto wt = type->to<IHasWidth>();
+    if (wt == nullptr)
+        return;
+
+    unsigned int width = wt->widthInBits();
+    if (width > 64) {
+        type->declare(builder, field->field->name, false);
+        builder->append("; ");
+    } else {
+        builder->appendFormat("unsigned long %s : %u; ", field->field->name.name.c_str(), width);
+    }
+    builder->append("/* ");
+    builder->append(type->type->toString());
+    if (field->comment != nullptr) {
+        builder->append(" ");
+        builder->append(field->comment);
+    }
+    builder->append(" */");
+    builder->newline();
+}
+
+void EBPFHeaderTypePSA::emit(CodeBuilder* builder) {
+    builder->emitIndent();
+    builder->appendFormat("%s %s ", kind.c_str(), name.c_str());
+    builder->blockStart();
+
+    builder->appendLine("#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__");
+
+    // In big endian byte order we can just define fields as in P4 program
+    for (auto f : fields) {
+        emitField(builder, f);
+    }
+
+    builder->appendLine("#elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__");
+
+    // In little endian byte order emit fields in group in reverse order. Preserve order of groups.
+    for (auto group : groupedFields) {
+        for (auto iter = group->fields.rbegin(); iter != group->fields.rend(); ++iter) {
+            emitField(builder, *iter);
+        }
+    }
+
+    builder->appendLine("#endif");
+
+    // For now add validity bit at the end of this structure
+    auto type = EBPFTypeFactory::instance->create(IR::Type_Boolean::get());
+    if (type != nullptr) {
+        builder->emitIndent();
+        type->declare(builder, "ebpf_valid", false);
+        builder->endOfStatement(true);
+    }
+
+    builder->blockEnd(false);
+    builder->append(" __attribute__((packed))");
+    builder->endOfStatement(true);
+}
+
 }  // namespace EBPF

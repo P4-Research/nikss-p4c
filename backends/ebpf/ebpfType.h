@@ -130,6 +130,7 @@ class EBPFTypeName : public EBPFType, public IHasWidth {
 
 // Also represents headers and unions
 class EBPFStructType : public EBPFType, public IHasWidth {
+ protected:
     class EBPFField {
      public:
         cstring comment;

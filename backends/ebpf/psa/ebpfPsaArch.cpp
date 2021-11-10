@@ -583,7 +583,12 @@ const PSAArch * ConvertToEbpfPSA::build(const IR::ToplevelBlock *tlb) {
                 }
             }
 
-            auto type = EBPFTypeFactory::instance->create(d->to<IR::Type>());
+            EBPFType* type;
+            if (d->is<IR::Type_Header>())
+                type = new EBPFHeaderTypePSA(d->to<IR::Type_Header>());
+            else
+                type = EBPFTypeFactory::instance->create(d->to<IR::Type>());
+
             if (type == nullptr)
                 continue;
             ebpfTypes.push_back(type);
