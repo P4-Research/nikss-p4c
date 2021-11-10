@@ -18,6 +18,7 @@ class EBPFPipeline : public EBPFProgram {
     cstring timestampVar, ifindexVar;
     cstring priorityVar, packetPathVar, pktInstanceVar;
     cstring compilerGlobalMetadata;
+    cstring oneKey;
 
     EBPFControlPSA* control;
     EBPFDeparserPSA* deparser;
@@ -39,6 +40,7 @@ class EBPFPipeline : public EBPFProgram {
         packetPathVar = compilerGlobalMetadata + cstring("->packet_path");
         pktInstanceVar = compilerGlobalMetadata + cstring("->instance");
         priorityVar = cstring("skb->priority");
+        oneKey = EBPFModel::reserved("one");
     }
 
     /* Check if pipeline does any processing.
@@ -88,7 +90,10 @@ class EBPFPipeline : public EBPFProgram {
     /* Generates and instance of user metadata for a pipeline,
      * allocated either on stack or in the per-CPU map. */
     void emitUserMetadataInstance(CodeBuilder *builder);
-    void emitCPUMAPInitializers(CodeBuilder *builder);
+
+    virtual void emitCPUMAPInitializers(CodeBuilder *builder);
+    virtual void emitCPUMAPLookup(CodeBuilder *builder);
+
     void emitHeadersFromCPUMAP(CodeBuilder* builder);
     void emitMetadataFromCPUMAP(CodeBuilder *builder);
 
@@ -129,6 +134,7 @@ class EBPFEgressPipeline : public EBPFPipeline {
 
     void emitPSAControlInputMetadata(CodeBuilder* builder) override;
     void emitPSAControlOutputMetadata(CodeBuilder* builder) override;
+    void emitCPUMAPLookup(CodeBuilder *builder) override;
 };
 
 class TCIngressPipeline : public EBPFIngressPipeline {

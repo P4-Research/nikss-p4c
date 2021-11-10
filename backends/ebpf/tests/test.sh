@@ -189,11 +189,7 @@ for xdp_enabled in "${XDP[@]}" ; do
     for hdr2map_enabled in "${HDR2MAP[@]}" ; do
       for table_caching_enabled in "${TABLE_CACHING[@]}" ; do
         for pipeline_opt_enabled in "${PIPELINE_OPT[@]}" ; do
-          # FIXME: hdr2map is not working properly for TC, we should fix it in future
-          if [ "$xdp_enabled" == "False" ] && [ "$hdr2map_enabled" == "True" ]; then
-            echo "Test skipped because hdr2map doesn't work properly in TC"
-            continue
-          elif [ "$xdp_enabled" == "False" ] && [ "$pipeline_opt_enabled" == "True" ]; then
+          if [ "$xdp_enabled" == "False" ] && [ "$pipeline_opt_enabled" == "True" ]; then
             echo "Test skipped because pipeline-aware optimization doesn't work in TC yet"
             continue
           fi
