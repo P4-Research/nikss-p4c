@@ -761,15 +761,15 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
          * If we remove appended headers (e.g. bridged metadata) we should fix pkt_len
          * and add missing bytes, because pkt_len is used to update byte Counters.
          */
-        unsigned append_bytes = 0;
+        unsigned append_bits = 0;
         for (auto el : parser->to<EBPFOptimizedEgressParserPSA>()->headersToSkipMovingOffset) {
             auto hdr = el.second;
-            append_bytes += hdr->width_bits();
+            append_bits += hdr->width_bits();
         }
 
-        if (append_bytes != 0) {
+        if (append_bits != 0) {
             builder->emitIndent();
-            builder->appendFormat("%s += %d", this->lengthVar, append_bytes / 8);
+            builder->appendFormat("%s += %d", this->lengthVar, append_bits / 8);
             builder->endOfStatement(true);
         }
 

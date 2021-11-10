@@ -610,6 +610,7 @@ void XDPEgressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->blockEnd(true);
 }
 
+// =====================OptimizedXDPIngressDeparserPSA=============================
 void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
     if (this->skipEgress) {
         EBPFDeparserPSA::emit(builder);
