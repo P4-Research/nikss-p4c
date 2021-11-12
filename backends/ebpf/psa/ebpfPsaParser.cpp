@@ -158,6 +158,71 @@ void PsaStateTranslationVisitor::compileVerify(const IR::MethodCallExpression * 
     builder->blockEnd(true);
 }
 
+void PsaStateTranslationVisitor::compileExtract(const IR::Expression* destination) {
+    auto type = state->parser->typeMap->getType(destination);
+    auto ht = type->to<IR::Type_Header>();
+    if (ht == nullptr) {
+        StateTranslationVisitor::compileExtract(destination);
+        return;
+    }
+
+    unsigned width = ht->width_bits();
+    auto program = state->parser->program;
+
+    cstring offsetStr = Util::printf_format("BYTES(%s + %u)", program->offsetVar, width);
+    // FIXME: program->lengthVariable should be used instead of difference of end and start
+    builder->target->emitTraceMessage(builder, "Parser: check pkt_len=%%d < last_read_byte=%%d", 2,
+                                      (program->packetEndVar + " - " + program->packetStartVar).c_str(),
+                                      offsetStr.c_str());
+
+    builder->emitIndent();
+    builder->appendFormat("if (%s < %s + BYTES(%s + %u)) ",
+                          program->packetEndVar.c_str(),
+                          program->packetStartVar.c_str(),
+                          program->offsetVar.c_str(), width);
+    builder->blockStart();
+
+    builder->target->emitTraceMessage(builder, "Parser: invalid packet (packet too short)");
+
+    builder->emitIndent();
+    builder->appendFormat("%s = %s;", program->errorVar.c_str(),
+                          p4lib.packetTooShort.str());
+    builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
+    builder->newline();
+    builder->blockEnd(true);
+
+    cstring msgStr = Util::printf_format("Parser: extracting header %s", destination->toString());
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    builder->newline();
+
+    builder->emitIndent();
+    builder->append("__builtin_memcpy((void *) &(");
+    visit(destination);
+    builder->appendFormat("), %s + BYTES(%s), BYTES(%u))",
+                          program->packetStartVar.c_str(),
+                          program->offsetVar.c_str(),
+                          width);
+    builder->endOfStatement(true);
+
+    builder->emitIndent();
+    visit(destination);
+    builder->appendLine(".ebpf_valid = 1;");
+
+    // TODO: bytes swap
+
+    builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat("%s += %d", program->offsetVar.c_str(), width);
+    builder->endOfStatement(true);
+
+    msgStr = Util::printf_format("Parser: extracted %s", destination->toString());
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+}
+
 EBPFPsaParser::EBPFPsaParser(const EBPFProgram* program, const IR::P4Parser* block,
                              const P4::TypeMap* typeMap) : EBPFParser(program, block, typeMap) {
     visitor = new PsaStateTranslationVisitor(program->refMap, program->typeMap, this);

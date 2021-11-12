@@ -32,6 +32,9 @@ class PsaStateTranslationVisitor : public StateTranslationVisitor {
     void processMethod(const P4::ExternMethod* ext) override;
 
     void compileVerify(const IR::MethodCallExpression * expression);
+
+ protected:
+    void compileExtract(const IR::Expression* destination) override;
 };
 
 class EBPFPsaParser : public EBPFParser {
