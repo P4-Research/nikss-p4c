@@ -79,6 +79,20 @@ EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* tab
     initImplementations();
 
     tryEnableTableCache();
+
+    auto sizeProperty = table->container->properties->getProperty("size");
+    if (keyGenerator == nullptr && sizeProperty != nullptr) {
+        ::warning(ErrorType::WARN_IGNORE_PROPERTY,
+                  "%1%: property ignored due to not defined table key", sizeProperty);
+    }
+    if (keyFieldNames.empty() && size != 1) {
+        if (sizeProperty != nullptr) {
+            ::warning(ErrorType::WARN_IGNORE,
+                      "%1%: only one entry allowed with empty key or selector-only key",
+                      sizeProperty);
+        }
+        this->size = 1;
+    }
 }
 
 EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name) :
@@ -238,10 +252,12 @@ void EBPFTablePSA::emitValueStructStructure(CodeBuilder* builder) {
 }
 
 void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
-    TableKind kind = isLPMTable() ? TableLPMTrie : TableHash;
-    emitTableDecl(builder, name, kind,
-                  cstring("struct ") + keyTypeName,
-                  cstring("struct ") + valueTypeName, size);
+    if (keyGenerator != nullptr) {
+        TableKind kind = isLPMTable() ? TableLPMTrie : TableHash;
+        emitTableDecl(builder, name, kind,
+                      cstring("struct ") + keyTypeName,
+                      cstring("struct ") + valueTypeName, size);
+    }
 
     if (!hasImplementation()) {
         // Default action is up to implementation
