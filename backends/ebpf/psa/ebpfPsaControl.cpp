@@ -70,13 +70,16 @@ void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
         rand->processMethod(builder, method);
         return;
     } else if (declType->name.name == "Register") {
+        auto di = method->object->to<IR::Declaration_Instance>();
+        name = EBPFObject::externalName(di);
+        auto reg = control->to<EBPFControlPSA>()->getRegister(name);
         if (method->method->type->name == "write") {
-            auto di = method->object->to<IR::Declaration_Instance>();
-            name = EBPFObject::externalName(di);
-            auto reg = control->to<EBPFControlPSA>()->getRegister(name);
             reg->emitRegisterWrite(builder, method, this);
-            return;
+        } else if (method->method->type->name == "read") {
+            ::warning(ErrorType::WARN_UNUSED, "This Register(%1%) read value is not used!", name);
+            reg->emitRegisterRead(builder, method, this, nullptr);
         }
+        return;
     } else if (declType->name.name == "Meter") {
         auto di = decl->to<IR::Declaration_Instance>();
         name = EBPFObject::externalName(di);

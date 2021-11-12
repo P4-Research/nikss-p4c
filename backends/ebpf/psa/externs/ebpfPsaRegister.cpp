@@ -113,7 +113,6 @@ void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMet
     auto indexArg = method->expr->arguments->at(0)->expression->to<IR::PathExpression>();
     cstring indexParamStr = translator->getIndexActionParam(indexArg);
     BUG_CHECK(!indexParamStr.isNullOrEmpty(), "Index param cannot be empty");
-    BUG_CHECK(leftExpression != nullptr, "Register read must be with left assigment");
 
     cstring valueName = program->refMap->newName("value");
     cstring msgStr, varStr;
@@ -140,26 +139,30 @@ void EBPFRegisterPSA::emitRegisterRead(CodeBuilder* builder, const P4::ExternMet
     builder->appendFormat("if (%s != NULL) ", valueName.c_str());
     builder->blockStart();
     builder->emitIndent();
-    codeGen->visit(leftExpression);
-    builder->appendFormat(" = *%s", valueName);
-    builder->endOfStatement(true);
+    if (leftExpression != nullptr) {
+        codeGen->visit(leftExpression);
+        builder->appendFormat(" = *%s", valueName);
+        builder->endOfStatement(true);
+    }
     builder->target->emitTraceMessage(builder, "Register: Entry found!");
     builder->blockEnd(false);
     builder->appendFormat(" else ");
     builder->blockStart();
     builder->emitIndent();
 
-    codeGen->visit(leftExpression);
-    builder->append(" = ");
-    if (this->initialValue != nullptr) {
-        builder->append(this->initialValue->value.str());
-    } else {
-        builder->append("(");
-        this->valueType->declare(builder, cstring::empty, false);
-        builder->append(")");
-        this->valueType->emitInitializer(builder);
+    if (leftExpression != nullptr) {
+        codeGen->visit(leftExpression);
+        builder->append(" = ");
+        if (this->initialValue != nullptr) {
+            builder->append(this->initialValue->value.str());
+        } else {
+            builder->append("(");
+            this->valueType->declare(builder, cstring::empty, false);
+            builder->append(")");
+            this->valueType->emitInitializer(builder);
+        }
+        builder->endOfStatement(true);
     }
-    builder->endOfStatement(true);
 
     builder->target->emitTraceMessage(builder, "Register: Entry not found, using default value");
     builder->blockEnd(true);
