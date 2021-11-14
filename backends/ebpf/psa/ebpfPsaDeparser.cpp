@@ -645,7 +645,6 @@ void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
     builder->appendFormat("%s = 0", program->offsetVar.c_str());
     builder->endOfStatement(true);
 
-
     for (auto const& el : removedHeadersToEmit) {
         builder->emitIndent();
         builder->appendFormat("if (%s.ebpf_valid) ", el.first);
