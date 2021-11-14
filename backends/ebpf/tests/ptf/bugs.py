@@ -48,3 +48,15 @@ class IfNotTest(P4EbpfTest):
         pkt = testutils.simple_ip_packet()
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_packet(self, pkt, PORT1)
+
+
+class Issue246(P4EbpfTest):
+    """
+    Program with empty key failed to load
+    """
+    p4_file_path = "p4testdata/issue246.p4"
+
+    def runTest(self):
+        self.table_add(table="ingress_tbl_fwd", keys=["none"], references=["1"])
+        self.table_update(table="ingress_tbl_fwd", keys=["none"], references=["2"])
+        self.table_delete(table="ingress_tbl_fwd", keys=["none"])

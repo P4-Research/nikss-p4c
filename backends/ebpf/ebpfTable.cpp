@@ -168,6 +168,14 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
         }
     }
 
+    // Add dummy key if P4 table define table with empty key. This due to that hash map
+    // cannot have zero-length key. See function htab_map_alloc_check in kernel/bpf/hashtab.c
+    // located in Linux kernel repository
+    if (keyFieldNames.empty()) {
+        builder->emitIndent();
+        builder->appendLine("u8 __dummy_table_key;");
+    }
+
     builder->blockEnd(false);
     builder->append(" __attribute__((aligned(4)))");
     builder->endOfStatement(true);
