@@ -93,8 +93,11 @@ class ConvertToEbpfPSA : public Transform {
                      : options(options), structure(structure), typemap(typemap), refmap(refmap) {
     }
 
-    const PSAArch *build(IR::ToplevelBlock *prog);
+    const PSAArch *build(const IR::ToplevelBlock *prog);
     const IR::Node *preorder(IR::ToplevelBlock *p) override;
+
+    void optimizePipeline();
+
     const PSAArch *getPSAArchForEBPF() { return ebpf_psa_arch; }
 };
 
@@ -137,7 +140,7 @@ class ConvertToEBPFParserPSA : public Inspector {
  public:
     ConvertToEBPFParserPSA(EBPF::EBPFProgram* program, P4::ReferenceMap* refmap,
             P4::TypeMap* typemap, const EbpfOptions &options, pipeline_type type) :
-            program(program), typemap(typemap), refmap(refmap), options(options), type(type) { }
+            program(program), type(type), typemap(typemap), refmap(refmap), options(options) { }
 
     bool preorder(const IR::ParserBlock *prsr) override;
     bool preorder(const IR::ParserState *s) override;
@@ -164,7 +167,7 @@ class ConvertToEBPFControlPSA : public Inspector {
                             const EbpfOptions &options,
                             pipeline_type type) : program(program),
                             parserHeaders(parserHeaders),
-                            typemap(typemap), refmap(refmap), options(options), type(type) {
+                            typemap(typemap), type(type), refmap(refmap), options(options) {
     }
 
     bool preorder(const IR::P4Action *) override;
@@ -197,10 +200,10 @@ class ConvertToEBPFDeparserPSA : public Inspector {
                              const IR::Parameter* istd,
                              P4::ReferenceMap* refmap, P4::TypeMap* typemap,
                              const EbpfOptions &options, pipeline_type type) : program(program),
-                                                     parserHeaders(parserHeaders), istd(istd),
-                                                     typemap(typemap), refmap(refmap),
+                                                     type(type), parserHeaders(parserHeaders),
+                                                     istd(istd), typemap(typemap), refmap(refmap),
                                                      p4lib(P4::P4CoreLibrary::instance),
-                                                     options(options), type(type) { }
+                                                     options(options) { }
 
     bool preorder(const IR::ControlBlock *) override;
     bool preorder(const IR::MethodCallExpression* expression) override;

@@ -36,7 +36,7 @@ class StateTranslationVisitor : public CodeGenInspector {
 
     void compileExtractField(const IR::Expression* expr, cstring name,
                              unsigned alignment, EBPFType* type);
-    void compileExtract(const IR::Expression* destination);
+    virtual void compileExtract(const IR::Expression* destination);
     void compileLookahead(const IR::Expression* destination);
 
     virtual void processFunction(const P4::ExternFunction* function);

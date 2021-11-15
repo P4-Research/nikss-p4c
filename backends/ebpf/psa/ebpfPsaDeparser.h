@@ -4,6 +4,7 @@
 #include "backends/ebpf/ebpfControl.h"
 #include "ebpfPsaControl.h"
 #include "backends/ebpf/psa/externs/ebpfPsaChecksum.h"
+#include "backends/ebpf/psa/ebpfPsaParser.h"
 
 namespace EBPF {
 
@@ -44,17 +45,25 @@ class EBPFDeparserPSA : public EBPFControlPSA {
       returnCode = cstring("returnCode");
     }
 
+    bool isHeaderEmitted(cstring hdrName) const;
+
     void emit(CodeBuilder* builder) override;
-    // A "PreDeparser" is emitted just before set of hdr.emit() functions.
-    // It is useful in case of resubmit or clone operation, as these operations
+    // A "PreDeparser" is emitted just before a sequence of hdr.emit() functions.
+    // It is useful in the case of resubmit or clone operation, as these operations
     // require to have an original packet.
-    virtual void emitPreDeparser(CodeBuilder *builder) {}
-    virtual void emitResizeHead(CodeBuilder *builder) {}
+    virtual void emitPreDeparser(CodeBuilder *builder) {
+        (void) builder;
+    }
+    virtual void emitResizeHead(CodeBuilder *builder) {
+        (void) builder;
+    }
     virtual void emitDeparserExternCalls(CodeBuilder* builder) {
         controlBlock->container->body->apply(*codeGen);
         builder->newline();
     }
-    void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
+
+    virtual void emitPreparePacketBuffer(CodeBuilder *builder);
+    virtual void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                     cstring &headerExpression) const;
     void emitField(CodeBuilder* builder, cstring headerExpression,
                    cstring field, unsigned alignment, EBPF::EBPFType* type) const;
@@ -137,6 +146,30 @@ class XDPEgressDeparserPSA : public XDPDeparserPSA {
             XDPDeparserPSA(program, control, parserHeaders, istd) { }
 
     bool build() override;
+    void emitPreDeparser(CodeBuilder *builder) override;
+};
+
+class OptimizedXDPEgressDeparserPSA : public XDPEgressDeparserPSA {
+ public:
+    OptimizedXDPEgressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
+                                  const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
+            XDPEgressDeparserPSA(program, control, parserHeaders, istd) {
+    }
+
+    void emit(CodeBuilder* builder) override;
+};
+
+class OptimizedXDPIngressDeparserPSA : public XDPIngressDeparserPSA {
+ public:
+    std::vector<cstring> optimizedHeadersExpressions;
+    std::vector<const IR::Type_Header *> optimizedHeadersToEmit;
+    std::map<cstring, const IR::Type_Header *> removedHeadersToEmit;
+    bool skipEgress = false;
+    OptimizedXDPIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
+                                   const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
+            XDPIngressDeparserPSA(program, control, parserHeaders, istd) {}
+
+    void emit(CodeBuilder* builder) override;
 };
 
 }  // namespace EBPF

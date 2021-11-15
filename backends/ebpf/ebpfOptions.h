@@ -42,8 +42,8 @@ class EbpfOptions : public CompilerOptions {
     // maximum number of ternary masks
     unsigned int maxTernaryMasks = 128;
 
-    // XDP-related opts
     bool generateToXDP = false;
+    bool pipelineOptimization = false;
     enum XDP2TC xdp2tcMode = XDP2TC_NONE;
     EbpfOptions();
 

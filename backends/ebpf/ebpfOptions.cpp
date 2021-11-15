@@ -52,4 +52,8 @@ EbpfOptions::EbpfOptions() {
                     return true;
                 },
                 "[psa] Set number of maximum possible masks for ternary key in a single table");
+        registerOption("--pipeline-opt", nullptr,
+                       [this](const char*) { pipelineOptimization = true; return true; },
+                       "Optimize the packet processing by leveraging clever data sharing "
+                       "and pipeline awareness.");
 }

@@ -62,7 +62,7 @@ set (P4C_EBPF_SRCS
   psa/externs/ebpfPsaRegister.cpp
   psa/externs/ebpfPsaTableImplementation.cpp
   psa/externs/ebpfPsaMeter.cpp
-  )
+  psa/backend.cpp)
 
 set (P4C_EBPF_HDRS
   codeGen.h
@@ -100,6 +100,7 @@ set (P4C_EBPF_HDRS
   ../bmv2/common/programStructure.h
   ../bmv2/common/sharedActionSelectorCheck.h
   ../bmv2/psa_switch/psaSwitch.h
+  psa/backend.h
   psa/xdpTarget.h
   psa/ebpfPsaArch.h
   psa/xdpHelpProgram.h
@@ -311,7 +312,7 @@ p4c_add_test_with_args("ebpf" ${EBPF_DRIVER_TEST} TRUE "testdata/p4_16_samples/e
 
 # Execute PSA PTF test only when: (1) kernel is supported, (2) libbpf (3) bpftool and (4) PTF are available
 if (SUPPORTS_KERNEL_PSA)
-  set (ebpf-psa-ptf_timeout 3600)
+  set (ebpf-psa-ptf_timeout 7200)
   p4c_add_tests("ebpf-psa-ptf" ${EBPF_PTF_DRIVER_TEST} ${EBPF_PSA_PTF_TEST_SUITES} "")
 endif()
 

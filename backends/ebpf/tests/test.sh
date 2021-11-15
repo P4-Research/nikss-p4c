@@ -12,6 +12,7 @@ function print_help() {
   echo "--xdp2tc         A mode to pass metadata from XDP to TC programs <meta|head|cpumap>."
   echo "--hdr2map        Allocate header structure in per-CPU map <on|off>."
   echo "--table-caching  Use table cache for tables with LPM and/or ternary key <on|off>."
+  echo "--pipeline-opt   Apply pipeline-aware optimization <on|off>."
   echo "--help           Print this message."
   echo
 }
@@ -58,6 +59,10 @@ for i in "$@"; do
       ;;
     --table-caching=*)
       TABLE_CACHING_ARG="${i#*=}"
+      shift # past argument=value
+      ;;
+    --pipeline-opt=*)
+      PIPELINE_OPT_ARG="${i#*=}"
       shift # past argument=value
       ;;
     *)
@@ -128,6 +133,7 @@ declare -a XDP=("False" "True")
 declare -a XDP2TC_MODE=("head" "cpumap" "meta")
 declare -a HDR2MAP=("False" "True")
 declare -a TABLE_CACHING=("False" "True")
+declare -a PIPELINE_OPT=("False" "True")
 
 if [ ! -z "$BPF_HOOK" ]; then
   if [ "$BPF_HOOK" == "tc" ]; then
@@ -167,22 +173,39 @@ if [ ! -z "$TABLE_CACHING_ARG" ]; then
   fi
 fi
 
+if [ ! -z "$PIPELINE_OPT_ARG" ]; then
+  if [ "$PIPELINE_OPT_ARG" == "on" ]; then
+    PIPELINE_OPT=( "True" )
+  elif [ "$PIPELINE_OPT_ARG" == "off" ]; then
+    PIPELINE_OPT=( "False" )
+  else
+    echo "Wrong --pipeline-opt value provided; running script for both enabled/disabled."
+  fi
+fi
+
 TEST_CASE=$@
 for xdp_enabled in "${XDP[@]}" ; do
   for xdp2tc_mode in "${XDP2TC_MODE[@]}" ; do
     for hdr2map_enabled in "${HDR2MAP[@]}" ; do
       for table_caching_enabled in "${TABLE_CACHING[@]}" ; do
-        TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
-        TEST_PARAMS+=";xdp='$xdp_enabled';xdp2tc='$xdp2tc_mode';hdr2Map='$hdr2map_enabled'"
-        TEST_PARAMS+=";table_caching='$table_caching_enabled'"
-        # Start tests
-        ptf \
-          --test-dir ptf/ \
-          --test-params="$TEST_PARAMS" \
-          --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
-          --interface 4@s1-eth4 --interface 5@s1-eth5 $TEST_CASE
-        exit_on_error
-        rm -rf ptf_out
+        for pipeline_opt_enabled in "${PIPELINE_OPT[@]}" ; do
+          if [ "$xdp_enabled" == "False" ] && [ "$pipeline_opt_enabled" == "True" ]; then
+            echo "Test skipped because pipeline-aware optimization doesn't work in TC yet"
+            continue
+          fi
+          TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
+          TEST_PARAMS+=";xdp='$xdp_enabled';xdp2tc='$xdp2tc_mode';hdr2Map='$hdr2map_enabled'"
+          TEST_PARAMS+=";table_caching='$table_caching_enabled'"
+          TEST_PARAMS+=";pipeline_optimization='$pipeline_opt_enabled'"
+          # Start tests
+          ptf \
+            --test-dir ptf/ \
+            --test-params="$TEST_PARAMS" \
+            --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
+            --interface 4@s1-eth4 --interface 5@s1-eth5 $TEST_CASE
+          exit_on_error
+          rm -rf ptf_out
+        done
       done
     done
   done

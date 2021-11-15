@@ -9,8 +9,6 @@ namespace EBPF {
 
 /*
  * EBPFPipeline represents a single eBPF program in the TC/XDP hook.
- * A single pipeline is composed of Parser, Control block and Deparser.
- * EBPFPipeline inherits from EBPFProgram, but extends it with deparser and other PSA-specific objects.
  */
 class EBPFPipeline : public EBPFProgram {
  public:
@@ -45,6 +43,10 @@ class EBPFPipeline : public EBPFProgram {
         oneKey = EBPFModel::reserved("one");
     }
 
+    /* Check if pipeline does any processing.
+     * Return false if not. */
+    bool isEmpty() const;
+
     virtual cstring dropReturnCode() {
         if (sectionName.startsWith("xdp")) {
             return "XDP_DROP";
@@ -62,32 +64,41 @@ class EBPFPipeline : public EBPFProgram {
         return "TC_ACT_OK";
     }
 
+    virtual void emit(CodeBuilder* builder) = 0;
     virtual void emitTrafficManager(CodeBuilder *builder) = 0;
+    virtual void emitPSAControlInputMetadata(CodeBuilder* builder) = 0;
+    virtual void emitPSAControlOutputMetadata(CodeBuilder* builder) = 0;
 
-    virtual void emitPSAControlDataTypes(CodeBuilder* builder) = 0;
-
+    /* Generates an instance of struct Headers_t and allocates it on the BPF program's stack. */
     void emitLocalHeaderInstances(CodeBuilder *builder);
+    /* Generates a pointer to struct Headers_t and puts it on the BPF program's stack. */
     void emitLocalHeaderInstancesAsPointers(CodeBuilder *builder);
+    /* Generates a pointer to struct hdr_md. The pointer is used to access data from per-CPU map. */
     void emitCPUMAPHeadersInitializers(CodeBuilder *builder);
     void emitCPUMAPHeaderInstances(CodeBuilder *builder);
-
+    /* Generates an instance of struct Headers_t,
+     * allocated either on stack or in the per-CPU map. */
     void emitHeaderInstances(CodeBuilder *builder) override;
-
+    /* Generates a set of helper variables that are used during packet processing. */
     void emitLocalVariables(CodeBuilder* builder) override;
+    /* Generates a pointer to skb->cb and maps it to
+     * psa_global_metadata to access global metadata shared between pipelines. */
     void emitGlobalMetadataInitializer(CodeBuilder *builder);
 
     void emitLocalUserMetadataInstances(CodeBuilder *builder);
     void emitCPUMapUserMetadataInstance(CodeBuilder *builder);
+    /* Generates and instance of user metadata for a pipeline,
+     * allocated either on stack or in the per-CPU map. */
     void emitUserMetadataInstance(CodeBuilder *builder);
 
     virtual void emitCPUMAPInitializers(CodeBuilder *builder);
     virtual void emitCPUMAPLookup(CodeBuilder *builder);
+
     void emitHeadersFromCPUMAP(CodeBuilder* builder);
     void emitMetadataFromCPUMAP(CodeBuilder *builder);
 
     virtual void emitPacketLength(CodeBuilder *builder);
     virtual void emitTimestamp(CodeBuilder *builder);
-    virtual void emit(CodeBuilder* builder);
     virtual bool shouldEmitTimestamp() {
         auto directMeter = std::find_if(control->tables.begin(),
                                         control->tables.end(),
@@ -110,17 +121,19 @@ class EBPFPipeline : public EBPFProgram {
 class EBPFIngressPipeline : public EBPFPipeline {
  public:
     EBPFIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
-                        P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) {}
+                        P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) { }
 
-    void emitPSAControlDataTypes(CodeBuilder* builder) override;
+    void emitPSAControlInputMetadata(CodeBuilder* builder) override;
+    void emitPSAControlOutputMetadata(CodeBuilder* builder) override;
 };
 
 class EBPFEgressPipeline : public EBPFPipeline {
  public:
     EBPFEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
-                       P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) {}
+                       P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) { }
 
-    void emitPSAControlDataTypes(CodeBuilder* builder) override;
+    void emitPSAControlInputMetadata(CodeBuilder* builder) override;
+    void emitPSAControlOutputMetadata(CodeBuilder* builder) override;
     void emitCPUMAPLookup(CodeBuilder *builder) override;
 };
 
@@ -151,6 +164,7 @@ class TCEgressPipeline : public EBPFEgressPipeline {
                        P4::TypeMap* typeMap) :
             EBPFEgressPipeline(name, options, refMap, typeMap) { }
 
+    void emit(CodeBuilder *builder) override;
     void emitTrafficManager(CodeBuilder *builder) override;
 };
 
@@ -173,8 +187,13 @@ class XDPEgressPipeline : public EBPFEgressPipeline {
     XDPEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                         P4::TypeMap* typeMap):
             EBPFEgressPipeline(name, options, refMap, typeMap) {
-        sectionName = "xdp_devmap/" + name;
-        ifindexVar = cstring("skb->egress_ifindex");
+        if (options.pipelineOptimization) {
+            sectionName = "xdp/" + name;
+            ifindexVar = cstring("egress_ifindex");
+        } else {
+            sectionName = "xdp_devmap/" + name;
+            ifindexVar = cstring("skb->egress_ifindex");
+        }
         // we do not support packet path, instance & priority in the XDP egress.
         packetPathVar = cstring("0");
         pktInstanceVar = cstring("0");

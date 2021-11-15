@@ -39,20 +39,13 @@ void DeparserBodyTranslator::processMethod(const P4::ExternMethod *method) {
     ControlBodyTranslator::processMethod(method);
 }
 
-void EBPFDeparserPSA::emit(CodeBuilder* builder) {
-    codeGen->setBuilder(builder);
-    if (program->options.generateHdrInMap) {
-        codeGen->asPointerVariables.insert(this->headers->name.name);
-    }
+bool EBPFDeparserPSA::isHeaderEmitted(cstring hdrName) const {
+    return std::find(headersExpressions.begin(),
+                     headersExpressions.end(),
+                     hdrName) != headersExpressions.end();
+}
 
-    for (auto a : controlBlock->container->controlLocals)
-        emitDeclaration(builder, a);
-
-    emitDeparserExternCalls(builder);
-    builder->newline();
-    emitPreDeparser(builder);
-
-    const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
+void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("int %s = 0", this->outerHdrLengthVar.c_str());
     builder->endOfStatement(true);
@@ -63,7 +56,12 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
         unsigned width = headerToEmit->width_bits();
         builder->emitIndent();
         builder->append("if (");
-        builder->append(headerExpression);
+        cstring hdrName = headerExpression;
+        // FIXME: we should use codeGen->visit()
+        if (this->is<OptimizedXDPEgressDeparserPSA>()) {
+            hdrName = headerExpression.replace(".", "->");
+        }
+        builder->append(hdrName);
         builder->append(".ebpf_valid) ");
         builder->blockStart();
         builder->emitIndent();
@@ -74,10 +72,12 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
 
     builder->newline();
     builder->emitIndent();
+
+    cstring offsetVar = program->offsetVar;
     builder->appendFormat("int %s = BYTES(%s) - BYTES(%s)",
                           this->outerHdrOffsetVar.c_str(),
                           this->outerHdrLengthVar.c_str(),
-                          pipelineProgram->offsetVar.c_str());
+                          offsetVar.c_str());
     builder->endOfStatement(true);
     builder->emitIndent();
     builder->appendFormat("if (%s != 0) ", this->outerHdrOffsetVar.c_str());
@@ -102,6 +102,23 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     builder->blockEnd(true);
     builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusted");
     builder->blockEnd(true);
+}
+
+void EBPFDeparserPSA::emit(CodeBuilder* builder) {
+    codeGen->setBuilder(builder);
+    if (program->options.generateHdrInMap) {
+        codeGen->asPointerVariables.insert(this->headers->name.name);
+    }
+
+    for (auto a : controlBlock->container->controlLocals)
+        emitDeclaration(builder, a);
+
+    emitDeparserExternCalls(builder);
+    builder->newline();
+
+    emitPreDeparser(builder);
+    emitPreparePacketBuffer(builder);
+
     builder->emitIndent();
     builder->appendFormat("%s = %s;",
                           program->packetStartVar,
@@ -114,7 +131,7 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     builder->newline();
 
     builder->emitIndent();
-    builder->appendFormat("%s = 0", pipelineProgram->offsetVar.c_str());
+    builder->appendFormat("%s = 0", program->offsetVar.c_str());
     builder->endOfStatement(true);
 
     for (unsigned long i = 0; i < this->headersToEmit.size(); i++) {
@@ -127,6 +144,9 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
 
 void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                                  cstring& headerExpression) const {
+    if (this->is<OptimizedXDPEgressDeparserPSA>()) {
+        headerExpression = headerExpression.replace(".", "->");
+    }
     cstring msgStr;
     builder->emitIndent();
     builder->append("if (");
@@ -167,8 +187,6 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
         alignment += et->widthInBits();
         alignment %= 8;
     }
-    msgStr = Util::printf_format("Deparser: emitted %s", headerExpression);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
     builder->blockEnd(true);
 }
 
@@ -211,12 +229,21 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
     unsigned bytes = ROUNDUP(widthToEmit, 8);
     unsigned shift = widthToEmit < 8 ?
                      (loadSize - alignment - widthToEmit) : (loadSize - widthToEmit);
+    cstring hdrField = headerExpression + "." + field;
+    if (program->options.pipelineOptimization &&
+        this->is<OptimizedXDPIngressDeparserPSA>()) {
+        hdrField = field + "_val";
+        builder->emitIndent();
+        type->emit(builder);
+        builder->appendFormat(" %s = %s.%s", hdrField, headerExpression, field.c_str());
+        builder->endOfStatement(true);
+    }
+
     if (!swap.isNullOrEmpty()) {
         builder->emitIndent();
-        builder->append(headerExpression);
-        builder->appendFormat(".%s = %s(", field.c_str(), swap);
-        builder->append(headerExpression);
-        builder->appendFormat(".%s", field.c_str());
+        builder->append(hdrField);
+        builder->appendFormat(" = %s(", swap);
+        builder->append(hdrField);
         if (shift != 0)
             builder->appendFormat(" << %d", shift);
         builder->append(")");
@@ -229,8 +256,8 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
     for (unsigned i = 0; i < (widthToEmit + 7) / 8; i++) {
         builder->emitIndent();
         builder->appendFormat("%s = ((char*)(&", program->byteVar.c_str());
-        builder->append(headerExpression);
-        builder->appendFormat(".%s))[%d]", field.c_str(), i);
+        builder->append(hdrField);
+        builder->appendFormat("))[%d]", i);
         builder->endOfStatement(true);
         unsigned freeBits = alignment != 0 ? (8 - alignment) : 8;
         bitsInCurrentByte = left >= 8 ? 8 : left;
@@ -292,9 +319,6 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
     builder->appendFormat("%s += %d", program->offsetVar.c_str(),
                           widthToEmit);
     builder->endOfStatement(true);
-
-    msgStr = Util::printf_format("Deparser: emitted %s", field);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     builder->newline();
 }
@@ -575,4 +599,95 @@ bool XDPEgressDeparserPSA::build() {
     return true;
 }
 
+void XDPEgressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
+    builder->emitIndent();
+    builder->appendFormat("if (%s.drop) ",
+                          istd->name.name);
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder, "PreDeparser: dropping packet..");
+    builder->emitIndent();
+    builder->appendFormat("return %s;\n", builder->target->abortReturnCode().c_str());
+    builder->blockEnd(true);
+}
+
+// =====================OptimizedXDPIngressDeparserPSA=============================
+void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
+    if (this->skipEgress) {
+        EBPFDeparserPSA::emit(builder);
+        return;
+    }
+
+    builder->emitIndent();
+
+    codeGen->setBuilder(builder);
+
+    for (auto a : controlBlock->container->controlLocals)
+        emitDeclaration(builder, a);
+
+    this->emitDeparserExternCalls(builder);
+    builder->newline();
+
+    this->emitPreDeparser(builder);
+    this->emitPreparePacketBuffer(builder);
+
+    builder->emitIndent();
+    builder->appendFormat("%s = %s;",
+                          program->packetStartVar,
+                          builder->target->dataOffset(program->model.CPacketName.str()));
+    builder->newline();
+    builder->emitIndent();
+    builder->appendFormat("%s = %s;",
+                          program->packetEndVar,
+                          builder->target->dataEnd(program->model.CPacketName.str()));
+    builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat("%s = 0", program->offsetVar.c_str());
+    builder->endOfStatement(true);
+
+    for (auto const& el : removedHeadersToEmit) {
+        builder->emitIndent();
+        builder->appendFormat("if (%s.ebpf_valid) ", el.first);
+        builder->blockStart();
+        builder->emitIndent();
+        builder->appendFormat("%s += %d", program->offsetVar.c_str(), el.second->width_bits());
+        builder->endOfStatement(true);
+        builder->blockEnd(true);
+    }
+
+    for (unsigned long i = 0; i < this->optimizedHeadersToEmit.size(); i++) {
+        auto headerToEmit = optimizedHeadersToEmit[i];
+        auto headerExpression = optimizedHeadersExpressions[i];
+        emitHeader(builder, headerToEmit, headerExpression);
+    }
+    builder->newline();
+
+    // put metadata into shared map
+    builder->emitIndent();
+    cstring hdrValue = this->headers->name.name;
+    if (program->options.generateHdrInMap) {
+        builder->appendFormat("%s->__helper_variable", this->headers->name.name);
+        hdrValue = "(*" + this->headers->name.name + ")";
+    } else {
+        builder->appendFormat("%s.__helper_variable", this->headers->name.name);
+    }
+    builder->appendFormat(" = %s.egress_port", this->istd->name.name);
+    builder->endOfStatement(true);
+
+    builder->emitIndent();
+    builder->target->emitTableUpdate(builder, "bridged_headers",
+                                     program->zeroKey.c_str(), hdrValue);
+    builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat("bpf_tail_call(%s, &egress_progs_table, 0)",
+                          this->program->model.CPacketName.str());
+    builder->endOfStatement(true);
+}
+
+void OptimizedXDPEgressDeparserPSA::emit(CodeBuilder *builder) {
+    codeGen->setBuilder(builder);
+    codeGen->asPointerVariables.insert(this->headers->name.name);
+    EBPFDeparserPSA::emit(builder);
+}
 }  // namespace EBPF

@@ -121,6 +121,9 @@ class EBPFTypeName : public EBPFType, public IHasWidth {
     unsigned widthInBits() override;
     unsigned implementationWidthInBits() override;
     void declareArray(CodeBuilder* builder, cstring id, unsigned size) override;
+    EBPFType* getCanonicalType() {
+        return canonical;
+    }
     template<typename T> bool canonicalTypeIs() const
     { return dynamic_cast<const T*>(this->canonical) != nullptr; }
 };

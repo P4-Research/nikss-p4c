@@ -59,7 +59,11 @@ void KernelSamplesTarget::emitTableDecl(Util::SourceCodeBuilder* builder,
         // it's more safe to overwrite user-provided key type,
         // as array map must have u32 key type.
         keyType = "u32";
+    } else if (tableKind == TableProgArray) {
+        keyType = "u32";
+        valueType = "u32";
     }
+
     if (tableKind == TableLPMTrie) {
         flags = "BPF_F_NO_PREALLOC";
     }

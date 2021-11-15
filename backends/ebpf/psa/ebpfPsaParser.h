@@ -1,6 +1,7 @@
 #ifndef BACKENDS_EBPF_PSA_EBPFPSAPARSER_H_
 #define BACKENDS_EBPF_PSA_EBPFPSAPARSER_H_
 
+#include "backends/ebpf/ebpfType.h"
 #include "backends/ebpf/ebpfParser.h"
 #include "backends/ebpf/psa/ebpfPsaObjects.h"
 #include "backends/ebpf/psa/externs/ebpfPsaChecksum.h"
@@ -8,6 +9,7 @@
 namespace EBPF {
 
 class EBPFPsaParser;
+class EBPFOptimizedEgressParserPSA;
 
 class PsaStateTranslationVisitor : public StateTranslationVisitor {
  public:
@@ -49,13 +51,43 @@ class EBPFPsaParser : public EBPFParser {
     EBPFPsaParser(const EBPFProgram* program, const IR::P4Parser* block,
                   const P4::TypeMap* typeMap);
 
-    bool build() override;
-
     void emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl) override;
 
     void emitTypes(CodeBuilder* builder) override;
     void emitValueSetInstances(CodeBuilder* builder) override;
     void emitRejectState(CodeBuilder* builder) override;
+
+    bool isHeaderExtractedByParser(cstring hdr);
+    bool isHeaderExtractedByParserWithNoLookaheadBefore(cstring hdr);
+};
+
+
+class OptimizedEgressParserStateVisitor : public PsaStateTranslationVisitor {
+    bool shouldMoveOffset(cstring hdr);
+ public:
+    EBPFOptimizedEgressParserPSA * parser;
+
+    explicit OptimizedEgressParserStateVisitor(P4::ReferenceMap* refMap, P4::TypeMap* typeMap,
+                                               EBPFPsaParser * prsr) :
+            PsaStateTranslationVisitor(refMap, typeMap, prsr),
+            parser(prsr->to<EBPFOptimizedEgressParserPSA>()) { }
+
+    bool preorder(const IR::ParserState* parserState) override;
+
+    void compileExtract(const IR::Expression* destination) override;
+};
+
+
+class EBPFOptimizedEgressParserPSA : public EBPFPsaParser {
+ public:
+    std::set<cstring> headersToInvalidate;
+    std::map<cstring, const IR::Type_Header *> headersToSkipMovingOffset;
+
+    EBPFOptimizedEgressParserPSA(const EBPFProgram* program, const IR::P4Parser* block,
+                                 const P4::TypeMap* typeMap) :
+                                 EBPFPsaParser(program, block, typeMap) {
+        visitor = new OptimizedEgressParserStateVisitor(program->refMap, program->typeMap, this);
+    }
 };
 
 }  // namespace EBPF

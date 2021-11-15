@@ -41,6 +41,10 @@ def hdr2map_required_with_table_caching(cls):
         cls.hdr2map_required = True
     return cls
 
+def hdr2map_required_with_pipeline_opt(cls):
+    if cls.is_pipeline_opt_enabled(cls):
+        cls.hdr2map_required = True
+    return cls
 
 def table_caching_only(cls):
     if not cls.is_table_caching_test(cls):
@@ -48,6 +52,12 @@ def table_caching_only(cls):
         cls.skip_reason = "table caching test"
     return cls
 
+
+def skip_if_pipeline_optimization_enabled(cls):
+    if cls.is_pipeline_opt_enabled(cls):
+        cls.skip = True
+        cls.skip_reason = "Skip if pipeline-aware optimization enabled"
+    return cls
 
 class EbpfTest(BaseTest):
     skip = False
@@ -126,7 +136,7 @@ class EbpfTest(BaseTest):
 
         if expected_value != value:
             self.fail("Map {} key {} does not have correct value. Expected {}; got {}"
-                      .format(name, key, hex(expected_value), hex(value)))
+                      .format(name, key, expected_value, value))
 
     def xdp2tc_mode(self):
         return testutils.test_param_get('xdp2tc')
@@ -136,6 +146,9 @@ class EbpfTest(BaseTest):
 
     def is_table_caching_test(self):
         return testutils.test_param_get('table_caching') == 'True'
+
+    def is_pipeline_opt_enabled(self):
+        return testutils.test_param_get('pipeline_optimization') == 'True'
 
     def setUp(self):
         super(EbpfTest, self).setUp()
@@ -195,6 +208,9 @@ class P4EbpfTest(EbpfTest):
 
         if self.is_xdp_test():
             p4args += " --xdp"
+
+        if self.is_pipeline_opt_enabled():
+            p4args += " --pipeline-opt"
 
         if testutils.test_param_get('hdr2Map') == 'True':
             p4args += " --hdr2Map"

@@ -163,27 +163,6 @@ EBPFPsaParser::EBPFPsaParser(const EBPFProgram* program, const IR::P4Parser* blo
     visitor = new PsaStateTranslationVisitor(program->refMap, program->typeMap, this);
 }
 
-bool EBPFPsaParser::build() {
-    auto pl = parserBlock->type->applyParams;
-    if (pl->size() != 6) {
-        ::error(ErrorType::ERR_EXPECTED,
-                "Expected parser to have exactly 6 parameters");
-        return false;
-    }
-    auto it = pl->parameters.begin();
-    packet = *it; ++it;
-    headers = *it;
-    for (auto state : parserBlock->states) {
-        auto ps = new EBPFParserState(state, this);
-        states.push_back(ps);
-    }
-    auto ht = typeMap->getType(headers);
-    if (ht == nullptr)
-        return false;
-    headerType = EBPFTypeFactory::instance->create(ht);
-    return true;
-}
-
 void EBPFPsaParser::emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl) {
     if (decl->is<IR::Declaration_Instance>()) {
         auto di = decl->to<IR::Declaration_Instance>();
@@ -240,6 +219,176 @@ void EBPFPsaParser::emitRejectState(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("goto %s", IR::ParserState::accept.c_str());
     builder->endOfStatement(true);
+}
+
+bool EBPFPsaParser::isHeaderExtractedByParser(cstring hdrName) {
+    for (auto state : parserBlock->states) {
+        for (auto c : state->components) {
+            if (c->is<IR::MethodCallStatement>()) {
+                auto mce = c->to<IR::MethodCallStatement>()->methodCall;
+                auto mi = P4::MethodInstance::resolve(mce,
+                                                      program->refMap,
+                                                      program->typeMap);
+                auto extMethod = mi->to<P4::ExternMethod>();
+                if (extMethod != nullptr) {
+                    auto extractedHdr = extMethod->expr->arguments->at(0)->expression;
+                    if (extractedHdr->is<IR::Member>() &&
+                        extractedHdr->to<IR::Member>()->expr->is<IR::PathExpression>()) {
+                        auto name = extractedHdr->to<IR::Member>()->member.name;
+                        auto headers = extractedHdr->to<IR::Member>()->expr->
+                                to<IR::PathExpression>()->path->name.name;
+                        // this kind of expression is independent of whether hdr is pointer or not.
+                        if (hdrName.find(headers) && hdrName.find(name)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+bool EBPFPsaParser::isHeaderExtractedByParserWithNoLookaheadBefore(cstring hdrName) {
+    for (auto state : parserBlock->states) {
+        for (auto c : state->components) {
+            if (c->is<IR::MethodCallStatement>()) {
+                auto mce = c->to<IR::MethodCallStatement>()->methodCall;
+                auto mi = P4::MethodInstance::resolve(mce,
+                                                      program->refMap,
+                                                      program->typeMap);
+                auto extMethod = mi->to<P4::ExternMethod>();
+                if (extMethod != nullptr) {
+                    auto extractedHdr = extMethod->expr->arguments->at(0)->expression;
+                    if (extractedHdr->is<IR::Member>() &&
+                        extractedHdr->to<IR::Member>()->expr->is<IR::PathExpression>()) {
+                        auto name = extractedHdr->to<IR::Member>()->member.name;
+                        auto headers = extractedHdr->to<IR::Member>()->expr->
+                                to<IR::PathExpression>()->path->name.name;
+                        // this kind of expression is independent of whether hdr is pointer or not.
+                        if (hdrName.find(headers) && hdrName.find(name)) {
+                            return true;
+                        }
+                    }
+                }
+            } else if (c->is<IR::AssignmentStatement>()) {
+                // if we met lookahead before the header being checked is extracted,
+                // we return false because header is conditionally extracted.
+                auto as = c->to<IR::AssignmentStatement>();
+                if (auto mce = as->right->to<IR::MethodCallExpression>()) {
+                    auto mi = P4::MethodInstance::resolve(mce,
+                                                          this->program->refMap,
+                                                          this->program->typeMap);
+                    auto extMethod = mi->to<P4::ExternMethod>();
+                    if (extMethod == nullptr)
+                        BUG("Unhandled method %1%", mce);
+
+                    auto decl = extMethod->object;
+                    if (decl == this->packet) {
+                        if (extMethod->method->name.name ==
+                            P4::P4CoreLibrary::instance.packetIn.lookahead.name) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+// =====================EBPFOptimizedEgressParserPSA=============================
+bool OptimizedEgressParserStateVisitor::shouldMoveOffset(cstring hdr) {
+    for (auto h : parser->headersToSkipMovingOffset) {
+        if (h.first.endsWith(hdr)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void OptimizedEgressParserStateVisitor::compileExtract(const IR::Expression *destination) {
+    auto type = state->parser->typeMap->getType(destination);
+    auto ht = type->to<IR::Type_StructLike>();
+    if (ht == nullptr) {
+        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                "Cannot extract to a non-struct type %1%", destination);
+        return;
+    }
+
+    unsigned width = ht->width_bits();
+
+    if (destination->is<IR::PathExpression>()) {
+        PsaStateTranslationVisitor::compileExtract(destination);
+        return;
+    }
+
+    builder->emitIndent();
+    builder->append("if (!");
+    cstring hdrName = destination->toString().replace(".", "_");
+    builder->append(hdrName);
+    builder->append("_ingress_ebpf_valid) ");
+    builder->blockStart();
+    PsaStateTranslationVisitor::compileExtract(destination);
+    builder->blockEnd(false);
+    builder->append(" else ");
+    builder->blockStart();
+    builder->emitIndent();
+    visit(destination);
+    builder->append(".ebpf_valid = 1");
+    builder->endOfStatement(true);
+    if (destination->is<IR::Member>()) {
+        auto hdr = destination->to<IR::Member>()->member.name;
+        if (shouldMoveOffset(hdr)) {
+            builder->emitIndent();
+            builder->appendFormat("%s += %d", parser->program->offsetVar.c_str(), width);
+            builder->endOfStatement(true);
+        }
+    }
+    builder->blockEnd(true);
+
+    if (destination->is<IR::Member>() &&
+        parser->headersToInvalidate.find(destination->to<IR::Member>()->member.name) !=
+        parser->headersToInvalidate.end()) {
+        parser->headersToInvalidate.erase(destination->to<IR::Member>()->member.name);
+    }
+}
+
+bool OptimizedEgressParserStateVisitor::preorder(const IR::ParserState *parserState) {
+    if (parserState->isBuiltin()) return false;
+
+    builder->emitIndent();
+    builder->append(parserState->name.name);
+    builder->append(":");
+    builder->spc();
+    builder->blockStart();
+
+    cstring msgStr = Util::printf_format("Parser: state %s (curr_offset=%%u)",
+                                         parserState->name.name);
+    builder->target->emitTraceMessage(builder, msgStr.c_str(), 1,
+                                      state->parser->program->offsetVar);
+
+    visit(parserState->components, "components");
+    if (parserState->selectExpression == nullptr) {
+        builder->emitIndent();
+        builder->append("goto ");
+        builder->append(IR::ParserState::reject);
+        builder->endOfStatement(true);
+    } else if (parserState->selectExpression->is<IR::SelectExpression>()) {
+        visit(parserState->selectExpression);
+    } else {
+        // must be a PathExpression which is a state name
+        if (!parserState->selectExpression->is<IR::PathExpression>())
+            BUG("Expected a PathExpression, got a %1%", parserState->selectExpression);
+        builder->emitIndent();
+        builder->append("goto ");
+        visit(parserState->selectExpression);
+        builder->endOfStatement(true);
+    }
+
+    builder->blockEnd(true);
+    return false;
 }
 
 }  // namespace EBPF
