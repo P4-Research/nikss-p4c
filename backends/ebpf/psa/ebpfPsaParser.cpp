@@ -1,5 +1,6 @@
 #include "ebpfPsaParser.h"
 #include "backends/ebpf/ebpfType.h"
+#include "ebpfPsaTypes.h"
 
 namespace EBPF {
 
@@ -173,8 +174,7 @@ void PsaStateTranslationVisitor::compileExtract(const IR::Expression* destinatio
     cstring offsetStr = Util::printf_format("BYTES(%s + %u)", program->offsetVar, width);
     // FIXME: program->lengthVariable should be used instead of difference of end and start
     builder->target->emitTraceMessage(builder, "Parser: check pkt_len=%%d < last_read_byte=%%d", 2,
-                                      (program->packetEndVar + " - " + program->packetStartVar).c_str(),
-                                      offsetStr.c_str());
+        (program->packetEndVar + " - " + program->packetStartVar).c_str(), offsetStr.c_str());
 
     builder->emitIndent();
     builder->appendFormat("if (%s < %s + BYTES(%s + %u)) ",
@@ -212,7 +212,8 @@ void PsaStateTranslationVisitor::compileExtract(const IR::Expression* destinatio
     visit(destination);
     builder->appendLine(".ebpf_valid = 1;");
 
-    auto emitByteSwap = [this, destination, program](unsigned byte1, unsigned byte2, unsigned baseOffset){
+    auto emitByteSwap = [this, destination, program]
+            (unsigned byte1, unsigned byte2, unsigned baseOffset){
         byte1 += baseOffset / 8;
         byte2 += baseOffset / 8;
 
@@ -280,7 +281,8 @@ void PsaStateTranslationVisitor::compileExtract(const IR::Expression* destinatio
         builder->emitIndent();
         builder->appendFormat("*(%s*)((u8*)&(", swap_type.c_str());
         visit(destination);
-        builder->appendFormat(") + BYTES(%u)) = %s(*(%s*)((u8*)&(", group->groupOffset, swap.c_str(), swap_type.c_str());
+        builder->appendFormat(") + BYTES(%u)) = %s(*(%s*)((u8*)&(",
+                              group->groupOffset, swap.c_str(), swap_type.c_str());
         visit(destination);
         builder->appendFormat(") + BYTES(%u)))", group->groupOffset);
         if (shift > 0)

@@ -1,5 +1,6 @@
 #include "ebpfPsaDeparser.h"
 #include "ebpfPipeline.h"
+#include "ebpfPsaTypes.h"
 
 namespace EBPF {
 
@@ -173,7 +174,8 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
     builder->newline();
     builder->blockEnd(true);
 
-    auto emitByteSwap = [builder, headerExpression, program](unsigned byte1, unsigned byte2, unsigned baseOffset) {
+    auto emitByteSwap = [builder, headerExpression, program]
+            (unsigned byte1, unsigned byte2, unsigned baseOffset) {
         byte1 += baseOffset / 8;
         byte2 += baseOffset / 8;
 
