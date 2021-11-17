@@ -165,6 +165,7 @@ void PsaStateTranslationVisitor::compileExtract(const IR::Expression* destinatio
         StateTranslationVisitor::compileExtract(destination);
         return;
     }
+    auto etype = new EBPFHeaderTypePSA(ht);
 
     unsigned width = ht->width_bits();
     auto program = state->parser->program;
@@ -211,7 +212,81 @@ void PsaStateTranslationVisitor::compileExtract(const IR::Expression* destinatio
     visit(destination);
     builder->appendLine(".ebpf_valid = 1;");
 
-    // TODO: bytes swap
+    auto emitByteSwap = [this, destination, program](unsigned byte1, unsigned byte2, unsigned baseOffset){
+        byte1 += baseOffset / 8;
+        byte2 += baseOffset / 8;
+
+        builder->emitIndent();
+        builder->appendFormat("%s = *(((u8*)&(", program->byteVar.c_str());
+        visit(destination);
+        builder->appendFormat(")) + %u)", byte1);
+        builder->endOfStatement(true);
+
+        builder->emitIndent();
+        builder->appendFormat("*(((u8*)&(");
+        visit(destination);
+        builder->appendFormat(")) + %u) = *(((u8*)&(", byte1);
+        visit(destination);
+        builder->appendFormat(")) + %u)", byte2);
+        builder->endOfStatement(true);
+
+        builder->emitIndent();
+        builder->appendFormat("*(((u8*)&(");
+        visit(destination);
+        builder->appendFormat(")) + %u) = %s", byte2, program->byteVar.c_str());
+        builder->endOfStatement(true);
+    };
+
+    // bytes swap in a single group
+    for (auto group : etype->groupedFields) {
+        cstring swap, swap_type;
+        unsigned swap_size = 0, shift = 0;
+        if (group->groupWidth <= 8) {
+            continue;
+        } else if (group->groupWidth <= 16) {
+            swap = "htons";
+            swap_size = 16;
+            swap_type = "u16";
+        } else if (group->groupWidth <= 24) {
+            emitByteSwap(0, 2, group->groupOffset);
+            continue;
+        } else if (group->groupWidth <= 32) {
+            swap = "htonl";
+            swap_size = 32;
+            swap_type = "u32";
+        } else if (group->groupWidth <= 40) {
+            emitByteSwap(0, 4, group->groupOffset);
+            emitByteSwap(1, 3, group->groupOffset);
+            continue;
+        } else if (group->groupWidth <= 48) {
+            emitByteSwap(0, 5, group->groupOffset);
+            emitByteSwap(1, 4, group->groupOffset);
+            emitByteSwap(2, 3, group->groupOffset);
+            continue;
+        } else if (group->groupWidth <= 56) {
+            emitByteSwap(0, 6, group->groupOffset);
+            emitByteSwap(1, 5, group->groupOffset);
+            emitByteSwap(2, 4, group->groupOffset);
+            continue;
+        } else if (group->groupWidth <= 64) {
+            swap = "htonll";
+            swap_size = 64;
+            swap_type = "u64";
+        } else {
+            // ?????
+        }
+
+        shift = swap_size - group->groupWidth;
+        builder->emitIndent();
+        builder->appendFormat("*(%s*)((u8*)&(", swap_type.c_str());
+        visit(destination);
+        builder->appendFormat(") + BYTES(%u)) = %s(*(%s*)((u8*)&(", group->groupOffset, swap.c_str(), swap_type.c_str());
+        visit(destination);
+        builder->appendFormat(") + BYTES(%u)))", group->groupOffset);
+        if (shift > 0)
+            builder->appendFormat(" >> %u", shift);
+        builder->endOfStatement(true);
+    }
 
     builder->newline();
 

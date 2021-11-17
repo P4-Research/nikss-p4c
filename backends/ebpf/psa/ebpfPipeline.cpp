@@ -524,6 +524,7 @@ void TCIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("return bpf_redirect(%s.egress_port, 0);",
                           control->outputStandardMetadata->name.name);
+    builder->newline();
 }
 
 // =====================TCEgressPipeline=============================

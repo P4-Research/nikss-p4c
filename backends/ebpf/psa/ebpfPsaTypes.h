@@ -24,7 +24,7 @@ class EBPFHeaderTypePSA : public EBPFStructType {
         std::vector<EBPFField*> fields;
         unsigned int groupWidth = 0;
         unsigned int groupOffset = 0;
-        bool byteSwapRequired = false;
+//        bool byteSwapRequired = false;
     };
 
     void createFieldsGroups();

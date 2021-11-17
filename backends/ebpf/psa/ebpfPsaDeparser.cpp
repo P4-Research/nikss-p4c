@@ -147,6 +147,7 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
     if (this->is<OptimizedXDPEgressDeparserPSA>()) {
         headerExpression = headerExpression.replace(".", "->");
     }
+    auto etype = new EBPFHeaderTypePSA(headerToEmit);
     cstring msgStr;
     builder->emitIndent();
     builder->append("if (");
@@ -171,22 +172,106 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
     builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
     builder->newline();
     builder->blockEnd(true);
-    builder->emitIndent();
-    builder->newline();
-    unsigned alignment = 0;
-    for (auto f : headerToEmit->fields) {
-        auto ftype = this->program->typeMap->getType(f);
-        auto etype = EBPFTypeFactory::instance->create(ftype);
-        auto et = dynamic_cast<EBPF::IHasWidth *>(etype);
-        if (et == nullptr) {
-            ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
-                    "Only headers with fixed widths supported %1%", f);
-            return;
+
+    auto emitByteSwap = [builder, headerExpression, program](unsigned byte1, unsigned byte2, unsigned baseOffset) {
+        byte1 += baseOffset / 8;
+        byte2 += baseOffset / 8;
+
+        builder->emitIndent();
+        builder->appendFormat("%s = *(((u8*)&(%s)) + %u)",
+                              program->byteVar.c_str(), headerExpression.c_str(), byte1);
+        builder->endOfStatement(true);
+
+        builder->emitIndent();
+        builder->appendFormat("*(((u8*)&(%s)) + %u) = *(((u8*)&(%s)) + %u)",
+                              headerExpression.c_str(), byte1, headerExpression.c_str(), byte2);
+        builder->endOfStatement(true);
+
+        builder->emitIndent();
+        builder->appendFormat("*(((u8*)&(%s)) + %u) = %s",
+                              headerExpression.c_str(), byte2, program->byteVar.c_str());
+        builder->endOfStatement(true);
+    };
+
+    // bytes swap in a single group
+    for (auto group : etype->groupedFields) {
+        cstring swap, swap_type;
+        unsigned swap_size = 0, shift = 0;
+        if (group->groupWidth <= 8) {
+            continue;
+        } else if (group->groupWidth <= 16) {
+            swap = "htons";
+            swap_size = 16;
+            swap_type = "u16";
+        } else if (group->groupWidth <= 24) {
+            emitByteSwap(0, 2, group->groupOffset);
+            continue;
+        } else if (group->groupWidth <= 32) {
+            swap = "htonl";
+            swap_size = 32;
+            swap_type = "u32";
+        } else if (group->groupWidth <= 40) {
+            emitByteSwap(0, 4, group->groupOffset);
+            emitByteSwap(1, 3, group->groupOffset);
+            continue;
+        } else if (group->groupWidth <= 48) {
+            emitByteSwap(0, 5, group->groupOffset);
+            emitByteSwap(1, 4, group->groupOffset);
+            emitByteSwap(2, 3, group->groupOffset);
+            continue;
+        } else if (group->groupWidth <= 56) {
+            emitByteSwap(0, 6, group->groupOffset);
+            emitByteSwap(1, 5, group->groupOffset);
+            emitByteSwap(2, 4, group->groupOffset);
+            continue;
+        } else if (group->groupWidth <= 64) {
+            swap = "htonll";
+            swap_size = 64;
+            swap_type = "u64";
+        } else {
+            // ?????
         }
-        emitField(builder, headerExpression, f->name, alignment, etype);
-        alignment += et->widthInBits();
-        alignment %= 8;
+
+        shift = swap_size - group->groupWidth;
+        builder->emitIndent();
+        builder->appendFormat("*(%s*)((u8*)&(%s) + BYTES(%u)) = ",
+                              swap_type.c_str(), headerExpression.c_str(), group->groupOffset);
+        builder->appendFormat("%s(*(%s*)((u8*)&(%s) + BYTES(%u)))",
+                              swap.c_str(), swap_type.c_str(),
+                              headerExpression.c_str(), group->groupOffset);
+        if (shift > 0)
+            builder->appendFormat(" >> %u", shift);
+        builder->endOfStatement(true);
     }
+
+    builder->emitIndent();
+    builder->appendFormat("__builtin_memcpy(%s + BYTES(%s), (void *) &(%s), BYTES(%u))",
+                          program->packetStartVar.c_str(),
+                          program->offsetVar.c_str(),
+                          headerExpression,
+                          width);
+    builder->endOfStatement(true);
+
+    builder->emitIndent();
+    builder->appendFormat("%s += %d", program->offsetVar.c_str(), width);
+    builder->endOfStatement(true);
+
+//    builder->emitIndent();
+//    builder->newline();
+//    unsigned alignment = 0;
+//    for (auto f : headerToEmit->fields) {
+//        auto ftype = this->program->typeMap->getType(f);
+//        auto etype = EBPFTypeFactory::instance->create(ftype);
+//        auto et = dynamic_cast<EBPF::IHasWidth *>(etype);
+//        if (et == nullptr) {
+//            ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+//                    "Only headers with fixed widths supported %1%", f);
+//            return;
+//        }
+//        emitField(builder, headerExpression, f->name, alignment, etype);
+//        alignment += et->widthInBits();
+//        alignment %= 8;
+//    }
     builder->blockEnd(true);
 }
 
