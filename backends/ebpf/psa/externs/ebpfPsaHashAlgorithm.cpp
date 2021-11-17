@@ -302,6 +302,17 @@ void CRCChecksumAlgorithm::emitAddData(CodeBuilder* builder,
         }
         const int width = fieldType->width_bits();
 
+        bool bitFieldAccess = false;
+        if (width <= 64 && field->is<IR::Member>()) {
+            auto member = field->to<IR::Member>();
+            auto outerType = program->typeMap->getType(member);
+            if (outerType != nullptr && outerType->is<IR::Type_Header>())
+                bitFieldAccess = true;
+            auto innerType = program->typeMap->getType(member->expr);
+            if (innerType != nullptr && innerType->is<IR::Type_Header>())
+                bitFieldAccess = true;
+        }
+
         if (width < 8 || concatenateBits) {
             concatenateBits = true;
             if (width > remainingBits) {
@@ -340,7 +351,13 @@ void CRCChecksumAlgorithm::emitAddData(CodeBuilder* builder,
             }
             builder->emitIndent();
             builder->appendFormat("%s(&%s, (u8 *) &(", updateMethod.c_str(), registerVar.c_str());
+            if (bitFieldAccess)
+                builder->append("(u64){");
             visitor->visit(field);
+            if (width > 64)
+                builder->append("[0]");  // because these types are defined as table of bytes
+            if (bitFieldAccess)
+                builder->append("}");
             builder->appendFormat("), %d, %s)", width / 8, polynomial.c_str());
             builder->endOfStatement(true);
         }
