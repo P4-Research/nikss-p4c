@@ -41,6 +41,8 @@ class EBPFHeaderTypePSA : public EBPFStructType {
 //    unsigned implementationWidthInBits() override { return implWidth; }
     void emit(CodeBuilder* builder) override;
 //    void declareArray(CodeBuilder* builder, cstring id, unsigned size) override;
+
+    bool isReadyToMemcpy();
 };
 
 }  // namespace EBPF

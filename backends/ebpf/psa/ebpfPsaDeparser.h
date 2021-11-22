@@ -65,6 +65,8 @@ class EBPFDeparserPSA : public EBPFControlPSA {
     virtual void emitPreparePacketBuffer(CodeBuilder *builder);
     virtual void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                     cstring &headerExpression) const;
+    void emitHeaderLegacy(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
+                          cstring &headerExpression) const;
     void emitField(CodeBuilder* builder, cstring headerExpression,
                    cstring field, unsigned alignment, EBPF::EBPFType* type) const;
     void emitDigestInstances(CodeBuilder* builder) const;

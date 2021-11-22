@@ -149,6 +149,10 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
         headerExpression = headerExpression.replace(".", "->");
     }
     auto etype = new EBPFHeaderTypePSA(headerToEmit);
+    if (!etype->isReadyToMemcpy()) {
+        emitHeaderLegacy(builder, headerToEmit, headerExpression);
+        return;
+    }
     cstring msgStr;
     builder->emitIndent();
     builder->append("if (");
@@ -277,23 +281,31 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
     builder->appendFormat("%s += %d", program->offsetVar.c_str(), width);
     builder->endOfStatement(true);
 
-//    builder->emitIndent();
-//    builder->newline();
-//    unsigned alignment = 0;
-//    for (auto f : headerToEmit->fields) {
-//        auto ftype = this->program->typeMap->getType(f);
-//        auto etype = EBPFTypeFactory::instance->create(ftype);
-//        auto et = dynamic_cast<EBPF::IHasWidth *>(etype);
-//        if (et == nullptr) {
-//            ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
-//                    "Only headers with fixed widths supported %1%", f);
-//            return;
-//        }
-//        emitField(builder, headerExpression, f->name, alignment, etype);
-//        alignment += et->widthInBits();
-//        alignment %= 8;
-//    }
     builder->blockEnd(true);
+}
+
+void EBPFDeparserPSA::emitHeaderLegacy(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
+                                       cstring &headerExpression) const {
+    if (this->is<OptimizedXDPEgressDeparserPSA>()) {
+        headerExpression = headerExpression.replace(".", "->");
+    }
+
+    builder->emitIndent();
+    builder->newline();
+    unsigned alignment = 0;
+    for (auto f : headerToEmit->fields) {
+        auto ftype = this->program->typeMap->getType(f);
+        auto etype = EBPFTypeFactory::instance->create(ftype);
+        auto et = dynamic_cast<EBPF::IHasWidth *>(etype);
+        if (et == nullptr) {
+            ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                    "Only headers with fixed widths supported %1%", f);
+            return;
+        }
+        emitField(builder, headerExpression, f->name, alignment, etype);
+        alignment += et->widthInBits();
+        alignment %= 8;
+    }
 }
 
 void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,

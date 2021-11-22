@@ -51,6 +51,7 @@ void EBPFHeaderTypePSA::createFieldsGroups() {
     FieldsGroup * currentGroup = nullptr;
     unsigned int currentOffset = 0;
     unsigned int groupSize = 0;
+    bool unableToCreateType = false;
 
     for (auto f : fields) {
         if (currentGroup == nullptr) {
@@ -65,10 +66,9 @@ void EBPFHeaderTypePSA::createFieldsGroups() {
         unsigned int width = wt->widthInBits();
 
         if (width > 64) {
-            if (groupSize != 0) {
-                // error
-            } else if (width % 8 != 0) {
-                // error
+            if (groupSize != 0 || width % 8 != 0) {
+                unableToCreateType = true;
+                break;
             } else {
                 currentGroup->fields.push_back(f);
                 currentGroup->groupWidth += width;
@@ -77,7 +77,8 @@ void EBPFHeaderTypePSA::createFieldsGroups() {
             }
         } else {
             if (groupSize + width > 64) {
-                // error
+                unableToCreateType = true;
+                break;
             } else if ((groupSize + width) % 8 == 0) {
                 currentGroup->fields.push_back(f);
                 currentGroup->groupWidth += width;
@@ -92,6 +93,10 @@ void EBPFHeaderTypePSA::createFieldsGroups() {
 
         currentOffset += width;
     }
+
+    // clear artifacts if algorithm failed
+    if (unableToCreateType)
+        groupedFields.clear();
 }
 
 void EBPFHeaderTypePSA::emitField(CodeBuilder* builder, EBPFField* field) {
@@ -120,6 +125,11 @@ void EBPFHeaderTypePSA::emitField(CodeBuilder* builder, EBPFField* field) {
 }
 
 void EBPFHeaderTypePSA::emit(CodeBuilder* builder) {
+    if (!isReadyToMemcpy()) {
+        EBPFStructType::emit(builder);
+        return;
+    }
+
     builder->emitIndent();
     builder->appendFormat("%s %s ", kind.c_str(), name.c_str());
     builder->blockStart();
@@ -153,6 +163,10 @@ void EBPFHeaderTypePSA::emit(CodeBuilder* builder) {
     builder->blockEnd(false);
     builder->append(" __attribute__((packed))");
     builder->endOfStatement(true);
+}
+
+bool EBPFHeaderTypePSA::isReadyToMemcpy() {
+    return !groupedFields.empty();
 }
 
 }  // namespace EBPF

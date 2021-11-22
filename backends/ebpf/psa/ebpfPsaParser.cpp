@@ -167,6 +167,10 @@ void PsaStateTranslationVisitor::compileExtract(const IR::Expression* destinatio
         return;
     }
     auto etype = new EBPFHeaderTypePSA(ht);
+    if (!etype->isReadyToMemcpy()) {
+        StateTranslationVisitor::compileExtract(destination);
+        return;
+    }
 
     unsigned width = ht->width_bits();
     auto program = state->parser->program;
