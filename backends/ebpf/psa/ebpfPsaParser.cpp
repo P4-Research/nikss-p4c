@@ -241,10 +241,14 @@ void PsaStateTranslationVisitor::compileExtract(const IR::Expression* destinatio
     // bytes swap in a single group
     for (auto group : etype->groupedFields) {
         cstring swap, swap_type;
-        unsigned swap_size = 0, shift = 0;
+        unsigned swap_size = 0, shift;
         if (group->groupWidth <= 8) {
             continue;
         } else if (group->groupWidth <= 16) {
+            if (program->options.generateToXDP) {
+                emitByteSwap(0, 1, group->groupOffset);
+                continue;
+            }
             swap = "htons";
             swap_size = 16;
             swap_type = "u16";
@@ -252,6 +256,11 @@ void PsaStateTranslationVisitor::compileExtract(const IR::Expression* destinatio
             emitByteSwap(0, 2, group->groupOffset);
             continue;
         } else if (group->groupWidth <= 32) {
+            if (program->options.generateToXDP) {
+                emitByteSwap(0, 3, group->groupOffset);
+                emitByteSwap(1, 2, group->groupOffset);
+                continue;
+            }
             swap = "htonl";
             swap_size = 32;
             swap_type = "u32";
@@ -270,6 +279,13 @@ void PsaStateTranslationVisitor::compileExtract(const IR::Expression* destinatio
             emitByteSwap(2, 4, group->groupOffset);
             continue;
         } else if (group->groupWidth <= 64) {
+            if (program->options.generateToXDP) {
+                emitByteSwap(0, 7, group->groupOffset);
+                emitByteSwap(1, 6, group->groupOffset);
+                emitByteSwap(2, 5, group->groupOffset);
+                emitByteSwap(3, 4, group->groupOffset);
+                continue;
+            }
             swap = "htonll";
             swap_size = 64;
             swap_type = "u64";

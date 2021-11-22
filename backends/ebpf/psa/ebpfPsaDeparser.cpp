@@ -174,28 +174,40 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
     builder->newline();
     builder->blockEnd(true);
 
+    builder->emitIndent();
+    builder->appendFormat("__builtin_memcpy(%s + BYTES(%s), (void *) &(%s), BYTES(%u))",
+                          program->packetStartVar.c_str(),
+                          program->offsetVar.c_str(),
+                          headerExpression,
+                          width);
+    builder->endOfStatement(true);
+
+    // bytes swap in a single group in packet buffer directly, so structure preserve native byte order
+
     auto emitByteSwap = [builder, headerExpression, program]
             (unsigned byte1, unsigned byte2, unsigned baseOffset) {
-        byte1 += baseOffset / 8;
-        byte2 += baseOffset / 8;
+        byte1 = baseOffset + byte1 * 8;
+        byte2 = baseOffset + byte2 * 8;
 
         builder->emitIndent();
-        builder->appendFormat("%s = *(((u8*)&(%s)) + %u)",
-                              program->byteVar.c_str(), headerExpression.c_str(), byte1);
+        builder->appendFormat("%s = *((u8*) %s + BYTES(%s + %u))",
+                              program->byteVar.c_str(),
+                              program->packetStartVar.c_str(), program->offsetVar.c_str(), byte1);
         builder->endOfStatement(true);
 
         builder->emitIndent();
-        builder->appendFormat("*(((u8*)&(%s)) + %u) = *(((u8*)&(%s)) + %u)",
-                              headerExpression.c_str(), byte1, headerExpression.c_str(), byte2);
+        builder->appendFormat("*((u8*) %s + BYTES(%s + %u)) = *((u8*) %s + BYTES(%s + %u))",
+                              program->packetStartVar.c_str(), program->offsetVar.c_str(), byte1,
+                              program->packetStartVar.c_str(), program->offsetVar.c_str(), byte2);
         builder->endOfStatement(true);
 
         builder->emitIndent();
-        builder->appendFormat("*(((u8*)&(%s)) + %u) = %s",
-                              headerExpression.c_str(), byte2, program->byteVar.c_str());
+        builder->appendFormat("*((u8*) %s + BYTES(%s + %u)) = %s",
+                              program->packetStartVar.c_str(), program->offsetVar.c_str(), byte2,
+                              program->byteVar.c_str());
         builder->endOfStatement(true);
     };
 
-    // bytes swap in a single group
     for (auto group : etype->groupedFields) {
         cstring swap, swap_type;
         unsigned swap_size = 0, shift = 0;
@@ -236,23 +248,18 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
 
         shift = swap_size - group->groupWidth;
         builder->emitIndent();
-        builder->appendFormat("*(%s*)((u8*)&(%s) + BYTES(%u)) = ",
-                              swap_type.c_str(), headerExpression.c_str(), group->groupOffset);
-        builder->appendFormat("%s(*(%s*)((u8*)&(%s) + BYTES(%u)))",
+        builder->appendFormat("*(%s*)((u8*) %s + BYTES(%s + %u)) = ",
+                              swap_type.c_str(),
+                              program->packetStartVar.c_str(), program->offsetVar.c_str(),
+                              group->groupOffset);
+        builder->appendFormat("%s(*(%s*)((u8*) %s + BYTES(%s + %u)))",
                               swap.c_str(), swap_type.c_str(),
-                              headerExpression.c_str(), group->groupOffset);
+                              program->packetStartVar.c_str(), program->offsetVar.c_str(),
+                              group->groupOffset);
         if (shift > 0)
             builder->appendFormat(" >> %u", shift);
         builder->endOfStatement(true);
     }
-
-    builder->emitIndent();
-    builder->appendFormat("__builtin_memcpy(%s + BYTES(%s), (void *) &(%s), BYTES(%u))",
-                          program->packetStartVar.c_str(),
-                          program->offsetVar.c_str(),
-                          headerExpression,
-                          width);
-    builder->endOfStatement(true);
 
     builder->emitIndent();
     builder->appendFormat("%s += %d", program->offsetVar.c_str(), width);
@@ -583,9 +590,6 @@ bool XDPIngressDeparserPSA::build() {
     return true;
 }
 
-/*
- * 
- */
 void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->emitIndent();
     // perform early multicast detection; if multicast is invoked, a packet will be
@@ -639,7 +643,9 @@ void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
             "    if (((char *) data + 14 + sizeof(struct xdp2tc_metadata)) > (char *) data_end) {\n"
             "        return XDP_ABORTED;\n"
             "    }\n");
+        builder->emitIndent();
         builder->appendLine("__builtin_memmove(data, data + sizeof(struct xdp2tc_metadata), 14);");
+        builder->emitIndent();
         builder->appendLine("__builtin_memcpy(data + 14, "
                             "&xdp2tc_md, sizeof(struct xdp2tc_metadata));");
     } else if (program->options.xdp2tcMode == XDP2TC_CPUMAP) {
