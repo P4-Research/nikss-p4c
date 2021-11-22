@@ -182,9 +182,10 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
                           width);
     builder->endOfStatement(true);
 
-    // bytes swap in a single group in packet buffer directly, so structure preserve native byte order
+    // bytes swap in a single group in packet buffer directly,
+    // so structure will preserve native byte order
 
-    auto emitByteSwap = [builder, headerExpression, program]
+    auto emitByteSwap = [builder, program]
             (unsigned byte1, unsigned byte2, unsigned baseOffset) {
         byte1 = baseOffset + byte1 * 8;
         byte2 = baseOffset + byte2 * 8;
@@ -243,7 +244,18 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
             swap_size = 64;
             swap_type = "u64";
         } else {
-            // ?????
+            // larger fields than 64 bit copy in reverse order, not swap bytes in place
+            unsigned int toCopy = group->groupWidth / 8;
+            for (unsigned int i = 0; i < toCopy; ++i) {
+                builder->emitIndent();
+                builder->appendFormat("*((u8*)(%s) + BYTES(%s) + %u) = *((u8*)&(%s) + %u)",
+                                      program->packetStartVar.c_str(), program->offsetVar.c_str(),
+                                      i + group->groupOffset / 8,
+                                      headerExpression.c_str(),
+                                      toCopy - i - 1 + group->groupOffset / 8);
+                builder->endOfStatement(true);
+            }
+            continue;
         }
 
         shift = swap_size - group->groupWidth;

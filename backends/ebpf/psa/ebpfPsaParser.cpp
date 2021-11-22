@@ -290,7 +290,19 @@ void PsaStateTranslationVisitor::compileExtract(const IR::Expression* destinatio
             swap_size = 64;
             swap_type = "u64";
         } else {
-            // ?????
+            // larger fields than 64 bit copy in reverse order, not swap bytes in place
+            unsigned int toCopy = group->groupWidth / 8;
+            for (unsigned int i = 0; i < toCopy; ++i) {
+                builder->emitIndent();
+                builder->append("*((u8*)&(");
+                visit(destination);
+                builder->appendFormat(") + %u) = *((u8*)(%s) + BYTES(%s) + %u)",
+                                      i + group->groupOffset / 8,
+                                      program->packetStartVar.c_str(), program->offsetVar.c_str(),
+                                      toCopy - i - 1 + group->groupOffset / 8);
+                builder->endOfStatement(true);
+            }
+            continue;
         }
 
         shift = swap_size - group->groupWidth;
