@@ -149,11 +149,8 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
         headerExpression = headerExpression.replace(".", "->");
     }
     auto etype = new EBPFHeaderTypePSA(headerToEmit);
-    if (!etype->isReadyToMemcpy()) {
-        emitHeaderLegacy(builder, headerToEmit, headerExpression);
-        return;
-    }
     cstring msgStr;
+
     builder->emitIndent();
     builder->append("if (");
     builder->append(headerExpression);
@@ -177,6 +174,12 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
     builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
     builder->newline();
     builder->blockEnd(true);
+
+    if (!etype->isReadyToMemcpy()) {
+        emitHeaderLegacy(builder, headerToEmit, headerExpression);
+        builder->blockEnd(true);
+        return;
+    }
 
     builder->emitIndent();
     builder->appendFormat("__builtin_memcpy(%s + BYTES(%s), (void *) &(%s), BYTES(%u))",
