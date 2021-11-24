@@ -180,7 +180,7 @@ void EBPFHeaderTypePSA::skipByteSwapForUnusedFields(UsageInspector * usedFields,
     }
 }
 
-bool EBPFHeaderTypePSA::isReadyToMemcpy() {
+bool EBPFHeaderTypePSA::isReadyToMemcpy() const {
     return !groupedFields.empty();
 }
 

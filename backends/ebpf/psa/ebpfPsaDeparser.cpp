@@ -221,7 +221,7 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
                                        headersIRExpressions.at(headerExpressionKey));
     for (auto group : etype->groupedFields) {
         cstring swap, swap_type;
-        unsigned swap_size = 0, shift = 0;
+        unsigned swap_size, shift;
         if (group->groupWidth <= 8 || !group->byteSwapRequired) {
             continue;
         } else if (group->groupWidth <= 16) {

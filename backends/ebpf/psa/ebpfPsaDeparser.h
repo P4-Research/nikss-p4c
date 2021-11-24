@@ -40,7 +40,8 @@ class EBPFDeparserPSA : public EBPFControlPSA {
 
     EBPFDeparserPSA(const EBPFProgram* program, const IR::ControlBlock* control,
                     const IR::Parameter* parserHeaders, const IR::Parameter *istd) :
-            EBPFControlPSA(program, control, parserHeaders), istd(istd) {
+            EBPFControlPSA(program, control, parserHeaders),
+            packet_out(nullptr), istd(istd), headerType(nullptr) {
       outerHdrOffsetVar = cstring("outHeaderOffset");
       outerHdrLengthVar = cstring("outHeaderLength");
       returnCode = cstring("returnCode");
@@ -92,7 +93,7 @@ class TCIngressDeparserPSA : public TCDeparserPSA {
     const IR::Parameter* resubmit_meta;
     TCIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
                          const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
-           TCDeparserPSA(program, control, parserHeaders, istd) {}
+           TCDeparserPSA(program, control, parserHeaders, istd), resubmit_meta(nullptr) {}
 
     bool build() override;
     void emitPreDeparser(CodeBuilder *builder) override;
@@ -135,7 +136,7 @@ class XDPIngressDeparserPSA : public XDPDeparserPSA {
     const IR::Parameter* resubmit_meta;
     XDPIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
                           const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
-                XDPDeparserPSA(program, control, parserHeaders, istd) { }
+                XDPDeparserPSA(program, control, parserHeaders, istd), resubmit_meta(nullptr) { }
 
     bool build() override;
     void emitPreDeparser(CodeBuilder *builder) override;

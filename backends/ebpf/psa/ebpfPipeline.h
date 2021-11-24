@@ -12,61 +12,19 @@ namespace EBPF {
  */
 class UsageInspector : public Inspector {
  protected:
-//    const IR::ParserBlock* parserBlock;
-//    const IR::ControlBlock* controlBlock;
-    // deparser is not allowed to mess with field's value
+    std::unordered_set<cstring> used;
 
-    std::map<cstring, int> used;
-
-    cstring resolveTypePath(const IR::Expression * access) {
-        cstring path;
-        auto expr = access;
-        while (expr->is<IR::Member>() || expr->is<IR::PathExpression>()) {
-            auto type = expr->type->to<IR::Type_StructLike>();
-            BUG_CHECK(type != nullptr, "%1%: unsupported type", expr);
-            if (path.isNullOrEmpty())
-                path = type->externalName();
-            else
-                path = type->externalName() + "." + path;
-            if (!expr->is<IR::Member>())
-                break;
-            expr = expr->to<IR::Member>()->expr;
-        }
-        return path;
-    }
+    cstring resolveTypePath(const IR::Expression * access) const;
 
  public:
     void findAllFieldsUsages(const IR::ParserBlock* parserBlock,
-                             const IR::ControlBlock* controlBlock) {
-        parserBlock->apply(*this);
-        controlBlock->apply(*this);
-    }
+                             const IR::ControlBlock* controlBlock);
+    void join(const UsageInspector * rhs);
 
-    void join(const UsageInspector * rhs) {
-        used.insert(rhs->used.begin(), rhs->used.end());
-    }
+    bool isUsed(cstring nodePath);
+    cstring resolveNodePath(const IR::Expression * access, cstring fieldName);
 
-    bool isUsed(cstring node) {
-        return used.count(node) > 0;
-    }
-
-    cstring resolveNodePath(const IR::Expression * access, cstring fieldName) {
-        return resolveTypePath(access) + "." + fieldName;
-    }
-
-    bool preorder(const IR::Member * member) override {
-        if (member->expr->type->is<IR::Type_Header>()) {
-            auto type = member->expr->type->to<IR::Type_Header>();
-            for (auto f : type->fields) {
-                if (f->name.name == member->member.name) {
-                    cstring key = resolveNodePath(member->expr, f->name.name);
-                    used.emplace(std::make_pair(key, 0));
-                    break;
-                }
-            }
-        }
-        return true;
-    }
+    bool preorder(const IR::Member * member) override;
 };
 
 /*

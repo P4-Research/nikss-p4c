@@ -246,7 +246,7 @@ void PsaStateTranslationVisitor::compileExtract(const IR::Expression* destinatio
     etype->skipByteSwapForUnusedFields(program->to<EBPFPipeline>()->usageScanner, destination);
     for (auto group : etype->groupedFields) {
         cstring swap, swap_type;
-        unsigned swap_size = 0, shift;
+        unsigned swap_size, shift;
         if (group->groupWidth <= 8 || !group->byteSwapRequired) {
             continue;
         } else if (group->groupWidth <= 16) {

@@ -3,6 +3,57 @@
 
 namespace EBPF {
 
+// =====================UsageInspector================================
+cstring UsageInspector::resolveTypePath(const IR::Expression * access) const {
+    cstring path;
+    auto expr = access;
+    while (expr->is<IR::Member>() || expr->is<IR::PathExpression>()) {
+        auto type = expr->type->to<IR::Type_StructLike>();
+        BUG_CHECK(type != nullptr, "%1%: unsupported type", expr);
+        if (path.isNullOrEmpty())
+            path = type->externalName();
+        else
+            path = type->externalName() + "." + path;
+        if (!expr->is<IR::Member>())
+            break;
+        expr = expr->to<IR::Member>()->expr;
+    }
+    return path;
+}
+
+void UsageInspector::findAllFieldsUsages(const IR::ParserBlock* parserBlock,
+                         const IR::ControlBlock* controlBlock) {
+    parserBlock->apply(*this);
+    controlBlock->apply(*this);
+}
+
+void UsageInspector::join(const UsageInspector * rhs) {
+    used.insert(rhs->used.begin(), rhs->used.end());
+}
+
+bool UsageInspector::isUsed(cstring nodePath) {
+    return used.count(nodePath) > 0;
+}
+
+cstring UsageInspector::resolveNodePath(const IR::Expression * access, cstring fieldName) {
+    return resolveTypePath(access) + "." + fieldName;
+}
+
+bool UsageInspector::preorder(const IR::Member *member) {
+    if (member->expr->type->is<IR::Type_Header>()) {
+        auto type = member->expr->type->to<IR::Type_Header>();
+        for (auto f : type->fields) {
+            if (f->name.name == member->member.name) {
+                cstring key = resolveNodePath(member->expr, f->name.name);
+                used.emplace(key);
+                break;
+            }
+        }
+    }
+    return true;
+}
+
+// =====================EBPFPipeline==================================
 bool EBPFPipeline::isEmpty() const {
     // check if parser doesn't have any state
     // Why 3? Parser will always have at least start, accept and reject states.

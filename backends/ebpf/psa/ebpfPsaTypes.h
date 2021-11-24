@@ -39,7 +39,7 @@ class EBPFHeaderTypePSA : public EBPFStructType {
     void emit(CodeBuilder* builder) override;
 
     void skipByteSwapForUnusedFields(UsageInspector * usedFields, const IR::Expression * header);
-    bool isReadyToMemcpy();
+    bool isReadyToMemcpy() const;
 };
 
 }  // namespace EBPF
