@@ -30,8 +30,9 @@ class EBPFDeparserPSA : public EBPFControlPSA {
     const IR::Parameter* istd;
 
     EBPFType* headerType;
-    std::vector<cstring> headersExpressions;
+    std::vector<cstring> headersExpressions;  // TODO: replace type with IR::Expression
     std::vector<const IR::Type_Header *> headersToEmit;
+    std::map<cstring, const IR::Expression*> headersIRExpressions;
     cstring outerHdrOffsetVar, outerHdrLengthVar;
     cstring returnCode;
     std::map<cstring, const IR::Type *> digests;

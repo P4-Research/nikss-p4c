@@ -17,6 +17,7 @@ class EBPFErrorTypePSA : public EBPFType {
     const IR::Type_Error* getType() const { return type->to<IR::Type_Error>(); }
 };
 
+class UsageInspector;
 class EBPFHeaderTypePSA : public EBPFStructType {
  protected:
     class FieldsGroup {
@@ -24,7 +25,7 @@ class EBPFHeaderTypePSA : public EBPFStructType {
         std::vector<EBPFField*> fields;
         unsigned int groupWidth = 0;
         unsigned int groupOffset = 0;
-//        bool byteSwapRequired = false;
+        bool byteSwapRequired = true;
     };
 
     void createFieldsGroups();
@@ -35,13 +36,9 @@ class EBPFHeaderTypePSA : public EBPFStructType {
 
     explicit EBPFHeaderTypePSA(const IR::Type_Header* header);
 
-//    void declare(CodeBuilder* builder, cstring id, bool asPointer) override;
-//    void emitInitializer(CodeBuilder* builder) override;
-//    unsigned widthInBits() override { return width; }
-//    unsigned implementationWidthInBits() override { return implWidth; }
     void emit(CodeBuilder* builder) override;
-//    void declareArray(CodeBuilder* builder, cstring id, unsigned size) override;
 
+    void skipByteSwapForUnusedFields(UsageInspector * usedFields, const IR::Expression * header);
     bool isReadyToMemcpy();
 };
 

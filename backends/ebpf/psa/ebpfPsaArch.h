@@ -46,13 +46,15 @@ class PSAArch {
 
     PSAArch(const EbpfOptions &options, std::vector<EBPFType*> ebpfTypes,
             XDPHelpProgram* xdp, EBPFPipeline* tcIngress, EBPFPipeline* tcEgress) :
-            options(options),
-            ebpfTypes(ebpfTypes), xdp(xdp), tcIngress(tcIngress),
-            tcEgress(tcEgress) { }
+            hasMeters(false), options(options), ebpfTypes(ebpfTypes),
+            xdp(xdp), tcIngress(tcIngress), tcEgress(tcEgress),
+            xdpIngress(nullptr), xdpEgress(nullptr),
+            tcIngressForXDP(nullptr), tcEgressForXDP(nullptr) { }
 
     PSAArch(const EbpfOptions &options, std::vector<EBPFType*> ebpfTypes, EBPFPipeline* xdpIngress,
             EBPFPipeline* xdpEgress, EBPFPipeline* tcTrafficManager, EBPFPipeline* tcEgress) :
-            options(options), ebpfTypes(ebpfTypes),
+            hasMeters(false), options(options), ebpfTypes(ebpfTypes),
+            xdp(nullptr), tcIngress(nullptr), tcEgress(nullptr),
             xdpIngress(xdpIngress), xdpEgress(xdpEgress), tcIngressForXDP(tcTrafficManager),
             tcEgressForXDP(tcEgress) { }
 
@@ -121,7 +123,7 @@ class ConvertToEbpfPipeline : public Inspector {
             type(type),
             options(options),
             parserBlock(parserBlock), controlBlock(controlBlock),
-            deparserBlock(deparserBlock), typemap(typemap), refmap(refmap) { }
+            deparserBlock(deparserBlock), typemap(typemap), refmap(refmap), pipeline(nullptr) { }
 
     bool preorder(const IR::PackageBlock *block) override;
     EBPFPipeline *getEbpfPipeline() { return pipeline; }
@@ -140,7 +142,8 @@ class ConvertToEBPFParserPSA : public Inspector {
  public:
     ConvertToEBPFParserPSA(EBPF::EBPFProgram* program, P4::ReferenceMap* refmap,
             P4::TypeMap* typemap, const EbpfOptions &options, pipeline_type type) :
-            program(program), type(type), typemap(typemap), refmap(refmap), options(options) { }
+            program(program), type(type), typemap(typemap), refmap(refmap),
+            parser(nullptr), options(options) { }
 
     bool preorder(const IR::ParserBlock *prsr) override;
     bool preorder(const IR::ParserState *s) override;
@@ -165,9 +168,9 @@ class ConvertToEBPFControlPSA : public Inspector {
                             P4::ReferenceMap *refmap,
                             P4::TypeMap *typemap,
                             const EbpfOptions &options,
-                            pipeline_type type) : program(program),
-                            parserHeaders(parserHeaders),
-                            typemap(typemap), type(type), refmap(refmap), options(options) {
+                            pipeline_type type) : program(program), type(type),
+                            parserHeaders(parserHeaders), typemap(typemap), refmap(refmap),
+                            control(nullptr), options(options) {
     }
 
     bool preorder(const IR::P4Action *) override;
@@ -203,7 +206,7 @@ class ConvertToEBPFDeparserPSA : public Inspector {
                                                      type(type), parserHeaders(parserHeaders),
                                                      istd(istd), typemap(typemap), refmap(refmap),
                                                      p4lib(P4::P4CoreLibrary::instance),
-                                                     options(options) { }
+                                                     deparser(nullptr), options(options) { }
 
     bool preorder(const IR::ControlBlock *) override;
     bool preorder(const IR::MethodCallExpression* expression) override;

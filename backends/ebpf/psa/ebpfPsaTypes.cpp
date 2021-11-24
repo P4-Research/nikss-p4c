@@ -1,4 +1,5 @@
 #include "ebpfPsaTypes.h"
+#include "ebpfPipeline.h"
 
 namespace EBPF {
 
@@ -163,6 +164,20 @@ void EBPFHeaderTypePSA::emit(CodeBuilder* builder) {
     builder->blockEnd(false);
     builder->append(" __attribute__((packed))");
     builder->endOfStatement(true);
+}
+
+void EBPFHeaderTypePSA::skipByteSwapForUnusedFields(UsageInspector * usedFields,
+                                                    const IR::Expression * header) {
+    for (auto group : groupedFields) {
+        group->byteSwapRequired = false;
+        for (auto f : group->fields) {
+            cstring key = usedFields->resolveNodePath(header, f->field->name.name);
+            if (usedFields->isUsed(key)) {
+                group->byteSwapRequired = true;
+                break;
+            }
+        }
+    }
 }
 
 bool EBPFHeaderTypePSA::isReadyToMemcpy() {

@@ -243,10 +243,11 @@ void PsaStateTranslationVisitor::compileExtract(const IR::Expression* destinatio
     };
 
     // bytes swap in a single group
+    etype->skipByteSwapForUnusedFields(program->to<EBPFPipeline>()->usageScanner, destination);
     for (auto group : etype->groupedFields) {
         cstring swap, swap_type;
         unsigned swap_size = 0, shift;
-        if (group->groupWidth <= 8) {
+        if (group->groupWidth <= 8 || !group->byteSwapRequired) {
             continue;
         } else if (group->groupWidth <= 16) {
             if (program->options.generateToXDP) {

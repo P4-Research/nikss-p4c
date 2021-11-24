@@ -145,11 +145,12 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
 
 void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                                  cstring& headerExpression) const {
+    auto etype = new EBPFHeaderTypePSA(headerToEmit);
+    cstring msgStr;
+    cstring headerExpressionKey = headerExpression;
     if (this->is<OptimizedXDPEgressDeparserPSA>()) {
         headerExpression = headerExpression.replace(".", "->");
     }
-    auto etype = new EBPFHeaderTypePSA(headerToEmit);
-    cstring msgStr;
 
     builder->emitIndent();
     builder->append("if (");
@@ -216,10 +217,12 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
         builder->endOfStatement(true);
     };
 
+    etype->skipByteSwapForUnusedFields(program->to<EBPFPipeline>()->usageScanner,
+                                       headersIRExpressions.at(headerExpressionKey));
     for (auto group : etype->groupedFields) {
         cstring swap, swap_type;
         unsigned swap_size = 0, shift = 0;
-        if (group->groupWidth <= 8) {
+        if (group->groupWidth <= 8 || !group->byteSwapRequired) {
             continue;
         } else if (group->groupWidth <= 16) {
             swap = "htons";

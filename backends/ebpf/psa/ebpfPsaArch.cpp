@@ -767,7 +767,22 @@ const IR::Node *ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
                     ->skipEgress = true;
         }
         this->optimizePipeline();
+
+        // used fields may span across ingress and egress, so we must expand knowledge
+        // TODO: make similar thing for TC if it will be allowed to use pipeline optimization
+        auto igScanner = ebpf_psa_arch->xdpIngress->usageScanner;
+        auto egScanner = ebpf_psa_arch->xdpEgress->usageScanner;
+        igScanner->join(egScanner);
+        egScanner->join(igScanner);
+        ebpf_psa_arch->tcIngressForXDP->usageScanner->join(igScanner);
     }
+
+    // TC ingress implements deparser for XDP
+    if (ebpf_psa_arch->tcIngressForXDP != nullptr)
+        ebpf_psa_arch->tcIngressForXDP->usageScanner->join(
+                ebpf_psa_arch->xdpIngress->usageScanner);
+    if (ebpf_psa_arch->tcEgressForXDP != nullptr)
+        ebpf_psa_arch->tcEgressForXDP->usageScanner->join(ebpf_psa_arch->xdpEgress->usageScanner);
 
     return tlb;
 }
@@ -812,6 +827,9 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
     deparserBlock->apply(*deparser_converter);
     pipeline->deparser = deparser_converter->getEBPFPsaDeparser();
     CHECK_NULL(pipeline->deparser);
+
+    pipeline->usageScanner = new UsageInspector();
+    pipeline->usageScanner->findAllFieldsUsages(parserBlock, controlBlock);
 
     return true;
 }
@@ -1129,7 +1147,9 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expressi
                 auto headersStructName = deparser->parserHeaders->name.name;
                 cstring op = (this->type == TC_INGRESS
                             || options.generateHdrInMap) ? "->" : ".";
-                deparser->headersExpressions.push_back(headersStructName + op + headerName);
+                cstring hdrExpression = headersStructName + op + headerName;
+                deparser->headersExpressions.push_back(hdrExpression);
+                deparser->headersIRExpressions.emplace(std::make_pair(hdrExpression, expr));
                 return false;
             }
         }

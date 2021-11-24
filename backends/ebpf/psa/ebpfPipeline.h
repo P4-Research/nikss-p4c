@@ -8,6 +8,68 @@
 namespace EBPF {
 
 /*
+ * Visitor to scan pipeline to detect if field from header is actively used
+ */
+class UsageInspector : public Inspector {
+ protected:
+//    const IR::ParserBlock* parserBlock;
+//    const IR::ControlBlock* controlBlock;
+    // deparser is not allowed to mess with field's value
+
+    std::map<cstring, int> used;
+
+    cstring resolveTypePath(const IR::Expression * access) {
+        cstring path;
+        auto expr = access;
+        while (expr->is<IR::Member>() || expr->is<IR::PathExpression>()) {
+            auto type = expr->type->to<IR::Type_StructLike>();
+            BUG_CHECK(type != nullptr, "%1%: unsupported type", expr);
+            if (path.isNullOrEmpty())
+                path = type->externalName();
+            else
+                path = type->externalName() + "." + path;
+            if (!expr->is<IR::Member>())
+                break;
+            expr = expr->to<IR::Member>()->expr;
+        }
+        return path;
+    }
+
+ public:
+    void findAllFieldsUsages(const IR::ParserBlock* parserBlock,
+                             const IR::ControlBlock* controlBlock) {
+        parserBlock->apply(*this);
+        controlBlock->apply(*this);
+    }
+
+    void join(const UsageInspector * rhs) {
+        used.insert(rhs->used.begin(), rhs->used.end());
+    }
+
+    bool isUsed(cstring node) {
+        return used.count(node) > 0;
+    }
+
+    cstring resolveNodePath(const IR::Expression * access, cstring fieldName) {
+        return resolveTypePath(access) + "." + fieldName;
+    }
+
+    bool preorder(const IR::Member * member) override {
+        if (member->expr->type->is<IR::Type_Header>()) {
+            auto type = member->expr->type->to<IR::Type_Header>();
+            for (auto f : type->fields) {
+                if (f->name.name == member->member.name) {
+                    cstring key = resolveNodePath(member->expr, f->name.name);
+                    used.emplace(std::make_pair(key, 0));
+                    break;
+                }
+            }
+        }
+        return true;
+    }
+};
+
+/*
  * EBPFPipeline represents a single eBPF program in the TC/XDP hook.
  */
 class EBPFPipeline : public EBPFProgram {
@@ -22,11 +84,12 @@ class EBPFPipeline : public EBPFProgram {
 
     EBPFControlPSA* control;
     EBPFDeparserPSA* deparser;
+    UsageInspector* usageScanner;
 
     EBPFPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                  P4::TypeMap* typeMap) :
                  EBPFProgram(options, nullptr, refMap, typeMap, nullptr),
-                             name(name) {
+                 name(name), control(nullptr), deparser(nullptr), usageScanner(nullptr) {
         sectionName = "classifier/" + name;
         functionName = name.replace("-", "_") + "_func";
         errorType = "ParserError_t";
