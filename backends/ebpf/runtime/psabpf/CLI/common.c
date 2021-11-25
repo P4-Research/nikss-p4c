@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <endian.h>
 
 #include "common.h"
 
@@ -156,13 +157,24 @@ static int convert_number_to_bytes(const char *data, void *ctx, enum destination
 int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_type_t ctx_type)
 {
     /* Try parse as a IPv4 */
-    struct sockaddr_in sa_buffer;
-    if (inet_pton(AF_INET, data, &(sa_buffer.sin_addr)) == 1) {
-        sa_buffer.sin_addr.s_addr = htonl(sa_buffer.sin_addr.s_addr);
-        return update_context((void *) &(sa_buffer.sin_addr), sizeof(sa_buffer.sin_addr), ctx, ctx_type);
+    struct in_addr sa_buffer;
+    if (inet_pton(AF_INET, data, &sa_buffer) == 1) {
+        sa_buffer.s_addr = htonl(sa_buffer.s_addr);
+        return update_context((void *) &sa_buffer, sizeof(sa_buffer), ctx, ctx_type);
     }
 
-    /* TODO: Try parse IPv6 (similar to IPv4) */
+    /* Try parse as a IPv6 */
+    struct in6_addr sa_buffer6;
+    if (inet_pton(AF_INET6, data, &sa_buffer6) == 1) {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+        // Swap byte order
+        uint64_t * ptr = (uint64_t *) &sa_buffer6;
+        uint64_t tmp = be64toh(ptr[0]);
+        ptr[0] = be64toh(ptr[1]);
+        ptr[1] = tmp;
+#endif
+        return update_context((void *) &sa_buffer6, sizeof(sa_buffer6), ctx, ctx_type);
+    }
 
     /* Try parse as a MAC address */
     if (is_valid_mac_address(data)) {
