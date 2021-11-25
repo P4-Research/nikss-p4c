@@ -14,15 +14,15 @@ class UsageInspector : public Inspector {
  protected:
     std::unordered_set<cstring> used;
 
-    cstring resolveTypePath(const IR::Expression * access) const;
+    cstring resolveNodePath(const IR::Expression * access) const;
 
  public:
     void findAllFieldsUsages(const IR::ParserBlock* parserBlock,
                              const IR::ControlBlock* controlBlock);
     void join(const UsageInspector * rhs);
 
-    bool isUsed(cstring nodePath);
-    cstring resolveNodePath(const IR::Expression * access, cstring fieldName);
+    bool isUsed(cstring nodePath) const;
+    cstring resolveNodePath(const IR::Expression * access, cstring fieldName) const;
 
     bool preorder(const IR::Member * member) override;
 };

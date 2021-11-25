@@ -4,25 +4,32 @@
 namespace EBPF {
 
 // =====================UsageInspector================================
-cstring UsageInspector::resolveTypePath(const IR::Expression * access) const {
-    cstring path;
+cstring UsageInspector::resolveNodePath(const IR::Expression * access) const {
+    cstring path = "";
     auto expr = access;
-    while (expr->is<IR::Member>() || expr->is<IR::PathExpression>()) {
-        auto type = expr->type->to<IR::Type_StructLike>();
-        BUG_CHECK(type != nullptr, "%1%: unsupported type", expr);
+    while (expr->is<IR::Member>()) {
+        cstring name = expr->to<IR::Member>()->member.name;
         if (path.isNullOrEmpty())
-            path = type->externalName();
+            path = name;
         else
-            path = type->externalName() + "." + path;
-        if (!expr->is<IR::Member>())
-            break;
+            path = name + "." + path;
         expr = expr->to<IR::Member>()->expr;
     }
+
+    if (expr->is<IR::PathExpression>()) {
+        // This should be first part of access to the member field.
+        // Use type name instead of instance name. In this way we
+        // get rid of different names in different blocks.
+        auto type = expr->to<IR::PathExpression>()->type->to<IR::Type_StructLike>();
+        BUG_CHECK(type != nullptr, "%1%: unsupported type", expr);
+        path = type->externalName() + "." + path;
+    }
+
     return path;
 }
 
 void UsageInspector::findAllFieldsUsages(const IR::ParserBlock* parserBlock,
-                         const IR::ControlBlock* controlBlock) {
+                                         const IR::ControlBlock* controlBlock) {
     parserBlock->apply(*this);
     controlBlock->apply(*this);
 }
@@ -31,12 +38,12 @@ void UsageInspector::join(const UsageInspector * rhs) {
     used.insert(rhs->used.begin(), rhs->used.end());
 }
 
-bool UsageInspector::isUsed(cstring nodePath) {
+bool UsageInspector::isUsed(cstring nodePath) const {
     return used.count(nodePath) > 0;
 }
 
-cstring UsageInspector::resolveNodePath(const IR::Expression * access, cstring fieldName) {
-    return resolveTypePath(access) + "." + fieldName;
+cstring UsageInspector::resolveNodePath(const IR::Expression * access, cstring fieldName) const {
+    return resolveNodePath(access) + "." + fieldName;
 }
 
 bool UsageInspector::preorder(const IR::Member *member) {
