@@ -9,22 +9,17 @@ cstring UsageInspector::resolveNodePath(const IR::Expression * access) const {
     cstring path = "";
     auto expr = access;
 
-    while (expr->is<IR::Member>()) {
-        cstring name = expr->to<IR::Member>()->member.name;
-        if (path.isNullOrEmpty())
-            path = name;
-        else
-            path = name + "." + path;
-        expr = expr->to<IR::Member>()->expr;
-    }
-
-    if (expr->is<IR::PathExpression>()) {
-        // This should be first part of access to the member field.
-        // Use type name instead of instance name. In this way we
-        // get rid of different names in different blocks.
-        auto type = expr->to<IR::PathExpression>()->type->to<IR::Type_StructLike>();
+    while (expr->is<IR::Member>() || expr->is<IR::PathExpression>()) {
+        auto type = expr->type->to<IR::Type_StructLike>();
         BUG_CHECK(type != nullptr, "%1%: unsupported type", expr);
-        path = type->externalName() + "." + path;
+        if (path.isNullOrEmpty())
+            path = type->externalName();
+        else
+            path = type->externalName() + "." + path;
+
+        if (!expr->is<IR::Member>())
+            break;
+        expr = expr->to<IR::Member>()->expr;
     }
 
     return path;
