@@ -217,73 +217,41 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
         builder->endOfStatement(true);
     };
 
-    etype->skipByteSwapForUnusedFields(program->to<EBPFPipeline>()->usageScanner,
-                                       headersIRExpressions.at(headerExpressionKey));
-    builder->appendLine("#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__");
-    for (auto group : etype->groupedFields) {
-        cstring swap, swap_type;
-        unsigned swap_size, shift;
-        if (group->groupWidth <= 8 || !group->byteSwapRequired) {
-            continue;
-        } else if (group->groupWidth <= 16) {
-            swap = "htons";
-            swap_size = 16;
-            swap_type = "u16";
-        } else if (group->groupWidth <= 24) {
-            emitByteSwap(0, 2, group->groupOffset);
-            continue;
-        } else if (group->groupWidth <= 32) {
-            swap = "htonl";
-            swap_size = 32;
-            swap_type = "u32";
-        } else if (group->groupWidth <= 40) {
-            emitByteSwap(0, 4, group->groupOffset);
-            emitByteSwap(1, 3, group->groupOffset);
-            continue;
-        } else if (group->groupWidth <= 48) {
-            emitByteSwap(0, 5, group->groupOffset);
-            emitByteSwap(1, 4, group->groupOffset);
-            emitByteSwap(2, 3, group->groupOffset);
-            continue;
-        } else if (group->groupWidth <= 56) {
-            emitByteSwap(0, 6, group->groupOffset);
-            emitByteSwap(1, 5, group->groupOffset);
-            emitByteSwap(2, 4, group->groupOffset);
-            continue;
-        } else if (group->groupWidth <= 64) {
-            swap = "htonll";
-            swap_size = 64;
-            swap_type = "u64";
-        } else {
-            // larger fields than 64 bit copy in reverse order, not swap bytes in place
-            unsigned int toCopy = group->groupWidth / 8;
-            for (unsigned int i = 0; i < toCopy; ++i) {
-                builder->emitIndent();
-                builder->appendFormat("*((u8*)(%s) + BYTES(%s) + %u) = *((u8*)&(%s) + %u)",
-                                      program->packetStartVar.c_str(), program->offsetVar.c_str(),
-                                      i + group->groupOffset / 8,
-                                      headerExpression.c_str(),
-                                      toCopy - i - 1 + group->groupOffset / 8);
-                builder->endOfStatement(true);
-            }
-            continue;
+    // larger fields than 64 bit copy in reverse order, not swap bytes in place
+    auto largeFieldSwapper = [builder, program, headerExpression](unsigned size,
+            unsigned baseOffset) {
+        baseOffset = baseOffset / 8;
+        for (unsigned int i = 0; i < size; ++i) {
+            builder->emitIndent();
+            builder->appendFormat("*((u8*)(%s) + BYTES(%s) + %u) = *((u8*)&(%s) + %u)",
+                                  program->packetStartVar.c_str(), program->offsetVar.c_str(),
+                                  i + baseOffset,
+                                  headerExpression.c_str(),
+                                  size - i - 1 + baseOffset);
+            builder->endOfStatement(true);
         }
+    };
 
-        shift = swap_size - group->groupWidth;
+    auto builtinMethodSwap = [builder, program](cstring method, cstring type,
+            unsigned shift, unsigned baseOffset) {
         builder->emitIndent();
         builder->appendFormat("*(%s*)((u8*) %s + BYTES(%s + %u)) = ",
-                              swap_type.c_str(),
+                              type.c_str(),
                               program->packetStartVar.c_str(), program->offsetVar.c_str(),
-                              group->groupOffset);
+                              baseOffset);
         builder->appendFormat("%s(*(%s*)((u8*) %s + BYTES(%s + %u)))",
-                              swap.c_str(), swap_type.c_str(),
+                              method.c_str(), type.c_str(),
                               program->packetStartVar.c_str(), program->offsetVar.c_str(),
-                              group->groupOffset);
+                              baseOffset);
         if (shift > 0)
             builder->appendFormat(" >> %u", shift);
         builder->endOfStatement(true);
-    }
-    builder->appendLine("#endif");
+    };
+
+    etype->skipByteSwapForUnusedFields(program->to<EBPFPipeline>()->usageScanner,
+                                       headersIRExpressions.at(headerExpressionKey));
+    etype->emitBELEConversion(builder, emitByteSwap, program->options.generateToXDP,
+                              largeFieldSwapper, builtinMethodSwap);
 
     builder->emitIndent();
     builder->appendFormat("%s += %d", program->offsetVar.c_str(), width);

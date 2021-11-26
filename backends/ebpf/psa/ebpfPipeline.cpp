@@ -5,8 +5,10 @@ namespace EBPF {
 
 // =====================UsageInspector================================
 cstring UsageInspector::resolveNodePath(const IR::Expression * access) const {
+    CHECK_NULL(access);
     cstring path = "";
     auto expr = access;
+
     while (expr->is<IR::Member>()) {
         cstring name = expr->to<IR::Member>()->member.name;
         if (path.isNullOrEmpty())
@@ -30,6 +32,7 @@ cstring UsageInspector::resolveNodePath(const IR::Expression * access) const {
 
 void UsageInspector::findAllFieldsUsages(const IR::ParserBlock* parserBlock,
                                          const IR::ControlBlock* controlBlock) {
+    CHECK_NULL(parserBlock); CHECK_NULL(controlBlock);
     parserBlock->apply(*this);
     controlBlock->apply(*this);
 }
