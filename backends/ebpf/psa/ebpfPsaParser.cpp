@@ -244,6 +244,7 @@ void PsaStateTranslationVisitor::compileExtract(const IR::Expression* destinatio
     };
 
     // bytes swap in a single group
+    builder->appendLine("#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__");
     etype->skipByteSwapForUnusedFields(program->to<EBPFPipeline>()->usageScanner, destination);
     for (auto group : etype->groupedFields) {
         cstring swap, swap_type;
@@ -323,6 +324,7 @@ void PsaStateTranslationVisitor::compileExtract(const IR::Expression* destinatio
             builder->appendFormat(" >> %u", shift);
         builder->endOfStatement(true);
     }
+    builder->appendLine("#endif");
 
     builder->newline();
 

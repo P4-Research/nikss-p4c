@@ -219,6 +219,7 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
 
     etype->skipByteSwapForUnusedFields(program->to<EBPFPipeline>()->usageScanner,
                                        headersIRExpressions.at(headerExpressionKey));
+    builder->appendLine("#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__");
     for (auto group : etype->groupedFields) {
         cstring swap, swap_type;
         unsigned swap_size, shift;
@@ -282,6 +283,7 @@ void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* he
             builder->appendFormat(" >> %u", shift);
         builder->endOfStatement(true);
     }
+    builder->appendLine("#endif");
 
     builder->emitIndent();
     builder->appendFormat("%s += %d", program->offsetVar.c_str(), width);
