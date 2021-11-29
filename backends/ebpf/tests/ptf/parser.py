@@ -3,6 +3,7 @@ from common import *
 
 from scapy.layers.l2 import Ether, Dot1Q
 from scapy.layers.inet6 import IPv6, TCP
+from scapy.layers.inet import IP
 
 PORT0 = 0
 PORT1 = 1
@@ -38,4 +39,17 @@ class FieldPlacementPSATest(P4EbpfTest):
         testutils.verify_packet(self, pkt, PORT1)
 
 
-# header copy, fallback to legacy
+class HeaderCopyInControlBlockPSATest(P4EbpfTest):
+    p4_file_path = "p4testdata/header-copy.p4"
+
+    def runTest(self):
+        data = "Data" * 50
+        pkt = Ether() / IP(ttl=64, chksum=0x1234) / data
+        exp_pkt = Ether() / IP(chksum=0x1234) / IP(ttl=63, chksum=0x1234) / data
+
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, exp_pkt, PORT1)
+
+
+# class LegacyHeaderPSATest(P4EbpfTest):
+#     p4_file_path = "p4testdata/header-legacy.p4"
