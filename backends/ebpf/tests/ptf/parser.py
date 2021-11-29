@@ -51,5 +51,11 @@ class HeaderCopyInControlBlockPSATest(P4EbpfTest):
         testutils.verify_packet(self, exp_pkt, PORT1)
 
 
-# class LegacyHeaderPSATest(P4EbpfTest):
-#     p4_file_path = "p4testdata/header-legacy.p4"
+class LegacyHeaderPSATest(P4EbpfTest):
+    p4_file_path = "p4testdata/header-legacy.p4"
+
+    def runTest(self):
+        pkt = Ether() / IP() / bytes.fromhex("A0102030405060708B")
+
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
