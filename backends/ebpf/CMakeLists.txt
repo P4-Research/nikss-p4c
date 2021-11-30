@@ -260,6 +260,7 @@ if (LIBBPF)
           runtime/psabpf/lib/psabpf_pipeline.c
           runtime/psabpf/lib/psabpf_table.c
           runtime/psabpf/lib/psabpf_meter.c
+          runtime/psabpf/CLI/action_selector.c
           runtime/psabpf/CLI/common.c
           runtime/psabpf/CLI/clone_session.c
           runtime/psabpf/CLI/pipeline.c

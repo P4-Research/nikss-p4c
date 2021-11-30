@@ -241,6 +241,59 @@ int psabpf_table_entry_setdefault(psabpf_table_entry_t *entry);
 int psabpf_table_entry_getdefault(psabpf_table_entry_t *entry);
 
 /*
+ * Action Selector
+ */
+
+typedef struct psabpf_action_selector_member_context {
+    uint32_t member_ref;
+    psabpf_action_t action;
+} psabpf_action_selector_member_context_t;
+
+typedef struct psabpf_action_selector_group_context {
+    uint32_t group_ref;
+} psabpf_action_selector_group_context_t;
+
+typedef struct psabpf_action_selector_context {
+    psabpf_btf_t btf_metadata;
+} psabpf_action_selector_context_t;
+
+void psabpf_action_selector_ctx_init(psabpf_action_selector_context_t *ctx);
+int psabpf_action_selector_ctx_open(psabpf_context_t *psabpf_ctx, psabpf_action_selector_context_t *ctx, const char *name);
+void psabpf_action_selector_ctx_free(psabpf_action_selector_context_t *ctx);
+
+int psabpf_action_selector_member_init(psabpf_action_selector_member_context_t *member);
+int psabpf_action_selector_member_free(psabpf_action_selector_member_context_t *member);
+
+int psabpf_action_selector_group_init(psabpf_action_selector_group_context_t *member);
+int psabpf_action_selector_group_free(psabpf_action_selector_group_context_t *member);
+
+/* Reuse table API */
+int psabpf_action_selector_member_action(psabpf_action_selector_member_context_t *member, psabpf_action_t *action);
+
+#define PSABPF_ACTION_SELECTOR_INVALID_REFERENCE 0
+uint32_t psabpf_action_selector_get_member_reference(psabpf_action_selector_member_context_t *member);
+void psabpf_action_selector_set_member_reference(psabpf_action_selector_member_context_t *member, uint32_t member_ref);
+uint32_t psabpf_action_selector_get_group_reference(psabpf_action_selector_group_context_t *member);
+void psabpf_action_selector_set_group_reference(psabpf_action_selector_group_context_t *member, uint32_t group_ref);
+
+int psabpf_action_selector_add_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member);
+int psabpf_action_selector_update_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member);
+int psabpf_action_selector_del_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member);
+
+int psabpf_action_selector_add_group(psabpf_action_selector_context_t *ctx, psabpf_action_selector_group_context_t *group);
+int psabpf_action_selector_del_group(psabpf_action_selector_context_t *ctx, psabpf_action_selector_group_context_t *group);
+
+int psabpf_action_selector_add_member_to_group(psabpf_action_selector_context_t *ctx,
+                                               psabpf_action_selector_group_context_t *group,
+                                               psabpf_action_selector_group_context_t *member);
+int psabpf_action_selector_del_member_from_group(psabpf_action_selector_context_t *ctx,
+                                                 psabpf_action_selector_group_context_t *group,
+                                                 psabpf_action_selector_group_context_t *member);
+
+/* Reuse table API */
+int psabpf_action_selector_set_default_group_action(psabpf_action_selector_context_t *ctx, psabpf_action_t *action);
+
+/*
  * P4 Counters
  */
 // TODO: design API for Counters
