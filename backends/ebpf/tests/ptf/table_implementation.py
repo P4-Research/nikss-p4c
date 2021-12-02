@@ -163,11 +163,21 @@ class ActionSelectorTest(P4EbpfTest):
     Simple tools for manipulating ActionSelector
     """
 
+    def add_action(self, selector, action, data=None):
+        cmd = "psabpf-ctl action-selector add_member pipe {} {} id {}".format(TEST_PIPELINE_ID, selector, action)
+        if data:
+            cmd = cmd + " data"
+            for d in data:
+                cmd = cmd + " {}".format(d)
+        _, stdout, _ = self.exec_ns_cmd(cmd, "ActionSelector add_member failed")
+        return int(stdout)
+
     def create_actions(self, selector):
-        selector = selector + "_actions"
         for i in range(1, 7):
             # i: member reference; 3+i: output port
-            self.table_add(table=selector, keys=[i], action=1, data=[3+i])
+            ref = self.add_action(selector, action=1, data=[i+3])
+            if i != ref:
+                self.fail("Invalid member reference: expected {}, got {}".format(i, ref))
 
     def create_empty_group(self, selector, name, gid):
         self.create_map(name=name, type="array", key_size=4, value_size=4, max_entries=129)
@@ -370,10 +380,10 @@ class ActionSelectorActionRunPSATest(ActionSelectorTest):
     p4_file_path = "p4testdata/action-selector-action-run.p4"
 
     def runTest(self):
-        self.table_add(table="MyIC_as_actions", keys=[2], action=1, data=[5])
-        self.table_add(table="MyIC_as_actions", keys=[3], action=0)
-        self.table_add(table="MyIC_tbl", keys=["02:22:33:44:55:66"], references=["0x2"])
-        self.table_add(table="MyIC_tbl", keys=["03:22:33:44:55:66"], references=["0x3"])
+        ref1 = self.add_action(selector="MyIC_as", action=1, data=[5])
+        ref2 = self.add_action(selector="MyIC_as", action=0, data=[])
+        self.table_add(table="MyIC_tbl", keys=["02:22:33:44:55:66"], references=[ref1])
+        self.table_add(table="MyIC_tbl", keys=["03:22:33:44:55:66"], references=[ref2])
 
         pkt = testutils.simple_ip_packet(eth_src="02:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
         testutils.send_packet(self, PORT0, pkt)

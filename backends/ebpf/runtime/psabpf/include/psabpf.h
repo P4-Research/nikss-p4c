@@ -132,32 +132,33 @@ typedef struct psabpf_btf {
     void * btf;
 } psabpf_btf_t;
 
+typedef struct psabpf_bpf_map_descriptor {
+    int fd;
+    uint32_t type;
+    uint32_t key_size;
+    uint32_t value_size;
+    uint32_t btf_type_id;  // TODO: key type ID and value type ID
+    uint32_t max_entries;
+} psabpf_bpf_map_descriptor_t;
+
 /*
  * TODO: specific fields of table entry context are still to be added.
  * The table entry context may store information about a table itself (e.g. key size, num of entries, etc.).
  * It may be filled in based on the P4Info file.
  */
 typedef struct psabpf_table_entry_context {
-    int table_fd;
-    uint32_t table_type;
-    uint32_t key_size;
-    uint32_t value_size;
-    uint32_t btf_type_id;
+    psabpf_bpf_map_descriptor_t table;
     bool is_indirect;
     bool is_ternary;
 
     char base_name[256];
 
     /* for ternary tables */
-    uint32_t tuple_max_entries;
-    int prefixes_fd;
-    uint32_t prefixes_key_size, prefixes_value_size, prefixes_btf_type_id;
-    int tuple_map_fd;
-    uint32_t tuple_map_key_size, tuple_map_value_size;
+    psabpf_bpf_map_descriptor_t prefixes;
+    psabpf_bpf_map_descriptor_t tuple_map;
 
     /* for cache maintenance */
-    int cache_fd;
-    uint32_t cache_key_size;
+    psabpf_bpf_map_descriptor_t cache;
 
     psabpf_btf_t btf_metadata;
 
@@ -254,18 +255,25 @@ typedef struct psabpf_action_selector_group_context {
 } psabpf_action_selector_group_context_t;
 
 typedef struct psabpf_action_selector_context {
-    psabpf_btf_t btf_metadata;
+    psabpf_btf_t btf;
+
+    psabpf_bpf_map_descriptor_t map_of_groups;
+    psabpf_bpf_map_descriptor_t group;
+    psabpf_bpf_map_descriptor_t group_template;
+    psabpf_bpf_map_descriptor_t map_of_members;
+    psabpf_bpf_map_descriptor_t default_group_action;
+    psabpf_bpf_map_descriptor_t cache;
 } psabpf_action_selector_context_t;
 
 void psabpf_action_selector_ctx_init(psabpf_action_selector_context_t *ctx);
-int psabpf_action_selector_ctx_open(psabpf_context_t *psabpf_ctx, psabpf_action_selector_context_t *ctx, const char *name);
 void psabpf_action_selector_ctx_free(psabpf_action_selector_context_t *ctx);
+int psabpf_action_selector_ctx_open(psabpf_context_t *psabpf_ctx, psabpf_action_selector_context_t *ctx, const char *name);
 
-int psabpf_action_selector_member_init(psabpf_action_selector_member_context_t *member);
-int psabpf_action_selector_member_free(psabpf_action_selector_member_context_t *member);
+void psabpf_action_selector_member_init(psabpf_action_selector_member_context_t *member);
+void psabpf_action_selector_member_free(psabpf_action_selector_member_context_t *member);
 
-int psabpf_action_selector_group_init(psabpf_action_selector_group_context_t *member);
-int psabpf_action_selector_group_free(psabpf_action_selector_group_context_t *member);
+void psabpf_action_selector_group_init(psabpf_action_selector_group_context_t *group);
+void psabpf_action_selector_group_free(psabpf_action_selector_group_context_t *group);
 
 /* Reuse table API */
 int psabpf_action_selector_member_action(psabpf_action_selector_member_context_t *member, psabpf_action_t *action);
@@ -273,8 +281,8 @@ int psabpf_action_selector_member_action(psabpf_action_selector_member_context_t
 #define PSABPF_ACTION_SELECTOR_INVALID_REFERENCE 0
 uint32_t psabpf_action_selector_get_member_reference(psabpf_action_selector_member_context_t *member);
 void psabpf_action_selector_set_member_reference(psabpf_action_selector_member_context_t *member, uint32_t member_ref);
-uint32_t psabpf_action_selector_get_group_reference(psabpf_action_selector_group_context_t *member);
-void psabpf_action_selector_set_group_reference(psabpf_action_selector_group_context_t *member, uint32_t group_ref);
+uint32_t psabpf_action_selector_get_group_reference(psabpf_action_selector_group_context_t *group);
+void psabpf_action_selector_set_group_reference(psabpf_action_selector_group_context_t *group, uint32_t group_ref);
 
 int psabpf_action_selector_add_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member);
 int psabpf_action_selector_update_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member);
