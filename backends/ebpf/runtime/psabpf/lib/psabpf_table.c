@@ -77,7 +77,7 @@ static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name, c
 int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name)
 {
     if (ctx == NULL || psabpf_ctx == NULL || name == NULL)
-        return EPERM;
+        return EINVAL;
 
     char base_path[256];
     build_ebpf_map_path(base_path, sizeof(base_path), psabpf_ctx);
@@ -111,6 +111,8 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
 
 void psabpf_table_entry_ctx_mark_indirect(psabpf_table_entry_ctx_t *ctx)
 {
+    if (ctx == NULL)
+        return;
     ctx->is_indirect = true;
 }
 
@@ -212,6 +214,8 @@ void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act
 /* only for ternary */
 void psabpf_table_entry_priority(psabpf_table_entry_t *entry, const uint32_t priority)
 {
+    if (entry == NULL)
+        return;
     entry->priority = priority;
 }
 
@@ -247,8 +251,8 @@ void psabpf_matchkey_type(psabpf_match_key_t *mk, enum psabpf_matchkind_t type)
 
 int psabpf_matchkey_data(psabpf_match_key_t *mk, const char *data, size_t size)
 {
-    if (mk == NULL)
-        return EFAULT;
+    if (mk == NULL || data == NULL)
+        return EINVAL;
     if (mk->data != NULL)
         return EEXIST;
 
@@ -265,7 +269,7 @@ int psabpf_matchkey_data(psabpf_match_key_t *mk, const char *data, size_t size)
 int psabpf_matchkey_prefix(psabpf_match_key_t *mk, uint32_t prefix)
 {
     if (mk == NULL)
-        return ENODATA;
+        return EINVAL;
     if (mk->type != PSABPF_LPM)
         return EINVAL;
 
@@ -278,7 +282,7 @@ int psabpf_matchkey_prefix(psabpf_match_key_t *mk, uint32_t prefix)
 int psabpf_matchkey_mask(psabpf_match_key_t *mk, const char *mask, size_t size)
 {
     if (mk == NULL || mask == NULL)
-        return ENODATA;
+        return EINVAL;
     if (mk->type != PSABPF_TERNARY)
         return EINVAL;
     if (mk->u.ternary.mask != NULL)
@@ -307,6 +311,9 @@ int psabpf_matchkey_end(psabpf_match_key_t *mk, uint64_t end)
 
 int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, size_t size)
 {
+    if (param == NULL || data == NULL)
+        return EINVAL;
+
     param->is_group_reference = false;
     param->len = size;
     if (size == 0) {
@@ -323,6 +330,8 @@ int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, s
 
 void psabpf_action_param_free(psabpf_action_param_t *param)
 {
+    if (param == NULL)
+        return;
     if (param->data != NULL)
         free(param->data);
     param->data = NULL;
@@ -330,6 +339,8 @@ void psabpf_action_param_free(psabpf_action_param_t *param)
 
 void psabpf_action_param_mark_group_reference(psabpf_action_param_t *param)
 {
+    if (param == NULL)
+        return;
     param->is_group_reference = true;
 }
 
@@ -1331,12 +1342,15 @@ int clear_table_cache(psabpf_bpf_map_descriptor_t *map)
     return delete_all_table_entries(map->fd, map->key_size);
 }
 
-int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
+static int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
 {
     char *key_buffer = NULL;
     char *key_mask_buffer = NULL;
     char *value_buffer = NULL;
     int return_code = NO_ERROR;
+
+    if (ctx == NULL || entry == NULL)
+        return EINVAL;
 
     if (ctx->is_ternary) {
         return_code = ternary_table_open_tuple(ctx, entry, &key_mask_buffer, bpf_flags);
@@ -1570,6 +1584,9 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
     char *key_buffer = NULL;
     char *key_mask_buffer = NULL;
     int return_code = NO_ERROR;
+
+    if (ctx == NULL || entry == NULL)
+        return EINVAL;
 
     if (ctx->is_ternary) {
         return_code = prepare_ternary_table_delete(ctx, entry, &key_mask_buffer);

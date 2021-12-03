@@ -4,9 +4,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <bpf/bpf.h>
-#include <bpf/btf.h>
 #include <linux/bpf.h>
-#include <linux/btf.h>
 
 #include "../include/psabpf.h"
 #include "btf.h"
@@ -22,7 +20,6 @@ void psabpf_action_selector_ctx_init(psabpf_action_selector_context_t *ctx)
     /* 0 is a valid file descriptor */
     ctx->btf.associated_prog = -1;
     ctx->group.fd = -1;
-    ctx->group_template.fd = -1;
     ctx->map_of_groups.fd = -1;
     ctx->map_of_members.fd = -1;
     ctx->default_group_action.fd = -1;
@@ -37,7 +34,6 @@ void psabpf_action_selector_ctx_free(psabpf_action_selector_context_t *ctx)
     free_btf(&ctx->btf);
 
     close_object_fd(&ctx->group.fd);
-    close_object_fd(&ctx->group_template.fd);
     close_object_fd(&ctx->map_of_groups.fd);
     close_object_fd(&ctx->map_of_members.fd);
     close_object_fd(&ctx->default_group_action.fd);
@@ -50,11 +46,12 @@ static int do_open_action_selector(psabpf_action_selector_context_t *ctx, const 
     char derived_name[256];
 
     snprintf(derived_name, sizeof(derived_name), "%s_groups_inner", name);
-    ret = open_bpf_map(&ctx->btf, derived_name, base_path, &ctx->group_template);
+    ret = open_bpf_map(&ctx->btf, derived_name, base_path, &ctx->group);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
+    close_object_fd(&ctx->group.fd);
 
     snprintf(derived_name, sizeof(derived_name), "%s_groups", name);
     ret = open_bpf_map(&ctx->btf, derived_name, base_path, &ctx->map_of_groups);
@@ -89,7 +86,7 @@ static int do_open_action_selector(psabpf_action_selector_context_t *ctx, const 
 int psabpf_action_selector_ctx_open(psabpf_context_t *psabpf_ctx, psabpf_action_selector_context_t *ctx, const char *name)
 {
     if (ctx == NULL || psabpf_ctx == NULL || name == NULL)
-        return EPERM;
+        return EINVAL;
 
     /* get the BTF, it is optional so print only warning */
     if (load_btf(psabpf_ctx, &ctx->btf) != NO_ERROR)
@@ -139,7 +136,7 @@ void psabpf_action_selector_group_free(psabpf_action_selector_group_context_t *g
 int psabpf_action_selector_member_action(psabpf_action_selector_member_context_t *member, psabpf_action_t *action)
 {
     if (member == NULL || action == NULL)
-        return EPERM;
+        return EINVAL;
 
     /* Stole data from action */
     memcpy(&member->action, action, sizeof(*action));
@@ -217,16 +214,16 @@ static uint32_t find_and_reserve_reference(psabpf_bpf_map_descriptor_t *map, voi
 int psabpf_action_selector_add_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
 {
     if (ctx == NULL || member == NULL)
-        return EPERM;
+        return EINVAL;
     if (ctx->map_of_members.fd < 0) {
         fprintf(stderr, "Map of members not opened\n");
-        return EPERM;
+        return EINVAL;
     }
 
     member->member_ref = find_and_reserve_reference(&ctx->map_of_members, NULL);
     if (member->member_ref == PSABPF_ACTION_SELECTOR_INVALID_REFERENCE) {
-        fprintf(stderr, "failed to find available handle for member");
-        return ENOMEM;
+        fprintf(stderr, "failed to find available reference for member");
+        return EFBIG;  /* Probably, here we know we have access to eBPF, so most probably version is that map is full */
     }
 
     int ret = psabpf_action_selector_update_member(ctx, member);
@@ -242,10 +239,10 @@ int psabpf_action_selector_add_member(psabpf_action_selector_context_t *ctx, psa
 int psabpf_action_selector_update_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
 {
     if (ctx == NULL || member == NULL)
-        return EPERM;
+        return EINVAL;
     if (ctx->map_of_members.fd < 0) {
         fprintf(stderr, "Map of members not opened\n");
-        return EPERM;
+        return EINVAL;
     }
 
     /* Let's go the simplest way - abuse (little) table API. Don't do this at home! */
@@ -275,14 +272,14 @@ int psabpf_action_selector_update_member(psabpf_action_selector_context_t *ctx, 
 int psabpf_action_selector_del_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
 {
     if (ctx == NULL || member == NULL)
-        return EPERM;
+        return EINVAL;
     if (ctx->map_of_members.fd < 0) {
         fprintf(stderr, "Map of members not opened\n");
-        return EPERM;
+        return EINVAL;
     }
     if (ctx->map_of_members.key_size != 4) {
         fprintf(stderr, "expected that map have 32 bit key\n");
-        return EPERM;
+        return EINVAL;
     }
 
     /* TODO: should we remove this member from every possible group? */
@@ -290,13 +287,13 @@ int psabpf_action_selector_del_member(psabpf_action_selector_context_t *ctx, psa
     int ret = bpf_map_delete_elem(ctx->map_of_members.fd, &member->member_ref);
     if (ret != 0) {
         ret = errno;
-        fprintf(stderr, "failed to delete entry: %s\n", strerror(ret));
+        fprintf(stderr, "failed to delete member %u: %s\n", member->member_ref, strerror(ret));
         return ret;
     }
 
     ret = clear_table_cache(&ctx->cache);
     if (ret != NO_ERROR) {
-        fprintf(stderr, "failed to clear table cache: %s\n", strerror(ret));
+        fprintf(stderr, "failed to clear cache: %s\n", strerror(ret));
     }
 
     return NO_ERROR;
@@ -304,12 +301,66 @@ int psabpf_action_selector_del_member(psabpf_action_selector_context_t *ctx, psa
 
 int psabpf_action_selector_add_group(psabpf_action_selector_context_t *ctx, psabpf_action_selector_group_context_t *group)
 {
-    return ENOTSUP;
+    if (ctx == NULL || group == NULL)
+        return EINVAL;
+    if (ctx->map_of_groups.fd < 0) {
+        fprintf(stderr, "Map of groups not opened\n");
+        return EINVAL;
+    }
+    if (ctx->group.fd >= 0) {
+        fprintf(stderr, "Group map not closed properly before\n");
+        return EINVAL;
+    }
+
+    struct bpf_create_map_attr attr = {
+            .key_size = ctx->group.key_size,
+            .value_size = ctx->group.value_size,
+            .max_entries = ctx->group.max_entries,
+            .map_type = ctx->group.type,
+//            .name = map_name,
+// TODO: remove name also from table (ternary tuple)
+    };
+    ctx->group.fd = bpf_create_map_xattr(&attr);
+    if (ctx->group.fd < 0) {
+        int err = errno;
+        fprintf(stderr, "failed to create new group: %s\n", strerror(err));
+        return err;
+    }
+
+    group->group_ref = find_and_reserve_reference(&ctx->map_of_groups, &ctx->group.fd);
+    /* Group is no more needed, restore ctx to its original state */
+    close_object_fd(&ctx->group.fd);
+
+    if (group->group_ref == PSABPF_ACTION_SELECTOR_INVALID_REFERENCE) {
+        fprintf(stderr, "failed to insert new group to map of groups\n");
+        return EFBIG;
+    }
+
+    return NO_ERROR;
 }
 
 int psabpf_action_selector_del_group(psabpf_action_selector_context_t *ctx, psabpf_action_selector_group_context_t *group)
 {
-    return ENOTSUP;
+    if (ctx == NULL || group == NULL)
+        return EINVAL;
+    if (ctx->map_of_groups.fd < 0) {
+        fprintf(stderr, "Map of groups not opened\n");
+        return EINVAL;
+    }
+
+    int ret = bpf_map_delete_elem(ctx->map_of_groups.fd, &group->group_ref);
+    if (ret != 0) {
+        ret = errno;
+        fprintf(stderr, "failed to delete group %u: %s\n", group->group_ref, strerror(ret));
+        return ret;
+    }
+
+    ret = clear_table_cache(&ctx->cache);
+    if (ret != NO_ERROR) {
+        fprintf(stderr, "failed to clear cache: %s\n", strerror(ret));
+    }
+
+    return NO_ERROR;
 }
 
 int psabpf_action_selector_add_member_to_group(psabpf_action_selector_context_t *ctx,

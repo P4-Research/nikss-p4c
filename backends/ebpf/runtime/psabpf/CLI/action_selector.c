@@ -98,6 +98,25 @@ static int parse_member_reference(int *argc, char ***argv,
     return NO_ERROR;
 }
 
+static int parse_group_reference(int *argc, char ***argv,
+                                  psabpf_action_selector_group_context_t *group, bool can_be_last)
+{
+    char *ptr;
+    psabpf_action_selector_set_group_reference(group, strtoul(**argv, &ptr, 0));
+    if (*ptr) {
+        fprintf(stderr, "%s: unable to parse as a member reference\n", **argv);
+        return EINVAL;
+    }
+
+    if (can_be_last) {
+        NEXT_ARGP();
+    } else {
+        NEXT_ARGP_RET();
+    }
+
+    return NO_ERROR;
+}
+
 /******************************************************************************
  * Command line Action Selector functions
  *****************************************************************************/
@@ -257,12 +276,86 @@ clean_up:
 
 int do_action_selector_create_group(int argc, char **argv)
 {
-    return 0;
+    int error_code = EPERM;
+    psabpf_context_t psabpf_ctx;
+    psabpf_action_selector_context_t ctx;
+    psabpf_action_selector_group_context_t group;
+
+    psabpf_context_init(&psabpf_ctx);
+    psabpf_action_selector_ctx_init(&ctx);
+    psabpf_action_selector_group_init(&group);
+
+    /* 0. Get the pipeline id */
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+        goto clean_up;
+
+    if (argc < 1) {
+        fprintf(stderr, "too few parameters\n");
+        goto clean_up;
+    }
+
+    /* 1. Get Action Selector */
+    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, true) != NO_ERROR)
+        goto clean_up;
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto clean_up;
+    }
+
+    error_code = psabpf_action_selector_add_group(&ctx, &group);
+    if (error_code == NO_ERROR)
+        fprintf(stdout, "%u\n", psabpf_action_selector_get_group_reference(&group));
+
+clean_up:
+    psabpf_action_selector_group_free(&group);
+    psabpf_action_selector_ctx_free(&ctx);
+    psabpf_context_free(&psabpf_ctx);
+
+    return error_code;
 }
 
 int do_action_selector_delete_group(int argc, char **argv)
 {
-    return 0;
+    int error_code = EPERM;
+    psabpf_context_t psabpf_ctx;
+    psabpf_action_selector_context_t ctx;
+    psabpf_action_selector_group_context_t group;
+
+    psabpf_context_init(&psabpf_ctx);
+    psabpf_action_selector_ctx_init(&ctx);
+    psabpf_action_selector_group_init(&group);
+
+    /* 0. Get the pipeline id */
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+        goto clean_up;
+
+    if (argc < 1) {
+        fprintf(stderr, "too few parameters\n");
+        goto clean_up;
+    }
+
+    /* 1. Get Action Selector */
+    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, false) != NO_ERROR)
+        goto clean_up;
+
+    /* 2. Get member reference */
+    if (parse_group_reference(&argc, &argv, &group, true) != NO_ERROR)
+        goto clean_up;
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto clean_up;
+    }
+
+    error_code = psabpf_action_selector_del_group(&ctx, &group);
+
+clean_up:
+    psabpf_action_selector_group_free(&group);
+    psabpf_action_selector_ctx_free(&ctx);
+    psabpf_context_free(&psabpf_ctx);
+
+    return error_code;
 }
 
 int do_action_selector_add_to_group(int argc, char **argv)
