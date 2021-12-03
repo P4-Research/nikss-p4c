@@ -363,16 +363,125 @@ int psabpf_action_selector_del_group(psabpf_action_selector_context_t *ctx, psab
     return NO_ERROR;
 }
 
+static int open_group_map(psabpf_action_selector_context_t *ctx,
+                          psabpf_action_selector_group_context_t *group)
+{
+    if (ctx->map_of_groups.fd < 0) {
+        fprintf(stderr, "map of groups not opened\n");
+        return EINVAL;
+    }
+    if (ctx->map_of_groups.key_size != 4 || ctx->map_of_groups.value_size != 4) {
+        fprintf(stderr, "invalid map of groups\n");
+        return EINVAL;
+    }
+
+    uint32_t inner_map_id = 0;
+    int err = bpf_map_lookup_elem(ctx->map_of_groups.fd, &group->group_ref, &inner_map_id);
+    if (err != 0) {
+        fprintf(stderr, "group %u was not found\n", group->group_ref);
+        return ENOENT;
+    }
+    ctx->group.fd = bpf_map_get_fd_by_id(inner_map_id);
+    if (ctx->group.fd < 0) {
+        fprintf(stderr, "group map for group %u was not found\n", group->group_ref);
+        return ENOENT;
+    }
+
+    return NO_ERROR;
+}
+
+static bool validate_member_reference(psabpf_action_selector_context_t *ctx,
+                                      psabpf_action_selector_member_context_t *member)
+{
+    char *value = malloc(ctx->map_of_members.value_size);
+    if (value == NULL)
+        return false;
+
+    int ret = bpf_map_lookup_elem(ctx->map_of_members.fd, &member->member_ref, value);
+    free(value);
+
+    if (ret != 0)
+        return false;
+    return true;
+}
+
+static int append_member_to_group(psabpf_action_selector_context_t *ctx,
+                                  psabpf_action_selector_member_context_t *member)
+{
+    if (ctx->group.key_size != 4 || ctx->group.value_size != 4 || ctx->group.fd < 0)
+        return EINVAL;
+
+    uint32_t group_key;
+    uint32_t number_of_members;
+    int return_code;
+
+    /* Get number of members. */
+    group_key = 0;
+    return_code = bpf_map_lookup_elem(ctx->group.fd, &group_key, &number_of_members);
+    if (return_code != 0) {
+        return_code = errno;
+        fprintf(stderr, "failed to obtain number of members in group: %s\n", strerror(return_code));
+        return return_code;
+    }
+
+    /* Append new member if possible */
+    group_key = number_of_members + 1;
+    return_code = bpf_map_update_elem(ctx->group.fd, &group_key, &member->member_ref, BPF_ANY);
+    if (return_code != 0) {
+        return_code = errno;
+        fprintf(stderr, "failed to add member to group: %s\n", strerror(return_code));
+        return return_code;
+    }
+
+    /* Register new member - increase number of members */
+    group_key = 0;
+    number_of_members = number_of_members + 1;
+    return_code = bpf_map_update_elem(ctx->group.fd, &group_key, &number_of_members, BPF_ANY);
+    if (return_code != 0) {
+        return_code = errno;
+        fprintf(stderr, "failed to register member in group: %s\n", strerror(return_code));
+        return return_code;
+    }
+
+    return NO_ERROR;
+}
+
 int psabpf_action_selector_add_member_to_group(psabpf_action_selector_context_t *ctx,
                                                psabpf_action_selector_group_context_t *group,
-                                               psabpf_action_selector_group_context_t *member)
+                                               psabpf_action_selector_member_context_t *member)
 {
-    return ENOTSUP;
+    int return_code;
+
+    if (ctx == NULL || group == NULL || member == NULL)
+        return EINVAL;
+    if (ctx->group.key_size != 4 || ctx->group.value_size != 4) {
+        fprintf(stderr, "invalid group map\n");
+        return EINVAL;
+    }
+    if (ctx->group.fd >= 0) {
+        fprintf(stderr, "group map not closed properly before\n");
+        return EINVAL;
+    }
+
+    /* verify that member reference exists and is valid */
+    if (!validate_member_reference(ctx, member)) {
+        fprintf(stderr, "invalid member reference: %u\n", member->member_ref);
+        return EINVAL;
+    }
+
+    return_code = open_group_map(ctx, group);
+    if (return_code != NO_ERROR)
+        return return_code;
+
+    return_code = append_member_to_group(ctx, member);
+    close_object_fd(&ctx->group.fd);
+
+    return return_code;
 }
 
 int psabpf_action_selector_del_member_from_group(psabpf_action_selector_context_t *ctx,
                                                  psabpf_action_selector_group_context_t *group,
-                                                 psabpf_action_selector_group_context_t *member)
+                                                 psabpf_action_selector_member_context_t *member)
 {
     return ENOTSUP;
 }

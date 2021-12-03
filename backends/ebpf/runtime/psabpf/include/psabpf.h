@@ -292,10 +292,10 @@ int psabpf_action_selector_del_group(psabpf_action_selector_context_t *ctx, psab
 
 int psabpf_action_selector_add_member_to_group(psabpf_action_selector_context_t *ctx,
                                                psabpf_action_selector_group_context_t *group,
-                                               psabpf_action_selector_group_context_t *member);
+                                               psabpf_action_selector_member_context_t *member);
 int psabpf_action_selector_del_member_from_group(psabpf_action_selector_context_t *ctx,
                                                  psabpf_action_selector_group_context_t *group,
-                                                 psabpf_action_selector_group_context_t *member);
+                                                 psabpf_action_selector_member_context_t *member);
 
 /* Reuse table API */
 int psabpf_action_selector_set_default_group_action(psabpf_action_selector_context_t *ctx, psabpf_action_t *action);
