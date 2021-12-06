@@ -139,11 +139,7 @@ int psabpf_action_selector_member_action(psabpf_action_selector_member_context_t
     if (member == NULL || action == NULL)
         return EINVAL;
 
-    /* Stole data from action */
-    memcpy(&member->action, action, sizeof(*action));
-    action->n_params = 0;
-    action->params = NULL;
-
+    move_action(&member->action, action);
     return NO_ERROR;
 }
 

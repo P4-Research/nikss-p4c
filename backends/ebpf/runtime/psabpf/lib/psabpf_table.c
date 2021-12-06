@@ -192,6 +192,16 @@ int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t 
     return NO_ERROR;
 }
 
+void move_action(psabpf_action_t *dst, psabpf_action_t *src) {
+    if (dst == NULL || src == NULL)
+        return;
+
+    /* stole action data from src */
+    memcpy(dst, src, sizeof(psabpf_action_t));
+    src->params = NULL;
+    src->n_params = 0;
+}
+
 void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act)
 {
     if (entry == NULL || act == NULL)
@@ -203,11 +213,7 @@ void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act
     entry->action = malloc(sizeof(psabpf_action_t));
     if (entry->action == NULL)
         return;
-    memcpy(entry->action, act, sizeof(psabpf_action_t));
-
-    /* stole action data */
-    act->params = NULL;
-    act->n_params = 0;
+    move_action(entry->action, act);
 }
 
 /* only for ternary */
