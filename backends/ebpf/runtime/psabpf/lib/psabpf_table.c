@@ -81,7 +81,6 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
 
     char base_path[256];
     build_ebpf_map_path(base_path, sizeof(base_path), psabpf_ctx);
-    snprintf(ctx->base_name, sizeof(ctx->base_name), "%s", name);
 
     /* get the BTF, it is optional so print only warning */
     if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR)
@@ -1172,15 +1171,12 @@ clean_up:
 static int ternary_table_add_tuple_and_open(psabpf_table_entry_ctx_t *ctx, const uint32_t tuple_id)
 {
     int err;
-    char map_name[264];
-    snprintf(map_name, sizeof(map_name), "%s_tuple_%u", ctx->base_name, tuple_id);
 
     struct bpf_create_map_attr attr = {
             .key_size = ctx->table.key_size,
             .value_size = ctx->table.value_size,
             .max_entries = ctx->table.max_entries,
             .map_type = ctx->table.type,
-            .name = map_name,
     };
     ctx->table.fd = bpf_create_map_xattr(&attr);
     if (ctx->table.fd < 0) {

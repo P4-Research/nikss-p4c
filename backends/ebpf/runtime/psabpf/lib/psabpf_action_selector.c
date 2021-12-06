@@ -110,6 +110,7 @@ void psabpf_action_selector_member_init(psabpf_action_selector_member_context_t 
         return;
 
     memset(member, 0, sizeof(*member));
+    psabpf_action_init(&member->action);
 }
 
 void psabpf_action_selector_member_free(psabpf_action_selector_member_context_t *member)
@@ -317,8 +318,6 @@ int psabpf_action_selector_add_group(psabpf_action_selector_context_t *ctx, psab
             .value_size = ctx->group.value_size,
             .max_entries = ctx->group.max_entries,
             .map_type = ctx->group.type,
-//            .name = map_name,
-// TODO: remove name also from table (ternary tuple)
     };
     ctx->group.fd = bpf_create_map_xattr(&attr);
     if (ctx->group.fd < 0) {

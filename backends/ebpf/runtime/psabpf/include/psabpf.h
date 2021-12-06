@@ -151,8 +151,6 @@ typedef struct psabpf_table_entry_context {
     bool is_indirect;
     bool is_ternary;
 
-    char base_name[256];
-
     /* for ternary tables */
     psabpf_bpf_map_descriptor_t prefixes;
     psabpf_bpf_map_descriptor_t tuple_map;
