@@ -364,7 +364,7 @@ clean_up:
     return error_code;
 }
 
-int do_action_selector_add_to_group(int argc, char **argv)
+static int add_or_remove_member_from_group(int argc, char **argv, bool add)
 {
     int error_code = EPERM;
     psabpf_context_t psabpf_ctx;
@@ -395,8 +395,13 @@ int do_action_selector_add_to_group(int argc, char **argv)
         goto clean_up;
 
     /* 3. Skip keyword */
-    if (parse_skip_keyword(&argc, &argv, "to") != NO_ERROR)
-        goto clean_up;
+    if (add) {
+        if (parse_skip_keyword(&argc, &argv, "to") != NO_ERROR)
+            goto clean_up;
+    } else {
+        if (parse_skip_keyword(&argc, &argv, "from") != NO_ERROR)
+            goto clean_up;
+    }
 
     /* 4. Get group reference */
     if (parse_group_reference(&argc, &argv, &group) != NO_ERROR)
@@ -407,7 +412,10 @@ int do_action_selector_add_to_group(int argc, char **argv)
         goto clean_up;
     }
 
-    error_code = psabpf_action_selector_add_member_to_group(&ctx, &group, &member);
+    if (add)
+        error_code = psabpf_action_selector_add_member_to_group(&ctx, &group, &member);
+    else
+        error_code = psabpf_action_selector_del_member_from_group(&ctx, &group, &member);
 
 clean_up:
     psabpf_action_selector_group_free(&group);
@@ -418,9 +426,14 @@ clean_up:
     return error_code;
 }
 
+int do_action_selector_add_to_group(int argc, char **argv)
+{
+    return add_or_remove_member_from_group(argc, argv, true);
+}
+
 int do_action_selector_delete_from_group(int argc, char **argv)
 {
-    return 0;
+    return add_or_remove_member_from_group(argc, argv, false);
 }
 
 int do_action_selector_help(int argc, char **argv)
