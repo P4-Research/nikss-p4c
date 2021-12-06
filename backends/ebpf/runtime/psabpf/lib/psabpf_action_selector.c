@@ -428,6 +428,20 @@ static int update_number_of_members_in_group(psabpf_action_selector_context_t *c
     return NO_ERROR;
 }
 
+static uint32_t find_member_entry_idx_in_group(psabpf_bpf_map_descriptor_t *group,
+                                               uint32_t number_of_members,
+                                               psabpf_action_selector_member_context_t *member)
+{
+    for (uint32_t index = 1; index <= number_of_members; ++index) {
+        uint32_t current_member_ref;
+        int return_code = bpf_map_lookup_elem(group->fd, &index, &current_member_ref);
+        if (return_code == 0 && current_member_ref == member->member_ref) {
+            return index;
+        }
+    }
+    return 0;
+}
+
 static int append_member_to_group(psabpf_action_selector_context_t *ctx,
                                   psabpf_action_selector_member_context_t *member)
 {
@@ -442,6 +456,12 @@ static int append_member_to_group(psabpf_action_selector_context_t *ctx,
     number_of_members = get_number_of_members_in_group(ctx);
     if (((int) number_of_members) < 0)
         return EPERM;
+
+    /* Verify that member reference not existed in group before */
+    if (find_member_entry_idx_in_group(&ctx->group, number_of_members, member) != 0) {
+        fprintf(stderr, "%u already exists in group\n", member->member_ref);
+        return EEXIST;
+    }
 
     /* Append new member if possible */
     group_key = number_of_members + 1;
@@ -500,22 +520,6 @@ int psabpf_action_selector_add_member_to_group(psabpf_action_selector_context_t 
     return return_code;
 }
 
-static uint32_t find_member_entry_idx_in_group(psabpf_bpf_map_descriptor_t *group,
-                                               uint32_t number_of_members,
-                                               psabpf_action_selector_member_context_t *member)
-{
-    for (uint32_t index = 1; index <= number_of_members; ++index) {
-        uint32_t current_member_ref;
-        int return_code = bpf_map_lookup_elem(group->fd, &index, &current_member_ref);
-        if (return_code == 0 && current_member_ref == member->member_ref) {
-            return index;
-        }
-    }
-
-    fprintf(stderr, "%u not referenced in group\n", member->member_ref);
-    return 0;
-}
-
 static int remove_member_from_group(psabpf_action_selector_context_t *ctx,
                                     psabpf_action_selector_member_context_t *member)
 {
@@ -536,8 +540,10 @@ static int remove_member_from_group(psabpf_action_selector_context_t *ctx,
 
     /* 2. Find index of our reference */
     index_to_remove = find_member_entry_idx_in_group(&ctx->group, number_of_members, member);
-    if (index_to_remove == 0)
+    if (index_to_remove == 0) {
+        fprintf(stderr, "%u not referenced in group\n", member->member_ref);
         return ENOENT;
+    }
 
     /* 3. Find reference of last member in group (see comment below) */
     return_code = bpf_map_lookup_elem(ctx->group.fd, &number_of_members, &last_member_ref);
