@@ -263,7 +263,13 @@ class ActionSelectorDefaultEmptyGroupActionPSATest(ActionSelectorTest):
         self.table_add(table="MyIC_tbl", keys=["08:22:33:44:55:66"], references=["group {}".format(gid)])
 
         testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
+        testutils.verify_packet(self, pkt, PORT1)
+
+        cmd = "psabpf-ctl action-selector default_group_action pipe {} MyIC_as id 1 data 6".format(TEST_PIPELINE_ID)
+        self.exec_ns_cmd(cmd, "default group action update failed")
+
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT2)
 
 
 class ActionSelectorMultipleSelectorsPSATest(ActionSelectorTest):

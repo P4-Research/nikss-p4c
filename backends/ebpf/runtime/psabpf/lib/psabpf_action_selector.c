@@ -671,5 +671,38 @@ int psabpf_action_selector_del_member_from_group(psabpf_action_selector_context_
 
 int psabpf_action_selector_set_default_group_action(psabpf_action_selector_context_t *ctx, psabpf_action_t *action)
 {
-    return ENOTSUP;
+    if (ctx == NULL || action == NULL)
+        return EINVAL;
+    if (ctx->default_group_action.fd < 0) {
+        fprintf(stderr, "map with default action for empty group not opened\n");
+        return EINVAL;
+    }
+    if (ctx->default_group_action.key_size != 4) {
+        fprintf(stderr, "invalid map with default action form empty group\n");
+        return EINVAL;
+    }
+    uint32_t key = 0;
+
+    /* Let's again abuse (little) table API. Don't do this at home! */
+    psabpf_table_entry_ctx_t tec = {
+            .table = ctx->default_group_action,
+            .btf_metadata = ctx->btf,
+            .cache = ctx->cache,  /* Allow clear cache if applicable */
+    };
+    psabpf_match_key_t mk[] = {
+            {
+                    .type = PSABPF_EXACT,
+                    .key_size = sizeof(key),
+                    .data = &key,
+            },
+    };
+    psabpf_match_key_t * mk_ptr = &(mk[0]);
+    psabpf_table_entry_t te = {
+            .action = action,
+            .match_keys = &mk_ptr,
+            .n_keys = 1,
+    };
+
+    /* Will also clear cache */
+    return psabpf_table_entry_update(&tec, &te);
 }
