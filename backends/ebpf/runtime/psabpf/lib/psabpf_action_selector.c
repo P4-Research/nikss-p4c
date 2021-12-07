@@ -11,6 +11,85 @@
 #include "common.h"
 #include "psabpf_table.h"
 
+static int open_group_map(psabpf_action_selector_context_t *ctx,
+                          psabpf_action_selector_group_context_t *group)
+{
+    if (ctx->map_of_groups.fd < 0) {
+        fprintf(stderr, "map of groups not opened\n");
+        return EINVAL;
+    }
+    if (ctx->map_of_groups.key_size != 4 || ctx->map_of_groups.value_size != 4) {
+        fprintf(stderr, "invalid map of groups\n");
+        return EINVAL;
+    }
+
+    uint32_t inner_map_id = 0;
+    int err = bpf_map_lookup_elem(ctx->map_of_groups.fd, &group->group_ref, &inner_map_id);
+    if (err != 0) {
+        fprintf(stderr, "group %u was not found\n", group->group_ref);
+        return ENOENT;
+    }
+    ctx->group.fd = bpf_map_get_fd_by_id(inner_map_id);
+    if (ctx->group.fd < 0) {
+        fprintf(stderr, "group map for group %u was not found\n", group->group_ref);
+        return ENOENT;
+    }
+
+    return NO_ERROR;
+}
+
+static uint32_t get_number_of_members_in_group(psabpf_action_selector_context_t *ctx) {
+    uint32_t key = 0;
+    uint32_t number_of_members;
+    int return_code = bpf_map_lookup_elem(ctx->group.fd, &key, &number_of_members);
+    if (return_code != 0) {
+        return_code = errno;
+        fprintf(stderr, "failed to obtain number of members in group: %s\n", strerror(return_code));
+        return -return_code;
+    }
+    return number_of_members;
+}
+
+static int update_number_of_members_in_group(psabpf_action_selector_context_t *ctx, uint32_t new_value) {
+    uint32_t key = 0;
+    int return_code = bpf_map_update_elem(ctx->group.fd, &key, &new_value, BPF_ANY);
+    if (return_code != 0) {
+        return_code = errno;
+        fprintf(stderr, "failed to update member in group: %s\n", strerror(return_code));
+        return return_code;
+    }
+    return NO_ERROR;
+}
+
+static uint32_t find_member_entry_idx_in_group(psabpf_bpf_map_descriptor_t *group,
+                                               uint32_t number_of_members,
+                                               psabpf_action_selector_member_context_t *member)
+{
+    for (uint32_t index = 1; index <= number_of_members; ++index) {
+        uint32_t current_member_ref;
+        int return_code = bpf_map_lookup_elem(group->fd, &index, &current_member_ref);
+        if (return_code == 0 && current_member_ref == member->member_ref) {
+            return index;
+        }
+    }
+    return 0;
+}
+
+static bool validate_member_reference(psabpf_action_selector_context_t *ctx,
+                                      psabpf_action_selector_member_context_t *member)
+{
+    char *value = malloc(ctx->map_of_members.value_size);
+    if (value == NULL)
+        return false;
+
+    int ret = bpf_map_lookup_elem(ctx->map_of_members.fd, &member->member_ref, value);
+    free(value);
+
+    if (ret != 0)
+        return false;
+    return true;
+}
+
 void psabpf_action_selector_ctx_init(psabpf_action_selector_context_t *ctx)
 {
     if (ctx == NULL)
@@ -77,7 +156,7 @@ static int do_open_action_selector(psabpf_action_selector_context_t *ctx, const 
     snprintf(derived_name, sizeof(derived_name), "%s_cache", name);
     ret = open_bpf_map(&ctx->btf, derived_name, base_path, &ctx->cache);
     if (ret != NO_ERROR) {
-        fprintf(stderr, "warning: couldn't find ActionSelector cache %s: %s\n", derived_name, strerror(ret));
+        fprintf(stderr, "warning: couldn't find ActionSelector cache: %s\n", strerror(ret));
     }
 
     return NO_ERROR;
@@ -266,6 +345,40 @@ int psabpf_action_selector_update_member(psabpf_action_selector_context_t *ctx, 
     return psabpf_table_entry_update(&tec, &te);
 }
 
+static bool member_in_use(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
+{
+    bool found = false;
+    uint32_t key = 0, next_key;
+
+    /* Iterate over every group and check if member reference exists */
+    if (bpf_map_get_next_key(ctx->map_of_groups.fd, NULL, &next_key) != 0)
+        return false;  /* no groups */
+    do {
+        /* Swap buffers, so next_key will become key and next_key may be reused */
+        uint32_t tmp_key = next_key;
+        next_key = key;
+        key = tmp_key;
+
+        /* Get group */
+        psabpf_action_selector_group_context_t group;
+        group.group_ref = key;
+        if (open_group_map(ctx, &group) != NO_ERROR)
+            continue;
+
+        /* Try to find member in a current group */
+        uint32_t number_of_members = get_number_of_members_in_group(ctx);
+        if (((int) number_of_members) > 0) {  /* Empty  groups we can also skip (as we do for errors) */
+            if (find_member_entry_idx_in_group(&ctx->group, number_of_members, member) != 0) {
+                fprintf(stderr, "%u referenced in group %u\n", member->member_ref, group.group_ref);
+                found = true;
+            }
+        }
+        close_object_fd(&ctx->group.fd);
+    } while (bpf_map_get_next_key(ctx->map_of_groups.fd, &key, &next_key) == 0 && !found);
+
+    return found;
+}
+
 int psabpf_action_selector_del_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
 {
     if (ctx == NULL || member == NULL)
@@ -278,8 +391,16 @@ int psabpf_action_selector_del_member(psabpf_action_selector_context_t *ctx, psa
         fprintf(stderr, "expected that map have 32 bit key\n");
         return EINVAL;
     }
+    if (ctx->group.key_size != 4 || ctx->group.value_size != 4) {
+        fprintf(stderr, "invalid group map\n");
+        return EINVAL;
+    }
 
-    /* TODO: should we remove this member from every possible group? */
+    /* Validate if member is referenced in any group */
+    if (member_in_use(ctx, member)) {
+        fprintf(stderr, "failed to delete member %u: already in use\n", member->member_ref);
+        return EBUSY;
+    }
 
     int ret = bpf_map_delete_elem(ctx->map_of_members.fd, &member->member_ref);
     if (ret != 0) {
@@ -306,6 +427,10 @@ int psabpf_action_selector_add_group(psabpf_action_selector_context_t *ctx, psab
     }
     if (ctx->group.fd >= 0) {
         fprintf(stderr, "Group map not closed properly before\n");
+        return EINVAL;
+    }
+    if (ctx->group.key_size != 4 || ctx->group.value_size != 4) {
+        fprintf(stderr, "invalid group map\n");
         return EINVAL;
     }
 
@@ -356,85 +481,6 @@ int psabpf_action_selector_del_group(psabpf_action_selector_context_t *ctx, psab
     }
 
     return NO_ERROR;
-}
-
-static int open_group_map(psabpf_action_selector_context_t *ctx,
-                          psabpf_action_selector_group_context_t *group)
-{
-    if (ctx->map_of_groups.fd < 0) {
-        fprintf(stderr, "map of groups not opened\n");
-        return EINVAL;
-    }
-    if (ctx->map_of_groups.key_size != 4 || ctx->map_of_groups.value_size != 4) {
-        fprintf(stderr, "invalid map of groups\n");
-        return EINVAL;
-    }
-
-    uint32_t inner_map_id = 0;
-    int err = bpf_map_lookup_elem(ctx->map_of_groups.fd, &group->group_ref, &inner_map_id);
-    if (err != 0) {
-        fprintf(stderr, "group %u was not found\n", group->group_ref);
-        return ENOENT;
-    }
-    ctx->group.fd = bpf_map_get_fd_by_id(inner_map_id);
-    if (ctx->group.fd < 0) {
-        fprintf(stderr, "group map for group %u was not found\n", group->group_ref);
-        return ENOENT;
-    }
-
-    return NO_ERROR;
-}
-
-static bool validate_member_reference(psabpf_action_selector_context_t *ctx,
-                                      psabpf_action_selector_member_context_t *member)
-{
-    char *value = malloc(ctx->map_of_members.value_size);
-    if (value == NULL)
-        return false;
-
-    int ret = bpf_map_lookup_elem(ctx->map_of_members.fd, &member->member_ref, value);
-    free(value);
-
-    if (ret != 0)
-        return false;
-    return true;
-}
-
-static uint32_t get_number_of_members_in_group(psabpf_action_selector_context_t *ctx) {
-    uint32_t key = 0;
-    uint32_t number_of_members;
-    int return_code = bpf_map_lookup_elem(ctx->group.fd, &key, &number_of_members);
-    if (return_code != 0) {
-        return_code = errno;
-        fprintf(stderr, "failed to obtain number of members in group: %s\n", strerror(return_code));
-        return -return_code;
-    }
-    return number_of_members;
-}
-
-static int update_number_of_members_in_group(psabpf_action_selector_context_t *ctx, uint32_t new_value) {
-    uint32_t key = 0;
-    int return_code = bpf_map_update_elem(ctx->group.fd, &key, &new_value, BPF_ANY);
-    if (return_code != 0) {
-        return_code = errno;
-        fprintf(stderr, "failed to update member in group: %s\n", strerror(return_code));
-        return return_code;
-    }
-    return NO_ERROR;
-}
-
-static uint32_t find_member_entry_idx_in_group(psabpf_bpf_map_descriptor_t *group,
-                                               uint32_t number_of_members,
-                                               psabpf_action_selector_member_context_t *member)
-{
-    for (uint32_t index = 1; index <= number_of_members; ++index) {
-        uint32_t current_member_ref;
-        int return_code = bpf_map_lookup_elem(group->fd, &index, &current_member_ref);
-        if (return_code == 0 && current_member_ref == member->member_ref) {
-            return index;
-        }
-    }
-    return 0;
 }
 
 static int append_member_to_group(psabpf_action_selector_context_t *ctx,

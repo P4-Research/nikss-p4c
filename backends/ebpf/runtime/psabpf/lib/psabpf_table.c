@@ -1327,7 +1327,7 @@ static int delete_all_table_entries(int fd, size_t key_size)
         bpf_map_delete_elem(fd, key);
     } while (bpf_map_get_next_key(fd, key, next_key) == 0);
 
-    clean_up:
+clean_up:
     if (key)
         free(key);
     if (next_key)
