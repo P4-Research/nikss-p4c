@@ -366,7 +366,7 @@ static bool member_in_use(psabpf_action_selector_context_t *ctx, psabpf_action_s
 
         /* Try to find member in a current group */
         uint32_t number_of_members = 0;
-        if (get_number_of_members_in_group(ctx, &number_of_members) != NO_ERROR) {
+        if (get_number_of_members_in_group(ctx, &number_of_members) == NO_ERROR) {
             if (find_member_entry_idx_in_group(&ctx->group, number_of_members, member) != 0) {
                 fprintf(stderr, "%u referenced in group %u\n", member->member_ref, group.group_ref);
                 found = true;
