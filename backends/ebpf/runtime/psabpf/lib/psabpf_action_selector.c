@@ -38,16 +38,15 @@ static int open_group_map(psabpf_action_selector_context_t *ctx,
     return NO_ERROR;
 }
 
-static uint32_t get_number_of_members_in_group(psabpf_action_selector_context_t *ctx) {
+static int get_number_of_members_in_group(psabpf_action_selector_context_t *ctx, uint32_t *number_of_members) {
     uint32_t key = 0;
-    uint32_t number_of_members;
-    int return_code = bpf_map_lookup_elem(ctx->group.fd, &key, &number_of_members);
+    int return_code = bpf_map_lookup_elem(ctx->group.fd, &key, number_of_members);
     if (return_code != 0) {
         return_code = errno;
         fprintf(stderr, "failed to obtain number of members in group: %s\n", strerror(return_code));
-        return -return_code;
+        return return_code;
     }
-    return number_of_members;
+    return NO_ERROR;
 }
 
 static int update_number_of_members_in_group(psabpf_action_selector_context_t *ctx, uint32_t new_value) {
@@ -366,8 +365,8 @@ static bool member_in_use(psabpf_action_selector_context_t *ctx, psabpf_action_s
             continue;
 
         /* Try to find member in a current group */
-        uint32_t number_of_members = get_number_of_members_in_group(ctx);
-        if (((int) number_of_members) > 0) {  /* Empty  groups we can also skip (as we do for errors) */
+        uint32_t number_of_members = 0;
+        if (get_number_of_members_in_group(ctx, &number_of_members) != NO_ERROR) {
             if (find_member_entry_idx_in_group(&ctx->group, number_of_members, member) != 0) {
                 fprintf(stderr, "%u referenced in group %u\n", member->member_ref, group.group_ref);
                 found = true;
@@ -494,8 +493,7 @@ static int append_member_to_group(psabpf_action_selector_context_t *ctx,
     int return_code;
 
     /* Get number of members. */
-    number_of_members = get_number_of_members_in_group(ctx);
-    if (((int) number_of_members) < 0)
+    if (get_number_of_members_in_group(ctx, &number_of_members) != NO_ERROR)
         return EPERM;
 
     /* Verify that member reference not existed in group before */
@@ -575,8 +573,7 @@ static int remove_member_from_group(psabpf_action_selector_context_t *ctx,
     uint32_t last_member_ref;
 
     /* 1. Find out number of members */
-    number_of_members = get_number_of_members_in_group(ctx);
-    if (((int) number_of_members) < 0)
+    if (get_number_of_members_in_group(ctx, &number_of_members) != NO_ERROR)
         return EPERM;
 
     /* 2. Find index of our reference */

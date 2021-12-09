@@ -10,7 +10,7 @@
  *****************************************************************************/
 
 static int parse_dst_action_selector(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
-                             psabpf_action_selector_context_t *ctx, bool can_be_last)
+                             psabpf_action_selector_context_t *ctx, bool is_last)
 {
     if (is_keyword(**argv, "id")) {
         NEXT_ARGP_RET();
@@ -26,7 +26,7 @@ static int parse_dst_action_selector(int *argc, char ***argv, psabpf_context_t *
             return error_code;
     }
 
-    if (can_be_last) {
+    if (is_last) {
         NEXT_ARGP();
     } else {
         NEXT_ARGP_RET();
@@ -80,7 +80,7 @@ static int parse_action_data(int *argc, char ***argv, psabpf_action_t *action)
 }
 
 static int parse_member_reference(int *argc, char ***argv,
-                                  psabpf_action_selector_member_context_t *member, bool can_be_last)
+                                  psabpf_action_selector_member_context_t *member, bool is_last)
 {
     char *ptr;
     psabpf_action_selector_set_member_reference(member, strtoul(**argv, &ptr, 0));
@@ -89,7 +89,7 @@ static int parse_member_reference(int *argc, char ***argv,
         return EINVAL;
     }
 
-    if (can_be_last) {
+    if (is_last) {
         NEXT_ARGP();
     } else {
         NEXT_ARGP_RET();
