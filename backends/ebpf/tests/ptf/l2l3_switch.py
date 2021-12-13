@@ -141,21 +141,18 @@ class RoutingTest(L2L3SwitchTest):
         # enable routing from VLAN 1 to VLAN 2
         self.table_add(table="ingress_tbl_routable", keys=["00:00:00:00:01:01", 2], action=0)
 
-        # create all possible actions
-        # forward actions                              member ref,       action id, smac                    dmac                          vlan_id
-        self.update_map(name="ingress_as_actions", key="1 0 0 0", value="1 0 0 0 0 0 0 0 02 01 00 00 00 00 00 00 01 00 00 00 00 00 00 0 01 00 00 00 0 0 0 0")
-        self.update_map(name="ingress_as_actions", key="2 0 0 0", value="1 0 0 0 0 0 0 0 02 01 00 00 00 00 00 00 02 00 00 00 00 00 00 0 01 00 00 00 0 0 0 0")
-        self.update_map(name="ingress_as_actions", key="3 0 0 0", value="1 0 0 0 0 0 0 0 02 01 00 00 00 00 00 00 03 00 00 00 00 00 00 0 01 00 00 00 0 0 0 0")
+        # create all possible actions                                                  smac                 dmac                vlan_id
+        act1 = self.action_selector_add_action(selector="ingress_as", action=1, data=["00:00:00:00:01:02", "00:00:00:00:00:01", 1])
+        act2 = self.action_selector_add_action(selector="ingress_as", action=1, data=["00:00:00:00:01:02", "00:00:00:00:00:02", 1])
+        act3 = self.action_selector_add_action(selector="ingress_as", action=1, data=["00:00:00:00:01:02", "00:00:00:00:00:03", 1])
 
-        self.create_map(name="as_group_g2", type="array", key_size=4, value_size=4, max_entries=129)
-        self.update_map(name="ingress_as_groups", key="hex 2 0 0 0", value="as_group_g2", map_in_map=True)
-        self.update_map(name="as_group_g2", key="0 0 0 0", value="3 0 0 0")
-        self.update_map(name="as_group_g2", key="1 0 0 0", value="1 0 0 0")
-        self.update_map(name="as_group_g2", key="2 0 0 0", value="2 0 0 0")
-        self.update_map(name="as_group_g2", key="3 0 0 0", value="3 0 0 0")
+        gid = self.action_selector_create_empty_group(selector="ingress_as")
+        self.action_selector_add_member_to_group(selector="ingress_as", group_ref=gid, member_ref=act1)
+        self.action_selector_add_member_to_group(selector="ingress_as", group_ref=gid, member_ref=act2)
+        self.action_selector_add_member_to_group(selector="ingress_as", group_ref=gid, member_ref=act3)
 
-        # ActionSelector reference = 2, is_group_ref=True
-        self.table_add(table="ingress_tbl_routing", keys=["20.0.0.0/24"], references=["group 2"])
+        # ActionSelector reference = gid (should be 1, but not guaranteed), is_group_ref=True
+        self.table_add(table="ingress_tbl_routing", keys=["20.0.0.0/24"], references=["group {}".format(gid)])
 
         pkt = testutils.simple_udp_packet(eth_dst="00:00:00:00:01:33", ip_dst="20.0.0.2", ip_src="10.0.0.1")
         pkt = pkt_add_vlan(pkt, vlan_vid=2)

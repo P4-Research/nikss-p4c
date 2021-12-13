@@ -164,32 +164,25 @@ class ActionSelectorTest(P4EbpfTest):
     """
 
     def create_actions(self, selector):
-        selector = selector + "_actions"
         for i in range(1, 7):
             # i: member reference; 3+i: output port
-            self.table_add(table=selector, keys=[i], action=1, data=[3+i])
+            ref = self.action_selector_add_action(selector, action=1, data=[i+3])
+            if i != ref:
+                self.fail("Invalid member reference: expected {}, got {}".format(i, ref))
 
-    def create_empty_group(self, selector, name, gid):
-        self.create_map(name=name, type="array", key_size=4, value_size=4, max_entries=129)
-        self.update_map(name=selector+"_groups", key="hex {} 0 0 0".format(gid), value=name, map_in_map=True)
-
-    def group_add_members(self, group_name, member_refs):
-        i = 1
+    def group_add_members(self, selector, gid, member_refs):
         for m in member_refs:
-            self.update_map(name=group_name, key="{} 0 0 0".format(i), value="{} 0 0 0".format(m))
-            i = i + 1
-        self.update_map(name=group_name, key="0 0 0 0", value="{} 0 0 0".format(len(member_refs)))
+            self.action_selector_add_member_to_group(selector=selector, group_ref=gid, member_ref=m)
 
     def create_default_rule_set(self, table, selector):
         self.create_actions(selector=selector)
-        group = selector + "_group_g7"
-        self.create_empty_group(selector=selector, name=group, gid=7)
-        self.group_add_members(group_name=group, member_refs=[4, 5, 6])
+        self.group_id = self.action_selector_create_empty_group(selector=selector)
+        self.group_add_members(selector=selector, gid=self.group_id, member_refs=[4, 5, 6])
         self.default_group_ports = [PORT3, PORT4, PORT5]
 
         if table:
             self.table_add(table=table, keys=["02:22:33:44:55:66"], references=["0x2"])
-            self.table_add(table=table, keys=["07:22:33:44:55:66"], references=["group 0x7"])
+            self.table_add(table=table, keys=["07:22:33:44:55:66"], references=["group {}".format(self.group_id)])
 
 
 class SimpleActionSelectorPSATest(ActionSelectorTest):
@@ -226,7 +219,7 @@ class SimpleActionSelectorPSATest(ActionSelectorTest):
 
         if self.is_table_caching_test():
             # modify cache directly and verify its usage
-            self.table_update(table="MyIC_as_cache", keys=[7, "22:33:44:55:66:78"],
+            self.table_update(table="MyIC_as_cache", keys=[self.group_id, "22:33:44:55:66:78"],
                               action=1, data=[5])
             testutils.send_packet(self, PORT0, pkt)
             testutils.verify_packet(self, pkt, PORT1)
@@ -266,11 +259,17 @@ class ActionSelectorDefaultEmptyGroupActionPSATest(ActionSelectorTest):
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_other_packets(self)
 
-        self.create_empty_group(selector="MyIC_as", name="MyIC_as_group_g8", gid=8)
-        self.table_add(table="MyIC_tbl", keys=["08:22:33:44:55:66"], references=["group 0x8"])
+        gid = self.action_selector_create_empty_group(selector="MyIC_as")
+        self.table_add(table="MyIC_tbl", keys=["08:22:33:44:55:66"], references=["group {}".format(gid)])
 
         testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
+        testutils.verify_packet(self, pkt, PORT1)
+
+        cmd = "psabpf-ctl action-selector default_group_action pipe {} MyIC_as id 1 data 6".format(TEST_PIPELINE_ID)
+        self.exec_ns_cmd(cmd, "default group action update failed")
+
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT2)
 
 
 class ActionSelectorMultipleSelectorsPSATest(ActionSelectorTest):
@@ -281,7 +280,7 @@ class ActionSelectorMultipleSelectorsPSATest(ActionSelectorTest):
 
     def runTest(self):
         self.create_default_rule_set(table="MyIC_tbl", selector="MyIC_as")
-        self.table_add(table="MyIC_tbl", keys=["07:22:33:44:55:67"], references=["group 0x7"])
+        self.table_add(table="MyIC_tbl", keys=["07:22:33:44:55:67"], references=["group {}".format(self.group_id)])
 
         allowed_ports = self.default_group_ports
         pkt = testutils.simple_ip_packet(eth_src="07:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
@@ -314,7 +313,7 @@ class ActionSelectorMultipleSelectorsTwoTablesPSATest(ActionSelectorTest):
 
     def runTest(self):
         self.create_default_rule_set(table="MyIC_tbl", selector="MyIC_as")
-        self.table_add(table="MyIC_tbl2", keys=["AA:BB:CC:DD:EE:FF"], references=["group 0x7"])
+        self.table_add(table="MyIC_tbl2", keys=["AA:BB:CC:DD:EE:FF"], references=["group {}".format(self.group_id)])
 
         pkt = testutils.simple_ip_packet(eth_src="07:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
         testutils.send_packet(self, PORT0, pkt)
@@ -336,7 +335,7 @@ class ActionSelectorLPMTablePSATest(ActionSelectorTest):
         # Match all xx:xx:02:44:55:xx MAC addresses into action ref 2
         self.table_add(table="MyIC_tbl", keys=["0x02445500/24"], references=[2])
         # Match all xx:xx:07:44:55:xx MAC addresses into group g7
-        self.table_add(table="MyIC_tbl", keys=["0x07445500/24"], references=["group 7"])
+        self.table_add(table="MyIC_tbl", keys=["0x07445500/24"], references=["group {}".format(self.group_id)])
 
         pkt = testutils.simple_ip_packet(eth_src="00:22:07:44:55:66", eth_dst="22:33:44:55:66:77")
         testutils.send_packet(self, PORT0, pkt)
@@ -356,7 +355,7 @@ class ActionSelectorTernaryTablePSATest(ActionSelectorTest):
     def runTest(self):
         self.create_default_rule_set(table=None, selector="MyIC_as")
         self.table_add(table="MyIC_tbl", keys=["00:00:07:44:55:00^00:00:FF:FF:FF:00"],
-                       references=["group 7"], priority=1)
+                       references=["group {}".format(self.group_id)], priority=1)
 
         pkt = testutils.simple_ip_packet(eth_src="00:22:07:44:55:66", eth_dst="22:33:44:55:66:77")
         testutils.send_packet(self, PORT0, pkt)
@@ -370,10 +369,10 @@ class ActionSelectorActionRunPSATest(ActionSelectorTest):
     p4_file_path = "p4testdata/action-selector-action-run.p4"
 
     def runTest(self):
-        self.table_add(table="MyIC_as_actions", keys=[2], action=1, data=[5])
-        self.table_add(table="MyIC_as_actions", keys=[3], action=0)
-        self.table_add(table="MyIC_tbl", keys=["02:22:33:44:55:66"], references=["0x2"])
-        self.table_add(table="MyIC_tbl", keys=["03:22:33:44:55:66"], references=["0x3"])
+        ref1 = self.action_selector_add_action(selector="MyIC_as", action=1, data=[5])
+        ref2 = self.action_selector_add_action(selector="MyIC_as", action=0, data=[])
+        self.table_add(table="MyIC_tbl", keys=["02:22:33:44:55:66"], references=[ref1])
+        self.table_add(table="MyIC_tbl", keys=["03:22:33:44:55:66"], references=[ref2])
 
         pkt = testutils.simple_ip_packet(eth_src="02:22:33:44:55:66", eth_dst="22:33:44:55:66:77")
         testutils.send_packet(self, PORT0, pkt)
