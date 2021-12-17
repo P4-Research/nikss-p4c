@@ -1,2 +1,0 @@
-bpftool map update pinned /sys/fs/bpf/tx_port key 11 00 00 00 value 8 00 00 00
-bpftool map update pinned /sys/fs/bpf/tx_port key 8 00 00 00 value 11 00 00 00
