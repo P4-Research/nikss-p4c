@@ -24,7 +24,7 @@ def pkt_add_vlan(pkt, vlan_vid=10, vlan_pcp=0, dl_vlan_cfi=0):
 
 class L2L3SwitchTest(P4EbpfTest):
 
-    p4_file_path = "./../evaluation/scenarios/use-cases/p4/l2l3_switch/l2l3_switch.p4"
+    p4_file_path = "p4testdata/l2l3_switch.p4"
 
     ctool_file_path = "ptf/tools/read_digest.c"
 

@@ -98,7 +98,7 @@ def pkt_decrement_ttl(pkt):
 
 class BNGTest(P4EbpfTest):
 
-    p4_file_path = "./../evaluation/scenarios/use-cases/p4/bng/bng.p4"
+    p4_file_path = "p4testdata/bng.p4"
     session_installed = False
 
     def setUp(self):

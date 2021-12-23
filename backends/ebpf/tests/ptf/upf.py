@@ -64,7 +64,7 @@ def pkt_route(pkt, mac_src, mac_dst):
 
 @hdr2map_required
 class UPFTest(P4EbpfTest):
-    p4_file_path = "./../evaluation/scenarios/use-cases/p4/upf/upf.p4"
+    p4_file_path = "p4testdata/upf.p4"
 
     def setup_pfcp_session(self,seid, teid, ue_ip):
         self.table_add(table="ingress_upf_ingress_session_lookup_by_teid", keys=[teid], action=1,data=[seid])
