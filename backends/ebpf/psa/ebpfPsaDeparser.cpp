@@ -106,9 +106,7 @@ void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
 
 void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     codeGen->setBuilder(builder);
-    if (program->options.generateHdrInMap) {
-        codeGen->asPointerVariables.insert(this->headers->name.name);
-    }
+    codeGen->asPointerVariables.insert(this->headers->name.name);
 
     for (auto a : controlBlock->container->controlLocals)
         emitDeclaration(builder, a);
@@ -510,11 +508,7 @@ void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendLine("struct xdp2tc_metadata xdp2tc_md = {};");
     builder->emitIndent();
-    if (program->options.generateHdrInMap) {
-        builder->appendFormat("xdp2tc_md.headers = *%s", this->headers->name.name);
-    } else {
-        builder->appendFormat("xdp2tc_md.headers = %s", this->headers->name.name);
-    }
+    builder->appendFormat("xdp2tc_md.headers = *%s", this->headers->name.name);
 
     builder->endOfStatement(true);
     builder->emitIndent();
@@ -664,13 +658,8 @@ void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
 
     // put metadata into shared map
     builder->emitIndent();
-    cstring hdrValue = this->headers->name.name;
-    if (program->options.generateHdrInMap) {
-        builder->appendFormat("%s->__helper_variable", this->headers->name.name);
-        hdrValue = "(*" + this->headers->name.name + ")";
-    } else {
-        builder->appendFormat("%s.__helper_variable", this->headers->name.name);
-    }
+    builder->appendFormat("%s->__helper_variable", this->headers->name.name);
+    cstring hdrValue = "(*" + this->headers->name.name + ")";
     builder->appendFormat(" = %s.egress_port", this->istd->name.name);
     builder->endOfStatement(true);
 

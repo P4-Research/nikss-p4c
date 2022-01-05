@@ -10,7 +10,6 @@ function print_help() {
   echo "OPTIONS:"
   echo "--bpf-hook       A BPF hook that should be used as a main attach point <tc|xdp>"
   echo "--xdp2tc         A mode to pass metadata from XDP to TC programs <meta|head|cpumap>."
-  echo "--hdr2map        Allocate header structure in per-CPU map <on|off>."
   echo "--table-caching  Use table cache for tables with LPM and/or ternary key <on|off>."
   echo "--pipeline-opt   Apply pipeline-aware optimization <on|off>."
   echo "--help           Print this message."
@@ -51,10 +50,6 @@ for i in "$@"; do
       ;;
     --xdp2tc=*)
       XDP2TC_ARG="${i#*=}"
-      shift # past argument=value
-      ;;
-    --hdr2map=*)
-      HDR2MAP_ARG="${i#*=}"
       shift # past argument=value
       ;;
     --table-caching=*)
@@ -128,10 +123,9 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LIBBPF_LD_PATH
 ulimit -l 65536
 
 # PTF test params:
-# ;xdp=<True|False>;xdp2tc=<meta|head|cpumap>;hdr2Map=<True|False>
+# ;xdp=<True|False>;xdp2tc=<meta|head|cpumap>
 declare -a XDP=("False" "True")
 declare -a XDP2TC_MODE=("head" "cpumap" "meta")
-declare -a HDR2MAP=("False" "True")
 declare -a TABLE_CACHING=("False" "True")
 declare -a PIPELINE_OPT=("False" "True")
 
@@ -150,16 +144,6 @@ if [ ! -z "$XDP2TC_ARG" ]; then
     XDP2TC_MODE=( "$XDP2TC_ARG" )
   else
     echo "Wrong --xdp2tc value provided; running script for all XDP2TC modes."
-  fi
-fi
-
-if [ ! -z "$HDR2MAP_ARG" ]; then
-  if [ "$HDR2MAP_ARG" == "on" ]; then
-    HDR2MAP=( "True" )
-  elif [ "$HDR2MAP_ARG" == "off" ]; then
-    HDR2MAP=( "False" )
-  else
-    echo "Wrong --hdr2map value provided; running script for both enabled/disabled."
   fi
 fi
 
@@ -186,7 +170,6 @@ fi
 TEST_CASE=$@
 for xdp_enabled in "${XDP[@]}" ; do
   for xdp2tc_mode in "${XDP2TC_MODE[@]}" ; do
-    for hdr2map_enabled in "${HDR2MAP[@]}" ; do
       for table_caching_enabled in "${TABLE_CACHING[@]}" ; do
         for pipeline_opt_enabled in "${PIPELINE_OPT[@]}" ; do
           if [ "$xdp_enabled" == "False" ] && [ "$pipeline_opt_enabled" == "True" ]; then
@@ -194,7 +177,7 @@ for xdp_enabled in "${XDP[@]}" ; do
             continue
           fi
           TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
-          TEST_PARAMS+=";xdp='$xdp_enabled';xdp2tc='$xdp2tc_mode';hdr2Map='$hdr2map_enabled'"
+          TEST_PARAMS+=";xdp='$xdp_enabled';xdp2tc='$xdp2tc_mode'"
           TEST_PARAMS+=";table_caching='$table_caching_enabled'"
           TEST_PARAMS+=";pipeline_optimization='$pipeline_opt_enabled'"
           # Start tests
@@ -207,6 +190,5 @@ for xdp_enabled in "${XDP[@]}" ; do
           rm -rf ptf_out
         done
       done
-    done
   done
 done
