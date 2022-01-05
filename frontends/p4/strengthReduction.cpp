@@ -28,6 +28,10 @@ bool DoStrengthReduction::isOne(const IR::Expression* expr) const {
 }
 
 bool DoStrengthReduction::isZero(const IR::Expression* expr) const {
+    if (auto bt = expr->type->to<IR::Type_Bits>()) {
+        if (bt->width_bits() == 0)
+            return true;
+    }
     auto cst = expr->to<IR::Constant>();
     if (cst == nullptr)
         return false;
@@ -47,6 +51,7 @@ bool DoStrengthReduction::isFalse(const IR::Expression* expr) const {
         return false;
     return !cst->value;
 }
+
 int DoStrengthReduction::isPowerOf2(const IR::Expression* expr) const {
     auto cst = expr->to<IR::Constant>();
     if (cst == nullptr)
@@ -334,6 +339,25 @@ const IR::Node* DoStrengthReduction::postorder(IR::Mod* expr) {
     return expr;
 }
 
+const IR::Node* DoStrengthReduction::postorder(IR::Range* range) {
+    // Range a..a is the same as a
+    if (auto c0 = range->left->to<IR::Constant>()) {
+        if (auto c1 = range->right->to<IR::Constant>()) {
+            if (c0->value == c1->value)
+                return c0;
+        }
+    }
+    return range;
+}
+
+const IR::Node* DoStrengthReduction::postorder(IR::Mask* mask) {
+    // a &&& 0xFFFF = a
+    if (isAllOnes(mask->right)) {
+        return mask->left;
+    }
+    return mask;
+}
+
 const IR::Node* DoStrengthReduction::postorder(IR::Mux* expr) {
     if (isTrue(expr->e1) && isFalse(expr->e2))
         return expr->e0;
@@ -343,6 +367,16 @@ const IR::Node* DoStrengthReduction::postorder(IR::Mux* expr) {
         return new IR::Mux(lnot->expr, expr->e2, expr->e1);
     else if (!hasSideEffects(expr) && expr->e1->equiv(*expr->e2))
         return expr->e1;
+    return expr;
+}
+
+const IR::Node* DoStrengthReduction::postorder(IR::Concat* expr) {
+    if (auto bt = expr->left->type->to<IR::Type_Bits>())
+        if (bt->width_bits() == 0)
+            return expr->right;
+    if (auto bt = expr->right->type->to<IR::Type_Bits>())
+        if (bt->width_bits() == 0)
+            return expr->left;
     return expr;
 }
 
@@ -360,7 +394,7 @@ const IR::Node* DoStrengthReduction::postorder(IR::Slice* expr) {
     if (shift_of) {
         if (!shift_of->type->is<IR::Type_Bits>())
             return expr;
-        if (shift_of->type->to<IR::Type_Bits>()->isSigned)
+        if (shift_of->type->to<IR::Type_Bits>()->isSigned && expr->e0->is<IR::Shr>())
             return expr;
         int hi = expr->getH();
         int lo = expr->getL();

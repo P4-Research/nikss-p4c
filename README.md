@@ -1,4 +1,6 @@
-[![Build Status](https://travis-ci.com/p4lang/p4c.svg?branch=master)](https://travis-ci.com/p4lang/p4c)
+[![Main Build](https://github.com/p4lang/p4c/actions/workflows/ci-test.yml/badge.svg)](https://github.com/p4lang/p4c/actions/workflows/ci-test.yml)
+[![Bazel Build](https://github.com/p4lang/p4c/actions/workflows/ci-bazel.yml/badge.svg)](https://github.com/p4lang/p4c/actions/workflows/ci-bazel.yml)
+[![Validation](https://github.com/p4lang/p4c/actions/workflows/ci-validation.yml/badge.svg)](https://github.com/p4lang/p4c/actions/workflows/ci-validation.yml)
 
 # p4c
 
@@ -17,15 +19,17 @@ make adding new backends easy.
 
 The code contains five sample backends:
 * p4c-bm2-ss: can be used to target the P4 `simple_switch` written using
-  the BMv2 behavioral model https://github.com/p4lang/behavioral-model
-* p4c-ebpf: can be used to generate C code which can be compiled to EBPF
+  the BMv2 behavioral model https://github.com/p4lang/behavioral-model,
+* p4c-dpdk: can be used to target the DPDK software switch (SWX) pipeline
+  https://doc.dpdk.org/guides/rel_notes/release_20_11.html,
+* p4c-ebpf: can be used to generate C code which can be compiled to eBPF
   https://en.wikipedia.org/wiki/Berkeley_Packet_Filter and then loaded
-  in the Linux kernel for packet filtering
+  in the Linux kernel for packet filtering,
 * p4test: a source-to-source P4 translator which can be used for
-  testing, learning compiler internals and debugging.
+  testing, learning compiler internals and debugging,
 * p4c-graphs: can be used to generate visual representations of a P4 program;
-  for now it only supports generating graphs of top-level control flows.
-* p4c-ubfp: can be used to generate ebpf code that runs in user-space
+  for now it only supports generating graphs of top-level control flows, and
+* p4c-ubfp: can be used to generate eBPF code that runs in user-space.
 
 Sample command lines:
 
@@ -97,6 +101,47 @@ dot -Tpdf ParserImpl.dot > ParserImpl.pdf
 
 # Getting started
 
+## Installing packaged versions of p4c
+
+p4c has package support for several Ubuntu and Debian distributions.
+
+### Ubuntu
+
+For Ubuntu 20.04 and Ubuntu 21.04 it can be installed as follows:
+
+```bash
+. /etc/os-release
+echo "deb http://download.opensuse.org/repositories/home:/p4lang/xUbuntu_${VERSION_ID}/ /" | sudo tee /etc/apt/sources.list.d/home:p4lang.list
+curl -L "http://download.opensuse.org/repositories/home:/p4lang/xUbuntu_${VERSION_ID}/Release.key" | sudo apt-key add -
+sudo apt-get update
+sudo apt install p4lang-p4c
+```
+
+### Debian
+
+For Debian 11 (Bullseye) it can be installed as follows:
+
+```bash
+echo 'deb http://download.opensuse.org/repositories/home:/p4lang/Debian_11/ /' | sudo tee /etc/apt/sources.list.d/home:p4lang.list
+curl -fsSL https://download.opensuse.org/repositories/home:p4lang/Debian_11/Release.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/home_p4lang.gpg > /dev/null
+sudo apt update
+sudo apt install p4lang-p4c
+```
+
+If you cannot use a repository to install p4c, you can download the `.deb` file
+for your release and install it manually. You need to download a new file each
+time you want to upgrade p4c.
+
+1. Go to https://build.opensuse.org/package/show/home:p4lang/p4lang-p4c, click on
+"Download package" and choose your operating system version.
+
+2. Install p4c, changing the path below to the path where you downloaded the package.
+
+```bash
+sudo dpkg -i /path/to/package.deb
+```
+
+## Installing p4c from source
 1.  Clone the repository. It includes submodules, so be sure to use
     `--recursive` to pull them in:
     ```
@@ -110,7 +155,7 @@ dot -Tpdf ParserImpl.dot > ParserImpl.pdf
 2.  Install [dependencies](#dependencies). You can find specific instructions
     for Ubuntu 16.04 [here](#ubuntu-dependencies) and for macOS 10.12
     [here](#macos-dependencies).  You can also look at the
-    [travis installation script](tools/travis-build).
+    [CI installation script](tools/ci-build.sh).
 
 3.  Build. Building should also take place in a subdirectory named `build`.
     ```
@@ -127,10 +172,18 @@ dot -Tpdf ParserImpl.dot > ParserImpl.pdf
       symbols to run in gdb. Default is RELEASE.
      - `-DCMAKE_INSTALL_PREFIX=<path>` -- set the directory where
        `make install` installs the compiler. Defaults to /usr/local.
-     - `-DENABLE_BMV2=ON|OFF`. Enable the bmv2 backend. Default ON.
-     - `-DENABLE_EBPF=ON|OFF`. Enable the ebpf backend. Default ON.
-     - `-DENABLE_P4C_GRAPHS=ON|OFF`. Enable the p4c-graphs backend. Default ON.
-     - `-DENABLE_P4TEST=ON|OFF`. Enable the p4test backend. Default ON.
+     - `-DENABLE_BMV2=ON|OFF`. Enable [the bmv2
+       backend](backends/bmv2/README.md). Default ON.
+     - `-DENABLE_EBPF=ON|OFF`. Enable [the ebpf
+       backend](backends/ebpf/README.md). Default ON.
+     - `-DENABLE_UBPF=ON|OFF`. Enable [the ubpf
+       backend](backends/ubpf/README.md). Default ON.
+     - `-DENABLE_DPDK=ON|OFF`. Enable [the DPDK
+       backend](backends/dpdk/README.md). Default ON.
+     - `-DENABLE_P4C_GRAPHS=ON|OFF`. Enable [the p4c-graphs
+       backend](backends/graphs/README.md). Default ON.
+     - `-DENABLE_P4TEST=ON|OFF`. Enable [the p4test
+       backend](backends/p4test/README.md). Default ON.
      - `-DENABLE_DOCS=ON|OFF`. Build documentation. Default is OFF.
      - `-DENABLE_GC=ON|OFF`. Enable the use of the garbage collection
        library. Default is ON.
@@ -138,6 +191,9 @@ dot -Tpdf ParserImpl.dot > ParserImpl.pdf
        Default is ON.
      - `-DENABLE_PROTOBUF_STATIC=ON|OFF`. Enable the use of static
        protobuf libraries. Default is ON.
+     - `-DENABLE_MULTITHREAD=ON|OFF`. Use multithreading.  Default is
+       OFF.
+     - `-DENABLE_GMP=ON|OFF`. Use the GMP library.  Default is ON.
 
     If adding new targets to this build system, please see
     [instructions](#defining-new-cmake-targets).
@@ -200,12 +256,12 @@ included with `p4c` are documented here:
 Most dependencies can be installed using `apt-get install`:
 
 ```bash
-$ sudo apt-get install cmake g++ git automake libtool libgc-dev bison flex
-libfl-dev libgmp-dev libboost-dev libboost-iostreams-dev
-libboost-graph-dev llvm pkg-config python python-scapy python-ipaddr python-ply python3-pip
+sudo apt-get install cmake g++ git automake libtool libgc-dev bison flex \
+libfl-dev libgmp-dev libboost-dev libboost-iostreams-dev \
+libboost-graph-dev llvm pkg-config python python-scapy python-ipaddr python-ply python3-pip \
 tcpdump
 
-$ pip3 install scapy ply
+pip3 install scapy ply
 ```
 
 For documentation building:
@@ -228,6 +284,22 @@ Please note that while all protobuf versions newer than 3.0 should work for
 `p4c` itself, you may run into trouble with some extensions and other p4lang
 projects unless you install version 3.6.1, so you may want to install from
 source even on newer releases of Ubuntu.
+
+## Fedora dependencies
+
+```bash
+sudo dnf install -y cmake g++ git automake libtool gc-devel bison flex \
+libfl-devel gmp-devel boost-devel boost-iostreams boost-graph llvm pkg-config \
+python3 python3-pip tcpdump protobuf-devel protobuf-static
+
+sudo pip3 install scapy ply
+```
+
+For documentation building:
+
+```bash
+sudo dnf install -y doxygen graphviz texlive-scheme-full
+```
 
 ## macOS dependencies
 
@@ -438,6 +510,18 @@ arguments to these macros.
 To pass custom arguments to p4c, you can set the environment variable `P4C_ARGS`:
 ```
 make check P4C_ARGS="-Xp4c=MY_CUSTOM_FLAG"
+```
+
+When making changes to p4c, it is sometimes useful to be able to run
+the tests while overwriting the expected output files that are saved
+in this repository.  One such situation is when your changes to p4c
+cause the names of compiler-generated local variables to change.  To
+force the expected output files to be rewritten while running the
+tests, assign a value to the shell environment variable
+`P4TEST_REPLACE`.  Here is one example Bash command to do so:
+
+```
+P4TEST_REPLACE=1 make check
 ```
 
 ### Installation

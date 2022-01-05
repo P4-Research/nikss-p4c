@@ -1,6 +1,5 @@
 /*
 Copyright 2016 VMware, Inc.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -136,13 +135,10 @@ class ExpressionEvaluator : public Inspector {
 
     SymbolicValue* set(const IR::Expression* expression, SymbolicValue* v)
     { value.emplace(expression, v); return v; }
-    SymbolicValue* get(const IR::Expression* expression) const {
-        auto r = ::get(value, expression);
-        BUG_CHECK(r != nullptr, "no evaluation for %1%", expression);
-        return r;
-    }
+
     void postorder(const IR::Constant* expression) override;
     void postorder(const IR::BoolLiteral* expression) override;
+    void postorder(const IR::Operation_Ternary* expression) override;
     void postorder(const IR::Operation_Binary* expression) override;
     void postorder(const IR::Operation_Relation* expression) override;
     void postorder(const IR::Operation_Unary* expression) override;
@@ -151,7 +147,11 @@ class ExpressionEvaluator : public Inspector {
     bool preorder(const IR::ArrayIndex* expression) override;
     void postorder(const IR::ArrayIndex* expression) override;
     void postorder(const IR::ListExpression* expression) override;
+    void postorder(const IR::StructExpression* expression) override;
     void postorder(const IR::MethodCallExpression* expression) override;
+    void checkResult(const IR::Expression* expression,
+                     const IR::Expression* result);
+    void setNonConstant(const IR::Expression* expression);
 
  public:
     ExpressionEvaluator(ReferenceMap* refMap, TypeMap* typeMap, ValueMap* valueMap) :
@@ -163,6 +163,12 @@ class ExpressionEvaluator : public Inspector {
     // May mutate the valueMap, when evaluating expression with side-effects.
     // If leftValue is true we are returning a leftValue.
     SymbolicValue* evaluate(const IR::Expression* expression, bool leftValue);
+
+    SymbolicValue* get(const IR::Expression* expression) const {
+        auto r = ::get(value, expression);
+        BUG_CHECK(r != nullptr, "no evaluation for %1%", expression);
+        return r;
+    }
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -363,11 +369,9 @@ class SymbolicEnum final : public ScalarValue {
 };
 
 class SymbolicStruct : public SymbolicValue {
- protected:
+ public:
     explicit SymbolicStruct(const IR::Type_StructLike* type) :
             SymbolicValue(type) { CHECK_NULL(type); }
-
- public:
     std::map<cstring, SymbolicValue*> fieldValue;
     SymbolicStruct(const IR::Type_StructLike* type, bool uninitialized,
                    const SymbolicValueFactory* factory);
@@ -406,8 +410,24 @@ class SymbolicHeader : public SymbolicStruct {
     bool equals(const SymbolicValue* other) const override;
 };
 
+class SymbolicHeaderUnion : public SymbolicStruct {
+ public:
+    explicit SymbolicHeaderUnion(const IR::Type_HeaderUnion* type) : SymbolicStruct(type) {}
+    SymbolicBool* valid = nullptr;
+    SymbolicHeaderUnion(const IR::Type_HeaderUnion* type, bool uninitialized,
+                   const SymbolicValueFactory* factory);
+    virtual void setValid(bool v);
+    SymbolicValue* clone() const override;
+    SymbolicValue* get(const IR::Node* node, cstring field) const override;
+    void setAllUnknown() override;
+    void assign(const SymbolicValue* other) override;
+    void dbprint(std::ostream& out) const override;
+    bool merge(const SymbolicValue* other) override;
+    bool equals(const SymbolicValue* other) const override;
+};
+
 class SymbolicArray final : public SymbolicValue {
-    std::vector<SymbolicHeader*> values;
+    std::vector<SymbolicStruct*> values;
     friend class AnyElement;
     explicit SymbolicArray(const IR::Type_Stack* type) :
             SymbolicValue(type), size(type->getSize()),
@@ -420,7 +440,7 @@ class SymbolicArray final : public SymbolicValue {
                   const SymbolicValueFactory* factory);
     SymbolicValue* get(const IR::Node* node, size_t index) const {
         if (index >= values.size())
-            return new SymbolicStaticError(node, "Out of bounds");
+            return new SymbolicException(node, P4::StandardExceptions::StackOutOfBounds);
         return values.at(index);
     }
     void shift(int amount);  // negative = shift left
@@ -432,6 +452,7 @@ class SymbolicArray final : public SymbolicValue {
     SymbolicValue* clone() const override;
     SymbolicValue* next(const IR::Node* node);
     SymbolicValue* last(const IR::Node* node);
+    SymbolicValue* lastIndex(const IR::Node* node);
     bool isScalar() const override { return false; }
     void setAllUnknown() override;
     void assign(const SymbolicValue* other) override;

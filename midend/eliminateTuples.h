@@ -62,6 +62,9 @@ class ReplacementMap {
  *
  *   @pre none
  *   @post ensure all tuples are replaced with struct.
+ *         Notice that ListExpressions are not converted
+ *         to StructExpressions; a subsequent type checking
+ *         is needed for that.
 */
 class DoReplaceTuples final : public Transform {
     ReplacementMap* repl;
@@ -73,6 +76,7 @@ class DoReplaceTuples final : public Transform {
     const IR::Node* insertReplacements(const IR::Node* before);
     const IR::Node* postorder(IR::Type_Struct* type) override
     { return insertReplacements(type); }
+    const IR::Node* postorder(IR::ArrayIndex* expression) override;
     const IR::Node* postorder(IR::Type_Typedef* type) override
     { return insertReplacements(type); }
     const IR::Node* postorder(IR::Type_Newtype* type) override

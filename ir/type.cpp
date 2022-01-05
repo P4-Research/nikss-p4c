@@ -16,7 +16,7 @@ limitations under the License.
 
 #include <utility>
 #include "ir.h"
-#include "configuration.h"
+#include "frontends/common/options.h"
 
 namespace IR {
 
@@ -29,8 +29,10 @@ const cstring IR::Type_Stack::pop_front = "pop_front";
 const cstring IR::Type_Header::isValid = "isValid";
 const cstring IR::Type_Header::setValid = "setValid";
 const cstring IR::Type_Header::setInvalid = "setInvalid";
-const cstring IR::Type_StructLike::minSizeInBits = "minSizeInBits";
-const cstring IR::Type_StructLike::minSizeInBytes = "minSizeInBytes";
+const cstring IR::Type::minSizeInBits = "minSizeInBits";
+const cstring IR::Type::minSizeInBytes = "minSizeInBytes";
+const cstring IR::Type::maxSizeInBits = "maxSizeInBits";
+const cstring IR::Type::maxSizeInBytes = "maxSizeInBytes";
 
 const IR::ID IR::Type_Table::hit = ID("hit");
 const IR::ID IR::Type_Table::miss = ID("miss");
@@ -50,11 +52,14 @@ const cstring IR::Annotation::pureAnnotation = "pure";
 const cstring IR::Annotation::noSideEffectsAnnotation = "noSideEffects";
 const cstring IR::Annotation::noWarnAnnotation = "noWarn";
 const cstring IR::Annotation::matchAnnotation = "match";
+const cstring IR::Annotation::fieldListAnnotation = "field_list";
 
 int Type_Declaration::nextId = 0;
 int Type_InfInt::nextId = 0;
 
 Annotations* Annotations::empty = new Annotations(Vector<Annotation>());
+
+const Type* Type_Stack::at(size_t) const { return elementType; }
 
 const Type_Bits* Type_Bits::get(int width, bool isSigned) {
     // map (width, signed) to type
@@ -65,9 +70,9 @@ const Type_Bits* Type_Bits::get(int width, bool isSigned) {
     auto &result = (*type_map)[std::make_pair(width, isSigned)];
     if (!result)
         result = new Type_Bits(width, isSigned);
-    if (width > P4CConfiguration::MaximumWidthSupported)
+    if (width > P4CContext::getConfig().maximumWidthSupported())
         ::error(ErrorType::ERR_UNSUPPORTED, "%1%: Compiler only supports widths up to %2%",
-                result, P4CConfiguration::MaximumWidthSupported);
+                result, P4CContext::getConfig().maximumWidthSupported());
     return result;
 }
 
@@ -93,13 +98,15 @@ const Type_String *Type_String::get() {
 }
 
 const Type::Bits *Type::Bits::get(Util::SourceInfo si, int sz, bool isSigned) {
-    if (sz <= 0)
-        ::error(ErrorType::ERR_INVALID, "%1%: Width cannot be negative or zero", si);
+    if (sz < 0)
+        ::error(ErrorType::ERR_INVALID, "%1%: Width cannot be negative", si);
+    if (sz == 0 && isSigned)
+        ::error(ErrorType::ERR_INVALID, "%1%: Width cannot be zero", si);
     return get(sz, isSigned);
 }
 
 const Type::Varbits *Type::Varbits::get(Util::SourceInfo si, int sz) {
-    if (sz <= 0)
+    if (sz < 0)
         ::error(ErrorType::ERR_INVALID, "%1%: Width cannot be negative or zero", si);
     return new Type::Varbits(si, sz);
 }
@@ -160,24 +167,6 @@ const Type* Type_List::getP4Type() const {
         args->push_back(at);
     }
     return new IR::Type_List(srcInfo, *args);
-}
-
-int Type_Tuple::fieldNameValid(cstring name) const {
-    if (!name.startsWith("f"))
-        return -1;
-
-    for (size_t i = 1; i < name.size(); i++) {
-        if (!isdigit(name.get(i)))
-            return -1;
-        if (name.get(i) == '0' && i < name.size() - 1)
-            // no leading zeros
-            return -1;
-    }
-    // There is no overflow if we use big_int
-    big_int v(name.substr(1));
-    if (v > size())
-        return -1;
-    return static_cast<int>(v);
 }
 
 const Type* Type_Tuple::getP4Type() const {

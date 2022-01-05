@@ -1,5 +1,5 @@
 #include <core.p4>
-#include <psa.p4>
+#include <bmv2/psa.p4>
 
 typedef bit<48> EthernetAddress;
 header ethernet_t {
@@ -35,8 +35,7 @@ parser IngressParserImpl(packet_in pkt, out headers_t hdr, inout metadata_t user
 }
 
 control cIngress(inout headers_t hdr, inout metadata_t user_meta, in psa_ingress_input_metadata_t istd, inout psa_ingress_output_metadata_t ostd) {
-    @noWarnUnused @name(".send_to_port") action send_to_port() {
-        ostd.drop = false;
+    @noWarnUnused @name(".send_to_port") action send_to_port_0() {
         ostd.multicast_group = 32w0;
         ostd.egress_port = (PortIdUint_t)hdr.ethernet.dstAddr;
     }
@@ -94,9 +93,9 @@ control cIngress(inout headers_t hdr, inout metadata_t user_meta, in psa_ingress
     }
     @hidden table tbl_send_to_port {
         actions = {
-            send_to_port();
+            send_to_port_0();
         }
-        const default_action = send_to_port();
+        const default_action = send_to_port_0();
     }
     @hidden table tbl_psaresubmitbmv2l52 {
         actions = {

@@ -162,6 +162,11 @@ class BackendDriver:
         if opts.disabled_annos is not None:
             self.add_command_option('compiler',
                                     '--disable-annotations={}'.format(opts.disabled_annos))
+
+        # enable parser inlining optimization
+        if opts.optimizeParserInlining:
+            self.add_command_option('compiler', '--parser-inline-opt')
+
         # set developer options
         if (os.environ['P4C_BUILD_TYPE'] == "DEVELOPER"):
             for option in opts.log_levels:
@@ -196,6 +201,17 @@ class BackendDriver:
             # this is the default, each backend driver is supposed to enable all
             # its commands and the order in which they execute
             pass
+
+    def should_not_check_input(self, opts):
+        """
+        Custom backends can use this function to implement their own --help* options
+        which don't require input file to be specified. In such cases, this function
+        should be overloaded and return true whenever such option has been specified by
+        the user.
+        As a result, dummy.p4 will be used as a source file to prevent sanity checking
+        from failing.
+        """
+        return False
 
     def enable_commands(self, cmdsEnabled):
         """

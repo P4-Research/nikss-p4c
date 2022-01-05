@@ -30,6 +30,7 @@ limitations under the License.
 // Passes
 #include "actionsInlining.h"
 #include "checkConstants.h"
+#include "checkCoreMethods.h"
 #include "checkNamedArgs.h"
 #include "createBuiltins.h"
 #include "defaultArguments.h"
@@ -47,6 +48,7 @@ limitations under the License.
 #include "parseAnnotations.h"
 #include "parserControlFlow.h"
 #include "reassociation.h"
+#include "removeParameters.h"
 #include "removeReturns.h"
 #include "resetHeaders.h"
 #include "setHeaders.h"
@@ -54,6 +56,7 @@ limitations under the License.
 #include "simplify.h"
 #include "simplifyDefUse.h"
 #include "simplifyParsers.h"
+#include "simplifySwitch.h"
 #include "specialize.h"
 #include "specializeGenericFunctions.h"
 #include "specializeGenericTypes.h"
@@ -150,14 +153,15 @@ const IR::P4Program *FrontEnd::run(const CompilerOptions &options, const IR::P4P
         new CheckNamedArgs(),
         // Type checking and type inference.  Also inserts
         // explicit casts where implicit casts exist.
-        new TypeInference(&refMap, &typeMap, false),  // insert casts
+        new TypeInference(&refMap, &typeMap, false, false),  // insert casts, dont' check arrays
         new ValidateMatchAnnotations(&typeMap),
         new BindTypeVariables(&refMap, &typeMap),
         new SpecializeGenericTypes(&refMap, &typeMap),
         new DefaultArguments(&refMap, &typeMap),  // add default argument values to parameters
         new ResolveReferences(&refMap),
         new TypeInference(&refMap, &typeMap, false),  // more casts may be needed
-        new RemoveParserControlFlow(&refMap, &typeMap),
+        new CheckCoreMethods(&refMap, &typeMap),
+        new RemoveParserIfs(&refMap, &typeMap),
         new StructInitializers(&refMap, &typeMap),
         new SpecializeGenericFunctions(&refMap, &typeMap),
         new TableKeyNames(&refMap, &typeMap),
@@ -178,6 +182,7 @@ const IR::P4Program *FrontEnd::run(const CompilerOptions &options, const IR::P4P
         new MoveInitializers(&refMap),
         new SideEffectOrdering(&refMap, &typeMap, skipSideEffectOrdering),
         new SimplifyControlFlow(&refMap, &typeMap),
+        new SimplifySwitch(&refMap, &typeMap),
         new MoveDeclarations(),  // Move all local declarations to the beginning
         new SimplifyDefUse(&refMap, &typeMap),
         new UniqueParameters(&refMap, &typeMap),
@@ -190,18 +195,23 @@ const IR::P4Program *FrontEnd::run(const CompilerOptions &options, const IR::P4P
         new RemoveAllUnusedDeclarations(&refMap),
         new ClearTypeMap(&typeMap),
         evaluator,
-        new Inline(&refMap, &typeMap, evaluator),
+        new Inline(&refMap, &typeMap, evaluator, options.optimizeParserInlining),
         new InlineActions(&refMap, &typeMap),
+        new LocalizeAllActions(&refMap),
+        new UniqueNames(&refMap),
+        new UniqueParameters(&refMap, &typeMap),
+        // Must be done before inlining functions, to allow
+        // function calls used as action arguments to be inlined
+        // in the proper place.
+        new RemoveActionParameters(&refMap, &typeMap),
         new InlineFunctions(&refMap, &typeMap),
         new SetHeaders(&refMap, &typeMap),
         // Check for constants only after inlining
         new CheckConstants(&refMap, &typeMap),
         new SimplifyControlFlow(&refMap, &typeMap),
-        new RemoveParserControlFlow(&refMap, &typeMap),
-        new UniqueNames(&refMap),
-        new LocalizeAllActions(&refMap),
+        new RemoveParserControlFlow(&refMap, &typeMap),  // more ifs may have been added to parsers
         new UniqueNames(&refMap),  // needed again after inlining
-        new UniqueParameters(&refMap, &typeMap),
+        new MoveDeclarations(),  // needed again after inlining
         new SimplifyControlFlow(&refMap, &typeMap),
         new HierarchicalNames(),
         new FrontEndLast(),

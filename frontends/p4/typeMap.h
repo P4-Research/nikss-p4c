@@ -46,13 +46,13 @@ class TypeMap final : public ProgramMap {
     std::vector<const IR::Type*> canonicalLists;
 
     // Map each node to its canonical type
-    std::map<const IR::Node*, const IR::Type*> typeMap;
+    ordered_map<const IR::Node*, const IR::Type*> typeMap;
     // All left-values in the program.
-    std::set<const IR::Expression*> leftValues;
+    ordered_set<const IR::Expression*> leftValues;
     // All compile-time constants.  A compile-time constant
     // is not necessarily a constant - it could be a directionless
     // parameter as well.
-    std::set<const IR::Expression*> constants;
+    ordered_set<const IR::Expression*> constants;
     // For each type variable in the program the actual
     // type that is substituted for it.
     TypeVariableSubstitution allTypeVariables;
@@ -94,9 +94,13 @@ class TypeMap final : public ProgramMap {
 
     // Used for tuples and stacks only
     const IR::Type* getCanonical(const IR::Type* type);
-    /// The minimum width in bits of this type.  If the width is not
+    /// The width in bits of this type.  If the width is not
     /// well-defined this will report an error and return -1.
-    int minWidthBits(const IR::Type* type, const IR::Node* errorPosition);
+    /// max indicates whether we want the max width or min width.
+    int widthBits(const IR::Type* type, const IR::Node* errorPosition, bool max);
+
+    /// True is type occupies no storage.
+    bool typeIsEmpty(const IR::Type* type) const;
 };
 }  // namespace P4
 

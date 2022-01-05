@@ -2,6 +2,15 @@
 #define V1MODEL_VERSION 20200408
 #include <v1model.p4>
 
+enum bit<8> FieldLists {
+    i2e_mirror_info = 0,
+    cpu_info = 1,
+    e2e_mirror_info = 2,
+    int_i2e_mirror_info = 3,
+    mirror_info = 4,
+    sflow_cpu_info = 5
+}
+
 struct acl_metadata_t {
     bit<1>  acl_deny;
     bit<1>  acl_copy;
@@ -40,6 +49,7 @@ struct egress_metadata_t {
 struct fabric_metadata_t {
     bit<3>  packetType;
     bit<1>  fabric_header_present;
+    @field_list(FieldLists.cpu_info, FieldLists.sflow_cpu_info)
     bit<16> reason_code;
     bit<8>  dst_device;
     bit<16> dst_port;
@@ -56,22 +66,28 @@ struct hash_metadata_t {
 }
 
 struct i2e_metadata_t {
+    @field_list(FieldLists.i2e_mirror_info, FieldLists.e2e_mirror_info)
     bit<32> ingress_tstamp;
+    @field_list(FieldLists.i2e_mirror_info, FieldLists.e2e_mirror_info, FieldLists.int_i2e_mirror_info)
     bit<16> mirror_session_id;
 }
 
 struct ingress_metadata_t {
+    @field_list(FieldLists.cpu_info, FieldLists.sflow_cpu_info)
     bit<9>  ingress_port;
+    @field_list(FieldLists.cpu_info, FieldLists.mirror_info, FieldLists.sflow_cpu_info)
     bit<16> ifindex;
     bit<16> egress_ifindex;
     bit<2>  port_type;
     bit<16> outer_bd;
+    @field_list(FieldLists.cpu_info, FieldLists.sflow_cpu_info)
     bit<16> bd;
     bit<1>  drop_flag;
+    @field_list(FieldLists.mirror_info)
     bit<8>  drop_reason;
     bit<1>  control_frame;
     bit<16> bypass_lookups;
-    @saturating 
+    @saturating
     bit<32> sflow_take_sample;
 }
 
@@ -85,6 +101,7 @@ struct int_metadata_t {
 }
 
 struct int_metadata_i2e_t {
+    @field_list(FieldLists.int_i2e_mirror_info)
     bit<1> sink;
     bit<1> source;
 }
@@ -155,7 +172,7 @@ struct l3_metadata_t {
     bit<1>  outer_routed;
     bit<8>  mtu_index;
     bit<1>  l3_copy;
-    @saturating 
+    @saturating
     bit<16> l3_mtu_check;
 }
 
@@ -640,166 +657,166 @@ header vlan_tag_t {
 }
 
 struct metadata {
-    @name(".acl_metadata") 
+    @name(".acl_metadata")
     acl_metadata_t           acl_metadata;
-    @name(".egress_filter_metadata") 
+    @name(".egress_filter_metadata")
     egress_filter_metadata_t egress_filter_metadata;
-    @name(".egress_metadata") 
+    @name(".egress_metadata")
     egress_metadata_t        egress_metadata;
-    @name(".fabric_metadata") 
+    @name(".fabric_metadata")
     fabric_metadata_t        fabric_metadata;
-    @name(".global_config_metadata") 
+    @name(".global_config_metadata")
     global_config_metadata_t global_config_metadata;
-    @name(".hash_metadata") 
+    @name(".hash_metadata")
     hash_metadata_t          hash_metadata;
-    @name(".i2e_metadata") 
+    @name(".i2e_metadata")
     i2e_metadata_t           i2e_metadata;
-    @name(".ingress_metadata") 
+    @name(".ingress_metadata")
     ingress_metadata_t       ingress_metadata;
-    @name(".int_metadata") 
+    @name(".int_metadata")
     int_metadata_t           int_metadata;
-    @name(".int_metadata_i2e") 
+    @name(".int_metadata_i2e")
     int_metadata_i2e_t       int_metadata_i2e;
-    @name(".ipv4_metadata") 
+    @name(".ipv4_metadata")
     ipv4_metadata_t          ipv4_metadata;
-    @name(".ipv6_metadata") 
+    @name(".ipv6_metadata")
     ipv6_metadata_t          ipv6_metadata;
-    @name(".l2_metadata") 
+    @name(".l2_metadata")
     l2_metadata_t            l2_metadata;
-    @name(".l3_metadata") 
+    @name(".l3_metadata")
     l3_metadata_t            l3_metadata;
-    @name(".meter_metadata") 
+    @name(".meter_metadata")
     meter_metadata_t         meter_metadata;
-    @name(".multicast_metadata") 
+    @name(".multicast_metadata")
     multicast_metadata_t     multicast_metadata;
-    @name(".nexthop_metadata") 
+    @name(".nexthop_metadata")
     nexthop_metadata_t       nexthop_metadata;
-    @name(".qos_metadata") 
+    @name(".qos_metadata")
     qos_metadata_t           qos_metadata;
-    @name(".security_metadata") 
+    @name(".security_metadata")
     security_metadata_t      security_metadata;
-    @name(".sflow_metadata") 
+    @name(".sflow_metadata")
     sflow_meta_t             sflow_metadata;
-    @name(".tunnel_metadata") 
+    @name(".tunnel_metadata")
     tunnel_metadata_t        tunnel_metadata;
 }
 
 struct headers {
-    @name(".arp_rarp") 
+    @name(".arp_rarp")
     arp_rarp_t                              arp_rarp;
-    @name(".arp_rarp_ipv4") 
+    @name(".arp_rarp_ipv4")
     arp_rarp_ipv4_t                         arp_rarp_ipv4;
-    @name(".bfd") 
+    @name(".bfd")
     bfd_t                                   bfd;
-    @name(".eompls") 
+    @name(".eompls")
     eompls_t                                eompls;
-    @name(".erspan_t3_header") 
+    @name(".erspan_t3_header")
     erspan_header_t3_t_0                    erspan_t3_header;
-    @name(".ethernet") 
+    @name(".ethernet")
     ethernet_t                              ethernet;
-    @name(".fabric_header") 
+    @name(".fabric_header")
     fabric_header_t                         fabric_header;
-    @name(".fabric_header_cpu") 
+    @name(".fabric_header_cpu")
     fabric_header_cpu_t                     fabric_header_cpu;
-    @name(".fabric_header_mirror") 
+    @name(".fabric_header_mirror")
     fabric_header_mirror_t                  fabric_header_mirror;
-    @name(".fabric_header_multicast") 
+    @name(".fabric_header_multicast")
     fabric_header_multicast_t               fabric_header_multicast;
-    @name(".fabric_header_sflow") 
+    @name(".fabric_header_sflow")
     fabric_header_sflow_t                   fabric_header_sflow;
-    @name(".fabric_header_unicast") 
+    @name(".fabric_header_unicast")
     fabric_header_unicast_t                 fabric_header_unicast;
-    @name(".fabric_payload_header") 
+    @name(".fabric_payload_header")
     fabric_payload_header_t                 fabric_payload_header;
-    @name(".fcoe") 
+    @name(".fcoe")
     fcoe_header_t                           fcoe;
-    @name(".genv") 
+    @name(".genv")
     genv_t                                  genv;
-    @name(".gre") 
+    @name(".gre")
     gre_t                                   gre;
-    @name(".icmp") 
+    @name(".icmp")
     icmp_t                                  icmp;
-    @name(".inner_ethernet") 
+    @name(".inner_ethernet")
     ethernet_t                              inner_ethernet;
-    @name(".inner_icmp") 
+    @name(".inner_icmp")
     icmp_t                                  inner_icmp;
-    @name(".inner_ipv4") 
+    @name(".inner_ipv4")
     ipv4_t                                  inner_ipv4;
-    @name(".inner_ipv6") 
+    @name(".inner_ipv6")
     ipv6_t                                  inner_ipv6;
-    @name(".inner_sctp") 
+    @name(".inner_sctp")
     sctp_t                                  inner_sctp;
-    @name(".inner_tcp") 
+    @name(".inner_tcp")
     tcp_t                                   inner_tcp;
-    @name(".inner_udp") 
+    @name(".inner_udp")
     udp_t                                   inner_udp;
-    @name(".int_egress_port_id_header") 
+    @name(".int_egress_port_id_header")
     int_egress_port_id_header_t             int_egress_port_id_header;
-    @name(".int_egress_port_tx_utilization_header") 
+    @name(".int_egress_port_tx_utilization_header")
     int_egress_port_tx_utilization_header_t int_egress_port_tx_utilization_header;
-    @name(".int_header") 
+    @name(".int_header")
     int_header_t                            int_header;
-    @name(".int_hop_latency_header") 
+    @name(".int_hop_latency_header")
     int_hop_latency_header_t                int_hop_latency_header;
-    @name(".int_ingress_port_id_header") 
+    @name(".int_ingress_port_id_header")
     int_ingress_port_id_header_t            int_ingress_port_id_header;
-    @name(".int_ingress_tstamp_header") 
+    @name(".int_ingress_tstamp_header")
     int_ingress_tstamp_header_t             int_ingress_tstamp_header;
-    @name(".int_q_congestion_header") 
+    @name(".int_q_congestion_header")
     int_q_congestion_header_t               int_q_congestion_header;
-    @name(".int_q_occupancy_header") 
+    @name(".int_q_occupancy_header")
     int_q_occupancy_header_t                int_q_occupancy_header;
-    @name(".int_switch_id_header") 
+    @name(".int_switch_id_header")
     int_switch_id_header_t                  int_switch_id_header;
-    @name(".ipv4") 
+    @name(".ipv4")
     ipv4_t                                  ipv4;
-    @name(".ipv6") 
+    @name(".ipv6")
     ipv6_t                                  ipv6;
-    @name(".lisp") 
+    @name(".lisp")
     lisp_t                                  lisp;
-    @name(".llc_header") 
+    @name(".llc_header")
     llc_header_t                            llc_header;
-    @name(".nsh") 
+    @name(".nsh")
     nsh_t                                   nsh;
-    @name(".nsh_context") 
+    @name(".nsh_context")
     nsh_context_t                           nsh_context;
-    @name(".nvgre") 
+    @name(".nvgre")
     nvgre_t                                 nvgre;
-    @name(".outer_udp") 
+    @name(".outer_udp")
     udp_t                                   outer_udp;
-    @name(".roce") 
+    @name(".roce")
     roce_header_t                           roce;
-    @name(".roce_v2") 
+    @name(".roce_v2")
     roce_v2_header_t                        roce_v2;
-    @name(".sctp") 
+    @name(".sctp")
     sctp_t                                  sctp;
-    @name(".sflow") 
+    @name(".sflow")
     sflow_hdr_t                             sflow;
-    @name(".sflow_raw_hdr_record") 
+    @name(".sflow_raw_hdr_record")
     sflow_raw_hdr_record_t                  sflow_raw_hdr_record;
-    @name(".sflow_sample") 
+    @name(".sflow_sample")
     sflow_sample_t                          sflow_sample;
-    @name(".snap_header") 
+    @name(".snap_header")
     snap_header_t                           snap_header;
-    @name(".tcp") 
+    @name(".tcp")
     tcp_t                                   tcp;
-    @name(".trill") 
+    @name(".trill")
     trill_t                                 trill;
-    @name(".udp") 
+    @name(".udp")
     udp_t                                   udp;
-    @name(".vntag") 
+    @name(".vntag")
     vntag_t                                 vntag;
-    @name(".vxlan") 
+    @name(".vxlan")
     vxlan_t                                 vxlan;
-    @name(".vxlan_gpe") 
+    @name(".vxlan_gpe")
     vxlan_gpe_t                             vxlan_gpe;
-    @name(".vxlan_gpe_int_header") 
+    @name(".vxlan_gpe_int_header")
     vxlan_gpe_int_header_t                  vxlan_gpe_int_header;
-    @name(".int_val") 
+    @name(".int_val")
     int_value_t[24]                         int_val;
-    @name(".mpls") 
+    @name(".mpls")
     mpls_t[3]                               mpls;
-    @name(".vlan_tag_") 
+    @name(".vlan_tag_")
     vlan_tag_t[2]                           vlan_tag_;
 }
 
@@ -2232,7 +2249,6 @@ control process_int_insertion(inout headers hdr, inout metadata meta, inout stan
                 int_meta_header_update.apply();
             }
         }
-
     }
 }
 
@@ -2908,7 +2924,7 @@ control process_egress_acl(inout headers hdr, inout metadata meta, inout standar
     }
     @name(".egress_mirror") action egress_mirror(bit<32> session_id) {
         meta.i2e_metadata.mirror_session_id = (bit<16>)session_id;
-        clone3(CloneType.E2E, (bit<32>)session_id, { meta.i2e_metadata.ingress_tstamp, meta.i2e_metadata.mirror_session_id });
+        clone_preserving_field_list(CloneType.E2E, (bit<32>)session_id, (bit<8>)FieldLists.e2e_mirror_info);
     }
     @name(".egress_mirror_drop") action egress_mirror_drop(bit<32> session_id) {
         egress_mirror(session_id);
@@ -2916,7 +2932,7 @@ control process_egress_acl(inout headers hdr, inout metadata meta, inout standar
     }
     @name(".egress_copy_to_cpu") action egress_copy_to_cpu(bit<16> reason_code) {
         meta.fabric_metadata.reason_code = reason_code;
-        clone3(CloneType.E2E, (bit<32>)32w250, { meta.ingress_metadata.bd, meta.ingress_metadata.ifindex, meta.fabric_metadata.reason_code, meta.ingress_metadata.ingress_port });
+        clone_preserving_field_list(CloneType.E2E, (bit<32>)32w250, (bit<8>)FieldLists.cpu_info);
     }
     @name(".egress_redirect_to_cpu") action egress_redirect_to_cpu(bit<16> reason_code) {
         egress_copy_to_cpu(reason_code);
@@ -3029,7 +3045,6 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
                     process_egress_bd_stats_0.apply(hdr, meta, standard_metadata);
                 }
             }
-
             process_tunnel_encap_0.apply(hdr, meta, standard_metadata);
             process_int_outer_encap_0.apply(hdr, meta, standard_metadata);
             if (meta.egress_metadata.port_type == 2w0) {
@@ -3262,7 +3277,6 @@ control process_validate_outer_header(inout headers hdr, inout metadata meta, in
                 }
             }
         }
-
     }
 }
 
@@ -3392,7 +3406,6 @@ control process_ip_sourceguard(inout headers hdr, inout metadata meta, inout sta
                     ipsg_permit_special.apply();
                 }
             }
-
         }
     }
 }
@@ -3415,7 +3428,7 @@ control process_int_endpoint(inout headers hdr, inout metadata meta, inout stand
     @name(".int_sink") action int_sink(bit<32> mirror_id) {
         meta.int_metadata_i2e.sink = 1w1;
         meta.i2e_metadata.mirror_session_id = (bit<16>)mirror_id;
-        clone3(CloneType.I2E, (bit<32>)mirror_id, { meta.int_metadata_i2e.sink, meta.i2e_metadata.mirror_session_id });
+        clone_preserving_field_list(CloneType.I2E, (bit<32>)mirror_id, (bit<8>)FieldLists.int_i2e_mirror_info);
         hdr.int_header.setInvalid();
         hdr.int_val[0].setInvalid();
         hdr.int_val[1].setInvalid();
@@ -3691,7 +3704,6 @@ control process_outer_ipv4_multicast(inout headers hdr, inout metadata meta, ino
                 outer_ipv4_multicast_star_g.apply();
             }
         }
-
     }
 }
 
@@ -3765,7 +3777,6 @@ control process_outer_ipv6_multicast(inout headers hdr, inout metadata meta, ino
                 outer_ipv6_multicast_star_g.apply();
             }
         }
-
     }
 }
 
@@ -3836,7 +3847,6 @@ control process_ipv4_vtep(inout headers hdr, inout metadata meta, inout standard
                 ipv4_dest_vtep.apply();
             }
         }
-
     }
 }
 
@@ -3886,7 +3896,6 @@ control process_ipv6_vtep(inout headers hdr, inout metadata meta, inout standard
                 ipv6_dest_vtep.apply();
             }
         }
-
     }
 }
 
@@ -4148,7 +4157,6 @@ control process_tunnel(inout headers hdr, inout metadata meta, inout standard_me
                     }
                 }
             }
-
         }
         if (meta.tunnel_metadata.tunnel_terminate == 1w1 || meta.multicast_metadata.outer_mcast_route_hit == 1w1 && (meta.multicast_metadata.outer_mcast_mode == 2w1 && meta.multicast_metadata.mcast_rpf_group == 16w0 || meta.multicast_metadata.outer_mcast_mode == 2w2 && meta.multicast_metadata.mcast_rpf_group != 16w0)) {
             switch (tunnel.apply().action_run) {
@@ -4156,7 +4164,6 @@ control process_tunnel(inout headers hdr, inout metadata meta, inout standard_me
                     tunnel_lookup_miss_0.apply();
                 }
             }
-
         } else {
             tunnel_miss.apply();
         }
@@ -4170,7 +4177,7 @@ control process_ingress_sflow(inout headers hdr, inout metadata meta, inout stan
     @name(".sflow_ing_pkt_to_cpu") action sflow_ing_pkt_to_cpu(bit<32> sflow_i2e_mirror_id, bit<16> reason_code) {
         meta.fabric_metadata.reason_code = reason_code;
         meta.i2e_metadata.mirror_session_id = (bit<16>)sflow_i2e_mirror_id;
-        clone3(CloneType.I2E, (bit<32>)sflow_i2e_mirror_id, { { meta.ingress_metadata.bd, meta.ingress_metadata.ifindex, meta.fabric_metadata.reason_code, meta.ingress_metadata.ingress_port }, meta.sflow_metadata.sflow_session_id, meta.i2e_metadata.mirror_session_id });
+        clone_preserving_field_list(CloneType.I2E, (bit<32>)sflow_i2e_mirror_id, (bit<8>)FieldLists.sflow_cpu_info);
     }
     @name(".sflow_ing_session_enable") action sflow_ing_session_enable(bit<32> rate_thr, bit<16> session_id) {
         meta.ingress_metadata.sflow_take_sample = rate_thr |+| meta.ingress_metadata.sflow_take_sample;
@@ -4183,7 +4190,7 @@ control process_ingress_sflow(inout headers hdr, inout metadata meta, inout stan
         sflow_ingress_session_pkt_counter.count();
         meta.fabric_metadata.reason_code = reason_code;
         meta.i2e_metadata.mirror_session_id = (bit<16>)sflow_i2e_mirror_id;
-        clone3(CloneType.I2E, (bit<32>)sflow_i2e_mirror_id, { { meta.ingress_metadata.bd, meta.ingress_metadata.ifindex, meta.fabric_metadata.reason_code, meta.ingress_metadata.ingress_port }, meta.sflow_metadata.sflow_session_id, meta.i2e_metadata.mirror_session_id });
+        clone_preserving_field_list(CloneType.I2E, (bit<32>)sflow_i2e_mirror_id, (bit<8>)FieldLists.sflow_cpu_info);
     }
     @name(".sflow_ing_take_sample") table sflow_ing_take_sample {
         actions = {
@@ -4389,7 +4396,7 @@ control process_mac_acl(inout headers hdr, inout metadata meta, inout standard_m
     @name(".acl_mirror") action acl_mirror(bit<32> session_id, bit<14> acl_stats_index, bit<16> acl_meter_index) {
         meta.i2e_metadata.mirror_session_id = (bit<16>)session_id;
         meta.i2e_metadata.ingress_tstamp = (bit<32>)standard_metadata.ingress_global_timestamp;
-        clone3(CloneType.I2E, (bit<32>)session_id, { meta.i2e_metadata.ingress_tstamp, meta.i2e_metadata.mirror_session_id });
+        clone_preserving_field_list(CloneType.I2E, (bit<32>)session_id, (bit<8>)FieldLists.i2e_mirror_info);
         meta.acl_metadata.acl_stats_index = acl_stats_index;
         meta.meter_metadata.meter_index = acl_meter_index;
     }
@@ -4455,7 +4462,7 @@ control process_ip_acl(inout headers hdr, inout metadata meta, inout standard_me
     @name(".acl_mirror") action acl_mirror(bit<32> session_id, bit<14> acl_stats_index, bit<16> acl_meter_index) {
         meta.i2e_metadata.mirror_session_id = (bit<16>)session_id;
         meta.i2e_metadata.ingress_tstamp = (bit<32>)standard_metadata.ingress_global_timestamp;
-        clone3(CloneType.I2E, (bit<32>)session_id, { meta.i2e_metadata.ingress_tstamp, meta.i2e_metadata.mirror_session_id });
+        clone_preserving_field_list(CloneType.I2E, (bit<32>)session_id, (bit<8>)FieldLists.i2e_mirror_info);
         meta.acl_metadata.acl_stats_index = acl_stats_index;
         meta.meter_metadata.meter_index = acl_meter_index;
     }
@@ -4689,7 +4696,6 @@ control process_ipv4_multicast(inout headers hdr, inout metadata meta, inout sta
                     ipv4_multicast_bridge_star_g.apply();
                 }
             }
-
         }
         if (meta.ingress_metadata.bypass_lookups & 16w0x2 == 16w0 && meta.multicast_metadata.ipv4_multicast_enabled == 1w1) {
             switch (ipv4_multicast_route.apply().action_run) {
@@ -4697,7 +4703,6 @@ control process_ipv4_multicast(inout headers hdr, inout metadata meta, inout sta
                     ipv4_multicast_route_star_g.apply();
                 }
             }
-
         }
     }
 }
@@ -4822,7 +4827,6 @@ control process_ipv6_multicast(inout headers hdr, inout metadata meta, inout sta
                     ipv6_multicast_bridge_star_g.apply();
                 }
             }
-
         }
         if (meta.ingress_metadata.bypass_lookups & 16w0x2 == 16w0 && meta.multicast_metadata.ipv6_multicast_enabled == 1w1) {
             switch (ipv6_multicast_route.apply().action_run) {
@@ -4830,7 +4834,6 @@ control process_ipv6_multicast(inout headers hdr, inout metadata meta, inout sta
                     ipv6_multicast_route_star_g.apply();
                 }
             }
-
         }
     }
 }
@@ -4949,7 +4952,6 @@ control process_ipv4_urpf(inout headers hdr, inout metadata meta, inout standard
                     ipv4_urpf_lpm.apply();
                 }
             }
-
         }
     }
 }
@@ -4997,7 +4999,6 @@ control process_ipv4_fib(inout headers hdr, inout metadata meta, inout standard_
                 ipv4_fib_lpm.apply();
             }
         }
-
     }
 }
 
@@ -5094,7 +5095,6 @@ control process_ipv6_urpf(inout headers hdr, inout metadata meta, inout standard
                     ipv6_urpf_lpm.apply();
                 }
             }
-
         }
     }
 }
@@ -5142,7 +5142,6 @@ control process_ipv6_fib(inout headers hdr, inout metadata meta, inout standard_
                 ipv6_fib_lpm.apply();
             }
         }
-
     }
 }
 
@@ -5628,7 +5627,7 @@ control process_system_acl(inout headers hdr, inout metadata meta, inout standar
     }
     @name(".copy_to_cpu_with_reason") action copy_to_cpu_with_reason(bit<16> reason_code) {
         meta.fabric_metadata.reason_code = reason_code;
-        clone3(CloneType.I2E, (bit<32>)32w250, { meta.ingress_metadata.bd, meta.ingress_metadata.ifindex, meta.fabric_metadata.reason_code, meta.ingress_metadata.ingress_port });
+        clone_preserving_field_list(CloneType.I2E, (bit<32>)32w250, (bit<8>)FieldLists.cpu_info);
     }
     @name(".redirect_to_cpu") action redirect_to_cpu(bit<16> reason_code) {
         copy_to_cpu_with_reason(reason_code);
@@ -5636,7 +5635,7 @@ control process_system_acl(inout headers hdr, inout metadata meta, inout standar
         meta.fabric_metadata.dst_device = 8w0;
     }
     @name(".copy_to_cpu") action copy_to_cpu() {
-        clone3(CloneType.I2E, (bit<32>)32w250, { meta.ingress_metadata.bd, meta.ingress_metadata.ifindex, meta.fabric_metadata.reason_code, meta.ingress_metadata.ingress_port });
+        clone_preserving_field_list(CloneType.I2E, (bit<32>)32w250, (bit<8>)FieldLists.cpu_info);
     }
     @name(".drop_packet") action drop_packet() {
         mark_to_drop(standard_metadata);
@@ -5646,7 +5645,7 @@ control process_system_acl(inout headers hdr, inout metadata meta, inout standar
         mark_to_drop(standard_metadata);
     }
     @name(".negative_mirror") action negative_mirror(bit<32> session_id) {
-        clone3(CloneType.I2E, (bit<32>)session_id, { meta.ingress_metadata.ifindex, meta.ingress_metadata.drop_reason });
+        clone_preserving_field_list(CloneType.I2E, (bit<32>)session_id, (bit<8>)FieldLists.mirror_info);
         mark_to_drop(standard_metadata);
     }
     @name(".drop_stats") table drop_stats_0 {
@@ -5802,7 +5801,6 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
                         }
                     }
                 }
-
             }
         }
         process_meter_index_0.apply(hdr, meta, standard_metadata);
@@ -5892,4 +5890,3 @@ control computeChecksum(inout headers hdr, inout metadata meta) {
 }
 
 V1Switch(ParserImpl(), verifyChecksum(), ingress(), egress(), computeChecksum(), DeparserImpl()) main;
-

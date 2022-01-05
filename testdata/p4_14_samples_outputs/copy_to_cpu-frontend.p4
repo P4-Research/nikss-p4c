@@ -2,6 +2,10 @@
 #define V1MODEL_VERSION 20200408
 #include <v1model.p4>
 
+enum bit<8> FieldLists {
+    copy_to_cpu_fields = 8w0
+}
+
 struct intrinsic_metadata_t {
     bit<4> mcast_grp;
     bit<4> egress_rid;
@@ -22,9 +26,9 @@ struct metadata {
 }
 
 struct headers {
-    @name(".cpu_header") 
+    @name(".cpu_header")
     cpu_header_t cpu_header;
-    @name(".ethernet") 
+    @name(".ethernet")
     ethernet_t   ethernet;
 }
 
@@ -50,7 +54,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
 }
 
 control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @noWarn("unused") @name(".NoAction") action NoAction_0() {
+    @noWarn("unused") @name(".NoAction") action NoAction_2() {
     }
     @name("._drop") action _drop() {
         mark_to_drop(standard_metadata);
@@ -64,13 +68,13 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
         actions = {
             _drop();
             do_cpu_encap();
-            @defaultonly NoAction_0();
+            @defaultonly NoAction_2();
         }
         key = {
             standard_metadata.instance_type: exact @name("standard_metadata.instance_type") ;
         }
         size = 16;
-        default_action = NoAction_0();
+        default_action = NoAction_2();
     }
     apply {
         redirect_0.apply();
@@ -78,18 +82,18 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
 }
 
 control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_3() {
     }
     @name(".do_copy_to_cpu") action do_copy_to_cpu() {
-        clone3<tuple<standard_metadata_t>>(CloneType.I2E, 32w250, { standard_metadata });
+        clone_preserving_field_list(CloneType.I2E, 32w250, (bit<8>)FieldLists.copy_to_cpu_fields);
     }
     @name(".copy_to_cpu") table copy_to_cpu_0 {
         actions = {
             do_copy_to_cpu();
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_3();
         }
         size = 1;
-        default_action = NoAction_1();
+        default_action = NoAction_3();
     }
     apply {
         copy_to_cpu_0.apply();
@@ -114,4 +118,3 @@ control computeChecksum(inout headers hdr, inout metadata meta) {
 }
 
 V1Switch<headers, metadata>(ParserImpl(), verifyChecksum(), ingress(), egress(), computeChecksum(), DeparserImpl()) main;
-

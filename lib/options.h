@@ -77,7 +77,6 @@ class Options {
                         OptionProcessor processor,  // function to execute when option matches
                         const char* description,  // option help message
                         OptionFlags flags = OptionFlags::Default);  // additional flags
-    void unRegisterOption(const char* option);
 
     explicit Options(cstring message) : binaryName(nullptr), message(message) {}
 
@@ -91,6 +90,8 @@ class Options {
      * @return 'nullptr' if an error is signaled.
      */
     virtual std::vector<const char*>* process(int argc, char* const argv[]);
+
+    virtual const char* getIncludePath() = 0;
 
     void usage();
 };

@@ -148,14 +148,14 @@ class PrimitiveConverter {
  * next highest will be run, etc.  The macro invocation is followed by the body of the
  * converter function.
  */
-#define CONVERT_PRIMITIVE(NAME, ...) \
-    class PrimitiveConverter_##NAME##_##__VA_ARGS__ : public PrimitiveConverter {               \
+#define CONVERT_PRIMITIVE(NAME) \
+    class PrimitiveConverter_##NAME : public PrimitiveConverter {               \
         const IR::Statement *convert(ProgramStructure *, const IR::Primitive *) override;       \
-        PrimitiveConverter_##NAME##_##__VA_ARGS__()                                             \
-        : PrimitiveConverter(#NAME, __VA_ARGS__ + 0) {}                                         \
-        static PrimitiveConverter_##NAME##_##__VA_ARGS__ singleton;                             \
-    } PrimitiveConverter_##NAME##_##__VA_ARGS__::singleton;                                     \
-    const IR::Statement *PrimitiveConverter_##NAME##_##__VA_ARGS__::convert(                    \
+        PrimitiveConverter_##NAME()                                             \
+        : PrimitiveConverter(#NAME, 0) {}                                       \
+        static PrimitiveConverter_##NAME singleton;                             \
+    } PrimitiveConverter_##NAME::singleton;                                     \
+    const IR::Statement *PrimitiveConverter_##NAME::convert(                    \
         ProgramStructure *structure, const IR::Primitive *primitive)
 
 ///////////////////////////////////////////////////////////////
@@ -187,8 +187,8 @@ class DiscoverStructure : public Inspector {
     { CHECK_NULL(structure); setName("DiscoverStructure"); }
 
     void postorder(const IR::ParserException* ex) override {
-        ::warning(ErrorType::WARN_UNSUPPORTED, "%1%: parser exception is not translated to P4-16",
-                  ex); }
+        warn(ErrorType::WARN_UNSUPPORTED, "%1%: parser exception is not translated to P4-16",
+             ex); }
     void postorder(const IR::Metadata* md) override
     { structure->metadata.emplace(md); checkReserved(md, md->name, "metadata"); }
     void postorder(const IR::Header* hd) override
@@ -596,6 +596,7 @@ class FixExtracts final : public Transform {
 
         // Create actual extract
         RewriteLength rewrite(fixed->fixedHeaderType, var);
+        rewrite.setCalledBy(this);
         auto length = fixed->headerLength->apply(rewrite);
         auto args = new IR::Vector<IR::Argument>();
         args->push_back(arg->clone());
@@ -728,7 +729,7 @@ class CheckIfMultiEntryPoint: public Inspector {
 class InsertCompilerGeneratedStartState: public Transform {
     ProgramStructure* structure;
     IR::Vector<IR::Node>               allTypeDecls;
-    IR::IndexedVector<IR::Declaration> varDecls;
+    IR::IndexedVector<IR::ParserState> parserStates;
     IR::Vector<IR::SelectCase>         selCases;
     cstring newStartState;
     cstring newInstanceType;
@@ -792,11 +793,11 @@ class InsertCompilerGeneratedStartState: public Transform {
         auto annos = new IR::Annotations();
         annos->add(new IR::Annotation(IR::Annotation::nameAnnotation, ".$start"));
         auto startState = new IR::ParserState(IR::ParserState::start, annos, selects);
-        varDecls.push_back(startState);
+        parserStates.push_back(startState);
 
-        if (!varDecls.empty()) {
-            parser->parserLocals.append(varDecls);
-            varDecls.clear();
+        if (!parserStates.empty()) {
+            parser->states.append(parserStates);
+            parserStates.clear();
         }
         return parser;
     }

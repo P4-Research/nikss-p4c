@@ -533,7 +533,7 @@ void EBPFControl::emitDeclaration(CodeBuilder* builder, const IR::Declaration* d
         auto etype = EBPFTypeFactory::instance->create(vd->type);
         builder->emitIndent();
         bool isPointer = shouldDeclareAsPointer(decl);
-        etype->declare(builder, vd->name, isPointer);
+        etype->declareInit(builder, vd->name, false);
         builder->endOfStatement(true);
 
         if (!isPointer) {

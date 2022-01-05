@@ -19,20 +19,21 @@ limitations under the License.
 #include <iostream>
 #include <string>
 
-#include "backends/bmv2/common/JsonObjects.h"
-#include "backends/bmv2/common/backend.h"
-#include "backends/bmv2/psa_switch/version.h"
 #include "backends/dpdk/backend.h"
 #include "backends/dpdk/midend.h"
 #include "backends/dpdk/options.h"
+#include "backends/dpdk/control-plane/bfruntime_arch_handler.h"
 #include "control-plane/p4RuntimeSerializer.h"
+#include "control-plane/bfruntime_ext.h"
 #include "frontends/common/applyOptionsPragmas.h"
 #include "frontends/common/parseInput.h"
+#include "frontends/common/parser_options.h"
 #include "frontends/p4/frontend.h"
 #include "ir/ir.h"
 #include "ir/json_loader.h"
 #include "lib/error.h"
 #include "lib/exceptions.h"
+#include "lib/exename.h"
 #include "lib/gc.h"
 #include "lib/log.h"
 #include "lib/nullstream.h"
@@ -40,10 +41,10 @@ limitations under the License.
 int main(int argc, char *const argv[]) {
     setup_gc_logging();
 
-    AutoCompileContext autoPsaSwitchContext(new DPDK::PsaSwitchContext);
-    auto &options = DPDK::PsaSwitchContext::get().options();
+    AutoCompileContext autoDpdkContext(new DPDK::DpdkContext);
+    auto &options = DPDK::DpdkContext::get().options();
     options.langVersion = CompilerOptions::FrontendVersion::P4_16;
-    options.compilerVersion = BMV2_PSA_VERSION_STRING;
+    options.compilerVersion = "0.1";
 
     if (options.process(argc, argv) != nullptr) {
         if (options.loadIRFromJson == false)
@@ -95,7 +96,22 @@ int main(int argc, char *const argv[]) {
     if (::errorCount() > 0)
         return 1;
 
-    DPDK::PsaSwitchMidEnd midEnd(options);
+    if (!options.bfRtSchema.isNullOrEmpty()) {
+        auto p4RuntimeSerializer = P4::P4RuntimeSerializer::get();
+        p4RuntimeSerializer->registerArch("psa",
+                new P4::ControlPlaneAPI::Standard::PSAArchHandlerBuilderForDPDK());
+
+        auto p4Runtime = P4::generateP4Runtime(program, options.arch);
+        auto p4rt = new P4::BFRT::BFRuntimeSchemaGenerator(*p4Runtime.p4Info);
+        std::ostream* out = openFile(options.bfRtSchema, false);
+        if (!out) {
+            ::error("Could not open BF-RT schema file: %1%", options.bfRtSchema);
+            return 1;
+        }
+        p4rt->serializeBFRuntimeSchema(out);
+    }
+
+    DPDK::DpdkMidEnd midEnd(options);
     midEnd.addDebugHook(hook);
     try {
         toplevel = midEnd.process(program);
@@ -112,19 +128,10 @@ int main(int argc, char *const argv[]) {
     if (::errorCount() > 0)
         return 1;
 
-    auto backend = new DPDK::PsaSwitchBackend(options, &midEnd.refMap,
-                                              &midEnd.typeMap, &midEnd.enumMap);
+    auto backend = new DPDK::DpdkBackend(options, &midEnd.refMap,
+                                         &midEnd.typeMap, &midEnd.enumMap);
 
-    // Necessary because BMV2Context is expected at the top of stack in further
-    // processing
-    AutoCompileContext autoContext(
-        new BMV2::BMV2Context(DPDK::PsaSwitchContext::get()));
-    try {
-        backend->convert(toplevel);
-    } catch (const std::exception &bug) {
-        std::cerr << bug.what() << std::endl;
-        return 1;
-    }
+    backend->convert(toplevel);
     if (::errorCount() > 0)
         return 1;
 
