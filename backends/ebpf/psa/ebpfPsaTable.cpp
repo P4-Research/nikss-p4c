@@ -393,21 +393,26 @@ void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
                 auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
                 if (matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name) {
                     auto expr = entry->keys->components[index];
-                    if (expr->is<IR::Mask>()) {
-                        auto km = expr->to<IR::Mask>();
-                        auto ebpfType = ::get(keyTypes, keyElement);
-                        unsigned width = 0;
-                        if (ebpfType->is<EBPFScalarType>()) {
-                            auto scalar = ebpfType->to<EBPFScalarType>();
-                            width = scalar->implementationWidthInBits();
-                        }
-                        builder->appendFormat("%s(", getByteSwapMethod(width));
+
+                    auto ebpfType = ::get(keyTypes, keyElement);
+                    unsigned width = 0;
+                    if (ebpfType->is<EBPFScalarType>()) {
+                        auto scalar = ebpfType->to<EBPFScalarType>();
+                        width = scalar->implementationWidthInBits();
+                    }
+                    builder->appendFormat("%s(", getByteSwapMethod(width));
+                    if (auto km = expr->to<IR::Mask>()) {
                         km->left->apply(cg);
-                        builder->append(")");
-                        builder->endOfStatement(true);
-                        builder->emitIndent();
-                        builder->appendFormat("%s.%s = ", keyName.c_str(), prefixFieldName.c_str());
-                        auto trailing_zeros = [width](const big_int& n) -> unsigned {
+                    } else {
+                        expr->apply(cg);
+                    }
+                    builder->append(")");
+                    builder->endOfStatement(true);
+                    builder->emitIndent();
+                    builder->appendFormat("%s.%s = ", keyName.c_str(), prefixFieldName.c_str());
+                    unsigned prefixLen = 32;
+                    if (auto km = expr->to<IR::Mask>()) {
+                        auto trailing_zeros = [width](const big_int& n) -> int {
                             return (n == 0) ? width : boost::multiprecision::lsb(n); };
                         auto count_ones = [](const big_int& n) -> unsigned {
                             return bitcount(n); };
@@ -418,10 +423,11 @@ void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
                                     "%1% invalid mask for LPM key", keyElement);
                             return;
                         }
-                        unsigned prefixLen = width - len;
-                        builder->append(prefixLen);
-                        builder->endOfStatement(true);
+                        prefixLen = width - len;
                     }
+                    builder->append(prefixLen);
+                    builder->endOfStatement(true);
+
                 } else if (matchType->name.name == P4::P4CoreLibrary::instance.exactMatch.name) {
                     entry->keys->components[index]->apply(cg);
                     builder->endOfStatement(true);
