@@ -28,6 +28,7 @@ class EBPFDeparserPSA : public EBPFControlPSA {
  public:
     const IR::Parameter* packet_out;
     const IR::Parameter* istd;
+    const IR::Parameter* resubmit_meta;
 
     EBPFType* headerType;
     std::vector<cstring> headersExpressions;
@@ -86,14 +87,12 @@ class TCDeparserPSA : public EBPFDeparserPSA {
 
 class TCIngressDeparserPSA : public TCDeparserPSA {
  public:
-    const IR::Parameter* resubmit_meta;
     TCIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
                          const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
            TCDeparserPSA(program, control, parserHeaders, istd) {}
 
     bool build() override;
     void emitPreDeparser(CodeBuilder *builder) override;
-    void emitSharedMetadataInitializer(CodeBuilder* builder);
 };
 
 class TCIngressDeparserForTrafficManagerPSA : public TCIngressDeparserPSA {
@@ -129,14 +128,12 @@ class XDPDeparserPSA : public EBPFDeparserPSA {
 
 class XDPIngressDeparserPSA : public XDPDeparserPSA {
  public:
-    const IR::Parameter* resubmit_meta;
     XDPIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
                           const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
                 XDPDeparserPSA(program, control, parserHeaders, istd) { }
 
     bool build() override;
     void emitPreDeparser(CodeBuilder *builder) override;
-    void emitSharedMetadataInitializer(CodeBuilder *builder);
 };
 
 class XDPEgressDeparserPSA : public XDPDeparserPSA {

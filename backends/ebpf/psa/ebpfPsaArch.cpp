@@ -836,7 +836,7 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     parser->headerType = EBPFTypeFactory::instance->create(ht);
 
     parser->visitor->asPointerVariables.insert(resubmit_meta->name.name);
-    if (type == TC_INGRESS || options.generateHdrInMap) {
+    if (type == TC_INGRESS || type == XDP_INGRESS || options.generateHdrInMap) {
         parser->visitor->asPointerVariables.insert(parser->headers->name.name);
     }
 
@@ -878,7 +878,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     codegen->substitute(control->headers, parserHeaders);
     codegen->asPointerVariables.insert(control->outputStandardMetadata->name.name);
 
-    if (this->type == TC_INGRESS || options.generateHdrInMap) {
+    if (this->type == TC_INGRESS || type == XDP_INGRESS || options.generateHdrInMap) {
         codegen->asPointerVariables.insert(control->headers->name.name);
     }
 
@@ -987,8 +987,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Instance* instance)
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Variable* decl) {
-    bool isTCPipeline = (type == TC_INGRESS || type == TC_EGRESS);
-    if (!options.generateHdrInMap || isTCPipeline) {
+    if (type == TC_INGRESS || type == XDP_INGRESS) {
         if (decl->type->is<IR::Type_Name>() &&
             decl->type->to<IR::Type_Name>()->path->name.name == "psa_ingress_output_metadata_t") {
                 control->codeGen->asPointerVariables.insert(decl->name.name);
@@ -1060,7 +1059,7 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
     }
 
     auto codegen = new DeparserBodyTranslator(deparser);
-    if (this->type == TC_INGRESS || options.generateHdrInMap) {
+    if (this->type == TC_INGRESS || type == XDP_INGRESS || options.generateHdrInMap) {
         codegen->asPointerVariables.insert(parserHeaders->name.name);
     }
 

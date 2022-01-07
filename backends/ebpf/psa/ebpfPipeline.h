@@ -81,9 +81,6 @@ class EBPFPipeline : public EBPFProgram {
     void emitHeaderInstances(CodeBuilder *builder) override;
     /* Generates a set of helper variables that are used during packet processing. */
     void emitLocalVariables(CodeBuilder* builder) override;
-    /* Generates a pointer to skb->cb and maps it to
-     * psa_global_metadata to access global metadata shared between pipelines. */
-    void emitGlobalMetadataInitializer(CodeBuilder *builder);
 
     void emitLocalUserMetadataInstances(CodeBuilder *builder);
     void emitCPUMapUserMetadataInstance(CodeBuilder *builder);
@@ -93,13 +90,15 @@ class EBPFPipeline : public EBPFProgram {
 
     virtual void emitCPUMAPInitializers(CodeBuilder *builder);
     virtual void emitCPUMAPLookup(CodeBuilder *builder);
+    /* Generates a pointer to skb->cb and maps it to
+     * psa_global_metadata to access global metadata shared between pipelines. */
+    virtual void emitGlobalMetadataInitializer(CodeBuilder *builder);
+    virtual void emitPacketLength(CodeBuilder *builder);
+    virtual void emitTimestamp(CodeBuilder *builder);
 
     void emitHeadersFromCPUMAP(CodeBuilder* builder);
     void emitMetadataFromCPUMAP(CodeBuilder *builder);
-
-    virtual void emitPacketLength(CodeBuilder *builder);
-    virtual void emitTimestamp(CodeBuilder *builder);
-    virtual bool shouldEmitTimestamp() {
+    bool shouldEmitTimestamp() {
         auto directMeter = std::find_if(control->tables.begin(),
                                         control->tables.end(),
                                         [](std::pair<const cstring, EBPFTable*> elem) {
@@ -120,9 +119,15 @@ class EBPFPipeline : public EBPFProgram {
  */
 class EBPFIngressPipeline : public EBPFPipeline {
  public:
-    EBPFIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
-                        P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) { }
+    unsigned int maxResubmitDepth;
 
+    EBPFIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
+                        P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) {
+        // FIXME: hardcded
+        maxResubmitDepth = 4;
+    }
+
+    void emitSharedMetadataInitializer(CodeBuilder* builder);
     void emitPSAControlInputMetadata(CodeBuilder* builder) override;
     void emitPSAControlOutputMetadata(CodeBuilder* builder) override;
 };
@@ -140,14 +145,11 @@ class EBPFEgressPipeline : public EBPFPipeline {
 class TCIngressPipeline : public EBPFIngressPipeline {
  public:
     cstring processFunctionName;
-    unsigned int maxResubmitDepth;
 
     TCIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                         P4::TypeMap* typeMap) :
             EBPFIngressPipeline(name, options, refMap, typeMap) {
         processFunctionName = "process";
-        // FIXME: hardcded
-        maxResubmitDepth = 4;
     }
 
     void emitTrafficManager(CodeBuilder *builder) override;
@@ -175,9 +177,10 @@ class XDPIngressPipeline : public EBPFIngressPipeline {
             EBPFIngressPipeline(name, options, refMap, typeMap) {
         sectionName = "xdp_ingress/" + name;
         ifindexVar = cstring("skb->ingress_ifindex");
-        packetPathVar = cstring("0");
+        packetPathVar = cstring(compilerGlobalMetadata + "->packet_path");
     }
 
+    void emitGlobalMetadataInitializer(CodeBuilder *builder) override;
     void emit(CodeBuilder *builder) override;
     void emitTrafficManager(CodeBuilder *builder) override;
 };

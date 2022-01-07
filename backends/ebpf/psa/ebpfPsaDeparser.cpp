@@ -433,12 +433,6 @@ void TCIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->blockEnd(true);
 }
 
-void TCIngressDeparserPSA::emitSharedMetadataInitializer(CodeBuilder *builder) {
-    auto type = EBPFTypeFactory::instance->create(resubmit_meta->type);
-    type->declare(builder, resubmit_meta->name.name, false);
-    builder->endOfStatement(true);
-}
-
 // =====================TCIngressDeparserForTrafficManagerPSA===========
 void TCIngressDeparserForTrafficManagerPSA::emitPreDeparser(CodeBuilder *builder) {
     // clone support
@@ -503,22 +497,18 @@ void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->emitIndent();
     // perform early multicast detection; if multicast is invoked, a packet will be
     // passed up anyway, so we can do deparsing entirely in TC
-    builder->appendFormat("if (%s.clone || %s.multicast_group != 0) ",
+    builder->appendFormat("if (%s->clone || %s->multicast_group != 0) ",
                           istd->name.name,
                           istd->name.name);
     builder->blockStart();
     builder->emitIndent();
     builder->appendLine("struct xdp2tc_metadata xdp2tc_md = {};");
     builder->emitIndent();
-    if (program->options.generateHdrInMap) {
-        builder->appendFormat("xdp2tc_md.headers = *%s", this->headers->name.name);
-    } else {
-        builder->appendFormat("xdp2tc_md.headers = %s", this->headers->name.name);
-    }
+    builder->appendFormat("xdp2tc_md.headers = *%s", this->headers->name.name);
 
     builder->endOfStatement(true);
     builder->emitIndent();
-    builder->appendFormat("xdp2tc_md.ostd = %s", this->istd->name.name);
+    builder->appendFormat("xdp2tc_md.ostd = *%s", this->istd->name.name);
     builder->endOfStatement(true);
     builder->emitIndent();
     builder->appendFormat("xdp2tc_md.packetOffsetInBits = %s", this->program->offsetVar);
@@ -568,19 +558,28 @@ void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->endOfStatement(true);
     builder->blockEnd(true);
     builder->emitIndent();
-    builder->appendFormat("if (%s.drop || %s.resubmit) ",
+    builder->appendFormat("if (%s->drop) ",
                            istd->name.name, istd->name.name);
     builder->blockStart();
     builder->target->emitTraceMessage(builder, "PreDeparser: dropping packet..");
     builder->emitIndent();
     builder->appendFormat("return %s;\n", builder->target->abortReturnCode().c_str());
     builder->blockEnd(true);
-}
 
-void XDPIngressDeparserPSA::emitSharedMetadataInitializer(CodeBuilder *builder) {
-    auto type = EBPFTypeFactory::instance->create(resubmit_meta->type);
-    type->declare(builder, resubmit_meta->name.name, false);
-    builder->endOfStatement(true);
+    // if packet should be resubmitted, we skip deparser
+    builder->emitIndent();
+    builder->appendFormat("if (%s->resubmit) ", istd->name.name);
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder, "PreDeparser: resubmitting packet, "
+                                               "skipping deparser..");
+    builder->emitIndent();
+    const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
+    builder->appendFormat("%s->packet_path = RESUBMIT;",
+                          pipelineProgram->compilerGlobalMetadata);
+    builder->newline();
+    builder->emitIndent();
+    builder->appendLine("return -1;");
+    builder->blockEnd(true);
 }
 
 // =====================XDPEgressDeparserPSA=============================
@@ -671,7 +670,7 @@ void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
     } else {
         builder->appendFormat("%s.__helper_variable", this->headers->name.name);
     }
-    builder->appendFormat(" = %s.egress_port", this->istd->name.name);
+    builder->appendFormat(" = %s->egress_port", this->istd->name.name);
     builder->endOfStatement(true);
 
     builder->emitIndent();
