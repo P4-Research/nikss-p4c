@@ -1040,8 +1040,6 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
         deparser = new OptimizedXDPIngressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == XDP_INGRESS) {
         deparser = new XDPIngressDeparserPSA(program, ctrl, parserHeaders, istd);
-    } else if (type == XDP_EGRESS && options.pipelineOptimization) {
-        deparser = new OptimizedXDPEgressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == XDP_EGRESS) {
         deparser = new XDPEgressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == TC_TRAFFIC_MANAGER) {

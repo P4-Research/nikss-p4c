@@ -58,12 +58,7 @@ void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
         unsigned width = headerToEmit->width_bits();
         builder->emitIndent();
         builder->append("if (");
-        cstring hdrName = headerExpression;
-        // FIXME: we should use codeGen->visit()
-        if (this->is<OptimizedXDPEgressDeparserPSA>()) {
-            hdrName = headerExpression.replace(".", "->");
-        }
-        builder->append(hdrName);
+        builder->append(headerExpression);
         builder->append(".ebpf_valid) ");
         builder->blockStart();
         builder->emitIndent();
@@ -147,9 +142,6 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
 
 void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
                                  cstring& headerExpression) const {
-    if (this->is<OptimizedXDPEgressDeparserPSA>()) {
-        headerExpression = headerExpression.replace(".", "->");
-    }
     cstring msgStr;
     builder->emitIndent();
     builder->append("if (");
@@ -363,8 +355,8 @@ void EBPFDeparserPSA::emitDeclaration(CodeBuilder* builder, const IR::Declaratio
     EBPFControlPSA::emitDeclaration(builder, decl);
 }
 
-// =====================TCIngressDeparserPSA=============================
-bool TCIngressDeparserPSA::build() {
+// =====================IngressDeparserPSA=============================
+bool IngressDeparserPSA::build() {
     auto pl = controlBlock->container->type->applyParams;
     auto it = pl->parameters.begin();
     packet_out = *it;
@@ -384,6 +376,23 @@ bool TCIngressDeparserPSA::build() {
     return true;
 }
 
+// =====================EgressDeparserPSA=============================
+bool EgressDeparserPSA::build() {
+    auto pl = controlBlock->container->type->applyParams;
+    auto it = pl->parameters.begin();
+    packet_out = *it;
+    headers = *(it + 3);
+
+    auto ht = program->typeMap->getType(headers);
+    if (ht == nullptr) {
+        return false;
+    }
+    headerType = EBPFTypeFactory::instance->create(ht);
+
+    return true;
+}
+
+// =====================TCIngressDeparserPSA=============================
 /*
  * PreDeparser for Ingress pipeline implements:
  * - packet cloning (using clone sessions)
@@ -444,46 +453,7 @@ void TCIngressDeparserForTrafficManagerPSA::emitPreDeparser(CodeBuilder *builder
     builder->blockEnd(true);
 }
 
-// =====================TCEgressDeparserPSA=============================
-bool TCEgressDeparserPSA::build() {
-    auto pl = controlBlock->container->type->applyParams;
-    auto it = pl->parameters.begin();
-    packet_out = *it;
-    headers = *(it + 3);
-
-    auto ht = program->typeMap->getType(headers);
-    if (ht == nullptr) {
-        return false;
-    }
-    headerType = EBPFTypeFactory::instance->create(ht);
-
-    return true;
-}
-
 // =====================XDPIngressDeparserPSA=============================
-bool XDPIngressDeparserPSA::build() {
-    auto pl = controlBlock->container->type->applyParams;
-    auto it = pl->parameters.begin();
-    packet_out = *it;
-    headers = *(it + 4);
-    user_metadata = *(it + 5);
-    resubmit_meta = *(it + 2);
-
-    auto ht = program->typeMap->getType(headers);
-    if (ht == nullptr) {
-        return false;
-    }
-    headerType = EBPFTypeFactory::instance->create(ht);
-
-    codeGen->asPointerVariables.insert(resubmit_meta->name.name);
-    codeGen->asPointerVariables.insert(user_metadata->name.name);
-    codeGen->substitute(this->headers, parserHeaders);
-    return true;
-}
-
-/*
- * 
- */
 void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->emitIndent();
     // perform early multicast detection; if multicast is invoked, a packet will be
@@ -574,21 +544,6 @@ void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
 }
 
 // =====================XDPEgressDeparserPSA=============================
-bool XDPEgressDeparserPSA::build() {
-    auto pl = controlBlock->container->type->applyParams;
-    auto it = pl->parameters.begin();
-    packet_out = *it;
-    headers = *(it + 3);
-
-    auto ht = program->typeMap->getType(headers);
-    if (ht == nullptr) {
-        return false;
-    }
-    headerType = EBPFTypeFactory::instance->create(ht);
-
-    return true;
-}
-
 void XDPEgressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("if (%s.drop) ",
@@ -668,11 +623,5 @@ void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
     builder->appendFormat("bpf_tail_call(%s, &egress_progs_table, 0)",
                           this->program->model.CPacketName.str());
     builder->endOfStatement(true);
-}
-
-void OptimizedXDPEgressDeparserPSA::emit(CodeBuilder *builder) {
-    codeGen->setBuilder(builder);
-    codeGen->asPointerVariables.insert(this->headers->name.name);
-    EBPFDeparserPSA::emit(builder);
 }
 }  // namespace EBPF
