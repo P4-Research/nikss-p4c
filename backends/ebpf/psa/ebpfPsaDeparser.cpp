@@ -369,6 +369,7 @@ bool TCIngressDeparserPSA::build() {
     auto it = pl->parameters.begin();
     packet_out = *it;
     headers = *(it + 4);
+    user_metadata = *(it + 5);
     resubmit_meta = *(it + 2);
 
     auto ht = program->typeMap->getType(headers);
@@ -378,6 +379,7 @@ bool TCIngressDeparserPSA::build() {
     headerType = EBPFTypeFactory::instance->create(ht);
 
     codeGen->asPointerVariables.insert(resubmit_meta->name.name);
+    codeGen->asPointerVariables.insert(user_metadata->name.name);
     codeGen->substitute(this->headers, parserHeaders);
     return true;
 }
@@ -464,6 +466,7 @@ bool XDPIngressDeparserPSA::build() {
     auto it = pl->parameters.begin();
     packet_out = *it;
     headers = *(it + 4);
+    user_metadata = *(it + 5);
     resubmit_meta = *(it + 2);
 
     auto ht = program->typeMap->getType(headers);
@@ -473,6 +476,7 @@ bool XDPIngressDeparserPSA::build() {
     headerType = EBPFTypeFactory::instance->create(ht);
 
     codeGen->asPointerVariables.insert(resubmit_meta->name.name);
+    codeGen->asPointerVariables.insert(user_metadata->name.name);
     codeGen->substitute(this->headers, parserHeaders);
     return true;
 }

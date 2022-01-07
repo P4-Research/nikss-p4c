@@ -816,8 +816,9 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
 
     auto it = pl->parameters.begin();
     parser->packet = *it; ++it;
-    parser->headers = *it;
-    auto resubmit_meta = *(it + 3);
+    parser->headers = *it; ++it;
+    parser->user_metadata = *it;
+    auto resubmit_meta = *(it + 2);
 
     for (auto state : prsr->container->states) {
         auto ps = new EBPFParserState(state, parser);
@@ -830,6 +831,7 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     parser->headerType = EBPFTypeFactory::instance->create(ht);
 
     parser->visitor->asPointerVariables.insert(resubmit_meta->name.name);
+    parser->visitor->asPointerVariables.insert(parser->user_metadata->name.name);
     parser->visitor->asPointerVariables.insert(parser->headers->name.name);
 
     findValueSets(prsr);

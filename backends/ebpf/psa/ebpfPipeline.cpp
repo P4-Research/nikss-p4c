@@ -225,10 +225,6 @@ void EBPFIngressPipeline::emitPSAControlOutputMetadata(CodeBuilder *builder) {
 void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     cstring msgStr, varStr;
 
-    control->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
-    parser->visitor->asPointerVariables.insert(control->user_metadata->name.name);
-    deparser->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
-
     // firstly emit process() in-lined function and then the actual BPF section.
     builder->append("static __always_inline");
     builder->spc();
