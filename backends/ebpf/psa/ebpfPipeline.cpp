@@ -393,6 +393,9 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
     varStr = Util::printf_format("%s->packet_path", compilerGlobalMetadata);
     builder->target->emitTraceMessage(builder, msgStr.c_str(), 2,
                                       varStr, lengthVar.c_str());
+    builder->emitIndent();
+    builder->appendFormat("goto %s;", IR::ParserState::start.c_str());
+    builder->newline();
     parser->emit(builder);
     builder->emitIndent();
     builder->append(IR::ParserState::accept);
@@ -561,6 +564,9 @@ void TCEgressPipeline::emit(CodeBuilder *builder) {
     pathStr = Util::printf_format("%s.packet_path", control->inputStandardMetadata->name.name);
     builder->target->emitTraceMessage(builder, msgStr.c_str(), 2, pathStr.c_str(),
                                       lengthVar.c_str());
+    builder->emitIndent();
+    builder->appendFormat("goto %s;", IR::ParserState::start.c_str());
+    builder->newline();
     parser->emit(builder);
     builder->emitIndent();
     builder->append(IR::ParserState::accept);
@@ -699,6 +705,9 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     // we do not support NM, CI2E, CE2E in XDP, so we hardcode NU as packet path
     msgStr = Util::printf_format("%s parser: parsing new packet, path=0", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
+    builder->emitIndent();
+    builder->appendFormat("goto %s;", IR::ParserState::start.c_str());
+    builder->newline();
     parser->emit(builder);
     builder->newline();
 
@@ -861,6 +870,9 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
     msgStr = Util::printf_format("%s parser: parsing new packet, path=0",
                                     sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
+    builder->emitIndent();
+    builder->appendFormat("goto %s;", IR::ParserState::start.c_str());
+    builder->newline();
     parser->emit(builder);
     builder->emitIndent();
     builder->append(IR::ParserState::accept);
