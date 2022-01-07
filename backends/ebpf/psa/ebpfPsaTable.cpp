@@ -475,6 +475,9 @@ void EBPFTablePSA::emitDefaultActionInitializer(CodeBuilder *builder) {
 
 void EBPFTablePSA::emitMapUpdateTraceMsg(CodeBuilder *builder, cstring mapName,
                                          cstring returnCode) const {
+    if (!program->options.emitTraceMessages) {
+        return;
+    }
     builder->emitIndent();
     builder->appendFormat("if (%s) ", returnCode.c_str());
     builder->blockStart();
