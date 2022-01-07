@@ -798,7 +798,7 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
             pipeline->parser->headers, pipeline->control->outputStandardMetadata,
             refmap, typemap, options, type);
     deparserBlock->apply(*deparser_converter);
-    pipeline->deparser = deparser_converter->getEBPFPsaDeparser();
+    pipeline->deparser = deparser_converter->getEBPFDeparser();
     CHECK_NULL(pipeline->deparser);
 
     return true;

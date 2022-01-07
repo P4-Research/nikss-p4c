@@ -17,12 +17,12 @@ bool EBPFPipeline::isEmpty() const {
     }
 
     // check if control is empty
-    if (control->p4Control->body->components.size() != 0) {
+    if (!control->p4Control->body->components.empty()) {
         return false;
     }
 
     // check if deparser doesn't emit anything
-    if (deparser->headersToEmit.size() != 0) {
+    if (!deparser->headersToEmit.empty()) {
         return false;
     }
 
@@ -422,13 +422,13 @@ void EBPFEgressPipeline::emit(CodeBuilder *builder) {
     builder->spc();
     builder->blockStart();
 
-    // TODO: override this method for XDPEgress
     emitGlobalMetadataInitializer(builder);
     emitLocalVariables(builder);
     emitUserMetadataInstance(builder);
     builder->newline();
 
-    if (options.pipelineOptimization) {
+    // FIXME: pipeline optimization supported for XDP only.
+    if (options.pipelineOptimization && this->is<XDPEgressPipeline>()) {
         /*
          * If we remove appended headers (e.g. bridged metadata) we should fix pkt_len
          * and add missing bytes, because pkt_len is used to update byte Counters.

@@ -4,7 +4,7 @@
 #include "ebpfPsaControl.h"
 #include "backends/ebpf/ebpfProgram.h"
 #include "ebpfPsaDeparser.h"
-#include "xdpTarget.h"
+#include "backends/ebpf/target.h"
 
 namespace EBPF {
 
