@@ -230,7 +230,8 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->spc();
     // FIXME: use Target to generate metadata type
     builder->appendFormat(
-            "int process(%s *%s, %s %s *%s, struct psa_ingress_output_metadata_t *%s, struct psa_global_metadata *%s, ",
+            "int process(%s *%s, %s %s *%s, struct psa_ingress_output_metadata_t *%s, "
+            "struct psa_global_metadata *%s, ",
             builder->target->packetDescriptorType(),
             model.CPacketName.str(),
             parser->headerType->to<EBPFStructType>()->kind,
@@ -240,7 +241,7 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
             compilerGlobalMetadata);
 
     auto type = EBPFTypeFactory::instance->create(deparser->resubmit_meta->type);
-    type->declare(builder,deparser->resubmit_meta->name.name,true);
+    type->declare(builder, deparser->resubmit_meta->name.name, true);
     builder->append(")");
     builder->newline();
     builder->blockStart();
