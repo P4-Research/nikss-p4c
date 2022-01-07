@@ -412,6 +412,131 @@ void EBPFEgressPipeline::emitCPUMAPLookup(CodeBuilder *builder) {
     builder->endOfStatement(true);
 }
 
+void EBPFEgressPipeline::emit(CodeBuilder *builder) {
+    cstring msgStr, varStr;
+
+    builder->newline();
+    target->emitCodeSection(builder, sectionName);
+    builder->emitIndent();
+    target->emitMain(builder, functionName, model.CPacketName.str());
+    builder->spc();
+    builder->blockStart();
+
+    // TODO: override this method for XDPEgress
+    emitGlobalMetadataInitializer(builder);
+    emitLocalVariables(builder);
+    emitUserMetadataInstance(builder);
+    builder->newline();
+
+    if (options.pipelineOptimization) {
+        /*
+         * If we remove appended headers (e.g. bridged metadata) we should fix pkt_len
+         * and add missing bytes, because pkt_len is used to update byte Counters.
+         */
+        unsigned append_bits = 0;
+        for (auto el : parser->to<EBPFOptimizedEgressParserPSA>()->headersToSkipMovingOffset) {
+            auto hdr = el.second;
+            append_bits += hdr->width_bits();
+        }
+
+        if (append_bits != 0) {
+            builder->emitIndent();
+            builder->appendFormat("%s += %d", this->lengthVar, append_bits / 8);
+            builder->endOfStatement(true);
+        }
+
+        emitLocalHeaderInstancesAsPointers(builder);
+        builder->emitIndent();
+
+        emitGetSharedHeaders(builder);
+
+        emitCPUMAPHeadersInitializers(builder);
+        builder->newline();
+        emitCPUMAPInitializers(builder);
+        builder->newline();
+        emitMetadataFromCPUMAP(builder);
+        builder->newline();
+
+        auto eg_parser = parser->to<EBPFOptimizedEgressParserPSA>();
+        auto fields = eg_parser->headerType->to<EBPFStructType>()->fields;
+
+        for (auto f : fields) {
+            builder->emitIndent();
+            builder->appendFormat("u8 %s_%s_ingress_ebpf_valid = %s->%s.ebpf_valid",
+                                  parser->headers->name.name, f->field->name.name,
+                                  parser->headers->name.name, f->field->name.name);
+            builder->endOfStatement(true);
+        }
+
+        for (auto f : fields) {
+            builder->emitIndent();
+            builder->appendFormat("%s->%s.ebpf_valid = 0",
+                                  parser->headers->name.name, f->field->name.name);
+            builder->endOfStatement(true);
+            eg_parser->headersToInvalidate.insert(f->field->name.name);
+        }
+    } else {
+        emitHeaderInstances(builder);
+        builder->newline();
+
+        emitCPUMAPInitializers(builder);
+        builder->newline();
+        emitHeadersFromCPUMAP(builder);
+        builder->newline();
+        emitMetadataFromCPUMAP(builder);
+        builder->newline();
+    }
+
+    emitPSAControlOutputMetadata(builder);
+    emitPSAControlInputMetadata(builder);
+
+    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d",
+                                 sectionName);
+    varStr = Util::printf_format("%s->packet_path", compilerGlobalMetadata);
+    builder->target->emitTraceMessage(builder, msgStr.c_str(), 2,
+                                      varStr, lengthVar.c_str());
+
+    // PRS
+    parser->emit(builder);
+    builder->emitIndent();
+
+    // CTRL
+    builder->append(IR::ParserState::accept);
+    builder->append(":");
+    builder->newline();
+    builder->emitIndent();
+    builder->appendFormat("%s.parser_error = %s",
+                          control->inputStandardMetadata->name.name, errorVar.c_str());
+    builder->endOfStatement(true);
+    builder->newline();
+    builder->emitIndent();
+    builder->blockStart();
+    builder->newline();
+    msgStr = Util::printf_format("%s control: packet processing started",
+                                 sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    control->emit(builder);
+    builder->blockEnd(true);
+    msgStr = Util::printf_format("%s control: packet processing finished",
+                                 sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+
+    // DPRS
+    builder->emitIndent();
+    builder->blockStart();
+    msgStr = Util::printf_format("%s deparser: packet deparsing started",
+                                 sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    deparser->emit(builder);
+    msgStr = Util::printf_format("%s deparser: packet deparsing finished",
+                                 sectionName);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    builder->blockEnd(true);
+
+    this->emitTrafficManager(builder);
+    builder->blockEnd(true);
+}
+
 // =====================TCIngressPipeline=============================
 void TCIngressPipeline::emitGlobalMetadataInitializer(CodeBuilder *builder) {
     EBPFPipeline::emitGlobalMetadataInitializer(builder);
@@ -523,71 +648,12 @@ void TCIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder,
             "IngressTM: Sending packet out of port %d with priority %d", 2, eg_port, cos);
     builder->emitIndent();
-    builder->appendFormat("return bpf_redirect(%s.egress_port, 0);",
+    builder->appendFormat("return bpf_redirect(%s.egress_port, 0)",
                           control->outputStandardMetadata->name.name);
+    builder->endOfStatement(true);
 }
 
 // =====================TCEgressPipeline=============================
-void TCEgressPipeline::emit(CodeBuilder *builder) {
-    cstring msgStr, pathStr;
-    control->codeGen->asPointerVariables.clear();
-    control->codeGen->asPointerVariables.insert(control->headers->name.name);
-    control->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
-    parser->visitor->asPointerVariables.insert(control->user_metadata->name.name);
-    deparser->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
-
-    builder->target->emitCodeSection(builder, sectionName);
-    builder->emitIndent();
-    builder->target->emitMain(builder, functionName, model.CPacketName.str());
-    builder->spc();
-    builder->blockStart();
-    emitGlobalMetadataInitializer(builder);
-    emitLocalVariables(builder);
-    emitUserMetadataInstance(builder);
-    emitHeaderInstances(builder);
-    emitCPUMAPInitializers(builder);
-    builder->newline();
-    emitHeadersFromCPUMAP(builder);
-    builder->newline();
-    emitMetadataFromCPUMAP(builder);
-    builder->newline();
-    emitPSAControlOutputMetadata(builder);
-    emitPSAControlInputMetadata(builder);
-    msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d",
-                                 sectionName);
-    pathStr = Util::printf_format("%s.packet_path", control->inputStandardMetadata->name.name);
-    builder->target->emitTraceMessage(builder, msgStr.c_str(), 2, pathStr.c_str(),
-                                      lengthVar.c_str());
-    parser->emit(builder);
-    builder->emitIndent();
-    builder->append(IR::ParserState::accept);
-    builder->append(":");
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat("%s.parser_error = %s",
-                          control->inputStandardMetadata->name.name, errorVar.c_str());
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->blockStart();
-    // TODO: add more info: packet length, ingress port
-    msgStr = Util::printf_format("%s control: packet processing started", sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
-    control->emit(builder);
-    builder->blockEnd(true);
-    msgStr = Util::printf_format("%s control: packet processing finished", sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
-    builder->emitIndent();
-    builder->blockStart();
-    msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
-    deparser->emit(builder);
-    builder->blockEnd(true);
-    msgStr = Util::printf_format("%s deparser: packet deparsing finished", sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
-    this->emitTrafficManager(builder);
-    builder->blockEnd(true);
-}
-
 void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     cstring varStr;
     // clone support
@@ -672,151 +738,36 @@ void XDPIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
 }
 
 // =====================XDPEgressPipeline=============================
-void XDPEgressPipeline::emit(CodeBuilder* builder) {
-    cstring msgStr, varStr;
-
-    control->codeGen->asPointerVariables.clear();
-    deparser->codeGen->asPointerVariables.clear();
-    control->codeGen->asPointerVariables.insert(control->headers->name.name);
-    control->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
-
-    parser->visitor->asPointerVariables.insert(control->user_metadata->name.name);
-    deparser->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
-    deparser->codeGen->asPointerVariables.insert(control->headers->name.name);
-
-    builder->target->emitCodeSection(builder, sectionName);
-    builder->appendFormat("int %s(struct xdp_md *%s)",
-                            functionName, model.CPacketName.str());
-    builder->spc();
-    builder->blockStart();
-
-    emitUserMetadataInstance(builder);
-    builder->newline();
-
-    emitLocalVariables(builder);
-    builder->newline();
-
-    if (options.pipelineOptimization) {
-        parser->visitor->asPointerVariables.insert(parser->headers->name.name);
-        control->codeGen->asPointerVariables.insert(control->headers->name.name);
-        deparser->codeGen->asPointerVariables.insert(control->headers->name.name);
-
-        /*
-         * If we remove appended headers (e.g. bridged metadata) we should fix pkt_len
-         * and add missing bytes, because pkt_len is used to update byte Counters.
-         */
-        unsigned append_bits = 0;
-        for (auto el : parser->to<EBPFOptimizedEgressParserPSA>()->headersToSkipMovingOffset) {
-            auto hdr = el.second;
-            append_bits += hdr->width_bits();
-        }
-
-        if (append_bits != 0) {
-            builder->emitIndent();
-            builder->appendFormat("%s += %d", this->lengthVar, append_bits / 8);
-            builder->endOfStatement(true);
-        }
-
-        emitLocalHeaderInstancesAsPointers(builder);
-        builder->emitIndent();
-        builder->target->emitTableLookup(builder, "bridged_headers", this->zeroKey.c_str(),
-                                         parser->headers->name.name);
-        builder->endOfStatement(true);
-        builder->emitIndent();
-        builder->appendFormat("if (!%s) ", parser->headers->name.name);
-        builder->blockStart();
-        builder->emitIndent();
-        builder->appendFormat("return %s;", dropReturnCode());
-        builder->newline();
-        builder->blockEnd(true);
-
-        builder->emitIndent();
-        builder->appendFormat("__u32 egress_ifindex = %s->__helper_variable",
-                              parser->headers->name.name);
-        builder->endOfStatement(true);
-
-        emitCPUMAPHeadersInitializers(builder);
-        builder->newline();
-        emitCPUMAPInitializers(builder);
-        builder->newline();
-        emitMetadataFromCPUMAP(builder);
-        builder->newline();
-    } else {
-        emitHeaderInstances(builder);
-        builder->newline();
-
-        emitCPUMAPInitializers(builder);
-        builder->newline();
-        emitHeadersFromCPUMAP(builder);
-        builder->newline();
-        emitMetadataFromCPUMAP(builder);
-        builder->newline();
-    }
-
-
-    emitPSAControlOutputMetadata(builder);
-    emitPSAControlInputMetadata(builder);
-
-    if (options.pipelineOptimization) {
-        auto dprs = this->deparser->to<OptimizedXDPEgressDeparserPSA>();
-
-        auto eg_parser = parser->to<EBPFOptimizedEgressParserPSA>();
-        auto fields = eg_parser->headerType->to<EBPFStructType>()->fields;
-
-        for (auto f : fields) {
-            builder->emitIndent();
-            builder->appendFormat("u8 %s_%s_ingress_ebpf_valid = %s->%s.ebpf_valid",
-                                  parser->headers->name.name, f->field->name.name,
-                                  parser->headers->name.name, f->field->name.name);
-            builder->endOfStatement(true);
-        }
-
-        for (auto f : fields) {
-            builder->emitIndent();
-            builder->appendFormat("%s->%s.ebpf_valid = 0",
-                                  parser->headers->name.name, f->field->name.name);
-            builder->endOfStatement(true);
-            eg_parser->headersToInvalidate.insert(f->field->name.name);
-        }
-    }
-
-    // we do not support NM, CI2E, CE2E in XDP, so we hardcode NU as packet path
-    msgStr = Util::printf_format("%s parser: parsing new packet, path=0",
-                                    sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
-    parser->emit(builder);
+void XDPEgressPipeline::emitGlobalMetadataInitializer(CodeBuilder *builder) {
     builder->emitIndent();
-    builder->append(IR::ParserState::accept);
-    builder->append(":");
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat("%s.parser_error = %s",
-                          control->inputStandardMetadata->name.name, errorVar.c_str());
+    builder->append("struct psa_global_metadata instance = {}");
     builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->appendFormat(
+            "struct psa_global_metadata *%s = &instance;",
+            compilerGlobalMetadata);
     builder->newline();
     builder->emitIndent();
-    builder->blockStart();
-    builder->newline();
-    msgStr = Util::printf_format("%s control: packet processing started",
-                                    sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
-    control->emit(builder);
-    builder->blockEnd(true);
-    msgStr = Util::printf_format("%s control: packet processing finished",
-                                    sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
+    builder->appendFormat("%s->packet_path = NORMAL_UNICAST", compilerGlobalMetadata);
+    builder->endOfStatement(true);
+}
+
+void XDPEgressPipeline::emitGetSharedHeaders(CodeBuilder *builder) {
+    builder->target->emitTableLookup(builder, "bridged_headers", this->zeroKey.c_str(),
+                                     parser->headers->name.name);
+    builder->endOfStatement(true);
     builder->emitIndent();
+    builder->appendFormat("if (!%s) ", parser->headers->name.name);
     builder->blockStart();
-    msgStr = Util::printf_format("%s deparser: packet deparsing started",
-                                    sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
-    deparser->emit(builder);
+    builder->emitIndent();
+    builder->appendFormat("return %s;", dropReturnCode());
+    builder->newline();
     builder->blockEnd(true);
-    msgStr = Util::printf_format("%s deparser: packet deparsing finished",
-                                    sectionName);
-    builder->target->emitTraceMessage(builder, msgStr.c_str());
-    this->emitTrafficManager(builder);
-    builder->blockEnd(true);
+
+    builder->emitIndent();
+    builder->appendFormat("__u32 egress_ifindex = %s->__helper_variable",
+                          parser->headers->name.name);
+    builder->endOfStatement(true);
 }
 
 void XDPEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
@@ -946,9 +897,9 @@ void TCTrafficManagerForXDP::emitReadXDP2TCMetadataFromCPUMAP(CodeBuilder *build
 
 void TCTrafficManagerForXDP::emit(CodeBuilder *builder) {
     cstring msgStr;
-    builder->target->emitCodeSection(builder, sectionName);
+    target->emitCodeSection(builder, sectionName);
     builder->emitIndent();
-    builder->target->emitMain(builder, functionName, model.CPacketName.str());
+    target->emitMain(builder, functionName, model.CPacketName.str());
     builder->spc();
     builder->blockStart();
     builder->emitIndent();

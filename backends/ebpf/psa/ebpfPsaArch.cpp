@@ -868,7 +868,11 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
 
     auto codegen = new ControlBodyTranslatorPSA(control);
     codegen->substitute(control->headers, parserHeaders);
-    codegen->asPointerVariables.insert(control->outputStandardMetadata->name.name);
+
+    if (type != TC_EGRESS && type != XDP_EGRESS) {
+        codegen->asPointerVariables.insert(control->outputStandardMetadata->name.name);
+    }
+
     codegen->asPointerVariables.insert(control->headers->name.name);
     codegen->asPointerVariables.insert(control->user_metadata->name.name);
 

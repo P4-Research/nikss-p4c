@@ -16,6 +16,15 @@ class XdpTarget : public KernelSamplesTarget {
     cstring redirectReturnCode() const { return "XDP_REDIRECT"; }
     cstring sysMapPath() const override { return "/sys/fs/bpf/xdp/globals"; }
     cstring packetDescriptorType() const override { return "struct xdp_md"; }
+
+    void emitMain(Util::SourceCodeBuilder* builder,
+                  cstring functionName,
+                  cstring argName) const override {
+        builder->appendFormat("int %s(%s *%s)",
+                              functionName.c_str(),
+                              packetDescriptorType(),
+                              argName.c_str());
+    }
 };
 
 }  // namespace EBPF

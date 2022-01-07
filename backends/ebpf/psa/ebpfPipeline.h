@@ -4,6 +4,7 @@
 #include "ebpfPsaControl.h"
 #include "backends/ebpf/ebpfProgram.h"
 #include "ebpfPsaDeparser.h"
+#include "xdpTarget.h"
 
 namespace EBPF {
 
@@ -11,7 +12,10 @@ namespace EBPF {
  * EBPFPipeline represents a single eBPF program in the TC/XDP hook.
  */
 class EBPFPipeline : public EBPFProgram {
+ protected:
+    const Target* target;
  public:
+
     const cstring name;
     cstring sectionName;
     cstring contextVar;
@@ -27,6 +31,7 @@ class EBPFPipeline : public EBPFProgram {
                  P4::TypeMap* typeMap) :
                  EBPFProgram(options, nullptr, refMap, typeMap, nullptr),
                              name(name) {
+        target = new KernelSamplesTarget(options.emitTraceMessages);
         sectionName = "classifier/" + name;
         functionName = name.replace("-", "_") + "_func";
         errorType = "ParserError_t";
@@ -143,6 +148,14 @@ class EBPFEgressPipeline : public EBPFPipeline {
     EBPFEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                        P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) { }
 
+    virtual void emitGetSharedHeaders(CodeBuilder* builder) {
+        (void) builder;
+        // this method should never be called.
+        ::error(ErrorType::ERR_UNSUPPORTED,
+                "We only implement pipeline optimization for XDP so far.");
+    }
+
+    void emit(CodeBuilder* builder) override;
     void emitPSAControlInputMetadata(CodeBuilder* builder) override;
     void emitPSAControlOutputMetadata(CodeBuilder* builder) override;
     void emitCPUMAPLookup(CodeBuilder *builder) override;
@@ -168,7 +181,6 @@ class TCEgressPipeline : public EBPFEgressPipeline {
                        P4::TypeMap* typeMap) :
             EBPFEgressPipeline(name, options, refMap, typeMap) { }
 
-    void emit(CodeBuilder *builder) override;
     void emitTrafficManager(CodeBuilder *builder) override;
 };
 
@@ -177,6 +189,7 @@ class XDPIngressPipeline : public EBPFIngressPipeline {
     XDPIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                     P4::TypeMap* typeMap) :
             EBPFIngressPipeline(name, options, refMap, typeMap) {
+        target = new XdpTarget(options.emitTraceMessages);
         sectionName = "xdp_ingress/" + name;
         ifindexVar = cstring("skb->ingress_ifindex");
         packetPathVar = cstring(compilerGlobalMetadata + "->packet_path");
@@ -191,6 +204,7 @@ class XDPEgressPipeline : public EBPFEgressPipeline {
     XDPEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                         P4::TypeMap* typeMap):
             EBPFEgressPipeline(name, options, refMap, typeMap) {
+        target = new XdpTarget(options.emitTraceMessages);
         if (options.pipelineOptimization) {
             sectionName = "xdp/" + name;
             ifindexVar = cstring("egress_ifindex");
@@ -204,7 +218,8 @@ class XDPEgressPipeline : public EBPFEgressPipeline {
         priorityVar = cstring("0");
     }
 
-    void emit(CodeBuilder *builder) override;
+    void emitGlobalMetadataInitializer(CodeBuilder *builder) override;
+    void emitGetSharedHeaders(CodeBuilder *builder) override;
     void emitTrafficManager(CodeBuilder *builder) override;
 };
 
