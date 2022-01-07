@@ -32,6 +32,9 @@ BPFNAME=$(basename $(BPFOBJ))
 
 CFILE=
 
+# Possible values: "-mcpu=generic|probe|v1|v2|v3" or "-mcpu=v1|v2 -mattr=+alu32"
+COMPILERFLAGS="-mcpu=generic"
+
 all: verify_target_bpf $(BPFOBJ)
 
 # Verify LLVM compiler tools are available and bpf target is supported by llc
@@ -79,13 +82,11 @@ ebpf:
 	$(CLANG) $(ARGS) $(CFLAGS) $(INCLUDES) -emit-llvm -c -o  $(BPFNAME).bc $(CFILE)
 	$(LLC) -march=bpf -mcpu=probe -filetype=obj -o $(BPFNAME).o $(BPFNAME).bc
 
-# Code generated in a one stage compilation C -> bpf is more friendly to eBPF verifier.
-# PTF tests do not pass when two stage compilation C -> bpf defined above is used. The
-# problem is with the code generated for bounded loops
 .PHONY: psa
 psa: P4ARGS_TARGET= --arch psa
 psa: $(BPFNAME).c
-	$(CLANG) -target bpf -DBTF $(ARGS) $(CFLAGS) $(INCLUDES) -c -o $(BPFNAME).o $(BPFNAME).c
+	$(CLANG) $(ARGS) $(CFLAGS) $(INCLUDES) -emit-llvm -DBTF -c -o  $(BPFNAME).bc $(BPFNAME).c
+	$(LLC) -march=bpf $(COMPILERFLAGS) -filetype=obj -o $(BPFNAME).o $(BPFNAME).bc
 
 clean:
 	rm -f *.o *.bc $(BPFNAME).c $(BPFNAME).h
