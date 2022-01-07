@@ -149,7 +149,6 @@ file(RELATIVE_PATH
 # binary to be in the top level directory. This should go away when we
 # remove automake and fix the scripts.
 add_custom_target(linkp4cebpf
-  COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/load-prog ${P4C_BINARY_DIR}/load-prog
   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/psabpf-ctl ${P4C_BINARY_DIR}/psabpf-ctl
   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CURRENT_BINARY_DIR_PATH_REL}/p4c-ebpf ${P4C_BINARY_DIR}/p4c-ebpf
   COMMAND ${CMAKE_COMMAND} -E make_directory ${P4C_BINARY_DIR}/p4include &&
@@ -255,11 +254,14 @@ endif()
 if (LIBBPF)
   set (PSABPFCTL_SRCS
           runtime/psabpf/lib/btf.c
+          runtime/psabpf/lib/common.c
           runtime/psabpf/lib/psabpf.c
           runtime/psabpf/lib/psabpf_clone_session.c
           runtime/psabpf/lib/psabpf_pipeline.c
           runtime/psabpf/lib/psabpf_table.c
+          runtime/psabpf/lib/psabpf_action_selector.c
           runtime/psabpf/lib/psabpf_meter.c
+          runtime/psabpf/CLI/action_selector.c
           runtime/psabpf/CLI/common.c
           runtime/psabpf/CLI/clone_session.c
           runtime/psabpf/CLI/pipeline.c
