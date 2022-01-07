@@ -46,6 +46,8 @@ bool EBPFDeparserPSA::isHeaderEmitted(cstring hdrName) const {
 }
 
 void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
+    auto pipeline = dynamic_cast<const EBPFPipeline*>(program);
+
     builder->emitIndent();
     builder->appendFormat("int %s = 0", this->outerHdrLengthVar.c_str());
     builder->endOfStatement(true);
@@ -88,7 +90,10 @@ void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
     builder->appendFormat("int %s = 0", this->returnCode.c_str());
     builder->endOfStatement(true);
     builder->emitIndent();
-    emitResizeHead(builder);
+    builder->appendFormat("%s = ", this->returnCode.c_str());
+    pipeline->target->emitResizeBuffer(builder, program->model.CPacketName.str(),
+                                       this->outerHdrOffsetVar.c_str());
+    builder->endOfStatement(true);
 
     builder->emitIndent();
     builder->appendFormat("if (%s) ", this->returnCode.c_str());
@@ -358,14 +363,6 @@ void EBPFDeparserPSA::emitDeclaration(CodeBuilder* builder, const IR::Declaratio
     EBPFControlPSA::emitDeclaration(builder, decl);
 }
 
-void TCDeparserPSA::emitResizeHead(CodeBuilder *builder) {
-    builder->appendFormat("%s = bpf_skb_adjust_room(%s, %s, 1, 0)",
-                          this->returnCode.c_str(),
-                          program->model.CPacketName.str(),
-                          this->outerHdrOffsetVar.c_str());
-    builder->endOfStatement(true);
-}
-
 // =====================TCIngressDeparserPSA=============================
 bool TCIngressDeparserPSA::build() {
     auto pl = controlBlock->container->type->applyParams;
@@ -459,14 +456,6 @@ bool TCEgressDeparserPSA::build() {
     headerType = EBPFTypeFactory::instance->create(ht);
 
     return true;
-}
-
-void XDPDeparserPSA::emitResizeHead(CodeBuilder *builder) {
-    builder->appendFormat("%s = bpf_xdp_adjust_head(%s, -%s)",
-                          this->returnCode.c_str(),
-                          program->model.CPacketName.str(),
-                          this->outerHdrOffsetVar.c_str());
-    builder->endOfStatement(true);
 }
 
 // =====================XDPIngressDeparserPSA=============================

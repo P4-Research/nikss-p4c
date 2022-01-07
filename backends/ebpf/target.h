@@ -47,6 +47,7 @@ class Target {
     virtual void emitLicense(Util::SourceCodeBuilder* builder, cstring license) const = 0;
     virtual void emitCodeSection(Util::SourceCodeBuilder* builder, cstring sectionName) const = 0;
     virtual void emitIncludes(Util::SourceCodeBuilder* builder) const = 0;
+    virtual void emitResizeBuffer(Util::SourceCodeBuilder* builder, cstring buffer, cstring offsetVar) const = 0;
     virtual void emitTableLookup(Util::SourceCodeBuilder* builder, cstring tblName,
                                  cstring key, cstring value) const = 0;
     virtual void emitTableUpdate(Util::SourceCodeBuilder* builder, cstring tblName,
@@ -141,6 +142,7 @@ class KernelSamplesTarget : public Target {
     void emitLicense(Util::SourceCodeBuilder* builder, cstring license) const override;
     void emitCodeSection(Util::SourceCodeBuilder* builder, cstring sectionName) const override;
     void emitIncludes(Util::SourceCodeBuilder* builder) const override;
+    void emitResizeBuffer(Util::SourceCodeBuilder* builder, cstring buffer, cstring offsetVar) const override;
     void emitTableLookup(Util::SourceCodeBuilder* builder, cstring tblName,
                          cstring key, cstring value) const override;
     void emitTableUpdate(Util::SourceCodeBuilder* builder, cstring tblName,
@@ -190,6 +192,7 @@ class XdpTarget : public KernelSamplesTarget {
     cstring sysMapPath() const override { return "/sys/fs/bpf/xdp/globals"; }
     cstring packetDescriptorType() const override { return "struct xdp_md"; }
 
+    void emitResizeBuffer(Util::SourceCodeBuilder* builder, cstring buffer, cstring offsetVar) const override;
     void emitMain(Util::SourceCodeBuilder* builder,
                   cstring functionName,
                   cstring argName) const override {
@@ -207,6 +210,7 @@ class BccTarget : public Target {
     void emitLicense(Util::SourceCodeBuilder*, cstring) const override {};
     void emitCodeSection(Util::SourceCodeBuilder*, cstring) const override {}
     void emitIncludes(Util::SourceCodeBuilder* builder) const override;
+    void emitResizeBuffer(Util::SourceCodeBuilder* builder, cstring buffer, cstring offsetVar) const override {};
     void emitTableLookup(Util::SourceCodeBuilder* builder, cstring tblName,
                          cstring key, cstring value) const override;
     void emitTableUpdate(Util::SourceCodeBuilder* builder, cstring tblName,
@@ -234,6 +238,7 @@ class BccTarget : public Target {
 class TestTarget : public EBPF::KernelSamplesTarget {
  public:
     TestTarget() : KernelSamplesTarget(false, "Userspace Test") {}
+    void emitResizeBuffer(Util::SourceCodeBuilder* builder, cstring buffer, cstring offsetVar) const override {};
     void emitIncludes(Util::SourceCodeBuilder* builder) const override;
     void emitTableDecl(Util::SourceCodeBuilder* builder,
                        cstring tblName, TableKind tableKind,

@@ -25,6 +25,12 @@ void KernelSamplesTarget::emitIncludes(Util::SourceCodeBuilder* builder) const {
     builder->newline();
 }
 
+void KernelSamplesTarget::emitResizeBuffer(Util::SourceCodeBuilder *builder,
+                                           cstring buffer, cstring offsetVar) const {
+    builder->appendFormat("bpf_skb_adjust_room(%s, %s, 1, 0)",
+                          buffer, offsetVar);
+}
+
 void KernelSamplesTarget::emitTableLookup(Util::SourceCodeBuilder* builder, cstring tblName,
                                           cstring key, cstring value) const {
     if (!value.isNullOrEmpty())
@@ -188,6 +194,13 @@ void KernelSamplesTarget::annotateTableWithBTF(Util::SourceCodeBuilder* builder,
     builder->appendFormat("BPF_ANNOTATE_KV_PAIR(%s, %s, %s)",
                           name.c_str(), keyType.c_str(), valueType.c_str());
     builder->newline();
+}
+
+//////////////////////////////////////////////////////////////
+void XdpTarget::emitResizeBuffer(Util::SourceCodeBuilder *builder,
+                                 cstring buffer, cstring offsetVar) const {
+    builder->appendFormat("bpf_xdp_adjust_head(%s, -%s)",
+                          buffer, offsetVar);
 }
 
 //////////////////////////////////////////////////////////////

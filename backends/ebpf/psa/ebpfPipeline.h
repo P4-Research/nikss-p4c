@@ -12,9 +12,8 @@ namespace EBPF {
  * EBPFPipeline represents a single eBPF program in the TC/XDP hook.
  */
 class EBPFPipeline : public EBPFProgram {
- protected:
-    const Target* target;
  public:
+    const Target* target;
 
     const cstring name;
     cstring sectionName;
