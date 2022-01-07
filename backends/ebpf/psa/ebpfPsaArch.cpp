@@ -80,9 +80,7 @@ void PSAArch::emit2TC(CodeBuilder *builder) const {
      */
     emitInternalStructures(builder);
     emitTypes(builder);
-    if (options.generateHdrInMap) {
-        emitGlobalHeadersMetadata(builder);
-    }
+    emitGlobalHeadersMetadata(builder);
 
     /*
      * 5. BPF map definitions.
@@ -319,11 +317,9 @@ void PSAArch::emitInstances2TC(CodeBuilder *builder) const {
     tcEgress->parser->emitValueSetInstances(builder);
     tcEgress->control->emitTableInstances(builder);
 
-    if (options.generateHdrInMap) {
-        builder->target->emitTableDecl(builder, "hdr_md_cpumap",
-                                       TablePerCPUArray, "u32",
-                                       "struct hdr_md", 2);
-    }
+    builder->target->emitTableDecl(builder, "hdr_md_cpumap",
+                                   TablePerCPUArray, "u32",
+                                   "struct hdr_md", 2);
 
     builder->appendLine("REGISTER_END()");
     builder->newline();
@@ -411,9 +407,8 @@ void PSAArch::emit2XDP(CodeBuilder *builder) const {
 
     emitInternalStructures(builder);
     emitTypes(builder);
-    if (options.generateHdrInMap) {
-        emitGlobalHeadersMetadata(builder);
-    }
+    emitGlobalHeadersMetadata(builder);
+
     emitXDP2TCInternalStructures(builder);
 
     emitInstances2XDP(builder);
@@ -494,11 +489,10 @@ void PSAArch::emitInstances2XDP(CodeBuilder *builder) const {
                                        "u32", "u32", 1);
     }
 
-    if (options.generateHdrInMap) {
-        builder->target->emitTableDecl(builder, "hdr_md_cpumap",
-                                       TablePerCPUArray, "u32",
-                                       "struct hdr_md", 2);
-    }
+    builder->target->emitTableDecl(builder, "hdr_md_cpumap",
+                                   TablePerCPUArray, "u32",
+                                   "struct hdr_md", 2);
+
     builder->appendLine("REGISTER_END()");
     builder->newline();
 }
@@ -836,9 +830,7 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     parser->headerType = EBPFTypeFactory::instance->create(ht);
 
     parser->visitor->asPointerVariables.insert(resubmit_meta->name.name);
-    if (type == TC_INGRESS || type == XDP_INGRESS || options.generateHdrInMap) {
-        parser->visitor->asPointerVariables.insert(parser->headers->name.name);
-    }
+    parser->visitor->asPointerVariables.insert(parser->headers->name.name);
 
     findValueSets(prsr);
 
@@ -877,14 +869,8 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     auto codegen = new ControlBodyTranslatorPSA(control);
     codegen->substitute(control->headers, parserHeaders);
     codegen->asPointerVariables.insert(control->outputStandardMetadata->name.name);
-
-    if (this->type == TC_INGRESS || type == XDP_INGRESS || options.generateHdrInMap) {
-        codegen->asPointerVariables.insert(control->headers->name.name);
-    }
-
-    if (options.generateHdrInMap) {
-        codegen->asPointerVariables.insert(control->user_metadata->name.name);
-    }
+    codegen->asPointerVariables.insert(control->headers->name.name);
+    codegen->asPointerVariables.insert(control->user_metadata->name.name);
 
     control->codeGen = codegen;
 
@@ -1059,9 +1045,7 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
     }
 
     auto codegen = new DeparserBodyTranslator(deparser);
-    if (this->type == TC_INGRESS || type == XDP_INGRESS || options.generateHdrInMap) {
-        codegen->asPointerVariables.insert(parserHeaders->name.name);
-    }
+    codegen->asPointerVariables.insert(parserHeaders->name.name);
 
     deparser->codeGen = codegen;
     if (!deparser->build()) {
@@ -1120,9 +1104,7 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expressi
                 auto exprMemb = expr->to<IR::Member>();
                 auto headerName = exprMemb->member.name;
                 auto headersStructName = deparser->parserHeaders->name.name;
-                cstring op = (this->type == TC_INGRESS
-                            || options.generateHdrInMap) ? "->" : ".";
-                deparser->headersExpressions.push_back(headersStructName + op + headerName);
+                deparser->headersExpressions.push_back(headersStructName + "->" + headerName);
                 return false;
             }
         }

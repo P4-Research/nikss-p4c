@@ -30,22 +30,6 @@ def xdp2tc_head_not_supported(cls):
         cls.skip_reason = "not supported for xdp2tc=head"
     return cls
 
-
-def hdr2map_required(cls):
-    cls.hdr2map_required = True
-    return cls
-
-
-def hdr2map_required_with_table_caching(cls):
-    if cls.is_table_caching_test(cls):
-        cls.hdr2map_required = True
-    return cls
-
-def hdr2map_required_with_pipeline_opt(cls):
-    if cls.is_pipeline_opt_enabled(cls):
-        cls.hdr2map_required = True
-    return cls
-
 def table_caching_only(cls):
     if not cls.is_table_caching_test(cls):
         cls.skip = True
@@ -62,7 +46,6 @@ def skip_if_pipeline_optimization_enabled(cls):
 class EbpfTest(BaseTest):
     skip = False
     skip_reason = ''
-    hdr2map_required = False
     switch_ns = 'test'
     test_prog_image = 'generic.o'  # default, if test case not specify program
     ctool_file_path = ""
@@ -211,12 +194,6 @@ class P4EbpfTest(EbpfTest):
 
         if self.is_pipeline_opt_enabled():
             p4args += " --pipeline-opt"
-
-        if testutils.test_param_get('hdr2Map') == 'True':
-            p4args += " --hdr2Map"
-        else:
-            if self.hdr2map_required:
-                self.skipTest("hdr2Map required for the PTF test")
 
         if self.is_table_caching_test():
             p4args += " --table-caching"
