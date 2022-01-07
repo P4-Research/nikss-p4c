@@ -15,6 +15,7 @@ class XdpTarget : public KernelSamplesTarget {
     cstring abortReturnCode() const override { return "XDP_ABORTED"; }
     cstring redirectReturnCode() const { return "XDP_REDIRECT"; }
     cstring sysMapPath() const override { return "/sys/fs/bpf/xdp/globals"; }
+    cstring packetDescriptorType() const override { return "struct xdp_md"; }
 };
 
 }  // namespace EBPF

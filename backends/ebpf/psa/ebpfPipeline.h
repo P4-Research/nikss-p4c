@@ -123,15 +123,21 @@ class EBPFIngressPipeline : public EBPFPipeline {
 
     EBPFIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                         P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) {
-        // FIXME: hardcded
+        // FIXME: hardcoded
         maxResubmitDepth = 4;
     }
 
     void emitSharedMetadataInitializer(CodeBuilder* builder);
+
+    void emit(CodeBuilder *builder) override;
     void emitPSAControlInputMetadata(CodeBuilder* builder) override;
     void emitPSAControlOutputMetadata(CodeBuilder* builder) override;
 };
 
+/*
+ * EBPFEgressPipeline represents a hook-independent EBPF-based egress pipeline.
+ * It includes common definitions for TC and XDP.
+ */
 class EBPFEgressPipeline : public EBPFPipeline {
  public:
     EBPFEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
@@ -144,16 +150,12 @@ class EBPFEgressPipeline : public EBPFPipeline {
 
 class TCIngressPipeline : public EBPFIngressPipeline {
  public:
-    cstring processFunctionName;
-
     TCIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                         P4::TypeMap* typeMap) :
-            EBPFIngressPipeline(name, options, refMap, typeMap) {
-        processFunctionName = "process";
-    }
+            EBPFIngressPipeline(name, options, refMap, typeMap) {}
 
+    void emitGlobalMetadataInitializer(CodeBuilder *builder) override;
     void emitTrafficManager(CodeBuilder *builder) override;
-    void emit(CodeBuilder *builder) override;
  private:
     void emitTCWorkaroundUsingMeta(CodeBuilder *builder);
     void emitTCWorkaroundUsingHead(CodeBuilder *builder);
@@ -181,7 +183,6 @@ class XDPIngressPipeline : public EBPFIngressPipeline {
     }
 
     void emitGlobalMetadataInitializer(CodeBuilder *builder) override;
-    void emit(CodeBuilder *builder) override;
     void emitTrafficManager(CodeBuilder *builder) override;
 };
 

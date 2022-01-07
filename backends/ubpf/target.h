@@ -61,6 +61,7 @@ namespace UBPF {
         cstring abortReturnCode() const override { return "1"; }
         cstring forwardReturnCode() const override { return "1"; }
         cstring sysMapPath() const override { return ""; }
+        cstring packetDescriptorType() const override { return "void"; }
     };
 
 }

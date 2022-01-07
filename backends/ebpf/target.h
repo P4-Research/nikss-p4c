@@ -103,6 +103,7 @@ class Target {
     virtual cstring abortReturnCode() const = 0;
     // Path on /sys filesystem where maps are stored
     virtual cstring sysMapPath() const = 0;
+    virtual cstring packetDescriptorType() const = 0;
 };
 
 // Represents a target that is compiled within the kernel
@@ -171,6 +172,7 @@ class KernelSamplesTarget : public Target {
     cstring dropReturnCode() const override { return "TC_ACT_SHOT"; }
     cstring abortReturnCode() const override { return "TC_ACT_SHOT"; }
     cstring sysMapPath() const override { return "/sys/fs/bpf/tc/globals"; }
+    cstring packetDescriptorType() const override { return "struct __sk_buff"; }
 
     void annotateTableWithBTF(Util::SourceCodeBuilder* builder, cstring name,
                               cstring keyType, cstring valueType) const;
@@ -202,6 +204,7 @@ class BccTarget : public Target {
     cstring dropReturnCode() const override { return "1"; }
     cstring abortReturnCode() const override { return "1"; }
     cstring sysMapPath() const override { return "/sys/fs/bpf"; }
+    cstring packetDescriptorType() const override { return "struct __sk_buff"; }
 };
 
 // A userspace test version with functionality equivalent to the kernel
@@ -221,6 +224,7 @@ class TestTarget : public EBPF::KernelSamplesTarget {
     cstring dropReturnCode() const override { return "false"; }
     cstring abortReturnCode() const override { return "false"; }
     cstring sysMapPath() const override { return "/sys/fs/bpf"; }
+    cstring packetDescriptorType() const override { return "struct __sk_buff"; }
 };
 
 }  // namespace EBPF
