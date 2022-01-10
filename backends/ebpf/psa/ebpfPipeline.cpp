@@ -73,20 +73,7 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     }
 }
 
-void EBPFPipeline::emitLocalUserMetadataInstances(CodeBuilder *builder) {
-    builder->emitIndent();
-    auto user_md_type = typeMap->getType(control->user_metadata);
-    if (user_md_type == nullptr) {
-        ::error("cannot emit user metadata");
-    }
-    auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
-    userMetadataType->declare(builder, control->user_metadata->name.name, false);
-    builder->append(" = ");
-    userMetadataType->emitInitializer(builder);
-    builder->endOfStatement(true);
-}
-
-void EBPFPipeline::emitCPUMapUserMetadataInstance(CodeBuilder *builder) {
+void EBPFPipeline::emitUserMetadataInstance(CodeBuilder *builder) {
     builder->emitIndent();
     auto user_md_type = typeMap->getType(control->user_metadata);
     if (user_md_type == nullptr) {
@@ -94,20 +81,6 @@ void EBPFPipeline::emitCPUMapUserMetadataInstance(CodeBuilder *builder) {
     }
     auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
     userMetadataType->declare(builder, control->user_metadata->name.name, true);
-    builder->endOfStatement(true);
-}
-
-void EBPFPipeline::emitUserMetadataInstance(CodeBuilder *builder) {
-    emitCPUMapUserMetadataInstance(builder);
-}
-
-void EBPFPipeline::emitLocalHeaderInstances(CodeBuilder *builder) {
-    builder->emitIndent();
-    // declaring header instance as volatile optimizes stack size and improves throughput
-    builder->append("volatile ");
-    parser->headerType->declare(builder, parser->headers->name.name, false);
-    builder->append(" = ");
-    parser->headerType->emitInitializer(builder);
     builder->endOfStatement(true);
 }
 
@@ -124,15 +97,11 @@ void EBPFPipeline::emitCPUMAPHeadersInitializers(CodeBuilder *builder) {
     builder->appendLine("struct hdr_md *hdrMd;");
 }
 
-void EBPFPipeline::emitCPUMAPHeaderInstances(CodeBuilder *builder) {
+void EBPFPipeline::emitHeaderInstances(CodeBuilder* builder) {
     emitCPUMAPHeadersInitializers(builder);
     builder->emitIndent();
     parser->headerType->declare(builder, parser->headers->name.name, true);
     builder->endOfStatement(false);
-}
-
-void EBPFPipeline::emitHeaderInstances(CodeBuilder* builder) {
-    emitCPUMAPHeaderInstances(builder);
 }
 
 void EBPFPipeline::emitCPUMAPLookup(CodeBuilder *builder) {
@@ -431,9 +400,8 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
     builder->appendFormat("%s.resubmit = 0;", control->outputStandardMetadata->name.name);
     builder->newline();
     builder->emitIndent();
-    builder->appendFormat("ret = %s(skb, ", processFunctionName);
-
-    builder->appendFormat("(%s %s *) %s, &%s, &%s);",
+    builder->appendFormat("ret =  %s(skb, (%s %s *) %s, &%s, &%s);",
+                          processFunctionName,
                           parser->headerType->to<EBPFStructType>()->kind,
                           parser->headerType->to<EBPFStructType>()->name,
                           parser->headers->name.name,
@@ -912,9 +880,10 @@ void TCTrafficManagerForXDP::emitReadXDP2TCMetadataFromHead(CodeBuilder *builder
                         "    *ether_type = xdp2tc_md.pkt_ether_type;\n");
         builder->emitIndent();
         builder->appendLine("struct psa_ingress_output_metadata_t ostd = xdp2tc_md.ostd;");
-        builder->emitIndent();
 
+        builder->emitIndent();
         emitLocalHeaderInstancesAsPointers(builder);
+
         builder->emitIndent();
         builder->appendFormat("%s = &(xdp2tc_md.headers);", parser->headers->name.name);
         builder->newline();
