@@ -73,20 +73,7 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     }
 }
 
-void EBPFPipeline::emitLocalUserMetadataInstances(CodeBuilder *builder) {
-    builder->emitIndent();
-    auto user_md_type = typeMap->getType(control->user_metadata);
-    if (user_md_type == nullptr) {
-        ::error("cannot emit user metadata");
-    }
-    auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
-    userMetadataType->declare(builder, control->user_metadata->name.name, false);
-    builder->append(" = ");
-    userMetadataType->emitInitializer(builder);
-    builder->endOfStatement(true);
-}
-
-void EBPFPipeline::emitCPUMapUserMetadataInstance(CodeBuilder *builder) {
+void EBPFPipeline::emitUserMetadataInstance(CodeBuilder *builder) {
     builder->emitIndent();
     auto user_md_type = typeMap->getType(control->user_metadata);
     if (user_md_type == nullptr) {
@@ -94,24 +81,6 @@ void EBPFPipeline::emitCPUMapUserMetadataInstance(CodeBuilder *builder) {
     }
     auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
     userMetadataType->declare(builder, control->user_metadata->name.name, true);
-    builder->endOfStatement(true);
-}
-
-void EBPFPipeline::emitUserMetadataInstance(CodeBuilder *builder) {
-    if (!options.generateHdrInMap) {
-        emitLocalUserMetadataInstances(builder);
-    } else {
-        emitCPUMapUserMetadataInstance(builder);
-    }
-}
-
-void EBPFPipeline::emitLocalHeaderInstances(CodeBuilder *builder) {
-    builder->emitIndent();
-    // declaring header instance as volatile optimizes stack size and improves throughput
-    builder->append("volatile ");
-    parser->headerType->declare(builder, parser->headers->name.name, false);
-    builder->append(" = ");
-    parser->headerType->emitInitializer(builder);
     builder->endOfStatement(true);
 }
 
@@ -128,19 +97,11 @@ void EBPFPipeline::emitCPUMAPHeadersInitializers(CodeBuilder *builder) {
     builder->appendLine("struct hdr_md *hdrMd;");
 }
 
-void EBPFPipeline::emitCPUMAPHeaderInstances(CodeBuilder *builder) {
+void EBPFPipeline::emitHeaderInstances(CodeBuilder* builder) {
     emitCPUMAPHeadersInitializers(builder);
     builder->emitIndent();
     parser->headerType->declare(builder, parser->headers->name.name, true);
     builder->endOfStatement(false);
-}
-
-void EBPFPipeline::emitHeaderInstances(CodeBuilder* builder) {
-    if (!options.generateHdrInMap) {
-        emitLocalHeaderInstances(builder);
-    } else {
-        emitCPUMAPHeaderInstances(builder);
-    }
 }
 
 void EBPFPipeline::emitCPUMAPLookup(CodeBuilder *builder) {
@@ -334,10 +295,8 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
     builder->append("static __always_inline");
     builder->spc();
 
-    if (options.generateHdrInMap) {
-        parser->visitor->asPointerVariables.insert(control->user_metadata->name.name);
-        deparser->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
-    }
+    parser->visitor->asPointerVariables.insert(control->user_metadata->name.name);
+    deparser->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
 
     builder->appendFormat(
             "int %s(SK_BUFF *%s, %s %s *%s, struct psa_ingress_output_metadata_t *%s, ",
@@ -377,15 +336,14 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
 
     builder->newline();
     emitUserMetadataInstance(builder);
-    if (options.generateHdrInMap) {
-        emitCPUMAPHeadersInitializers(builder);
-        builder->newline();
-        emitCPUMAPInitializers(builder);
-        builder->newline();
-        emitMetadataFromCPUMAP(builder);
-        builder->newline();
-        emitHeadersFromCPUMAP(builder);
-    }
+
+    emitCPUMAPHeadersInitializers(builder);
+    builder->newline();
+    emitCPUMAPInitializers(builder);
+    builder->newline();
+    emitMetadataFromCPUMAP(builder);
+    builder->newline();
+    emitHeadersFromCPUMAP(builder);
     builder->newline();
 
     msgStr = Util::printf_format("%s parser: parsing new packet, path=%%d, pkt_len=%%d",
@@ -442,23 +400,14 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
     builder->appendFormat("%s.resubmit = 0;", control->outputStandardMetadata->name.name);
     builder->newline();
     builder->emitIndent();
-    builder->appendFormat("ret = %s(skb, ", processFunctionName);
+    builder->appendFormat("ret =  %s(skb, (%s %s *) %s, &%s, &%s);",
+                          processFunctionName,
+                          parser->headerType->to<EBPFStructType>()->kind,
+                          parser->headerType->to<EBPFStructType>()->name,
+                          parser->headers->name.name,
+                          control->outputStandardMetadata->name.name,
+                          deparser->to<TCIngressDeparserPSA>()->resubmit_meta->name.name);
 
-    if (!options.generateHdrInMap) {
-        builder->appendFormat("(%s %s *) &%s, &%s, &%s);",
-                    parser->headerType->to<EBPFStructType>()->kind,
-                    parser->headerType->to<EBPFStructType>()->name,
-                    parser->headers->name.name,
-                    control->outputStandardMetadata->name.name,
-                    deparser->to<TCIngressDeparserPSA>()->resubmit_meta->name.name);
-    } else {
-        builder->appendFormat("(%s %s *) %s, &%s, &%s);",
-                    parser->headerType->to<EBPFStructType>()->kind,
-                    parser->headerType->to<EBPFStructType>()->name,
-                    parser->headers->name.name,
-                    control->outputStandardMetadata->name.name,
-                    deparser->to<TCIngressDeparserPSA>()->resubmit_meta->name.name);
-    }
     builder->newline();
     builder->appendFormat("        if (%s.drop == 1 || %s.resubmit == 0) {\n"
                     "            break;\n"
@@ -466,14 +415,6 @@ void TCIngressPipeline::emit(CodeBuilder *builder) {
                     control->outputStandardMetadata->name.name,
                     control->outputStandardMetadata->name.name);
     builder->emitIndent();
-    // This memset is useless if hdr2Map is used because the 'process' function
-    // zero-initialize data from CPU map.
-    if (!options.generateHdrInMap) {
-        builder->appendFormat("__builtin_memset((void *) &%s, 0, sizeof(%s %s));",
-                    parser->headers->name.name,
-                    parser->headerType->to<EBPFStructType>()->kind,
-                    parser->headerType->to<EBPFStructType>()->name);
-    }
     builder->newline();
     builder->blockEnd(true);
 
@@ -530,12 +471,10 @@ void TCIngressPipeline::emitTrafficManager(CodeBuilder *builder) {
 void TCEgressPipeline::emit(CodeBuilder *builder) {
     cstring msgStr, pathStr;
     control->codeGen->asPointerVariables.clear();
-    if (options.generateHdrInMap) {
-        control->codeGen->asPointerVariables.insert(control->headers->name.name);
-        control->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
-        parser->visitor->asPointerVariables.insert(control->user_metadata->name.name);
-        deparser->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
-    }
+    control->codeGen->asPointerVariables.insert(control->headers->name.name);
+    control->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
+    parser->visitor->asPointerVariables.insert(control->user_metadata->name.name);
+    deparser->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
 
     builder->target->emitCodeSection(builder, sectionName);
     builder->emitIndent();
@@ -546,13 +485,11 @@ void TCEgressPipeline::emit(CodeBuilder *builder) {
     emitLocalVariables(builder);
     emitUserMetadataInstance(builder);
     emitHeaderInstances(builder);
-    if (options.generateHdrInMap) {
-        emitCPUMAPInitializers(builder);
-        builder->newline();
-        emitHeadersFromCPUMAP(builder);
-        builder->newline();
-        emitMetadataFromCPUMAP(builder);
-    }
+    emitCPUMAPInitializers(builder);
+    builder->newline();
+    emitHeadersFromCPUMAP(builder);
+    builder->newline();
+    emitMetadataFromCPUMAP(builder);
     builder->newline();
     emitPSAControlOutputMetadata(builder);
     emitPSAControlInputMetadata(builder);
@@ -657,13 +594,11 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     control->codeGen->asPointerVariables.clear();
     deparser->codeGen->asPointerVariables.clear();
 
-    if (options.generateHdrInMap) {
-        control->codeGen->asPointerVariables.insert(control->headers->name.name);
-        control->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
-        parser->visitor->asPointerVariables.insert(control->user_metadata->name.name);
-        deparser->codeGen->asPointerVariables.insert(control->headers->name.name);
-        deparser->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
-    }
+    control->codeGen->asPointerVariables.insert(control->headers->name.name);
+    control->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
+    parser->visitor->asPointerVariables.insert(control->user_metadata->name.name);
+    deparser->codeGen->asPointerVariables.insert(control->headers->name.name);
+    deparser->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
 
     builder->target->emitCodeSection(builder, sectionName);
     builder->emitIndent();
@@ -683,15 +618,12 @@ void XDPIngressPipeline::emit(CodeBuilder *builder) {
     builder->newline();
 
     emitLocalVariables(builder);
-
-    if (options.generateHdrInMap) {
-        emitCPUMAPInitializers(builder);
-        builder->newline();
-        emitHeadersFromCPUMAP(builder);
-        builder->newline();
-        emitMetadataFromCPUMAP(builder);
-        builder->newline();
-    }
+    emitCPUMAPInitializers(builder);
+    builder->newline();
+    emitHeadersFromCPUMAP(builder);
+    builder->newline();
+    emitMetadataFromCPUMAP(builder);
+    builder->newline();
 
     emitPSAControlOutputMetadata(builder);
 
@@ -748,14 +680,12 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
 
     control->codeGen->asPointerVariables.clear();
     deparser->codeGen->asPointerVariables.clear();
-    if (options.generateHdrInMap) {
-        control->codeGen->asPointerVariables.insert(control->headers->name.name);
-        control->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
+    control->codeGen->asPointerVariables.insert(control->headers->name.name);
+    control->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
 
-        parser->visitor->asPointerVariables.insert(control->user_metadata->name.name);
-        deparser->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
-        deparser->codeGen->asPointerVariables.insert(control->headers->name.name);
-    }
+    parser->visitor->asPointerVariables.insert(control->user_metadata->name.name);
+    deparser->codeGen->asPointerVariables.insert(control->user_metadata->name.name);
+    deparser->codeGen->asPointerVariables.insert(control->headers->name.name);
 
     builder->target->emitCodeSection(builder, sectionName);
     builder->appendFormat("int %s(struct xdp_md *%s)",
@@ -808,26 +738,22 @@ void XDPEgressPipeline::emit(CodeBuilder* builder) {
                               parser->headers->name.name);
         builder->endOfStatement(true);
 
-        if (options.generateHdrInMap) {
-            emitCPUMAPHeadersInitializers(builder);
-            builder->newline();
-            emitCPUMAPInitializers(builder);
-            builder->newline();
-            emitMetadataFromCPUMAP(builder);
-            builder->newline();
-        }
+        emitCPUMAPHeadersInitializers(builder);
+        builder->newline();
+        emitCPUMAPInitializers(builder);
+        builder->newline();
+        emitMetadataFromCPUMAP(builder);
+        builder->newline();
     } else {
         emitHeaderInstances(builder);
         builder->newline();
 
-        if (options.generateHdrInMap) {
-            emitCPUMAPInitializers(builder);
-            builder->newline();
-            emitHeadersFromCPUMAP(builder);
-            builder->newline();
-            emitMetadataFromCPUMAP(builder);
-            builder->newline();
-        }
+        emitCPUMAPInitializers(builder);
+        builder->newline();
+        emitHeadersFromCPUMAP(builder);
+        builder->newline();
+        emitMetadataFromCPUMAP(builder);
+        builder->newline();
     }
 
 
@@ -954,18 +880,14 @@ void TCTrafficManagerForXDP::emitReadXDP2TCMetadataFromHead(CodeBuilder *builder
                         "    *ether_type = xdp2tc_md.pkt_ether_type;\n");
         builder->emitIndent();
         builder->appendLine("struct psa_ingress_output_metadata_t ostd = xdp2tc_md.ostd;");
+
         builder->emitIndent();
-        // declaring header instance as volatile optimizes stack size and improves throughput
-        if (!options.generateHdrInMap) {
-            builder->append("volatile ");
-            parser->headerType->declare(builder, parser->headers->name.name, false);
-            builder->appendLine(" = xdp2tc_md.headers;");
-        } else {
-            emitLocalHeaderInstancesAsPointers(builder);
-            builder->emitIndent();
-            builder->appendFormat("%s = &(xdp2tc_md.headers);", parser->headers->name.name);
-            builder->newline();
-        }
+        emitLocalHeaderInstancesAsPointers(builder);
+
+        builder->emitIndent();
+        builder->appendFormat("%s = &(xdp2tc_md.headers);", parser->headers->name.name);
+        builder->newline();
+
         builder->emitIndent();
         builder->appendFormat("%s = xdp2tc_md.packetOffsetInBits;", offsetVar.c_str());
 
@@ -1001,17 +923,11 @@ void TCTrafficManagerForXDP::emitReadXDP2TCMetadataFromCPUMAP(CodeBuilder *build
     builder->emitIndent();
 
     builder->emitIndent();
-    // declaring header instance as volatile optimizes stack size and improves throughput
-    if (!options.generateHdrInMap) {
-        builder->append("volatile ");
-        parser->headerType->declare(builder, parser->headers->name.name, false);
-        builder->appendLine(" = md->headers;");
-    } else {
-        emitLocalHeaderInstancesAsPointers(builder);
-        builder->emitIndent();
-        builder->appendFormat("%s = &(md->headers);", parser->headers->name.name);
-        builder->newline();
-    }
+    emitLocalHeaderInstancesAsPointers(builder);
+    builder->emitIndent();
+    builder->appendFormat("%s = &(md->headers);", parser->headers->name.name);
+    builder->newline();
+
     builder->emitIndent();
     builder->appendLine("struct psa_ingress_output_metadata_t ostd = md->ostd;");
     builder->emitIndent();

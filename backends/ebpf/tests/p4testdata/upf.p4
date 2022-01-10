@@ -1,8 +1,5 @@
-// must be compiled with --hdr2map option
-
 #include <core.p4>
 #include "psa.p4"
-
 
 const bit<16> TYPE_IPV4 = 0x800;
 const bit<8> PROTO_ICMP = 1;

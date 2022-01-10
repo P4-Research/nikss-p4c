@@ -62,7 +62,6 @@ def pkt_route(pkt, mac_src, mac_dst):
     new_pkt[Ether].dst = mac_dst
     return new_pkt
 
-@hdr2map_required
 class UPFTest(P4EbpfTest):
     p4_file_path = "p4testdata/upf.p4"
 
