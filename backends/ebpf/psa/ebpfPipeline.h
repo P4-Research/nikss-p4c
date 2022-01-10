@@ -73,23 +73,18 @@ class EBPFPipeline : public EBPFProgram {
     virtual void emitPSAControlInputMetadata(CodeBuilder* builder) = 0;
     virtual void emitPSAControlOutputMetadata(CodeBuilder* builder) = 0;
 
-    /* Generates an instance of struct Headers_t and allocates it on the BPF program's stack. */
-    void emitLocalHeaderInstances(CodeBuilder *builder);
     /* Generates a pointer to struct Headers_t and puts it on the BPF program's stack. */
     void emitLocalHeaderInstancesAsPointers(CodeBuilder *builder);
     /* Generates a pointer to struct hdr_md. The pointer is used to access data from per-CPU map. */
     void emitCPUMAPHeadersInitializers(CodeBuilder *builder);
-    void emitCPUMAPHeaderInstances(CodeBuilder *builder);
     /* Generates an instance of struct Headers_t,
-     * allocated either on stack or in the per-CPU map. */
+     * allocated in the per-CPU map. */
     void emitHeaderInstances(CodeBuilder *builder) override;
     /* Generates a set of helper variables that are used during packet processing. */
     void emitLocalVariables(CodeBuilder* builder) override;
 
-    void emitLocalUserMetadataInstances(CodeBuilder *builder);
-    void emitCPUMapUserMetadataInstance(CodeBuilder *builder);
     /* Generates and instance of user metadata for a pipeline,
-     * allocated either on stack or in the per-CPU map. */
+     * allocated in the per-CPU map. */
     void emitUserMetadataInstance(CodeBuilder *builder);
 
     virtual void emitCPUMAPInitializers(CodeBuilder *builder);
