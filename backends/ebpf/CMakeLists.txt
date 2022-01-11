@@ -101,7 +101,6 @@ set (P4C_EBPF_HDRS
   ../bmv2/common/sharedActionSelectorCheck.h
   ../bmv2/psa_switch/psaSwitch.h
   psa/backend.h
-  psa/xdpTarget.h
   psa/ebpfPsaArch.h
   psa/xdpHelpProgram.h
   psa/ebpfPipeline.h

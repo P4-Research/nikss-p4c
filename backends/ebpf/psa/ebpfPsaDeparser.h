@@ -28,6 +28,7 @@ class EBPFDeparserPSA : public EBPFControlPSA {
  public:
     const IR::Parameter* packet_out;
     const IR::Parameter* istd;
+    const IR::Parameter* resubmit_meta;
 
     EBPFType* headerType;
     std::vector<cstring> headersExpressions;
@@ -54,9 +55,7 @@ class EBPFDeparserPSA : public EBPFControlPSA {
     virtual void emitPreDeparser(CodeBuilder *builder) {
         (void) builder;
     }
-    virtual void emitResizeHead(CodeBuilder *builder) {
-        (void) builder;
-    }
+
     virtual void emitDeparserExternCalls(CodeBuilder* builder) {
         controlBlock->container->body->apply(*codeGen);
         builder->newline();
@@ -76,24 +75,31 @@ class EBPFDeparserPSA : public EBPFControlPSA {
         return result; }
 };
 
-class TCDeparserPSA : public EBPFDeparserPSA {
+class IngressDeparserPSA : public EBPFDeparserPSA {
  public:
-    TCDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
-                           const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
-           EBPFDeparserPSA(program, control, parserHeaders, istd) {}
-    void emitResizeHead(CodeBuilder *builder) override;
-};
-
-class TCIngressDeparserPSA : public TCDeparserPSA {
- public:
-    const IR::Parameter* resubmit_meta;
-    TCIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
+    IngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
                          const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
-           TCDeparserPSA(program, control, parserHeaders, istd) {}
+            EBPFDeparserPSA(program, control, parserHeaders, istd) {}
 
     bool build() override;
+};
+
+class EgressDeparserPSA : public EBPFDeparserPSA {
+ public:
+    EgressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
+                      const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
+            EBPFDeparserPSA(program, control, parserHeaders, istd) {}
+
+    bool build() override;
+};
+
+class TCIngressDeparserPSA : public IngressDeparserPSA {
+ public:
+    TCIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
+                         const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
+            IngressDeparserPSA(program, control, parserHeaders, istd) {}
+
     void emitPreDeparser(CodeBuilder *builder) override;
-    void emitSharedMetadataInitializer(CodeBuilder* builder);
 };
 
 class TCIngressDeparserForTrafficManagerPSA : public TCIngressDeparserPSA {
@@ -110,53 +116,29 @@ class TCIngressDeparserForTrafficManagerPSA : public TCIngressDeparserPSA {
     }
 };
 
-class TCEgressDeparserPSA : public TCDeparserPSA {
+class TCEgressDeparserPSA : public EgressDeparserPSA {
  public:
     TCEgressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
                           const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
-            TCDeparserPSA(program, control, parserHeaders, istd) { }
-
-    bool build() override;
+            EgressDeparserPSA(program, control, parserHeaders, istd) { }
 };
 
-class XDPDeparserPSA : public EBPFDeparserPSA {
+class XDPIngressDeparserPSA : public IngressDeparserPSA {
  public:
-    XDPDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
-                          const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
-                EBPFDeparserPSA(program, control, parserHeaders, istd) { }
-    void emitResizeHead(CodeBuilder *builder) override;
-};
-
-class XDPIngressDeparserPSA : public XDPDeparserPSA {
- public:
-    const IR::Parameter* resubmit_meta;
     XDPIngressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
                           const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
-                XDPDeparserPSA(program, control, parserHeaders, istd) { }
+            IngressDeparserPSA(program, control, parserHeaders, istd) { }
 
-    bool build() override;
     void emitPreDeparser(CodeBuilder *builder) override;
-    void emitSharedMetadataInitializer(CodeBuilder *builder);
 };
 
-class XDPEgressDeparserPSA : public XDPDeparserPSA {
+class XDPEgressDeparserPSA : public EgressDeparserPSA {
  public:
     XDPEgressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
                           const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
-            XDPDeparserPSA(program, control, parserHeaders, istd) { }
+            EgressDeparserPSA(program, control, parserHeaders, istd) { }
 
-    bool build() override;
     void emitPreDeparser(CodeBuilder *builder) override;
-};
-
-class OptimizedXDPEgressDeparserPSA : public XDPEgressDeparserPSA {
- public:
-    OptimizedXDPEgressDeparserPSA(const EBPFProgram *program, const IR::ControlBlock *control,
-                                  const IR::Parameter *parserHeaders, const IR::Parameter *istd) :
-            XDPEgressDeparserPSA(program, control, parserHeaders, istd) {
-    }
-
-    void emit(CodeBuilder* builder) override;
 };
 
 class OptimizedXDPIngressDeparserPSA : public XDPIngressDeparserPSA {
