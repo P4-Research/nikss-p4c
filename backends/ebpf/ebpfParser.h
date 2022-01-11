@@ -82,6 +82,7 @@ class EBPFParser : public EBPFObject {
     std::vector<EBPFParserState*> states;
     const IR::Parameter*          packet;
     const IR::Parameter*          headers;
+    const IR::Parameter*          user_metadata;
     EBPFType*                     headerType;
 
     StateTranslationVisitor*      visitor;

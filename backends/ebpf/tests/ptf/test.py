@@ -32,7 +32,6 @@ class SimpleForwardingPSATest(P4EbpfTest):
         super(SimpleForwardingPSATest, self).tearDown()
 
 
-@tc_only
 class PSAResubmitTest(P4EbpfTest):
 
     p4_file_path = "p4testdata/resubmit.p4"

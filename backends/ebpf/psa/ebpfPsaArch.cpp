@@ -798,7 +798,7 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
             pipeline->parser->headers, pipeline->control->outputStandardMetadata,
             refmap, typemap, options, type);
     deparserBlock->apply(*deparser_converter);
-    pipeline->deparser = deparser_converter->getEBPFPsaDeparser();
+    pipeline->deparser = deparser_converter->getEBPFDeparser();
     CHECK_NULL(pipeline->deparser);
 
     return true;
@@ -816,8 +816,9 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
 
     auto it = pl->parameters.begin();
     parser->packet = *it; ++it;
-    parser->headers = *it;
-    auto resubmit_meta = *(it + 3);
+    parser->headers = *it; ++it;
+    parser->user_metadata = *it;
+    auto resubmit_meta = *(it + 2);
 
     for (auto state : prsr->container->states) {
         auto ps = new EBPFParserState(state, parser);
@@ -830,6 +831,7 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     parser->headerType = EBPFTypeFactory::instance->create(ht);
 
     parser->visitor->asPointerVariables.insert(resubmit_meta->name.name);
+    parser->visitor->asPointerVariables.insert(parser->user_metadata->name.name);
     parser->visitor->asPointerVariables.insert(parser->headers->name.name);
 
     findValueSets(prsr);
@@ -868,7 +870,11 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
 
     auto codegen = new ControlBodyTranslatorPSA(control);
     codegen->substitute(control->headers, parserHeaders);
-    codegen->asPointerVariables.insert(control->outputStandardMetadata->name.name);
+
+    if (type != TC_EGRESS && type != XDP_EGRESS) {
+        codegen->asPointerVariables.insert(control->outputStandardMetadata->name.name);
+    }
+
     codegen->asPointerVariables.insert(control->headers->name.name);
     codegen->asPointerVariables.insert(control->user_metadata->name.name);
 
@@ -973,8 +979,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Instance* instance)
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Variable* decl) {
-    bool isTCPipeline = (type == TC_INGRESS || type == TC_EGRESS);
-    if (isTCPipeline) {
+    if (type == TC_INGRESS || type == XDP_INGRESS) {
         if (decl->type->is<IR::Type_Name>() &&
             decl->type->to<IR::Type_Name>()->path->name.name == "psa_ingress_output_metadata_t") {
                 control->codeGen->asPointerVariables.insert(decl->name.name);
@@ -1035,8 +1040,6 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
         deparser = new OptimizedXDPIngressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == XDP_INGRESS) {
         deparser = new XDPIngressDeparserPSA(program, ctrl, parserHeaders, istd);
-    } else if (type == XDP_EGRESS && options.pipelineOptimization) {
-        deparser = new OptimizedXDPEgressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == XDP_EGRESS) {
         deparser = new XDPEgressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == TC_TRAFFIC_MANAGER) {
@@ -1052,6 +1055,7 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
     if (!deparser->build()) {
         BUG("failed to build deparser");
     }
+
     deparser->headers = parserHeaders;
     if (ctrl->container->is<IR::P4Control>()) {
         auto p4Control = ctrl->container->to<IR::P4Control>();

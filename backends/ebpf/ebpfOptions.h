@@ -39,8 +39,6 @@ class EbpfOptions : public CompilerOptions {
     bool emitTraceMessages = false;
     // Enable table cache for LPM and ternary tables
     bool enableTableCache = false;
-    // Generate headers and user metadata in/from CPUMAP
-    bool generateHdrInMap = false;
     // maximum number of ternary masks
     unsigned int maxTernaryMasks = 128;
 

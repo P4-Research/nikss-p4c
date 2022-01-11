@@ -47,6 +47,8 @@ class Target {
     virtual void emitLicense(Util::SourceCodeBuilder* builder, cstring license) const = 0;
     virtual void emitCodeSection(Util::SourceCodeBuilder* builder, cstring sectionName) const = 0;
     virtual void emitIncludes(Util::SourceCodeBuilder* builder) const = 0;
+    virtual void emitResizeBuffer(Util::SourceCodeBuilder* builder, cstring buffer,
+                                  cstring offsetVar) const = 0;
     virtual void emitTableLookup(Util::SourceCodeBuilder* builder, cstring tblName,
                                  cstring key, cstring value) const = 0;
     virtual void emitTableUpdate(Util::SourceCodeBuilder* builder, cstring tblName,
@@ -103,6 +105,7 @@ class Target {
     virtual cstring abortReturnCode() const = 0;
     // Path on /sys filesystem where maps are stored
     virtual cstring sysMapPath() const = 0;
+    virtual cstring packetDescriptorType() const = 0;
 };
 
 // Represents a target that is compiled within the kernel
@@ -140,6 +143,8 @@ class KernelSamplesTarget : public Target {
     void emitLicense(Util::SourceCodeBuilder* builder, cstring license) const override;
     void emitCodeSection(Util::SourceCodeBuilder* builder, cstring sectionName) const override;
     void emitIncludes(Util::SourceCodeBuilder* builder) const override;
+    void emitResizeBuffer(Util::SourceCodeBuilder* builder, cstring buffer,
+                          cstring offsetVar) const override;
     void emitTableLookup(Util::SourceCodeBuilder* builder, cstring tblName,
                          cstring key, cstring value) const override;
     void emitTableUpdate(Util::SourceCodeBuilder* builder, cstring tblName,
@@ -171,9 +176,34 @@ class KernelSamplesTarget : public Target {
     cstring dropReturnCode() const override { return "TC_ACT_SHOT"; }
     cstring abortReturnCode() const override { return "TC_ACT_SHOT"; }
     cstring sysMapPath() const override { return "/sys/fs/bpf/tc/globals"; }
+    cstring packetDescriptorType() const override { return "struct __sk_buff"; }
 
     void annotateTableWithBTF(Util::SourceCodeBuilder* builder, cstring name,
                               cstring keyType, cstring valueType) const;
+};
+
+// Target XDP
+class XdpTarget : public KernelSamplesTarget {
+ public:
+    explicit XdpTarget(bool emitTrace) : KernelSamplesTarget(emitTrace, "XDP") {}
+
+    cstring forwardReturnCode() const override { return "XDP_PASS"; }
+    cstring dropReturnCode() const override { return "XDP_DROP"; }
+    cstring abortReturnCode() const override { return "XDP_ABORTED"; }
+    cstring redirectReturnCode() const { return "XDP_REDIRECT"; }
+    cstring sysMapPath() const override { return "/sys/fs/bpf/xdp/globals"; }
+    cstring packetDescriptorType() const override { return "struct xdp_md"; }
+
+    void emitResizeBuffer(Util::SourceCodeBuilder* builder, cstring buffer,
+                          cstring offsetVar) const override;
+    void emitMain(Util::SourceCodeBuilder* builder,
+                  cstring functionName,
+                  cstring argName) const override {
+        builder->appendFormat("int %s(%s *%s)",
+                              functionName.c_str(),
+                              packetDescriptorType(),
+                              argName.c_str());
+    }
 };
 
 // Represents a target compiled by bcc that uses the TC
@@ -183,6 +213,8 @@ class BccTarget : public Target {
     void emitLicense(Util::SourceCodeBuilder*, cstring) const override {};
     void emitCodeSection(Util::SourceCodeBuilder*, cstring) const override {}
     void emitIncludes(Util::SourceCodeBuilder* builder) const override;
+    void emitResizeBuffer(Util::SourceCodeBuilder* builder, cstring buffer,
+                          cstring offsetVar) const override {};
     void emitTableLookup(Util::SourceCodeBuilder* builder, cstring tblName,
                          cstring key, cstring value) const override;
     void emitTableUpdate(Util::SourceCodeBuilder* builder, cstring tblName,
@@ -202,6 +234,7 @@ class BccTarget : public Target {
     cstring dropReturnCode() const override { return "1"; }
     cstring abortReturnCode() const override { return "1"; }
     cstring sysMapPath() const override { return "/sys/fs/bpf"; }
+    cstring packetDescriptorType() const override { return "struct __sk_buff"; }
 };
 
 // A userspace test version with functionality equivalent to the kernel
@@ -209,6 +242,8 @@ class BccTarget : public Target {
 class TestTarget : public EBPF::KernelSamplesTarget {
  public:
     TestTarget() : KernelSamplesTarget(false, "Userspace Test") {}
+    void emitResizeBuffer(Util::SourceCodeBuilder* builder, cstring buffer,
+                          cstring offsetVar) const override {};
     void emitIncludes(Util::SourceCodeBuilder* builder) const override;
     void emitTableDecl(Util::SourceCodeBuilder* builder,
                        cstring tblName, TableKind tableKind,
@@ -221,6 +256,7 @@ class TestTarget : public EBPF::KernelSamplesTarget {
     cstring dropReturnCode() const override { return "false"; }
     cstring abortReturnCode() const override { return "false"; }
     cstring sysMapPath() const override { return "/sys/fs/bpf"; }
+    cstring packetDescriptorType() const override { return "struct __sk_buff"; }
 };
 
 }  // namespace EBPF
