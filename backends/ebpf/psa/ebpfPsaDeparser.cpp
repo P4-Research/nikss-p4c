@@ -46,7 +46,7 @@ bool EBPFDeparserPSA::isHeaderEmitted(cstring hdrName) const {
 }
 
 void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
-    auto pipeline = dynamic_cast<const EBPFPipeline*>(program);
+    auto pipeline = program->to<EBPFPipeline>();
 
     builder->emitIndent();
     builder->appendFormat("int %s = 0", this->outerHdrLengthVar.c_str());
@@ -87,7 +87,7 @@ void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendFormat("%s = ", this->returnCode.c_str());
     pipeline->target->emitResizeBuffer(builder, program->model.CPacketName.str(),
-                                       this->outerHdrOffsetVar.c_str());
+                                       this->outerHdrOffsetVar);
     builder->endOfStatement(true);
 
     builder->emitIndent();
@@ -534,9 +534,8 @@ void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder, "PreDeparser: resubmitting packet, "
                                                "skipping deparser..");
     builder->emitIndent();
-    const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
     builder->appendFormat("%s->packet_path = RESUBMIT;",
-                          pipelineProgram->compilerGlobalMetadata);
+                          program->to<EBPFPipeline>()->compilerGlobalMetadata);
     builder->newline();
     builder->emitIndent();
     builder->appendLine("return -1;");

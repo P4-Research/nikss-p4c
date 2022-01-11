@@ -235,11 +235,11 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder, msgStr.c_str(), 2,
                                       varStr, lengthVar.c_str());
 
-    // PRS
+    // PARSER
     parser->emit(builder);
     builder->newline();
 
-    // CTRL
+    // CONTROL
     builder->emitIndent();
     builder->append(IR::ParserState::accept);
     builder->append(":");
@@ -253,7 +253,7 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     msgStr = Util::printf_format("%s control: packet processing finished", sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
 
-    // DEPRS
+    // DEPARSER
     builder->emitIndent();
     builder->blockStart();
     msgStr = Util::printf_format("%s deparser: packet deparsing started", sectionName);
@@ -462,11 +462,11 @@ void EBPFEgressPipeline::emit(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder, msgStr.c_str(), 2,
                                       varStr, lengthVar.c_str());
 
-    // PRS
+    // PARSER
     parser->emit(builder);
     builder->emitIndent();
 
-    // CTRL
+    // CONTROL
     builder->append(IR::ParserState::accept);
     builder->append(":");
     builder->newline();
@@ -487,7 +487,7 @@ void EBPFEgressPipeline::emit(CodeBuilder *builder) {
                                  sectionName);
     builder->target->emitTraceMessage(builder, msgStr.c_str());
 
-    // DPRS
+    // DEPARSER
     builder->emitIndent();
     builder->blockStart();
     msgStr = Util::printf_format("%s deparser: packet deparsing started",
