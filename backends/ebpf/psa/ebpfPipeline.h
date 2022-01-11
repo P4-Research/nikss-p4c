@@ -119,11 +119,15 @@ class EBPFPipeline : public EBPFProgram {
 class EBPFIngressPipeline : public EBPFPipeline {
  public:
     unsigned int maxResubmitDepth;
+    int actUnspecCode;
 
     EBPFIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
                         P4::TypeMap* typeMap) : EBPFPipeline(name, options, refMap, typeMap) {
         // FIXME: hardcoded
         maxResubmitDepth = 4;
+        // actUnspecCode should not collide with TC/XDP return codes,
+        // but it's safe to use the same value as TC_ACT_UNSPEC.
+        actUnspecCode = -1;
     }
 
     void emitSharedMetadataInitializer(CodeBuilder* builder);

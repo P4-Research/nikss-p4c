@@ -264,7 +264,8 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->blockEnd(true);
 
     builder->emitIndent();
-    builder->appendLine("return -1;");
+    builder->appendFormat("return %d;", actUnspecCode);
+    builder->newline();
     builder->blockEnd(true);
     builder->target->emitCodeSection(builder, sectionName);
     builder->emitIndent();
@@ -287,7 +288,9 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->newline();
 
     builder->emitIndent();
-    builder->appendLine("int ret = -1;");
+    builder->appendFormat("int ret = %d;", actUnspecCode);
+    builder->newline();
+
     builder->emitIndent();
     builder->appendLine("#pragma clang loop unroll(disable)");
     builder->emitIndent();
