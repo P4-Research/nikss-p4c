@@ -319,9 +319,10 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
     builder->blockEnd(true);
 
     builder->emitIndent();
-    builder->appendLine("if (ret != -1) {\n"
+    builder->appendFormat("if (ret != %d) {\n"
                         "        return ret;\n"
-                        "    }");
+                        "    }", actUnspecCode);
+    builder->newline();
 
     if (!options.pipelineOptimization ||
         (deparser->is<OptimizedXDPIngressDeparserPSA>() &&
