@@ -532,18 +532,15 @@ void TCIngressPipeline::emitGlobalMetadataInitializer(CodeBuilder *builder) {
 
 void TCIngressPipeline::emitTCWorkaroundUsingMeta(CodeBuilder *builder) {
     builder->append("struct internal_metadata *md = "
-                    "(struct internal_metadata *)(unsigned long)skb->data_meta;\n");
-    builder->emitIndent();
-    builder->append("if ((void *) ((struct internal_metadata *) md + 1) > "
-                        "(void *)(long)skb->data) {\n"
-                        "           return TC_ACT_SHOT;\n"
-                        "       }\n");
-    builder->append("    __u16 *ether_type = (__u16 *) ((void *) (long)skb->data + 12);\n"
-                        "    if ((void *) ((__u16 *) ether_type + 1) > "
-                        "    (void *) (long) skb->data_end) {\n"
-                        "        return TC_ACT_SHOT;\n"
-                        "    }\n"
-                        "    *ether_type = md->pkt_ether_type;\n");
+        "(struct internal_metadata *)(unsigned long)skb->data_meta;\n"
+        "        if ((void *) ((struct internal_metadata *) md + 1) <= "
+                    "(void *)(long)skb->data) {\n"
+        "            __u16 *ether_type = (__u16 *) ((void *) (long)skb->data + 12);\n"
+        "            if ((void *) ((__u16 *) ether_type + 1) > (void *) (long) skb->data_end) {\n"
+        "                return TC_ACT_SHOT;\n"
+        "            }\n"
+        "            *ether_type = md->pkt_ether_type;\n"
+        "        }\n");
 }
 
 void TCIngressPipeline::emitTCWorkaroundUsingHead(CodeBuilder *builder) {
