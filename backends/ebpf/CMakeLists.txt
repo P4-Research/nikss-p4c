@@ -238,40 +238,13 @@ else()
   set (SUPPORTS_KERNEL False)
 endif()
 
-# check for the libbpf library
-find_library(LIBBPF NAMES bpf HINTS "${CMAKE_CURRENT_SOURCE_DIR}/runtime/usr/lib64/")
-if (LIBBPF)
-  message(STATUS "Found libbpf library")
+# check for the psabpf-ctl program
+find_program(PSABPF_CTL_PROG "psabpf-ctl")
+if (PSABPF_CTL_PROG)
+  message(STATUS "Found psabpf-ctl program")
 else()
-  message(WARNING "Missing the libbpf dependency, disabling kernel tests."
-  " You can install libbpf by running './build_libbpf' in the "
-  "${CMAKE_CURRENT_SOURCE_DIR}/runtime folder.")
-  set (SUPPORTS_KERNEL False)
+  MESSAGE(WARNING "psabpf-ctl not found, ignoring ebpf kernel PSA PTF tests...")
   set (SUPPORTS_KERNEL_PSA False)
-endif()
-
-if (LIBBPF)
-  set (PSABPFCTL_SRCS
-          runtime/psabpf/lib/btf.c
-          runtime/psabpf/lib/common.c
-          runtime/psabpf/lib/psabpf.c
-          runtime/psabpf/lib/psabpf_clone_session.c
-          runtime/psabpf/lib/psabpf_pipeline.c
-          runtime/psabpf/lib/psabpf_table.c
-          runtime/psabpf/lib/psabpf_action_selector.c
-          runtime/psabpf/lib/psabpf_meter.c
-          runtime/psabpf/CLI/action_selector.c
-          runtime/psabpf/CLI/common.c
-          runtime/psabpf/CLI/clone_session.c
-          runtime/psabpf/CLI/pipeline.c
-          runtime/psabpf/CLI/table.c
-          runtime/psabpf/CLI/meter.c
-          runtime/psabpf/main.c)
-  add_executable(psabpf-ctl ${PSABPFCTL_SRCS})
-  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/runtime/usr/include)
-  target_link_libraries (psabpf-ctl z elf ${LIBBPF} gmp m)
-  install (TARGETS psabpf-ctl
-          RUNTIME DESTINATION ${P4C_RUNTIME_OUTPUT_DIRECTORY})
 endif()
 
 # check if bpftool is available
@@ -311,7 +284,7 @@ p4c_add_test_with_args("ebpf" ${EBPF_DRIVER_TEST} FALSE "testdata/p4_16_samples/
 # We do not have support for dynamic addition of tables in the test framework
 p4c_add_test_with_args("ebpf" ${EBPF_DRIVER_TEST} TRUE "testdata/p4_16_samples/ebpf_conntrack_extern.p4" "testdata/p4_16_samples/ebpf_conntrack_extern.p4" "--extern-file ${P4C_SOURCE_DIR}/testdata/extern_modules/extern-conntrack-ebpf.c" "")
 
-# Execute PSA PTF test only when: (1) kernel is supported, (2) libbpf (3) bpftool and (4) PTF are available
+# Execute PSA PTF test only when: (1) kernel is supported, (2) psabpf-ctl, (3) bpftool and (4) PTF are available
 if (SUPPORTS_KERNEL_PSA)
   set (ebpf-psa-ptf_timeout 7200)
   p4c_add_tests("ebpf-psa-ptf" ${EBPF_PTF_DRIVER_TEST} ${EBPF_PSA_PTF_TEST_SUITES} "")
