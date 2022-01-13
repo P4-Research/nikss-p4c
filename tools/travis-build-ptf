@@ -85,10 +85,16 @@ if [[ "${IMAGE_TYPE}" == "test" ]] ; then
   install_ptf
 fi
 
-# Build libbpf for eBPF tests.
+# Build psabpf-ctl for eBPF tests.
 cd /p4c
-backends/ebpf/build_libbpf
-cd -
+git clone --recursive https://github.com/P4-Research/psabpf.git /psabpf
+cd /psabpf
+./build_libbpf.sh
+mkdir build
+cd build
+cmake ..
+make "-j$(nproc)"
+make install
 
 cd /p4c
 rm -rf /tmp/pip
