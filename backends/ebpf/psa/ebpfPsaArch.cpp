@@ -74,8 +74,7 @@ void PSAArch::emitInternalStructures(CodeBuilder *builder) const {
 }
 
 /* Generate headers and structs in p4 prog */
-void PSAArch::emitTypes(CodeBuilder *builder,
-                        EBPFPipeline* ingressPipeline, EBPFPipeline* egressPipeline) const {
+void PSAArch::emitTypes(CodeBuilder *builder) const {
     for (auto type : ebpfTypes) {
         type->emit(builder);
     }
@@ -85,22 +84,22 @@ void PSAArch::emitTypes(CodeBuilder *builder,
         meter->emitValueStruct(builder);
     }
 
-    ingressPipeline->parser->emitTypes(builder);
-    ingressPipeline->control->emitTableTypes(builder);
-    egressPipeline->parser->emitTypes(builder);
-    egressPipeline->control->emitTableTypes(builder);
+    ingress->parser->emitTypes(builder);
+    ingress->control->emitTableTypes(builder);
+    egress->parser->emitTypes(builder);
+    egress->control->emitTableTypes(builder);
     builder->newline();
 }
 
-void PSAArch::emitGlobalHeadersMetadata(CodeBuilder *builder, EBPFPipeline *pipeline) const {
+void PSAArch::emitGlobalHeadersMetadata(CodeBuilder *builder) const {
     builder->append("struct hdr_md ");
     builder->blockStart();
     builder->emitIndent();
 
-    pipeline->parser->headerType->declare(builder, "cpumap_hdr", false);
+    ingress->parser->headerType->declare(builder, "cpumap_hdr", false);
     builder->endOfStatement(true);
     builder->emitIndent();
-    auto user_md_type = pipeline->typeMap->getType(pipeline->control->user_metadata);
+    auto user_md_type = ingress->typeMap->getType(ingress->control->user_metadata);
     BUG_CHECK(user_md_type != nullptr, "cannot declare user metadata");
     auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
     userMetadataType->declare(builder, "cpumap_usermeta", false);
@@ -127,15 +126,13 @@ void PSAArch::emitPacketReplicationTables(CodeBuilder *builder) const {
                                       TableArray, "__u32", MaxCloneSessions);
 }
 
-void PSAArch::emitPipelineInstances(CodeBuilder *builder,
-                                    EBPFPipeline* ingressPipeline,
-                                    EBPFPipeline* egressPipeline) const {
-    ingressPipeline->parser->emitValueSetInstances(builder);
-    ingressPipeline->control->emitTableInstances(builder);
-    ingressPipeline->deparser->emitDigestInstances(builder);
+void PSAArch::emitPipelineInstances(CodeBuilder *builder) const {
+    ingress->parser->emitValueSetInstances(builder);
+    ingress->control->emitTableInstances(builder);
+    ingress->deparser->emitDigestInstances(builder);
 
-    egressPipeline->parser->emitValueSetInstances(builder);
-    egressPipeline->control->emitTableInstances(builder);
+    egress->parser->emitValueSetInstances(builder);
+    egress->control->emitTableInstances(builder);
     // no Digest in egress pipeline
 
     builder->target->emitTableDecl(builder, "hdr_md_cpumap",
@@ -143,18 +140,17 @@ void PSAArch::emitPipelineInstances(CodeBuilder *builder,
                                    "struct hdr_md", 2);
 }
 
-void PSAArch::emitInitializer(CodeBuilder *builder,
-                              EBPFPipeline* ingressPipeline, EBPFPipeline* egressPipeline) const {
+void PSAArch::emitInitializer(CodeBuilder *builder) const {
     emitInitializerSection(builder);
     builder->appendFormat("int %s()",
                           "map_initializer");
     builder->spc();
     builder->blockStart();
     builder->emitIndent();
-    builder->appendFormat("u32 %s = 0;", ingressPipeline->zeroKey.c_str());
+    builder->appendFormat("u32 %s = 0;", ingress->zeroKey.c_str());
     builder->newline();
-    ingressPipeline->control->emitTableInitializers(builder);
-    egressPipeline->control->emitTableInitializers(builder);
+    ingress->control->emitTableInitializers(builder);
+    egress->control->emitTableInitializers(builder);
     builder->newline();
     builder->emitIndent();
     builder->appendLine("return 0;");
@@ -290,8 +286,9 @@ EBPFMeterPSA *PSAArch::getMeter(EBPFPipeline *pipeline) {
     return nullptr;
 }
 
-EBPFMeterPSA *PSAArch::getAnyMeter(const std::initializer_list<EBPFPipeline *> pipelines) const {
+EBPFMeterPSA *PSAArch::getAnyMeter() const {
     EBPFMeterPSA *meter = nullptr;
+    std::array<EBPFPipeline*, 2> pipelines = {ingress, egress};
     for (auto pipeline : pipelines) {
         meter = getMeter(pipeline);
         if (meter != nullptr) {
@@ -347,7 +344,7 @@ void PSAArchTC::emit(CodeBuilder *builder) const {
     /*
      * 6. BPF map initialization
      */
-    emitInitializer(builder, tcIngress, tcEgress);
+    emitInitializer(builder);
     builder->newline();
 
     /*
@@ -363,26 +360,17 @@ void PSAArchTC::emit(CodeBuilder *builder) const {
     /*
      * 9. TC Ingress program.
      */
-    tcIngress->emit(builder);
+    ingress->emit(builder);
 
     /*
      * 10. TC Egress program.
      */
     if (!options.pipelineOptimization ||
-        (options.pipelineOptimization && !tcEgress->isEmpty())) {
-        tcEgress->emit(builder);
+        (options.pipelineOptimization && !egress->isEmpty())) {
+        egress->emit(builder);
     }
 
     builder->target->emitLicense(builder, xdp->license);
-}
-
-void PSAArchTC::emitTypes(CodeBuilder *builder) const {
-    PSAArch::emitTypes(builder, tcIngress, tcEgress);
-}
-
-void PSAArchTC::emitGlobalHeadersMetadata(CodeBuilder *builder) const {
-    // Note: here, we could also use tcEgress pipeline
-    PSAArch::emitGlobalHeadersMetadata(builder, tcIngress);
 }
 
 void PSAArchTC::emitInstances(CodeBuilder *builder) const {
@@ -395,7 +383,7 @@ void PSAArchTC::emitInstances(CodeBuilder *builder) const {
     }
 
     emitPacketReplicationTables(builder);
-    emitPipelineInstances(builder, tcIngress, tcEgress);
+    emitPipelineInstances(builder);
 
     builder->appendLine("REGISTER_END()");
     builder->newline();
@@ -422,13 +410,13 @@ void PSAArchXDP::emit(CodeBuilder *builder) const {
 
     emitHelperFunctions(builder);
 
-    emitInitializer(builder, xdpIngress, xdpEgress);
+    emitInitializer(builder);
 
-    xdpIngress->emit(builder);
+    ingress->emit(builder);
 
     if (!options.pipelineOptimization ||
-        (options.pipelineOptimization && !xdpEgress->isEmpty())) {
-        xdpEgress->emit(builder);
+        (options.pipelineOptimization && !egress->isEmpty())) {
+        egress->emit(builder);
     }
 
     builder->newline();
@@ -451,24 +439,15 @@ void PSAArchXDP::emitPreamble(CodeBuilder* builder) const {
     builder->newline();
 }
 
-void PSAArchXDP::emitTypes(CodeBuilder *builder) const {
-    PSAArch::emitTypes(builder, xdpIngress, xdpEgress);
-}
-
-void PSAArchXDP::emitGlobalHeadersMetadata(CodeBuilder *builder) const {
-    // Note: here, we could also use any pipeline in { xdpIngress, xdpEgress tcEgressForXDP }
-    PSAArch::emitGlobalHeadersMetadata(builder, tcIngressForXDP);
-}
-
 void PSAArchXDP::emitInstances(CodeBuilder *builder) const {
     builder->newline();
 
     builder->appendLine("REGISTER_START()");
     emitPacketReplicationTables(builder);
-    emitPipelineInstances(builder, xdpIngress, xdpEgress);
+    emitPipelineInstances(builder);
 
-    tcEgressForXDP->control->tables.insert(xdpEgress->control->tables.begin(),
-                                           xdpEgress->control->tables.end());
+    tcEgressForXDP->control->tables.insert(egress->control->tables.begin(),
+                                           egress->control->tables.end());
 
     builder->target->emitTableDecl(builder, "xdp2tc_shared_map", TablePerCPUArray,
                                    "u32", "struct xdp2tc_metadata", 1);
@@ -476,7 +455,7 @@ void PSAArchXDP::emitInstances(CodeBuilder *builder) const {
         // bridged_headers is used to transfer Headers data from ingress to egress.
         builder->target->emitTableDecl(builder, "bridged_headers", TablePerCPUArray,
                        "u32",
-                       "struct " + xdpIngress->parser->headerType->to<EBPFStructType>()->name, 1);
+                       "struct " + ingress->parser->headerType->to<EBPFStructType>()->name, 1);
         builder->target->emitTableDecl(builder, "egress_progs_table", TableProgArray,
                                        "u32", "u32", 1);
     }
@@ -644,12 +623,10 @@ const PSAArch * ConvertToEbpfPSA::build(const IR::ToplevelBlock *tlb) {
 }
 
 void ConvertToEbpfPSA::optimizePipeline() {
-    auto xdpArch = dynamic_cast<const PSAArchXDP *>(ebpf_psa_arch);
-    CHECK_NULL(xdpArch);
-    auto ig_deparser = xdpArch->xdpIngress->deparser->to<OptimizedXDPIngressDeparserPSA>();
-    auto eg_deparser = xdpArch->xdpEgress->deparser;
+    auto ig_deparser = ebpf_psa_arch->ingress->deparser->to<OptimizedXDPIngressDeparserPSA>();
+    auto eg_deparser = ebpf_psa_arch->egress->deparser;
 
-    auto eg_parser = xdpArch->xdpEgress->parser->to<EBPFOptimizedEgressParserPSA>();
+    auto eg_parser = ebpf_psa_arch->egress->parser->to<EBPFOptimizedEgressParserPSA>();
 
     /* remove headers from ingress deparser that are deparsed at ingress,
      * but are removed from packet by egress.
@@ -711,10 +688,8 @@ const IR::Node *ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
     ebpf_psa_arch = build(tlb);
 
     if (options.generateToXDP && options.pipelineOptimization) {
-        auto xdpArch = dynamic_cast<const PSAArchXDP *>(ebpf_psa_arch);
-        CHECK_NULL(xdpArch);
-        if (xdpArch->xdpEgress->isEmpty()) {
-            xdpArch->xdpIngress->deparser->to<OptimizedXDPIngressDeparserPSA>()
+        if (ebpf_psa_arch->egress->isEmpty()) {
+            ebpf_psa_arch->ingress->deparser->to<OptimizedXDPIngressDeparserPSA>()
                     ->skipEgress = true;
         }
         this->optimizePipeline();
