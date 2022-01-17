@@ -29,9 +29,6 @@ void PSAArch::emitPreamble(CodeBuilder *builder) const {
     builder->appendLine("#define CLONE_MAX_INSTANCES 1");
     builder->appendLine("#define CLONE_MAX_CLONES (CLONE_MAX_PORTS * CLONE_MAX_INSTANCES)");
     builder->appendLine("#define CLONE_MAX_SESSIONS 1024");
-    if (options.generateToXDP) {
-        builder->appendLine("#define DEVMAP_SIZE 256");
-    }
     builder->newline();
 
     builder->appendLine("#ifndef PSA_PORT_RECIRCULATE\n"
@@ -447,6 +444,13 @@ void PSAArchXDP::emit(CodeBuilder *builder) const {
     builder->appendLine("char _license[] SEC(\"license\") = \"GPL\";");
 }
 
+void PSAArchXDP::emitPreamble(CodeBuilder* builder) const {
+    PSAArch::emitPreamble(builder);
+    builder->appendFormat("#define DEVMAP_SIZE %u", egressDevmapSize);
+    builder->newline();
+    builder->newline();
+}
+
 void PSAArchXDP::emitTypes(CodeBuilder *builder) const {
     PSAArch::emitTypes(builder, xdpIngress, xdpEgress);
 }
@@ -477,20 +481,8 @@ void PSAArchXDP::emitInstances(CodeBuilder *builder) const {
                                        "u32", "u32", 1);
     }
 
-    builder->newline();
-    builder->append("struct bpf_map_def SEC(\"maps\") tx_port = ");
-    builder->blockStart();
-    builder->emitIndent();
-    builder->appendLine(".type          = BPF_MAP_TYPE_DEVMAP,");
-    builder->emitIndent();
-    builder->appendLine(".key_size      = sizeof(int),");
-    builder->emitIndent();
-    builder->appendLine(".value_size    = sizeof(struct bpf_devmap_val),");
-    builder->emitIndent();
-    builder->appendLine(".max_entries   = DEVMAP_SIZE,");
-    builder->blockEnd(false);
-    builder->endOfStatement(true);
-    builder->newline();
+    builder->target->emitTableDecl(builder, "tx_port", TableEgressDevmap,
+                                   "u32", "struct bpf_devmap_val", egressDevmapSize);
 
     builder->appendLine("REGISTER_END()");
     builder->newline();

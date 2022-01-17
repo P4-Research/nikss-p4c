@@ -34,7 +34,7 @@ class PSAArch {
     virtual void emit(CodeBuilder* builder) const = 0;
 
     void emitPSAIncludes(CodeBuilder *builder) const;
-    void emitPreamble(CodeBuilder* builder) const;
+    virtual void emitPreamble(CodeBuilder* builder) const;
     void emitCommonPreamble(CodeBuilder *builder) const;
     void emitInternalStructures(CodeBuilder* pBuilder) const;
     virtual void emitTypes(CodeBuilder *builder) const = 0;
@@ -95,6 +95,7 @@ class PSAArchXDP : public PSAArch {
     EBPFPipeline* tcIngressForXDP;
     // If the XDP mode is used, we need to have TC Egress pipeline to handle cloned packets.
     EBPFPipeline* tcEgressForXDP;
+    static const unsigned egressDevmapSize = 256;
 
     PSAArchXDP(const EbpfOptions &options, std::vector<EBPFType*> &ebpfTypes,
                EBPFPipeline* xdpIngress, EBPFPipeline* xdpEgress,
@@ -105,6 +106,7 @@ class PSAArchXDP : public PSAArch {
 
     void emit(CodeBuilder* builder) const override;
 
+    void emitPreamble(CodeBuilder* builder) const override;
     void emitTypes(CodeBuilder *builder) const override;
     void emitGlobalHeadersMetadata(CodeBuilder *builder) const override;
     void emitInstances(CodeBuilder *builder) const override;
