@@ -650,7 +650,6 @@ void ConvertToEbpfPSA::optimizePipeline() {
     auto eg_deparser = xdpArch->xdpEgress->deparser;
 
     auto eg_parser = xdpArch->xdpEgress->parser->to<EBPFOptimizedEgressParserPSA>();
-    auto eg_control = xdpArch->xdpEgress->control;
 
     /* remove headers from ingress deparser that are deparsed at ingress,
      * but are removed from packet by egress.
@@ -730,6 +729,7 @@ const IR::Node *ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
 // If so, EBPFPipeline construct should have the following arguments:
 // EBPFPipeline(name, EBPFParser, EBPFControl, EBPFDeparser).
 bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
+    (void) block;
     if (type == TC_INGRESS) {
         pipeline = new TCIngressPipeline(name, options, refmap, typemap);
     } else if (type == TC_EGRESS) {
@@ -804,6 +804,7 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
 }
 
 bool ConvertToEBPFParserPSA::preorder(const IR::ParserState *s) {
+    (void) s;
     return false;
 }
 
@@ -897,7 +898,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
     // use 1024 by default
     size_t size = 1024;
     auto sizeProperty = tblblk->container->properties->getProperty(
-            tblblk->container->properties->sizePropertyName);
+            IR::TableProperties::sizePropertyName);
     if (sizeProperty != nullptr) {
         auto expr = sizeProperty->value->to<IR::ExpressionValue>()->expression;
         size = expr->to<IR::Constant>()->asInt();
@@ -917,6 +918,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::P4Action *a) {
+    (void) a;
     return true;
 }
 
@@ -940,6 +942,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::IfStatement *ifState) {
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Instance* instance) {
+    (void) instance;
     return true;
 }
 
@@ -969,7 +972,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
     } else if (typeName == "Counter") {
         auto ctr = new EBPFCounterPSA(program, di, name, control->codeGen);
         control->counters.emplace(name, ctr);
-    } else if (typeName == "DirectCounter") {
+    } else if (typeName == "DirectCounter" || typeName == "DirectMeter") {
         return false;
     } else if (typeName == "Hash") {
         auto hash = new EBPFHashPSA(program, di, name);
@@ -980,9 +983,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
         }
         auto met = new EBPFMeterPSA(program, name, di, control->codeGen);
         control->meters.emplace(name, met);
-    } else if (typeName == "DirectMeter") {
-        return false;
-    } else if (instance->type->getName().name == "Random") {
+    } else if (typeName == "Random") {
         auto rand = new EBPFRandomPSA(di);
         control->randGenerators.emplace(name, rand);
     } else if (typeName == "Register") {
@@ -1063,8 +1064,8 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expressi
         if (decl == deparser->packet_out) {
             if (extMethod->method->name.name == p4lib.packetOut.emit.name) {
                 auto expr = extMethod->expr->arguments->at(0)->expression;
-                auto type = deparser->program->typeMap->getType(expr);
-                auto ht = type->to<IR::Type_Header>();
+                auto exprType = deparser->program->typeMap->getType(expr);
+                auto ht = exprType->to<IR::Type_Header>();
                 if (ht == nullptr) {
                     ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
                             "Cannot emit a non-header type %1%", expr);
