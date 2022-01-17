@@ -21,40 +21,21 @@ enum pipeline_type {
 };
 
 class PSAArch {
- private:
+ protected:
     static EBPFMeterPSA *getMeter(EBPFPipeline *pipeline);
-    EBPFMeterPSA *getAnyMeter() const;
+    virtual EBPFMeterPSA *getAnyMeter() const = 0;
+    EBPFMeterPSA *getAnyMeter(const std::initializer_list<EBPFPipeline *> pipelines) const;
 
 
  public:
     static const unsigned MaxClones = 64;
     static const unsigned MaxCloneSessions = 1024;
 
-    bool                   hasMeters;
     const EbpfOptions&     options;
     std::vector<EBPFType*> ebpfTypes;
-    XDPHelpProgram*        xdp;
-    EBPFPipeline*          tcIngress;
-    EBPFPipeline*          tcEgress;
 
-    EBPFPipeline*          xdpIngress;
-    EBPFPipeline*          xdpEgress;
-    // TC Ingress program used to support packet cloning in the XDP mode.
-    EBPFPipeline*          tcIngressForXDP;
-    // If the XDP mode is used, we need to have TC Egress pipeline to handle cloned packets.
-    EBPFPipeline*          tcEgressForXDP;
-
-    PSAArch(const EbpfOptions &options, std::vector<EBPFType*> ebpfTypes,
-            XDPHelpProgram* xdp, EBPFPipeline* tcIngress, EBPFPipeline* tcEgress) :
-            options(options),
-            ebpfTypes(ebpfTypes), xdp(xdp), tcIngress(tcIngress),
-            tcEgress(tcEgress) { }
-
-    PSAArch(const EbpfOptions &options, std::vector<EBPFType*> ebpfTypes, EBPFPipeline* xdpIngress,
-            EBPFPipeline* xdpEgress, EBPFPipeline* tcTrafficManager, EBPFPipeline* tcEgress) :
-            options(options), ebpfTypes(ebpfTypes),
-            xdpIngress(xdpIngress), xdpEgress(xdpEgress), tcIngressForXDP(tcTrafficManager),
-            tcEgressForXDP(tcEgress) { }
+    PSAArch(const EbpfOptions &options, std::vector<EBPFType*> &ebpfTypes) :
+            options(options), ebpfTypes(ebpfTypes) {}
 
     void emitCommonPreamble(CodeBuilder *builder) const;
     void emitPSAIncludes(CodeBuilder *builder) const;
@@ -64,19 +45,81 @@ class PSAArch {
     void emitPacketReplicationTables(CodeBuilder *builder) const;
     void emitPreamble(CodeBuilder* builder) const;
 
-    void emit2TC(CodeBuilder* builder) const;  // emits C file for eBPF program - at TC layer
+    virtual void emit(CodeBuilder* builder) const = 0;
 
-    void emitInstances2TC(CodeBuilder *builder) const;
-    void emitInitializer2TC(CodeBuilder *p_builder) const;
+    void emitInitializer(CodeBuilder *builder,
+                         EBPFPipeline* ingressPipeline, EBPFPipeline* egressPipeline) const;
+    virtual void emitInitializerSection(CodeBuilder *builder) const = 0;
 
-    void emitGlobalHeadersMetadata(CodeBuilder *builder) const;
+    virtual void emitGlobalHeadersMetadata(CodeBuilder *builder) const = 0;
+    // required any valid pipeline
+    void emitGlobalHeadersMetadata(CodeBuilder *builder, EBPFPipeline *pipeline) const;
+};
 
-    void emit2XDP(CodeBuilder* builder) const;
-    void emitInstances2XDP(CodeBuilder *builder) const;
-    void emitHelperFunctions2XDP(CodeBuilder *builder) const;
-    void emitInitializer2XDP(CodeBuilder *p_builder) const;
-    void emitDummy2XDP(CodeBuilder *builder) const;
+class PSAArchTC : public PSAArch {
+ protected:
+    EBPFMeterPSA *getAnyMeter() const override {
+        return PSAArch::getAnyMeter({tcIngress, tcEgress});
+    }
+
+ public:
+    XDPHelpProgram* xdp;
+    EBPFPipeline*   tcIngress;
+    EBPFPipeline*   tcEgress;
+
+    PSAArchTC(const EbpfOptions &options, std::vector<EBPFType*> &ebpfTypes,
+              XDPHelpProgram* xdp, EBPFPipeline* tcIngress, EBPFPipeline* tcEgress) :
+              PSAArch(options, ebpfTypes),
+              xdp(xdp), tcIngress(tcIngress), tcEgress(tcEgress) { }
+
+    void emit(CodeBuilder* builder) const override;
+
+    void emitInstances(CodeBuilder *builder) const;
+    void emitInitializerSection(CodeBuilder *builder) const override {
+        builder->appendLine("SEC(\"classifier/map-initializer\")");
+    }
+
+    void emitGlobalHeadersMetadata(CodeBuilder *builder) const override {
+        // Note: here, we could also use tcEgress pipeline
+        PSAArch::emitGlobalHeadersMetadata(builder, tcIngress);
+    }
+};
+
+class PSAArchXDP : public PSAArch {
+ protected:
+    EBPFMeterPSA *getAnyMeter() const override {
+            return PSAArch::getAnyMeter({xdpIngress, xdpEgress});
+    }
+
+ public:
+    EBPFPipeline* xdpIngress;
+    EBPFPipeline* xdpEgress;
+    // TC Ingress program used to support packet cloning in the XDP mode.
+    EBPFPipeline* tcIngressForXDP;
+    // If the XDP mode is used, we need to have TC Egress pipeline to handle cloned packets.
+    EBPFPipeline* tcEgressForXDP;
+
+    PSAArchXDP(const EbpfOptions &options, std::vector<EBPFType*> &ebpfTypes,
+               EBPFPipeline* xdpIngress, EBPFPipeline* xdpEgress,
+               EBPFPipeline* tcTrafficManager, EBPFPipeline* tcEgress) :
+               PSAArch(options, ebpfTypes),
+               xdpIngress(xdpIngress), xdpEgress(xdpEgress),
+               tcIngressForXDP(tcTrafficManager), tcEgressForXDP(tcEgress) { }
+
+    void emit(CodeBuilder* builder) const override;
+
+    void emitInstances(CodeBuilder *builder) const;
+    void emitInitializerSection(CodeBuilder *builder) const override {
+        builder->appendLine("SEC(\"xdp/map-initializer\")");
+    }
+
+    void emitGlobalHeadersMetadata(CodeBuilder *builder) const override {
+        // Note: here, we could also use any pipeline in { xdpIngress, xdpEgress tcEgressForXDP }
+        PSAArch::emitGlobalHeadersMetadata(builder, tcIngressForXDP);
+    }
+
     void emitXDP2TCInternalStructures(CodeBuilder *builder) const;
+    void emitDummyProgram(CodeBuilder *builder) const;
 };
 
 class ConvertToEbpfPSA : public Transform {

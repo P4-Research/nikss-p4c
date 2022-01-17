@@ -29,11 +29,7 @@ class PSASwitchBackend {
     void codegen(std::ostream &cstream) const {
         CodeBuilder c(target);
         // instead of generating two files, put all the code in a single file
-        if (!options.generateToXDP) {
-            ebpf_program->emit2TC(&c);
-        } else {
-            ebpf_program->emit2XDP(&c);
-        }
+        ebpf_program->emit(&c);
         cstream << c.toString();
     }
 };
