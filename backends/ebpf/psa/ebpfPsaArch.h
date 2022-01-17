@@ -37,17 +37,20 @@ class PSAArch {
     void emitPreamble(CodeBuilder* builder) const;
     void emitCommonPreamble(CodeBuilder *builder) const;
     void emitInternalStructures(CodeBuilder* pBuilder) const;
-    void emitTypes(CodeBuilder *builder) const;
+    virtual void emitTypes(CodeBuilder *builder) const = 0;
+    void emitTypes(CodeBuilder *builder,
+                   EBPFPipeline* ingressPipeline, EBPFPipeline* egressPipeline) const;
     virtual void emitGlobalHeadersMetadata(CodeBuilder *builder) const = 0;
-    virtual void emitInstances(CodeBuilder *builder) const = 0;
-    void emitInitializer(CodeBuilder *builder,
-                         EBPFPipeline* ingressPipeline, EBPFPipeline* egressPipeline) const;
-    void emitHelperFunctions(CodeBuilder *builder) const;
-
     // required any valid pipeline
     void emitGlobalHeadersMetadata(CodeBuilder *builder, EBPFPipeline *pipeline) const;
+    virtual void emitInstances(CodeBuilder *builder) const = 0;
     void emitPacketReplicationTables(CodeBuilder *builder) const;
+    void emitPipelineInstances(CodeBuilder *builder,
+                               EBPFPipeline* ingressPipeline, EBPFPipeline* egressPipeline) const;
+    void emitInitializer(CodeBuilder *builder,
+                         EBPFPipeline* ingressPipeline, EBPFPipeline* egressPipeline) const;
     virtual void emitInitializerSection(CodeBuilder *builder) const = 0;
+    void emitHelperFunctions(CodeBuilder *builder) const;
 
  protected:
     static EBPFMeterPSA *getMeter(EBPFPipeline *pipeline);
@@ -73,6 +76,7 @@ class PSAArchTC : public PSAArch {
 
     void emit(CodeBuilder* builder) const override;
 
+    void emitTypes(CodeBuilder *builder) const override;
     void emitGlobalHeadersMetadata(CodeBuilder *builder) const override;
     void emitInstances(CodeBuilder *builder) const override;
     void emitInitializerSection(CodeBuilder *builder) const override;
@@ -101,6 +105,7 @@ class PSAArchXDP : public PSAArch {
 
     void emit(CodeBuilder* builder) const override;
 
+    void emitTypes(CodeBuilder *builder) const override;
     void emitGlobalHeadersMetadata(CodeBuilder *builder) const override;
     void emitInstances(CodeBuilder *builder) const override;
     void emitInitializerSection(CodeBuilder *builder) const override;

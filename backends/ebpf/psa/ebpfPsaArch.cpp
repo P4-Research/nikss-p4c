@@ -56,28 +56,29 @@ void PSAArch::emitCommonPreamble(CodeBuilder *builder) const {
     builder->target->emitPreamble(builder);
 }
 
-void PSAArch::emitInternalStructures(CodeBuilder *pBuilder) const {
-    pBuilder->appendLine("struct internal_metadata {\n"
-                         "    __u16 pkt_ether_type;\n"
-                         "} __attribute__((aligned(4)));");
-    pBuilder->newline();
+void PSAArch::emitInternalStructures(CodeBuilder *builder) const {
+    builder->appendLine("struct internal_metadata {\n"
+                        "    __u16 pkt_ether_type;\n"
+                        "} __attribute__((aligned(4)));");
+    builder->newline();
 
     // emit helper struct for clone sessions
-    pBuilder->appendLine("struct list_key_t {\n"
-                         "    __u32 port;\n"
-                         "    __u16 instance;\n"
-                         "};\n"
-                         "typedef struct list_key_t elem_t;\n"
-                         "\n"
-                         "struct element {\n"
-                         "    struct clone_session_entry entry;\n"
-                         "    elem_t next_id;\n"
-                         "} __attribute__((aligned(4)));");
-    pBuilder->newline();
+    builder->appendLine("struct list_key_t {\n"
+                        "    __u32 port;\n"
+                        "    __u16 instance;\n"
+                        "};\n"
+                        "typedef struct list_key_t elem_t;\n"
+                        "\n"
+                        "struct element {\n"
+                        "    struct clone_session_entry entry;\n"
+                        "    elem_t next_id;\n"
+                        "} __attribute__((aligned(4)));");
+    builder->newline();
 }
 
 /* Generate headers and structs in p4 prog */
-void PSAArch::emitTypes(CodeBuilder *builder) const {
+void PSAArch::emitTypes(CodeBuilder *builder,
+                        EBPFPipeline* ingressPipeline, EBPFPipeline* egressPipeline) const {
     for (auto type : ebpfTypes) {
         type->emit(builder);
     }
@@ -86,6 +87,63 @@ void PSAArch::emitTypes(CodeBuilder *builder) const {
     if (meter != nullptr) {
         meter->emitValueStruct(builder);
     }
+
+    ingressPipeline->parser->emitTypes(builder);
+    ingressPipeline->control->emitTableTypes(builder);
+    egressPipeline->parser->emitTypes(builder);
+    egressPipeline->control->emitTableTypes(builder);
+    builder->newline();
+}
+
+void PSAArch::emitGlobalHeadersMetadata(CodeBuilder *builder, EBPFPipeline *pipeline) const {
+    builder->append("struct hdr_md ");
+    builder->blockStart();
+    builder->emitIndent();
+
+    pipeline->parser->headerType->declare(builder, "cpumap_hdr", false);
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    auto user_md_type = pipeline->typeMap->getType(pipeline->control->user_metadata);
+    BUG_CHECK(user_md_type != nullptr, "cannot declare user metadata");
+    auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
+    userMetadataType->declare(builder, "cpumap_usermeta", false);
+    builder->endOfStatement(true);
+
+    // additional field to avoid compiler errors when both headers and user_metadata are empty.
+    builder->emitIndent();
+    builder->append("__u8 __hook");
+    builder->endOfStatement(true);
+
+    builder->blockEnd(false);
+    builder->endOfStatement(true);
+    builder->newline();
+}
+
+void PSAArch::emitPacketReplicationTables(CodeBuilder *builder) const {
+    builder->target->emitMapInMapDecl(builder, "clone_session_tbl_inner",
+                                      TableHash, "elem_t",
+                                      "struct element", MaxClones, "clone_session_tbl",
+                                      TableArray, "__u32", MaxCloneSessions);
+    builder->target->emitMapInMapDecl(builder, "multicast_grp_tbl_inner",
+                                      TableHash, "elem_t",
+                                      "struct element", MaxClones, "multicast_grp_tbl",
+                                      TableArray, "__u32", MaxCloneSessions);
+}
+
+void PSAArch::emitPipelineInstances(CodeBuilder *builder,
+                                    EBPFPipeline* ingressPipeline,
+                                    EBPFPipeline* egressPipeline) const {
+    ingressPipeline->parser->emitValueSetInstances(builder);
+    ingressPipeline->control->emitTableInstances(builder);
+    ingressPipeline->deparser->emitDigestInstances(builder);
+
+    egressPipeline->parser->emitValueSetInstances(builder);
+    egressPipeline->control->emitTableInstances(builder);
+    // no Digest in egress pipeline
+
+    builder->target->emitTableDecl(builder, "hdr_md_cpumap",
+                                   TablePerCPUArray, "u32",
+                                   "struct hdr_md", 2);
 }
 
 void PSAArch::emitInitializer(CodeBuilder *builder,
@@ -217,40 +275,6 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
     }
 }
 
-void PSAArch::emitGlobalHeadersMetadata(CodeBuilder *builder, EBPFPipeline *pipeline) const {
-    builder->append("struct hdr_md ");
-    builder->blockStart();
-    builder->emitIndent();
-
-    pipeline->parser->headerType->declare(builder, "cpumap_hdr", false);
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    auto user_md_type = pipeline->typeMap->getType(pipeline->control->user_metadata);
-    BUG_CHECK(user_md_type != nullptr, "cannot declare user metadata");
-    auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
-    userMetadataType->declare(builder, "cpumap_usermeta", false);
-    builder->endOfStatement(true);
-
-    // additional field to avoid compiler errors when both headers and user_metadata are empty.
-    builder->emitIndent();
-    builder->append("__u8 __hook");
-    builder->endOfStatement(true);
-
-    builder->blockEnd(false);
-    builder->endOfStatement(true);
-}
-
-void PSAArch::emitPacketReplicationTables(CodeBuilder *builder) const {
-    builder->target->emitMapInMapDecl(builder, "clone_session_tbl_inner",
-                                      TableHash, "elem_t",
-                                      "struct element", MaxClones, "clone_session_tbl",
-                                      TableArray, "__u32", MaxCloneSessions);
-    builder->target->emitMapInMapDecl(builder, "multicast_grp_tbl_inner",
-                                      TableHash, "elem_t",
-                                      "struct element", MaxClones, "multicast_grp_tbl",
-                                      TableArray, "__u32", MaxCloneSessions);
-}
-
 EBPFMeterPSA *PSAArch::getMeter(EBPFPipeline *pipeline) {
     if (pipeline == nullptr) {
         return nullptr;
@@ -355,35 +379,26 @@ void PSAArchTC::emit(CodeBuilder *builder) const {
     builder->target->emitLicense(builder, xdp->license);
 }
 
+void PSAArchTC::emitTypes(CodeBuilder *builder) const {
+    PSAArch::emitTypes(builder, tcIngress, tcEgress);
+}
+
 void PSAArchTC::emitGlobalHeadersMetadata(CodeBuilder *builder) const {
     // Note: here, we could also use tcEgress pipeline
     PSAArch::emitGlobalHeadersMetadata(builder, tcIngress);
 }
 
 void PSAArchTC::emitInstances(CodeBuilder *builder) const {
-    builder->newline();
-    tcIngress->parser->emitTypes(builder);
-    tcIngress->control->emitTableTypes(builder);
-    tcEgress->parser->emitTypes(builder);
-    tcEgress->control->emitTableTypes(builder);
     builder->appendLine("REGISTER_START()");
+
     if (options.xdp2tcMode == XDP2TC_CPUMAP) {
         builder->target->emitTableDecl(builder, "workaround_cpumap",
                                        TablePerCPUArray, "u32",
                                        "u16", 1);
     }
+
     emitPacketReplicationTables(builder);
-
-    tcIngress->parser->emitValueSetInstances(builder);
-    tcIngress->control->emitTableInstances(builder);
-    tcIngress->deparser->emitDigestInstances(builder);
-
-    tcEgress->parser->emitValueSetInstances(builder);
-    tcEgress->control->emitTableInstances(builder);
-
-    builder->target->emitTableDecl(builder, "hdr_md_cpumap",
-                                   TablePerCPUArray, "u32",
-                                   "struct hdr_md", 2);
+    emitPipelineInstances(builder, tcIngress, tcEgress);
 
     builder->appendLine("REGISTER_END()");
     builder->newline();
@@ -432,6 +447,10 @@ void PSAArchXDP::emit(CodeBuilder *builder) const {
     builder->appendLine("char _license[] SEC(\"license\") = \"GPL\";");
 }
 
+void PSAArchXDP::emitTypes(CodeBuilder *builder) const {
+    PSAArch::emitTypes(builder, xdpIngress, xdpEgress);
+}
+
 void PSAArchXDP::emitGlobalHeadersMetadata(CodeBuilder *builder) const {
     // Note: here, we could also use any pipeline in { xdpIngress, xdpEgress tcEgressForXDP }
     PSAArch::emitGlobalHeadersMetadata(builder, tcIngressForXDP);
@@ -440,40 +459,9 @@ void PSAArchXDP::emitGlobalHeadersMetadata(CodeBuilder *builder) const {
 void PSAArchXDP::emitInstances(CodeBuilder *builder) const {
     builder->newline();
 
-    xdpIngress->parser->emitTypes(builder);
-    xdpIngress->control->emitTableTypes(builder);
-    xdpEgress->parser->emitTypes(builder);
-    xdpEgress->control->emitTableTypes(builder);
-    builder->newline();
-
-    builder->emitIndent();
-    builder->append("struct bpf_map_def SEC(\"maps\") tx_port = ");
-    builder->blockStart();
-    builder->emitIndent();
-    builder->append(".type          = ");
-    builder->appendLine("BPF_MAP_TYPE_DEVMAP,");
-    builder->emitIndent();
-    builder->append(".key_size      = sizeof(int),");
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat(".value_size    = sizeof(struct bpf_devmap_val),");
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat(".max_entries   = DEVMAP_SIZE,");
-    builder->newline();
-    builder->blockEnd(false);
-    builder->endOfStatement(true);
-    builder->newline();
-
     builder->appendLine("REGISTER_START()");
     emitPacketReplicationTables(builder);
-    xdpIngress->parser->emitValueSetInstances(builder);
-    xdpIngress->control->emitTableInstances(builder);
-    xdpIngress->deparser->emitDigestInstances(builder);
-
-    xdpEgress->parser->emitValueSetInstances(builder);
-    xdpEgress->control->emitTableInstances(builder);
-    xdpEgress->deparser->emitDigestInstances(builder);
+    emitPipelineInstances(builder, xdpIngress, xdpEgress);
 
     tcEgressForXDP->control->tables.insert(xdpEgress->control->tables.begin(),
                                            xdpEgress->control->tables.end());
@@ -489,9 +477,20 @@ void PSAArchXDP::emitInstances(CodeBuilder *builder) const {
                                        "u32", "u32", 1);
     }
 
-    builder->target->emitTableDecl(builder, "hdr_md_cpumap",
-                                   TablePerCPUArray, "u32",
-                                   "struct hdr_md", 2);
+    builder->newline();
+    builder->append("struct bpf_map_def SEC(\"maps\") tx_port = ");
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendLine(".type          = BPF_MAP_TYPE_DEVMAP,");
+    builder->emitIndent();
+    builder->appendLine(".key_size      = sizeof(int),");
+    builder->emitIndent();
+    builder->appendLine(".value_size    = sizeof(struct bpf_devmap_val),");
+    builder->emitIndent();
+    builder->appendLine(".max_entries   = DEVMAP_SIZE,");
+    builder->blockEnd(false);
+    builder->endOfStatement(true);
+    builder->newline();
 
     builder->appendLine("REGISTER_END()");
     builder->newline();
@@ -501,16 +500,15 @@ void PSAArchXDP::emitInitializerSection(CodeBuilder *builder) const {
     builder->appendLine("SEC(\"xdp/map-initializer\")");
 }
 
-void PSAArchXDP::emitXDP2TCInternalStructures(CodeBuilder *pBuilder) const {
-    pBuilder->appendFormat("struct xdp2tc_metadata {\n"
-                           "    struct %s headers;\n"
-                           "    struct psa_ingress_output_metadata_t ostd;\n"
-                           "    __u32 packetOffsetInBits;\n"
-                           "    __u16 pkt_ether_type;\n"
-                           "} __attribute__((aligned(4)));",
-                           tcIngressForXDP->parser->headerType->to<EBPFStructType>()->name);
-    pBuilder->newline();
-    pBuilder->newline();
+void PSAArchXDP::emitXDP2TCInternalStructures(CodeBuilder *builder) const {
+    builder->appendFormat("struct xdp2tc_metadata {\n"
+                          "    struct %s headers;\n"
+                          "    struct psa_ingress_output_metadata_t ostd;\n"
+                          "    __u32 packetOffsetInBits;\n"
+                          "    __u16 pkt_ether_type;\n"
+                          "} __attribute__((aligned(4)));",
+                          tcIngressForXDP->parser->headerType->to<EBPFStructType>()->name);
+    builder->newline();
 }
 
 void PSAArchXDP::emitDummyProgram(CodeBuilder *builder) const {
@@ -1092,4 +1090,3 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expressi
     return false;
 }
 }  // namespace EBPF
-
