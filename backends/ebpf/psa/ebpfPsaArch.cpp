@@ -14,6 +14,35 @@
 
 namespace EBPF {
 
+// =====================PSAArch=============================
+void PSAArch::emitPSAIncludes(CodeBuilder *builder) const {
+    builder->appendLine("#include <stdbool.h>");
+    builder->appendLine("#include <linux/if_ether.h>");
+    builder->appendLine("#include \"psa.h\"");
+}
+
+void PSAArch::emitPreamble(CodeBuilder *builder) const {
+    emitCommonPreamble(builder);
+    builder->newline();
+
+    builder->appendLine("#define CLONE_MAX_PORTS 64");
+    builder->appendLine("#define CLONE_MAX_INSTANCES 1");
+    builder->appendLine("#define CLONE_MAX_CLONES (CLONE_MAX_PORTS * CLONE_MAX_INSTANCES)");
+    builder->appendLine("#define CLONE_MAX_SESSIONS 1024");
+    if (options.generateToXDP) {
+        builder->appendLine("#define DEVMAP_SIZE 256");
+    }
+    builder->newline();
+
+    builder->appendLine("#ifndef PSA_PORT_RECIRCULATE\n"
+        "#error \"PSA_PORT_RECIRCULATE not specified, "
+        "please use -DPSA_PORT_RECIRCULATE=n option to specify index of recirculation "
+        "interface (see the result of command 'ip link')\"\n"
+        "#endif");
+    builder->appendLine("#define P4C_PSA_PORT_RECIRCULATE 0xfffffffa");
+    builder->newline();
+}
+
 void PSAArch::emitCommonPreamble(CodeBuilder *builder) const {
     builder->newline();
     builder->appendLine("#define EBPF_MASK(t, w) ((((t)(1)) << (w)) - (t)1)");
@@ -27,10 +56,24 @@ void PSAArch::emitCommonPreamble(CodeBuilder *builder) const {
     builder->target->emitPreamble(builder);
 }
 
-void PSAArch::emitPSAIncludes(CodeBuilder *builder) const {
-    builder->appendLine("#include <stdbool.h>");
-    builder->appendLine("#include <linux/if_ether.h>");
-    builder->appendLine("#include \"psa.h\"");
+void PSAArch::emitInternalStructures(CodeBuilder *pBuilder) const {
+    pBuilder->appendLine("struct internal_metadata {\n"
+                         "    __u16 pkt_ether_type;\n"
+                         "} __attribute__((aligned(4)));");
+    pBuilder->newline();
+
+    // emit helper struct for clone sessions
+    pBuilder->appendLine("struct list_key_t {\n"
+                         "    __u32 port;\n"
+                         "    __u16 instance;\n"
+                         "};\n"
+                         "typedef struct list_key_t elem_t;\n"
+                         "\n"
+                         "struct element {\n"
+                         "    struct clone_session_entry entry;\n"
+                         "    elem_t next_id;\n"
+                         "} __attribute__((aligned(4)));");
+    pBuilder->newline();
 }
 
 /* Generate headers and structs in p4 prog */
@@ -45,6 +88,199 @@ void PSAArch::emitTypes(CodeBuilder *builder) const {
     }
 }
 
+void PSAArch::emitInitializer(CodeBuilder *builder,
+                              EBPFPipeline* ingressPipeline, EBPFPipeline* egressPipeline) const {
+    emitInitializerSection(builder);
+    builder->appendFormat("int %s()",
+                          "map_initializer");
+    builder->spc();
+    builder->blockStart();
+    builder->emitIndent();
+    builder->appendFormat("u32 %s = 0;", ingressPipeline->zeroKey.c_str());
+    builder->newline();
+    ingressPipeline->control->emitTableInitializers(builder);
+    egressPipeline->control->emitTableInitializers(builder);
+    builder->newline();
+    builder->emitIndent();
+    builder->appendLine("return 0;");
+    builder->blockEnd(true);
+}
+
+void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
+    EBPFHashAlgorithmTypeFactoryPSA::instance()->emitGlobals(builder);
+
+    cstring forEachFunc =
+            "static __always_inline\n"
+            "int do_for_each(SK_BUFF *skb, void *map, "
+            "unsigned int max_iter, "
+            "void (*a)(SK_BUFF *, void *))\n"
+            "{\n"
+            "    elem_t head_idx = {0, 0};\n"
+            "    struct element *elem = bpf_map_lookup_elem(map, &head_idx);\n"
+            "    if (!elem) {\n"
+            "        return -1;\n"
+            "    }\n"
+            "    if (elem->next_id.port == 0 && elem->next_id.instance == 0) {\n"
+            "       %trace_msg_no_elements%"
+            "        return 0;\n"
+            "    }\n"
+            "    elem_t next_id = elem->next_id;\n"
+            "    for (unsigned int i = 0; i < max_iter; i++) {\n"
+            "        struct element *elem = bpf_map_lookup_elem(map, &next_id);\n"
+            "        if (!elem) {\n"
+            "            break;\n"
+            "        }\n"
+            "        a(skb, &elem->entry);\n"
+            "        if (elem->next_id.port == 0 && elem->next_id.instance == 0) {\n"
+            "            break;\n"
+            "        }\n"
+            "        next_id = elem->next_id;\n"
+            "    }\n"
+            "    return 0;\n"
+            "}";
+    if (options.emitTraceMessages) {
+        forEachFunc = forEachFunc.replace("%trace_msg_no_elements%",
+            "        bpf_trace_message(\"do_for_each: No elements found in list\\n\");\n");
+    } else {
+        forEachFunc = forEachFunc.replace("%trace_msg_no_elements%", "");
+    }
+    builder->appendLine(forEachFunc);
+    builder->newline();
+
+    // Function to perform cloning, common for ingress and egress
+    cstring cloneFunction =
+            "static __always_inline\n"
+            "void do_clone(SK_BUFF *skb, void *data)\n"
+            "{\n"
+            "    struct clone_session_entry *entry = (struct clone_session_entry *) data;\n"
+            "%trace_msg_redirect%"
+            "    bpf_clone_redirect(skb, entry->egress_port, 0);\n"
+            "}";
+    if (options.emitTraceMessages) {
+        cloneFunction = cloneFunction.replace(cstring("%trace_msg_redirect%"),
+            "    bpf_trace_message(\"do_clone: cloning pkt, egress_port=%d, cos=%d\\n\", "
+            "entry->egress_port, entry->class_of_service);\n");
+    } else {
+        cloneFunction = cloneFunction.replace(cstring("%trace_msg_redirect%"), "");
+    }
+    builder->appendLine(cloneFunction);
+    builder->newline();
+
+    cstring pktClonesFunc =
+            "static __always_inline\n"
+            "int do_packet_clones(SK_BUFF * skb, void * map, __u32 session_id, "
+            "PSA_PacketPath_t new_pkt_path, __u8 caller_id)\n"
+            "{\n"
+            "%trace_msg_clone_requested%"
+            "    struct psa_global_metadata * meta = (struct psa_global_metadata *) skb->cb;\n"
+            "    void * inner_map;\n"
+            "    inner_map = bpf_map_lookup_elem(map, &session_id);\n"
+            "    if (inner_map != NULL) {\n"
+            "        PSA_PacketPath_t original_pkt_path = meta->packet_path;\n"
+            "        meta->packet_path = new_pkt_path;\n"
+            "        if (do_for_each(skb, inner_map, CLONE_MAX_CLONES, &do_clone) < 0) {\n"
+            "%trace_msg_clone_failed%"
+            "            return -1;\n"
+            "        }\n"
+            "        meta->packet_path = original_pkt_path;\n"
+            "    } else {\n"
+            "%trace_msg_no_session%"
+            "    }\n"
+            "%trace_msg_cloning_done%"
+            "    return 0;\n"
+            " }";
+    if (options.emitTraceMessages) {
+        pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_clone_requested%"),
+            "    bpf_trace_message(\"Clone#%d: pkt clone requested, session=%d\\n\", "
+            "caller_id, session_id);\n");
+        pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_clone_failed%"),
+            "            bpf_trace_message(\"Clone#%d: failed to clone packet\", caller_id);\n");
+        pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_no_session%"),
+            "        bpf_trace_message(\"Clone#%d: session_id not found, "
+            "no clones created\\n\", caller_id);\n");
+        pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_cloning_done%"),
+            "    bpf_trace_message(\"Clone#%d: packet cloning finished\\n\", caller_id);\n");
+    } else {
+        pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_clone_requested%"), "");
+        pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_clone_failed%"), "");
+        pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_no_session%"), "");
+        pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_cloning_done%"), "");
+    }
+
+    builder->appendLine(pktClonesFunc);
+    builder->newline();
+
+    if (auto meter = getAnyMeter()) {
+        cstring meterExecuteFunc = meter->meterExecuteFunc(options.emitTraceMessages);
+        builder->appendLine(meterExecuteFunc);
+        builder->newline();
+    }
+}
+
+void PSAArch::emitGlobalHeadersMetadata(CodeBuilder *builder, EBPFPipeline *pipeline) const {
+    builder->append("struct hdr_md ");
+    builder->blockStart();
+    builder->emitIndent();
+
+    pipeline->parser->headerType->declare(builder, "cpumap_hdr", false);
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    auto user_md_type = pipeline->typeMap->getType(pipeline->control->user_metadata);
+    BUG_CHECK(user_md_type != nullptr, "cannot declare user metadata");
+    auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
+    userMetadataType->declare(builder, "cpumap_usermeta", false);
+    builder->endOfStatement(true);
+
+    // additional field to avoid compiler errors when both headers and user_metadata are empty.
+    builder->emitIndent();
+    builder->append("__u8 __hook");
+    builder->endOfStatement(true);
+
+    builder->blockEnd(false);
+    builder->endOfStatement(true);
+}
+
+void PSAArch::emitPacketReplicationTables(CodeBuilder *builder) const {
+    builder->target->emitMapInMapDecl(builder, "clone_session_tbl_inner",
+                                      TableHash, "elem_t",
+                                      "struct element", MaxClones, "clone_session_tbl",
+                                      TableArray, "__u32", MaxCloneSessions);
+    builder->target->emitMapInMapDecl(builder, "multicast_grp_tbl_inner",
+                                      TableHash, "elem_t",
+                                      "struct element", MaxClones, "multicast_grp_tbl",
+                                      TableArray, "__u32", MaxCloneSessions);
+}
+
+EBPFMeterPSA *PSAArch::getMeter(EBPFPipeline *pipeline) {
+    if (pipeline == nullptr) {
+        return nullptr;
+    }
+    if (!pipeline->control->meters.empty()) {
+        return pipeline->control->meters.begin()->second;
+    }
+    auto directMeter = std::find_if(pipeline->control->tables.begin(),
+                                    pipeline->control->tables.end(),
+                                    [](std::pair<const cstring, EBPFTable*> elem) {
+                                        return !elem.second->to<EBPFTablePSA>()->meters.empty();
+                                    });
+    if (directMeter != pipeline->control->tables.end()) {
+        return directMeter->second->to<EBPFTablePSA>()->meters.front().second;
+    }
+    return nullptr;
+}
+
+EBPFMeterPSA *PSAArch::getAnyMeter(const std::initializer_list<EBPFPipeline *> pipelines) const {
+    EBPFMeterPSA *meter = nullptr;
+    for (auto pipeline : pipelines) {
+        meter = getMeter(pipeline);
+        if (meter != nullptr) {
+            return meter;
+        }
+    }
+    return meter;
+}
+
+// =====================PSAArchTC=============================
 void PSAArchTC::emit(CodeBuilder *builder) const {
     /**
      * How the structure of a single C program for PSA should look like?
@@ -119,181 +355,9 @@ void PSAArchTC::emit(CodeBuilder *builder) const {
     builder->target->emitLicense(builder, xdp->license);
 }
 
-void PSAArch::emitPacketReplicationTables(CodeBuilder *builder) const {
-    builder->target->emitMapInMapDecl(builder, "clone_session_tbl_inner",
-                                      TableHash, "elem_t",
-                                      "struct element", MaxClones, "clone_session_tbl",
-                                      TableArray, "__u32", MaxCloneSessions);
-    builder->target->emitMapInMapDecl(builder, "multicast_grp_tbl_inner",
-                                      TableHash, "elem_t",
-                                      "struct element", MaxClones, "multicast_grp_tbl",
-                                      TableArray, "__u32", MaxCloneSessions);
-}
-
-void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
-    EBPFHashAlgorithmTypeFactoryPSA::instance()->emitGlobals(builder);
-
-    cstring forEachFunc ="static __always_inline\n"
-                        "int do_for_each(SK_BUFF *skb, void *map, "
-                                        "unsigned int max_iter, "
-                                        "void (*a)(SK_BUFF *, void *))\n"
-                        "{\n"
-                        "    elem_t head_idx = {0, 0};\n"
-                        "    struct element *elem = bpf_map_lookup_elem(map, &head_idx);\n"
-                        "    if (!elem) {\n"
-                        "        return -1;\n"
-                        "    }\n"
-                        "    if (elem->next_id.port == 0 && elem->next_id.instance == 0) {\n"
-                        "       %trace_msg_no_elements%"
-                        "        return 0;\n"
-                        "    }\n"
-                        "    elem_t next_id = elem->next_id;\n"
-                        "    for (unsigned int i = 0; i < max_iter; i++) {\n"
-                        "        struct element *elem = bpf_map_lookup_elem(map, &next_id);\n"
-                        "        if (!elem) {\n"
-                        "            break;\n"
-                        "        }\n"
-                        "        a(skb, &elem->entry);\n"
-                        "        if (elem->next_id.port == 0 && elem->next_id.instance == 0) {\n"
-                        "            break;\n"
-                        "        }\n"
-                        "        next_id = elem->next_id;\n"
-                        "    }\n"
-                        "    return 0;\n"
-                        "}";
-    if (options.emitTraceMessages) {
-        forEachFunc = forEachFunc.replace("%trace_msg_no_elements%",
-            "        bpf_trace_message(\"do_for_each: No elements found in list\\n\");\n");
-    } else {
-        forEachFunc = forEachFunc.replace("%trace_msg_no_elements%", "");
-    }
-    builder->appendLine(forEachFunc);
-    builder->newline();
-
-    // Function to perform cloning, common for ingress and egress
-    cstring cloneFunction =
-            "static __always_inline\n"
-            "void do_clone(SK_BUFF *skb, void *data)\n"
-            "{\n"
-            "    struct clone_session_entry *entry = (struct clone_session_entry *) data;\n"
-                "%trace_msg_redirect%"
-            "    bpf_clone_redirect(skb, entry->egress_port, 0);\n"
-            "}";
-    if (options.emitTraceMessages) {
-        cloneFunction = cloneFunction.replace(cstring("%trace_msg_redirect%"),
-            "    bpf_trace_message(\"do_clone: cloning pkt, egress_port=%d, cos=%d\\n\", "
-            "entry->egress_port, entry->class_of_service);\n");
-    } else {
-        cloneFunction = cloneFunction.replace(cstring("%trace_msg_redirect%"), "");
-    }
-    builder->appendLine(cloneFunction);
-    builder->newline();
-
-    cstring pktClonesFunc =
-            "static __always_inline\n"
-            "int do_packet_clones(SK_BUFF * skb, void * map, __u32 session_id, "
-                "PSA_PacketPath_t new_pkt_path, __u8 caller_id)\n"
-            "{\n"
-                "%trace_msg_clone_requested%"
-            "    struct psa_global_metadata * meta = (struct psa_global_metadata *) skb->cb;\n"
-            "    void * inner_map;\n"
-            "    inner_map = bpf_map_lookup_elem(map, &session_id);\n"
-            "    if (inner_map != NULL) {\n"
-            "        PSA_PacketPath_t original_pkt_path = meta->packet_path;\n"
-            "        meta->packet_path = new_pkt_path;\n"
-            "        if (do_for_each(skb, inner_map, CLONE_MAX_CLONES, &do_clone) < 0) {\n"
-                        "%trace_msg_clone_failed%"
-            "            return -1;\n"
-            "        }\n"
-            "        meta->packet_path = original_pkt_path;\n"
-            "    } else {\n"
-                    "%trace_msg_no_session%"
-            "    }\n"
-                "%trace_msg_cloning_done%"
-            "    return 0;\n"
-            " }";
-    if (options.emitTraceMessages) {
-        pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_clone_requested%"),
-            "    bpf_trace_message(\"Clone#%d: pkt clone requested, session=%d\\n\", "
-            "caller_id, session_id);\n");
-        pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_clone_failed%"),
-            "            bpf_trace_message(\"Clone#%d: failed to clone packet\", caller_id);\n");
-        pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_no_session%"),
-            "        bpf_trace_message(\"Clone#%d: session_id not found, "
-            "no clones created\\n\", caller_id);\n");
-        pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_cloning_done%"),
-            "    bpf_trace_message(\"Clone#%d: packet cloning finished\\n\", caller_id);\n");
-    } else {
-        pktClonesFunc = pktClonesFunc.replace(
-                cstring("%trace_msg_clone_requested%"), "");
-        pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_clone_failed%"),
-                                              "");
-        pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_no_session%"), "");
-        pktClonesFunc = pktClonesFunc.replace(cstring("%trace_msg_cloning_done%"), "");
-    }
-
-    builder->appendLine(pktClonesFunc);
-    builder->newline();
-
-    if (auto meter = getAnyMeter()) {
-        cstring meterExecuteFunc = meter->meterExecuteFunc(options.emitTraceMessages);
-        builder->appendLine(meterExecuteFunc);
-        builder->newline();
-    }
-}
-
-void PSAArch::emitInternalStructures(CodeBuilder *pBuilder) const {
-    pBuilder->appendLine("struct internal_metadata {\n"
-                         "    __u16 pkt_ether_type;\n"
-                         "} __attribute__((aligned(4)));");
-    pBuilder->newline();
-
-    // emit helper struct for clone sessions
-    pBuilder->appendLine("struct list_key_t {\n"
-                         "    __u32 port;\n"
-                         "    __u16 instance;\n"
-                         "};\n"
-                         "typedef struct list_key_t elem_t;\n"
-                         "\n"
-                         "struct element {\n"
-                         "    struct clone_session_entry entry;\n"
-                         "    elem_t next_id;\n"
-                         "} __attribute__((aligned(4)));");
-    pBuilder->newline();
-}
-
-void PSAArchXDP::emitXDP2TCInternalStructures(CodeBuilder *pBuilder) const {
-    pBuilder->appendFormat("struct xdp2tc_metadata {\n"
-                         "    struct %s headers;\n"
-                         "    struct psa_ingress_output_metadata_t ostd;\n"
-                         "    __u32 packetOffsetInBits;\n"
-                         "    __u16 pkt_ether_type;\n"
-                         "} __attribute__((aligned(4)));",
-                     tcIngressForXDP->parser->headerType->to<EBPFStructType>()->name);
-    pBuilder->newline();
-    pBuilder->newline();
-}
-
-void PSAArch::emitPreamble(CodeBuilder *builder) const {
-    emitCommonPreamble(builder);
-    builder->newline();
-
-    builder->appendLine("#define CLONE_MAX_PORTS 64");
-    builder->appendLine("#define CLONE_MAX_INSTANCES 1");
-    builder->appendLine("#define CLONE_MAX_CLONES (CLONE_MAX_PORTS * CLONE_MAX_INSTANCES)");
-    builder->appendLine("#define CLONE_MAX_SESSIONS 1024");
-    if (options.generateToXDP) {
-        builder->appendLine("#define DEVMAP_SIZE 256");
-    }
-    builder->newline();
-
-    builder->appendLine("#ifndef PSA_PORT_RECIRCULATE\n"
-        "#error \"PSA_PORT_RECIRCULATE not specified, "
-            "please use -DPSA_PORT_RECIRCULATE=n option to specify index of recirculation "
-            "interface (see the result of command 'ip link')\"\n"
-        "#endif");
-    builder->appendLine("#define P4C_PSA_PORT_RECIRCULATE 0xfffffffa");
-    builder->newline();
+void PSAArchTC::emitGlobalHeadersMetadata(CodeBuilder *builder) const {
+    // Note: here, we could also use tcEgress pipeline
+    PSAArch::emitGlobalHeadersMetadata(builder, tcIngress);
 }
 
 void PSAArchTC::emitInstances(CodeBuilder *builder) const {
@@ -325,47 +389,11 @@ void PSAArchTC::emitInstances(CodeBuilder *builder) const {
     builder->newline();
 }
 
-void PSAArch::emitInitializer(CodeBuilder *builder,
-                              EBPFPipeline* ingressPipeline, EBPFPipeline* egressPipeline) const {
-    emitInitializerSection(builder);
-    builder->appendFormat("int %s()",
-                          "map_initializer");
-    builder->spc();
-    builder->blockStart();
-    builder->emitIndent();
-    builder->appendFormat("u32 %s = 0;", ingressPipeline->zeroKey.c_str());
-    builder->newline();
-    ingressPipeline->control->emitTableInitializers(builder);
-    egressPipeline->control->emitTableInitializers(builder);
-    builder->newline();
-    builder->emitIndent();
-    builder->appendLine("return 0;");
-    builder->blockEnd(true);
+void PSAArchTC::emitInitializerSection(CodeBuilder *builder) const {
+    builder->appendLine("SEC(\"classifier/map-initializer\")");
 }
 
-void PSAArch::emitGlobalHeadersMetadata(CodeBuilder *builder, EBPFPipeline *pipeline) const {
-    builder->append("struct hdr_md ");
-    builder->blockStart();
-    builder->emitIndent();
-
-    pipeline->parser->headerType->declare(builder, "cpumap_hdr", false);
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    auto user_md_type = pipeline->typeMap->getType(pipeline->control->user_metadata);
-    BUG_CHECK(user_md_type != nullptr, "cannot declare user metadata");
-    auto userMetadataType = EBPFTypeFactory::instance->create(user_md_type);
-    userMetadataType->declare(builder, "cpumap_usermeta", false);
-    builder->endOfStatement(true);
-
-    // additional field to avoid compiler errors when both headers and user_metadata are empty.
-    builder->emitIndent();
-    builder->append("__u8 __hook");
-    builder->endOfStatement(true);
-
-    builder->blockEnd(false);
-    builder->endOfStatement(true);
-}
-
+// =====================PSAArchXDP=============================
 void PSAArchXDP::emit(CodeBuilder *builder) const {
     builder->target->emitIncludes(builder);
     emitPSAIncludes(builder);
@@ -402,6 +430,11 @@ void PSAArchXDP::emit(CodeBuilder *builder) const {
     tcEgressForXDP->emit(builder);
 
     builder->appendLine("char _license[] SEC(\"license\") = \"GPL\";");
+}
+
+void PSAArchXDP::emitGlobalHeadersMetadata(CodeBuilder *builder) const {
+    // Note: here, we could also use any pipeline in { xdpIngress, xdpEgress tcEgressForXDP }
+    PSAArch::emitGlobalHeadersMetadata(builder, tcIngressForXDP);
 }
 
 void PSAArchXDP::emitInstances(CodeBuilder *builder) const {
@@ -464,6 +497,22 @@ void PSAArchXDP::emitInstances(CodeBuilder *builder) const {
     builder->newline();
 }
 
+void PSAArchXDP::emitInitializerSection(CodeBuilder *builder) const {
+    builder->appendLine("SEC(\"xdp/map-initializer\")");
+}
+
+void PSAArchXDP::emitXDP2TCInternalStructures(CodeBuilder *pBuilder) const {
+    pBuilder->appendFormat("struct xdp2tc_metadata {\n"
+                           "    struct %s headers;\n"
+                           "    struct psa_ingress_output_metadata_t ostd;\n"
+                           "    __u32 packetOffsetInBits;\n"
+                           "    __u16 pkt_ether_type;\n"
+                           "} __attribute__((aligned(4)));",
+                           tcIngressForXDP->parser->headerType->to<EBPFStructType>()->name);
+    pBuilder->newline();
+    pBuilder->newline();
+}
+
 void PSAArchXDP::emitDummyProgram(CodeBuilder *builder) const {
     // this is static program, so we can just paste a piece of code.
     builder->appendLine("SEC(\"xdp_redirect_dummy_sec\")");
@@ -477,35 +526,7 @@ void PSAArchXDP::emitDummyProgram(CodeBuilder *builder) const {
     builder->blockEnd(true);  // end of function
 }
 
-EBPFMeterPSA *PSAArch::getMeter(EBPFPipeline *pipeline) {
-    if (pipeline == nullptr) {
-        return nullptr;
-    }
-    if (!pipeline->control->meters.empty()) {
-        return pipeline->control->meters.begin()->second;
-    }
-    auto directMeter = std::find_if(pipeline->control->tables.begin(),
-                                    pipeline->control->tables.end(),
-                                    [](std::pair<const cstring, EBPFTable*> elem) {
-                                        return !elem.second->to<EBPFTablePSA>()->meters.empty();
-                                    });
-    if (directMeter != pipeline->control->tables.end()) {
-        return directMeter->second->to<EBPFTablePSA>()->meters.front().second;
-    }
-    return nullptr;
-}
-
-EBPFMeterPSA *PSAArch::getAnyMeter(const std::initializer_list<EBPFPipeline *> pipelines) const {
-    EBPFMeterPSA *meter = nullptr;
-    for (auto pipeline : pipelines) {
-        meter = getMeter(pipeline);
-        if (meter != nullptr) {
-            return meter;
-        }
-    }
-    return meter;
-}
-
+// =====================ConvertToEbpfPSA=============================
 const PSAArch * ConvertToEbpfPSA::build(const IR::ToplevelBlock *tlb) {
     /*
      * TYPES
@@ -806,6 +827,7 @@ void ConvertToEBPFParserPSA::findValueSets(const IR::ParserBlock *prsr) {
         }
     }
 }
+
 // =====================EBPFControl=============================
 bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     control = new EBPFControlPSA(program,
