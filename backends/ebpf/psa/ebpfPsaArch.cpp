@@ -481,7 +481,7 @@ void PSAArchXDP::emitInstances(CodeBuilder *builder) const {
                                        "u32", "u32", 1);
     }
 
-    builder->target->emitTableDecl(builder, "tx_port", TableEgressDevmap,
+    builder->target->emitTableDecl(builder, "tx_port", TableDevmap,
                                    "u32", "struct bpf_devmap_val", egressDevmapSize);
 
     builder->appendLine("REGISTER_END()");
@@ -803,11 +803,6 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     return true;
 }
 
-bool ConvertToEBPFParserPSA::preorder(const IR::ParserState *s) {
-    (void) s;
-    return false;
-}
-
 void ConvertToEBPFParserPSA::findValueSets(const IR::ParserBlock *prsr) {
     for (auto decl : prsr->container->parserLocals) {
         if (decl->is<IR::P4ValueSet>()) {
@@ -917,11 +912,6 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
     return true;
 }
 
-bool ConvertToEBPFControlPSA::preorder(const IR::P4Action *a) {
-    (void) a;
-    return true;
-}
-
 bool ConvertToEBPFControlPSA::preorder(const IR::AssignmentStatement *a) {
     // the condition covers both ingress and egress timestamp
     if (a->right->toString().endsWith("timestamp")) {
@@ -938,11 +928,6 @@ bool ConvertToEBPFControlPSA::preorder(const IR::IfStatement *ifState) {
             control->timestampIsUsed = true;
         }
     }
-    return true;
-}
-
-bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Instance* instance) {
-    (void) instance;
     return true;
 }
 

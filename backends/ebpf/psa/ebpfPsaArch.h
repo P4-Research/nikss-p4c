@@ -180,7 +180,6 @@ class ConvertToEBPFParserPSA : public Inspector {
             parser(nullptr), options(options) {}
 
     bool preorder(const IR::ParserBlock *prsr) override;
-    bool preorder(const IR::ParserState *s) override;
     EBPF::EBPFParser* getEBPFParser() { return parser; }
 
     void findValueSets(const IR::ParserBlock *prsr);
@@ -205,10 +204,8 @@ class ConvertToEBPFControlPSA : public Inspector {
                             parserHeaders(parserHeaders),
                             typemap(typemap), refmap(refmap), options(options) {}
 
-    bool preorder(const IR::P4Action *) override;
     bool preorder(const IR::TableBlock *) override;
     bool preorder(const IR::ControlBlock *) override;
-    bool preorder(const IR::Declaration_Instance*) override;
     bool preorder(const IR::Declaration_Variable*) override;
     bool preorder(const IR::AssignmentStatement *a) override;
     bool preorder(const IR::IfStatement *a) override;

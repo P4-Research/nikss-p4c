@@ -33,7 +33,7 @@ enum TableKind {
     TableProgArray,
     TableLPMTrie,  // longest prefix match trie
     TableHashLRU,
-    TableEgressDevmap
+    TableDevmap
 };
 
 class Target {
@@ -128,7 +128,7 @@ class KernelSamplesTarget : public Target {
             return "BPF_MAP_TYPE_LRU_HASH";
         } else if (kind == TableProgArray) {
             return "BPF_MAP_TYPE_PROG_ARRAY";
-        } else if (kind == TableEgressDevmap) {
+        } else if (kind == TableDevmap) {
             return "BPF_MAP_TYPE_DEVMAP";
         }
         BUG("Unknown table kind");
