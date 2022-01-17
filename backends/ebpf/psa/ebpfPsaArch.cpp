@@ -208,7 +208,7 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
             "void do_clone(SK_BUFF *skb, void *data)\n"
             "{\n"
             "    struct clone_session_entry *entry = (struct clone_session_entry *) data;\n"
-            "%trace_msg_redirect%"
+                "%trace_msg_redirect%"
             "    bpf_clone_redirect(skb, entry->egress_port, 0);\n"
             "}";
     if (options.emitTraceMessages) {
@@ -224,9 +224,9 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
     cstring pktClonesFunc =
             "static __always_inline\n"
             "int do_packet_clones(SK_BUFF * skb, void * map, __u32 session_id, "
-            "PSA_PacketPath_t new_pkt_path, __u8 caller_id)\n"
+                "PSA_PacketPath_t new_pkt_path, __u8 caller_id)\n"
             "{\n"
-            "%trace_msg_clone_requested%"
+                "%trace_msg_clone_requested%"
             "    struct psa_global_metadata * meta = (struct psa_global_metadata *) skb->cb;\n"
             "    void * inner_map;\n"
             "    inner_map = bpf_map_lookup_elem(map, &session_id);\n"
@@ -234,14 +234,14 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
             "        PSA_PacketPath_t original_pkt_path = meta->packet_path;\n"
             "        meta->packet_path = new_pkt_path;\n"
             "        if (do_for_each(skb, inner_map, CLONE_MAX_CLONES, &do_clone) < 0) {\n"
-            "%trace_msg_clone_failed%"
+                        "%trace_msg_clone_failed%"
             "            return -1;\n"
             "        }\n"
             "        meta->packet_path = original_pkt_path;\n"
             "    } else {\n"
-            "%trace_msg_no_session%"
+                    "%trace_msg_no_session%"
             "    }\n"
-            "%trace_msg_cloning_done%"
+                "%trace_msg_cloning_done%"
             "    return 0;\n"
             " }";
     if (options.emitTraceMessages) {
