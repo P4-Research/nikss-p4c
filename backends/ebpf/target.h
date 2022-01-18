@@ -32,7 +32,8 @@ enum TableKind {
     TablePerCPUArray,
     TableProgArray,
     TableLPMTrie,  // longest prefix match trie
-    TableHashLRU
+    TableHashLRU,
+    TableDevmap
 };
 
 class Target {
@@ -127,6 +128,8 @@ class KernelSamplesTarget : public Target {
             return "BPF_MAP_TYPE_LRU_HASH";
         } else if (kind == TableProgArray) {
             return "BPF_MAP_TYPE_PROG_ARRAY";
+        } else if (kind == TableDevmap) {
+            return "BPF_MAP_TYPE_DEVMAP";
         }
         BUG("Unknown table kind");
     }
@@ -213,8 +216,7 @@ class BccTarget : public Target {
     void emitLicense(Util::SourceCodeBuilder*, cstring) const override {};
     void emitCodeSection(Util::SourceCodeBuilder*, cstring) const override {}
     void emitIncludes(Util::SourceCodeBuilder* builder) const override;
-    void emitResizeBuffer(Util::SourceCodeBuilder* builder, cstring buffer,
-                          cstring offsetVar) const override {};
+    void emitResizeBuffer(Util::SourceCodeBuilder*, cstring, cstring) const override {};
     void emitTableLookup(Util::SourceCodeBuilder* builder, cstring tblName,
                          cstring key, cstring value) const override;
     void emitTableUpdate(Util::SourceCodeBuilder* builder, cstring tblName,
@@ -242,8 +244,7 @@ class BccTarget : public Target {
 class TestTarget : public EBPF::KernelSamplesTarget {
  public:
     TestTarget() : KernelSamplesTarget(false, "Userspace Test") {}
-    void emitResizeBuffer(Util::SourceCodeBuilder* builder, cstring buffer,
-                          cstring offsetVar) const override {};
+    void emitResizeBuffer(Util::SourceCodeBuilder*, cstring, cstring) const override {};
     void emitIncludes(Util::SourceCodeBuilder* builder) const override;
     void emitTableDecl(Util::SourceCodeBuilder* builder,
                        cstring tblName, TableKind tableKind,

@@ -20,8 +20,8 @@ class PSASwitchBackend {
                      Target *target,
                      P4::ReferenceMap *refMap,
                      P4::TypeMap *typeMap)
-            : options(options), target(target), refMap(refMap), typeMap(typeMap),
-              corelib(P4::P4CoreLibrary::instance) {
+            : options(options), refMap(refMap), typeMap(typeMap),
+              corelib(P4::P4CoreLibrary::instance), target(target) {
         refMap->setIsV1(options.isv1());
     }
 
@@ -29,11 +29,7 @@ class PSASwitchBackend {
     void codegen(std::ostream &cstream) const {
         CodeBuilder c(target);
         // instead of generating two files, put all the code in a single file
-        if (!options.generateToXDP) {
-            ebpf_program->emit2TC(&c);
-        } else {
-            ebpf_program->emit2XDP(&c);
-        }
+        ebpf_program->emit(&c);
         cstream << c.toString();
     }
 };

@@ -30,9 +30,9 @@ class EBPFPipeline : public EBPFProgram {
     EBPFDeparserPSA* deparser;
 
     EBPFPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
-                 P4::TypeMap* typeMap) :
-                 EBPFProgram(options, nullptr, refMap, typeMap, nullptr),
-                             name(name) {
+                 P4::TypeMap* typeMap)
+                 : EBPFProgram(options, nullptr, refMap, typeMap, nullptr),
+                 name(name), control(nullptr), deparser(nullptr) {
         target = new KernelSamplesTarget(options.emitTraceMessages);
         sectionName = "classifier/" + name;
         functionName = name.replace("-", "_") + "_func";
@@ -100,18 +100,18 @@ class EBPFPipeline : public EBPFProgram {
 
     void emitHeadersFromCPUMAP(CodeBuilder* builder);
     void emitMetadataFromCPUMAP(CodeBuilder *builder);
-    bool shouldEmitTimestamp() {
+
+    bool hasAnyMeter() const {
         auto directMeter = std::find_if(control->tables.begin(),
                                         control->tables.end(),
                                         [](std::pair<const cstring, EBPFTable*> elem) {
                                             return !elem.second->to<EBPFTablePSA>()->meters.empty();
                                         });
         bool anyDirectMeter = directMeter != control->tables.end();
-        if (!control->meters.empty() || anyDirectMeter || control->timestampIsUsed) {
-            return true;
-        }
-
-        return false;
+        return anyDirectMeter || (!control->meters.empty());
+    }
+    bool shouldEmitTimestamp() const {
+        return hasAnyMeter() || control->timestampIsUsed;
     }
 };
 
