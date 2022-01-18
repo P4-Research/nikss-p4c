@@ -887,7 +887,6 @@ void TCTrafficManagerForXDP::emit(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder, msgStr.c_str());
     this->emitTrafficManager(builder);
 
-    builder->emitIndent();
     builder->blockEnd(true);
 }
 

@@ -365,9 +365,9 @@ void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
                         builder->endOfStatement(true);
                         builder->emitIndent();
                         builder->appendFormat("%s.%s = ", keyName.c_str(), prefixFieldName.c_str());
-                        auto trailing_zeros = [width](const big_int& n) -> int {
+                        auto trailing_zeros = [width](const big_int& n) -> unsigned {
                             return (n == 0) ? width : boost::multiprecision::lsb(n); };
-                        auto count_ones = [](const big_int& n) -> int {
+                        auto count_ones = [](const big_int& n) -> unsigned {
                             return bitcount(n); };
                         auto mask = km->right->to<IR::Constant>()->value;
                         auto len = trailing_zeros(mask);

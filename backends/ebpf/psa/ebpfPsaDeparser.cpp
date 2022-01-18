@@ -442,6 +442,7 @@ void TCIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
 // =====================TCIngressDeparserForTrafficManagerPSA===========
 void TCIngressDeparserForTrafficManagerPSA::emitPreDeparser(CodeBuilder *builder) {
     // clone support
+    builder->emitIndent();
     builder->appendFormat("if (%s.clone) ", this->istd->name.name);
     builder->blockStart();
     builder->emitIndent();
