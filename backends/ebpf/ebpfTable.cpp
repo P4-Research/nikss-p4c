@@ -397,27 +397,33 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
                 isLPMKeyBigEndian = true;
         }
 
-        auto tmpVar = "tmp_" + fieldName;
-        if (isLPMKeyBigEndian) {
-            declareTmpLpmKey(builder, c, tmpVar);
-        }
-
         builder->emitIndent();
         if (memcpy) {
-            builder->appendFormat("memcpy(&%s.%s, &", keyName.c_str(), fieldName.c_str());
             if (isLPMKeyBigEndian) {
-                emitLpmKeyField(builder, swap, tmpVar);
+                // FIXME: will not work on big endian machines because byte swap
+                //  is done always. Also test this solution because fields larger
+                //  than 64 bit are not deparsed correctly
+                const unsigned bytesToCopy = scalar->bytesRequired();
+                for (unsigned byte = 0; byte < bytesToCopy; ++byte) {
+                    builder->appendFormat("%s.%s[%u] = (",
+                                          keyName.c_str(), fieldName.c_str(), byte);
+                    codeGen->visit(c->expression);
+                    builder->appendFormat(")[%u]", bytesToCopy - byte - 1);
+                    builder->endOfStatement(true);
+                    builder->emitIndent();
+                }
             } else {
+                builder->appendFormat("memcpy(&%s.%s, &", keyName.c_str(), fieldName.c_str());
                 codeGen->visit(c->expression);
+                builder->appendFormat(", %d)", scalar->bytesRequired());
             }
-            builder->appendFormat(", %d)", scalar->bytesRequired());
         } else {
             builder->appendFormat("%s.%s = ", keyName.c_str(), fieldName.c_str());
-            if (isLPMKeyBigEndian) {
-                emitLpmKeyField(builder, swap, tmpVar);
-            } else {
-                codeGen->visit(c->expression);
-            }
+            if (isLPMKeyBigEndian)
+                builder->appendFormat("%s(", swap.c_str());
+            codeGen->visit(c->expression);
+            if (isLPMKeyBigEndian)
+                builder->append(")");
         }
         builder->endOfStatement(true);
 
@@ -434,30 +440,11 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
     }
 }
 
-void EBPFTable::emitLpmKeyField(CodeBuilder *builder,
-                                const cstring &swap,
-                                const std::string &tmpVar) const {
-    if (!swap.isNullOrEmpty()) {
-        builder->appendFormat("%s(%s)", swap.c_str(), tmpVar.c_str());
-    } else {
-        builder->append(tmpVar);
-    }
-}
-
-void EBPFTable::declareTmpLpmKey(CodeBuilder *builder,
-                                 const IR::KeyElement *c,
-                                 std::string &tmpVar) {
-    auto lpmField = EBPFTypeFactory::instance->create(IR::Type_Bits::get(32));
-    builder->emitIndent();
-    lpmField->declare(builder, tmpVar, false);
-    builder->append(" = ");
-    codeGen->visit(c->expression);
-    builder->endOfStatement(true);
-}
-
 cstring EBPFTable::getByteSwapMethod(unsigned int width) const {
     cstring swap;
-    if (width <= 16) {
+    if (width <= 8) {
+        swap = "";  // single byte, nothing to swap
+    } else if (width <= 16) {
         swap = "bpf_htons";
     } else if (width <= 32) {
         swap = "bpf_htonl";
@@ -490,7 +477,7 @@ void EBPFTable::emitAction(CodeBuilder* builder, cstring valueName, cstring acti
         builder->target->emitTraceMessage(builder, msgStr.c_str());
         for (auto param : *(action->parameters)) {
             auto etype = EBPFTypeFactory::instance->create(param->type);
-            int width = dynamic_cast<IHasWidth*>(etype)->widthInBits();
+            unsigned width = dynamic_cast<IHasWidth*>(etype)->widthInBits();
 
             if (width <= 64) {
                 convStr = Util::printf_format("(unsigned long long) (%s->u.%s.%s)",
