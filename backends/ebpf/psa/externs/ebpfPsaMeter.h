@@ -5,20 +5,21 @@
 
 namespace EBPF {
 
-class EBPFMeterPSA : public EBPFTablePSA {
+class EBPFMeterPSA : public EBPFTableBase {
  private:
     static IR::IndexedVector<IR::StructField> getValueFields();
     static IR::Type_Struct *createSpinlockStruct();
-    const cstring indirectValueField = "value";
-    const cstring spinlockField = "lock";
-    EBPFType *getBaseValueType() const;
+    static EBPFType *getBaseValueType(P4::ReferenceMap* refMap);
     EBPFType *getIndirectValueType() const;
-    cstring getBaseStructName() const;
+    static cstring getBaseStructName(P4::ReferenceMap* refMap);
     cstring getIndirectStructName() const;
 
     void emitIndex(CodeBuilder* builder, const P4::ExternMethod *method) const;
 
  protected:
+    const cstring indirectValueField = "value";
+    const cstring spinlockField = "lock";
+
     size_t size{};
     const IR::Type *keyArg{};
     EBPFType *keyType{};
@@ -37,16 +38,16 @@ class EBPFMeterPSA : public EBPFTablePSA {
 
     static MeterType toType(const int typeCode);
 
-    void emitKeyType(CodeBuilder* builder) override;
-    void emitValueStruct(CodeBuilder* builder);
-    void emitValueType(CodeBuilder* builder) override;
-    void emitSpinLockField(CodeBuilder* builder);
-    void emitInstance(CodeBuilder* builder) override;
-    void emitExecute(CodeBuilder* builder, const P4::ExternMethod* method);
+    void emitKeyType(CodeBuilder* builder) const;
+    static void emitValueStruct(CodeBuilder* builder, P4::ReferenceMap* refMap);
+    void emitValueType(CodeBuilder* builder) const;
+    void emitSpinLockField(CodeBuilder* builder) const;
+    void emitInstance(CodeBuilder* builder) const;
+    void emitExecute(CodeBuilder* builder, const P4::ExternMethod* method) const;
     void emitDirectExecute(CodeBuilder* builder, const P4::ExternMethod* method,
-                           cstring valuePtr);
+                           cstring valuePtr) const;
 
-    cstring meterExecuteFunc(bool trace);
+    static cstring meterExecuteFunc(bool trace, P4::ReferenceMap* refMap);
 };
 
 }  // namespace EBPF

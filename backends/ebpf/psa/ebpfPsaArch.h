@@ -49,10 +49,6 @@ class PSAArch {
     void emitInitializer(CodeBuilder *builder) const;
     virtual void emitInitializerSection(CodeBuilder *builder) const = 0;
     void emitHelperFunctions(CodeBuilder *builder) const;
-
- protected:
-    static EBPFMeterPSA *getMeter(EBPFPipeline *pipeline);
-    EBPFMeterPSA *getAnyMeter() const;
 };
 
 class PSAArchTC : public PSAArch {

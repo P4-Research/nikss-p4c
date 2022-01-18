@@ -5,9 +5,8 @@ namespace EBPF {
 
 EBPFMeterPSA::EBPFMeterPSA(const EBPFProgram *program,
                            cstring instanceName, const IR::Declaration_Instance* di,
-                           CodeGenInspector *codeGen) : EBPFTablePSA(program,
-                                                                     codeGen,
-                                                                     instanceName) {
+                           CodeGenInspector *codeGen)
+                           : EBPFTableBase(program, instanceName, codeGen) {
     CHECK_NULL(di);
     auto typeName = di->type->toString();
     if (typeName == "DirectMeter") {
@@ -33,17 +32,17 @@ EBPFMeterPSA::EBPFMeterPSA(const EBPFProgram *program,
     this->type = toType(typeExpr->asInt());
 }
 
-EBPFType * EBPFMeterPSA::getBaseValueType() const {
+EBPFType * EBPFMeterPSA::getBaseValueType(P4::ReferenceMap* refMap) {
     IR::IndexedVector<IR::StructField> vec = getValueFields();
     auto valueStructType = new IR::Type_Struct(
-            IR::ID(getBaseStructName()), vec);
+            IR::ID(getBaseStructName(refMap)), vec);
     return EBPFTypeFactory::instance->create(valueStructType);
 }
 
 EBPFType * EBPFMeterPSA::getIndirectValueType() const {
     auto vec = IR::IndexedVector<IR::StructField>();
 
-    auto baseValue = new IR::Type_Struct(IR::ID(getBaseStructName()));
+    auto baseValue = new IR::Type_Struct(IR::ID(getBaseStructName(program->refMap)));
     vec.push_back(new IR::StructField(IR::ID(indirectValueField), baseValue));
 
     IR::Type_Struct *spinLock = createSpinlockStruct();
@@ -56,11 +55,11 @@ EBPFType * EBPFMeterPSA::getIndirectValueType() const {
     return meterType;
 }
 
-cstring EBPFMeterPSA::getBaseStructName() const {
+cstring EBPFMeterPSA::getBaseStructName(P4::ReferenceMap* refMap) {
     static cstring valueBaseStructName;
 
     if (valueBaseStructName.isNullOrEmpty()) {
-        valueBaseStructName = program->refMap->newName("meter_value");
+        valueBaseStructName = refMap->newName("meter_value");
     }
 
     return valueBaseStructName;
@@ -107,7 +106,7 @@ IR::Type_Struct *EBPFMeterPSA::createSpinlockStruct() {
     return spinLock;
 }
 
-void EBPFMeterPSA::emitSpinLockField(CodeBuilder* builder) {
+void EBPFMeterPSA::emitSpinLockField(CodeBuilder* builder) const {
     auto spinlockStruct = createSpinlockStruct();
     auto spinlockType = EBPFTypeFactory::instance->create(spinlockStruct);
     builder->emitIndent();
@@ -115,28 +114,28 @@ void EBPFMeterPSA::emitSpinLockField(CodeBuilder* builder) {
     builder->endOfStatement(true);
 }
 
-void EBPFMeterPSA::emitKeyType(CodeBuilder* builder) {
+void EBPFMeterPSA::emitKeyType(CodeBuilder* builder) const {
     builder->emitIndent();
     builder->append("typedef ");
     this->keyType->declare(builder, keyTypeName, false);
     builder->endOfStatement(true);
 }
 
-void EBPFMeterPSA::emitValueStruct(CodeBuilder* builder) {
+void EBPFMeterPSA::emitValueStruct(CodeBuilder* builder, P4::ReferenceMap* refMap) {
     builder->emitIndent();
-    getBaseValueType()->emit(builder);
+    getBaseValueType(refMap)->emit(builder);
 }
-void EBPFMeterPSA::emitValueType(CodeBuilder* builder) {
+void EBPFMeterPSA::emitValueType(CodeBuilder* builder) const {
     if (isDirect) {
         builder->emitIndent();
-        getBaseValueType()->declare(builder, instanceName, false);
+        getBaseValueType(program->refMap)->declare(builder, instanceName, false);
         builder->endOfStatement(true);
     } else {
         getIndirectValueType()->emit(builder);
     }
 }
 
-void EBPFMeterPSA::emitInstance(CodeBuilder *builder) {
+void EBPFMeterPSA::emitInstance(CodeBuilder *builder) const {
     if (!isDirect) {
         builder->target->emitTableDeclSpinlock(builder, instanceName, TableHash,
                                                this->keyTypeName,
@@ -147,7 +146,7 @@ void EBPFMeterPSA::emitInstance(CodeBuilder *builder) {
     }
 }
 
-void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* method) {
+void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* method) const {
     if (method->expr->arguments->size() == 2) {
         ::warning("Color-Aware mode is not supported");
     }
@@ -183,7 +182,7 @@ void EBPFMeterPSA::emitIndex(CodeBuilder *builder, const P4::ExternMethod* metho
 
 void EBPFMeterPSA::emitDirectExecute(CodeBuilder *builder,
                                      const P4::ExternMethod *method,
-                                     cstring valuePtr) {
+                                     cstring valuePtr) const {
     auto pipeline = dynamic_cast<const EBPFPipeline *>(program);
     if (pipeline == nullptr) {
         ::error(ErrorType::ERR_INVALID, "Meter used outside of pipeline %1%", method->expr);
@@ -206,96 +205,97 @@ void EBPFMeterPSA::emitDirectExecute(CodeBuilder *builder,
     }
 }
 
-cstring EBPFMeterPSA::meterExecuteFunc(bool trace) {
-    cstring meterExecuteFunc = "static __always_inline\n"
-                               "enum PSA_MeterColor_t meter_execute(%meter_struct% *value, "
-                               "void *lock, "
-                               "u32 *packet_len, u64 *time_ns) {\n"
-                               "    if (value != NULL && value->pir_period != 0) {\n"
-                               "        u64 delta_p, delta_c;\n"
-                               "        u64 n_periods_p, n_periods_c, tokens_pbs, tokens_cbs;\n"
-                               "        bpf_spin_lock(lock);\n"
-                               "        delta_p = *time_ns - value->time_p;\n"
-                               "        delta_c = *time_ns - value->time_c;\n"
-                               "\n"
-                               "        n_periods_p = delta_p / value->pir_period;\n"
-                               "        n_periods_c = delta_c / value->cir_period;\n"
-                               "\n"
-                               "        value->time_p += n_periods_p * value->pir_period;\n"
-                               "        value->time_c += n_periods_c * value->cir_period;\n"
-                               "\n"
-                               "        tokens_pbs = value->pbs_left + "
-                               "n_periods_p * value->pir_unit_per_period;\n"
-                               "        if (tokens_pbs > value->pbs) {\n"
-                               "            tokens_pbs = value->pbs;\n"
-                               "        }\n"
-                               "        tokens_cbs = value->cbs_left + "
-                               "n_periods_c * value->cir_unit_per_period;\n"
-                               "        if (tokens_cbs > value->cbs) {\n"
-                               "            tokens_cbs = value->cbs;\n"
-                               "        }\n"
-                               "\n"
-                               "        if (*packet_len > tokens_pbs) {\n"
-                               "            value->pbs_left = tokens_pbs;\n"
-                               "            value->cbs_left = tokens_cbs;\n"
-                               "            bpf_spin_unlock(lock);\n"
-                                            "%trace_msg_meter_red%"
-                               "            return RED;\n"
-                               "        }\n"
-                               "\n"
-                               "        if (*packet_len > tokens_cbs) {\n"
-                               "            value->pbs_left = tokens_pbs - *packet_len;\n"
-                               "            value->cbs_left = tokens_cbs;\n"
-                               "            bpf_spin_unlock(lock);\n"
-                                            "%trace_msg_meter_yellow%"
-                               "            return YELLOW;\n"
-                               "        }\n"
-                               "\n"
-                               "        value->pbs_left = tokens_pbs - *packet_len;\n"
-                               "        value->cbs_left = tokens_cbs - *packet_len;\n"
-                               "        bpf_spin_unlock(lock);\n"
-                                        "%trace_msg_meter_green%"
-                               "        return GREEN;\n"
-                               "    } else {\n"
-                               "        // From P4Runtime spec. No value - return default GREEN.\n"
-                                        "%trace_msg_meter_no_value%"
-                               "        return GREEN;\n"
-                               "    }\n"
-                               "}\n"
-                               "\n"
-                               "static __always_inline\n"
-                               "enum PSA_MeterColor_t meter_execute_bytes_value("
-                               "void *value, void *lock, u32 *packet_len, "
-                               "u64 *time_ns) {\n"
-                                    "%trace_msg_meter_execute_bytes%"
-                               "    return meter_execute(value, lock, packet_len, time_ns);\n"
-                               "}\n"
-                               "\n"
-                               "static __always_inline\n"
-                               "enum PSA_MeterColor_t meter_execute_bytes("
-                               "void *map, u32 *packet_len, void *key, u64 *time_ns) {\n"
-                               "    %meter_struct% *value = BPF_MAP_LOOKUP_ELEM(*map, key);\n"
-                               "    return meter_execute_bytes_value(value, ((void *)value) + "
-                               "sizeof(%meter_struct%), "
-                               "packet_len, time_ns);\n"
-                               "}\n"
-                               "\n"
-                               "static __always_inline\n"
-                               "enum PSA_MeterColor_t meter_execute_packets_value("
-                               "void *value, void *lock, u64 *time_ns) {\n"
-                                    "%trace_msg_meter_execute_packets%"
-                               "    u32 len = 1;\n"
-                               "    return meter_execute(value, lock, &len, time_ns);\n"
-                               "}\n"
-                               "\n"
-                               "static __always_inline\n"
-                               "enum PSA_MeterColor_t meter_execute_packets(void *map, "
-                               "void *key, u64 *time_ns) {\n"
-                               "    %meter_struct% *value = BPF_MAP_LOOKUP_ELEM(*map, key);\n"
-                               "    return meter_execute_packets_value(value, ((void *)value) + "
-                               "sizeof(%meter_struct%), "
-                               "time_ns);\n"
-                               "}\n";
+cstring EBPFMeterPSA::meterExecuteFunc(bool trace, P4::ReferenceMap* refMap) {
+    cstring meterExecuteFunc =
+        "static __always_inline\n"
+        "enum PSA_MeterColor_t meter_execute(%meter_struct% *value, "
+        "void *lock, "
+        "u32 *packet_len, u64 *time_ns) {\n"
+        "    if (value != NULL && value->pir_period != 0) {\n"
+        "        u64 delta_p, delta_c;\n"
+        "        u64 n_periods_p, n_periods_c, tokens_pbs, tokens_cbs;\n"
+        "        bpf_spin_lock(lock);\n"
+        "        delta_p = *time_ns - value->time_p;\n"
+        "        delta_c = *time_ns - value->time_c;\n"
+        "\n"
+        "        n_periods_p = delta_p / value->pir_period;\n"
+        "        n_periods_c = delta_c / value->cir_period;\n"
+        "\n"
+        "        value->time_p += n_periods_p * value->pir_period;\n"
+        "        value->time_c += n_periods_c * value->cir_period;\n"
+        "\n"
+        "        tokens_pbs = value->pbs_left + "
+        "n_periods_p * value->pir_unit_per_period;\n"
+        "        if (tokens_pbs > value->pbs) {\n"
+        "            tokens_pbs = value->pbs;\n"
+        "        }\n"
+        "        tokens_cbs = value->cbs_left + "
+        "n_periods_c * value->cir_unit_per_period;\n"
+        "        if (tokens_cbs > value->cbs) {\n"
+        "            tokens_cbs = value->cbs;\n"
+        "        }\n"
+        "\n"
+        "        if (*packet_len > tokens_pbs) {\n"
+        "            value->pbs_left = tokens_pbs;\n"
+        "            value->cbs_left = tokens_cbs;\n"
+        "            bpf_spin_unlock(lock);\n"
+                "%trace_msg_meter_red%"
+        "            return RED;\n"
+        "        }\n"
+        "\n"
+        "        if (*packet_len > tokens_cbs) {\n"
+        "            value->pbs_left = tokens_pbs - *packet_len;\n"
+        "            value->cbs_left = tokens_cbs;\n"
+        "            bpf_spin_unlock(lock);\n"
+                "%trace_msg_meter_yellow%"
+        "            return YELLOW;\n"
+        "        }\n"
+        "\n"
+        "        value->pbs_left = tokens_pbs - *packet_len;\n"
+        "        value->cbs_left = tokens_cbs - *packet_len;\n"
+        "        bpf_spin_unlock(lock);\n"
+            "%trace_msg_meter_green%"
+        "        return GREEN;\n"
+        "    } else {\n"
+        "        // From P4Runtime spec. No value - return default GREEN.\n"
+            "%trace_msg_meter_no_value%"
+        "        return GREEN;\n"
+        "    }\n"
+        "}\n"
+        "\n"
+        "static __always_inline\n"
+        "enum PSA_MeterColor_t meter_execute_bytes_value("
+        "void *value, void *lock, u32 *packet_len, "
+        "u64 *time_ns) {\n"
+        "%trace_msg_meter_execute_bytes%"
+        "    return meter_execute(value, lock, packet_len, time_ns);\n"
+        "}\n"
+        "\n"
+        "static __always_inline\n"
+        "enum PSA_MeterColor_t meter_execute_bytes("
+        "void *map, u32 *packet_len, void *key, u64 *time_ns) {\n"
+        "    %meter_struct% *value = BPF_MAP_LOOKUP_ELEM(*map, key);\n"
+        "    return meter_execute_bytes_value(value, ((void *)value) + "
+        "sizeof(%meter_struct%), "
+        "packet_len, time_ns);\n"
+        "}\n"
+        "\n"
+        "static __always_inline\n"
+        "enum PSA_MeterColor_t meter_execute_packets_value("
+        "void *value, void *lock, u64 *time_ns) {\n"
+        "%trace_msg_meter_execute_packets%"
+        "    u32 len = 1;\n"
+        "    return meter_execute(value, lock, &len, time_ns);\n"
+        "}\n"
+        "\n"
+        "static __always_inline\n"
+        "enum PSA_MeterColor_t meter_execute_packets(void *map, "
+        "void *key, u64 *time_ns) {\n"
+        "    %meter_struct% *value = BPF_MAP_LOOKUP_ELEM(*map, key);\n"
+        "    return meter_execute_packets_value(value, ((void *)value) + "
+        "sizeof(%meter_struct%), "
+        "time_ns);\n"
+        "}\n";
 
     if (trace) {
         meterExecuteFunc = meterExecuteFunc
@@ -336,7 +336,7 @@ cstring EBPFMeterPSA::meterExecuteFunc(bool trace) {
     }
 
     meterExecuteFunc = meterExecuteFunc.replace(cstring("%meter_struct%"),
-                                                cstring("struct ") + getBaseStructName());
+                                                cstring("struct ") + getBaseStructName(refMap));
 
     return meterExecuteFunc;
 }

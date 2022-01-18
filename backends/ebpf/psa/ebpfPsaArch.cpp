@@ -79,10 +79,8 @@ void PSAArch::emitTypes(CodeBuilder *builder) const {
         type->emit(builder);
     }
 
-    EBPFMeterPSA *meter = getAnyMeter();
-    if (meter != nullptr) {
-        meter->emitValueStruct(builder);
-    }
+    if (ingress->hasAnyMeter() || egress->hasAnyMeter())
+        EBPFMeterPSA::emitValueStruct(builder, ingress->refMap);
 
     ingress->parser->emitTypes(builder);
     ingress->control->emitTableTypes(builder);
@@ -261,41 +259,12 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
     builder->appendLine(pktClonesFunc);
     builder->newline();
 
-    if (auto meter = getAnyMeter()) {
-        cstring meterExecuteFunc = meter->meterExecuteFunc(options.emitTraceMessages);
+    if (ingress->hasAnyMeter() || egress->hasAnyMeter()) {
+        cstring meterExecuteFunc =
+                EBPFMeterPSA::meterExecuteFunc(options.emitTraceMessages, ingress->refMap);
         builder->appendLine(meterExecuteFunc);
         builder->newline();
     }
-}
-
-EBPFMeterPSA *PSAArch::getMeter(EBPFPipeline *pipeline) {
-    if (pipeline == nullptr) {
-        return nullptr;
-    }
-    if (!pipeline->control->meters.empty()) {
-        return pipeline->control->meters.begin()->second;
-    }
-    auto directMeter = std::find_if(pipeline->control->tables.begin(),
-                                    pipeline->control->tables.end(),
-                                    [](std::pair<const cstring, EBPFTable*> elem) {
-                                        return !elem.second->to<EBPFTablePSA>()->meters.empty();
-                                    });
-    if (directMeter != pipeline->control->tables.end()) {
-        return directMeter->second->to<EBPFTablePSA>()->meters.front().second;
-    }
-    return nullptr;
-}
-
-EBPFMeterPSA *PSAArch::getAnyMeter() const {
-    EBPFMeterPSA *meter = nullptr;
-    std::array<EBPFPipeline*, 2> pipelines = {ingress, egress};
-    for (auto pipeline : pipelines) {
-        meter = getMeter(pipeline);
-        if (meter != nullptr) {
-            return meter;
-        }
-    }
-    return meter;
 }
 
 // =====================PSAArchTC=============================
