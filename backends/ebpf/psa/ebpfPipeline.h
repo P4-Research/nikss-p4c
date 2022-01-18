@@ -30,9 +30,9 @@ class EBPFPipeline : public EBPFProgram {
     EBPFDeparserPSA* deparser;
 
     EBPFPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
-                 P4::TypeMap* typeMap) :
-                 EBPFProgram(options, nullptr, refMap, typeMap, nullptr),
-                             name(name) {
+                 P4::TypeMap* typeMap)
+                 : EBPFProgram(options, nullptr, refMap, typeMap, nullptr),
+                 name(name), control(nullptr), deparser(nullptr) {
         target = new KernelSamplesTarget(options.emitTraceMessages);
         sectionName = "classifier/" + name;
         functionName = name.replace("-", "_") + "_func";

@@ -370,7 +370,7 @@ void PSAArchTC::emit(CodeBuilder *builder) const {
         egress->emit(builder);
     }
 
-    builder->target->emitLicense(builder, xdp->license);
+    builder->target->emitLicense(builder, ingress->license);
 }
 
 void PSAArchTC::emitInstances(CodeBuilder *builder) const {
@@ -429,7 +429,7 @@ void PSAArchXDP::emit(CodeBuilder *builder) const {
 
     tcEgressForXDP->emit(builder);
 
-    builder->appendLine("char _license[] SEC(\"license\") = \"GPL\";");
+    builder->target->emitLicense(builder, ingress->license);
 }
 
 void PSAArchXDP::emitPreamble(CodeBuilder* builder) const {
