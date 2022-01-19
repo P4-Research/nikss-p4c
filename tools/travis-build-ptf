@@ -86,7 +86,8 @@ if [[ "${IMAGE_TYPE}" == "test" ]] ; then
 fi
 
 function install_psabpf_ctl() {
-  git clone --recursive https://github.com/P4-Research/psabpf.git /tmp/psabpf
+  # TODO: revert this branch checkout when merged in psabpf repo
+  git clone --branch tatry/bpftool-remove --recursive https://github.com/P4-Research/psabpf.git /tmp/psabpf
   cd /tmp/psabpf
   ./build_libbpf.sh
   mkdir build
