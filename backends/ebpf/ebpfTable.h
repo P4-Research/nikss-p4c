@@ -74,10 +74,6 @@ class EBPFTable : public EBPFTableBase {
 
     bool isLPMTable();
     bool isTernaryTable();
-    void declareTmpLpmKey(CodeBuilder *builder, const IR::KeyElement *c, std::string &tmpVar);
-    void emitLpmKeyField(CodeBuilder *builder,
-                         const cstring &swap,
-                         const std::string &tmpVar) const;
     virtual void validateKeys() const;
     virtual ActionTranslationVisitor*
     createActionTranslationVisitor(cstring valueName, const EBPFProgram* program) const {

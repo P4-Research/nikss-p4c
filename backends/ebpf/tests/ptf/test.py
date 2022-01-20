@@ -581,7 +581,7 @@ class LPMTableCachePSATest(P4EbpfTest):
 
         # modify cache directly - verify that it is used (modify to NoAction)
         self.table_update(table="ingress_tbl_lpm_cache",
-                          keys=["64w0x60", "32w0", "32w0x55443322"], action=0, data=["160w0"])
+                          keys=["64w0x60", "16w0", "48w0x554433221100"], action=0, data=["160w0"])
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)
 
