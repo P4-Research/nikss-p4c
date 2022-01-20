@@ -38,7 +38,7 @@ control MyIC(inout headers a, inout EMPTY bc,
     action a2(bit<16> param) { a.eth.etherType = param; }
     table tbl {
         key = {
-            a.eth.srcAddr[31:0] : lpm;
+            a.eth.srcAddr : lpm;
         }
         actions = { NoAction; a1; a2; }
         psa_implementation = ap;
