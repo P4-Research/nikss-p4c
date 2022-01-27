@@ -75,14 +75,14 @@ class EbpfTest(BaseTest):
         return process.returncode, stdout_data, stderr_data
 
     def add_port(self, dev):
-        self.exec_ns_cmd("psabpf-ctl pipeline add-port id {} {}".format(TEST_PIPELINE_ID, dev))
+        self.exec_ns_cmd("psabpf-ctl add-port pipe {} dev {}".format(TEST_PIPELINE_ID, dev))
         if dev.startswith("eth") and self.is_xdp_test():
             self.exec_cmd("ip link set dev s1-{} xdp pinned {}/{}".format(dev, TEST_PIPELINE_MOUNT_PATH, "xdp_redirect_dummy_sec"))
 
     def del_port(self, dev):
-        self.exec_ns_cmd("psabpf-ctl pipeline del-port id {} {}".format(TEST_PIPELINE_ID, dev))
+        self.exec_ns_cmd("psabpf-ctl del-port pipe {} dev {}".format(TEST_PIPELINE_ID, dev))
         if dev.startswith("eth"):
-            self.exec_cmd("psabpf-ctl pipeline del-port id {} s1-{}".format(TEST_PIPELINE_ID, dev))
+            self.exec_cmd("psabpf-ctl del-port pipe {} dev s1-{}".format(TEST_PIPELINE_ID, dev))
 
     def remove_map(self, name):
         self.exec_ns_cmd("rm {}/maps/{}".format(TEST_PIPELINE_MOUNT_PATH, name))
