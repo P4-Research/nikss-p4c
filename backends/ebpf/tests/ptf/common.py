@@ -30,6 +30,7 @@ def xdp2tc_head_not_supported(cls):
         cls.skip_reason = "not supported for xdp2tc=head"
     return cls
 
+
 def table_caching_only(cls):
     if not cls.is_table_caching_test(cls):
         cls.skip = True
@@ -43,12 +44,12 @@ def skip_if_pipeline_optimization_enabled(cls):
         cls.skip_reason = "Skip if pipeline-aware optimization enabled"
     return cls
 
+
 class EbpfTest(BaseTest):
     skip = False
     skip_reason = ''
     switch_ns = 'test'
     test_prog_image = 'generic.o'  # default, if test case not specify program
-    ctool_file_path = ""
 
     def exec_ns_cmd(self, command='echo me', do_fail=None):
         command = "nsenter --net=/var/run/netns/" + self.switch_ns + " " + command
@@ -150,15 +151,6 @@ class EbpfTest(BaseTest):
             if intf == "psa_recirc" and self.is_xdp_test():
                 continue
             self.add_port(dev=intf)
-
-        if self.ctool_file_path:
-            head, tail = os.path.split(self.ctool_file_path)
-            filename = tail.split(".")[0]
-            so_file_path = head + "/" + filename + ".so"
-            cmd = ["clang", "-I../runtime/usr/include", "-L../runtime/usr/lib64",
-                   "-fPIC", "-l", "bpf", "-shared", "-o", so_file_path, self.ctool_file_path]
-            self.exec_cmd(cmd, "Ctool compilation error")
-            self.so_file_path = so_file_path
 
     def tearDown(self):
         for intf in self.interfaces:
@@ -284,3 +276,8 @@ class P4EbpfTest(EbpfTest):
         cmd = "psabpf-ctl action-selector add_to_group pipe {} {} {} to {}"\
             .format(TEST_PIPELINE_ID, selector, member_ref, group_ref)
         self.exec_ns_cmd(cmd, "ActionSelector add_to_group failed")
+
+    def digest_get(self, name):
+        cmd = "psabpf-ctl digest get pipe {} {}".format(TEST_PIPELINE_ID, name)
+        _, stdout, _ = self.exec_ns_cmd(cmd, "Digest get failed")
+        return json.loads(stdout)['Digest'][name]['digests']
