@@ -68,6 +68,7 @@ pip3 install $P4C_PIP_PACKAGES
 function install_ptf() {
   export P4C_PTF_PACKAGES="gcc-multilib \
                            python3-six \
+                           libjansson-dev \
                            linux-tools-`uname -r`"
   # Package "linux-tools-generic-hwe-20.04" is not required because
   # we test under current kernel, not the newest one
