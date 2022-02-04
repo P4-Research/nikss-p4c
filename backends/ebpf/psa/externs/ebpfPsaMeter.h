@@ -14,7 +14,7 @@ class EBPFMeterPSA : public EBPFTableBase {
     static cstring getBaseStructName(P4::ReferenceMap* refMap);
     cstring getIndirectStructName() const;
 
-    void emitIndex(CodeBuilder* builder, const P4::ExternMethod *method) const;
+    void emitIndex(CodeBuilder* builder, const P4::ExternMethod *method, cstring actionParam) const;
 
  protected:
     const cstring indirectValueField = "value";
@@ -43,7 +43,8 @@ class EBPFMeterPSA : public EBPFTableBase {
     void emitValueType(CodeBuilder* builder) const;
     void emitSpinLockField(CodeBuilder* builder) const;
     void emitInstance(CodeBuilder* builder) const;
-    void emitExecute(CodeBuilder* builder, const P4::ExternMethod* method) const;
+    void emitExecute(CodeBuilder* builder, const P4::ExternMethod* method,
+                     cstring actionParam) const;
     void emitDirectExecute(CodeBuilder* builder, const P4::ExternMethod* method,
                            cstring valuePtr) const;
 

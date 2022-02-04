@@ -27,6 +27,10 @@ class ControlBodyTranslatorPSA : public ControlBodyTranslator {
 
 class ActionTranslationVisitorPSA : public ActionTranslationVisitor,
                                     public ControlBodyTranslatorPSA {
+ private:
+    bool isActionParameter(const IR::Expression *expression) const;
+    cstring getActionParamStr(const IR::Expression *expression) const override;
+
  protected:
     const EBPFTablePSA* table;
 

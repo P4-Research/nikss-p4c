@@ -146,7 +146,7 @@ void EBPFMeterPSA::emitInstance(CodeBuilder *builder) const {
     }
 }
 
-void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* method) const {
+void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* method, cstring actionParam) const {
     if (method->expr->arguments->size() == 2) {
         ::warning("Color-Aware mode is not supported");
     }
@@ -159,25 +159,29 @@ void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* met
     if (type == BYTES) {
         builder->appendFormat("meter_execute_bytes(&%s, &%s, ", instanceName,
                             pipeline->lengthVar.c_str());
-        this->emitIndex(builder, method);
+        this->emitIndex(builder, method, actionParam);
         builder->appendFormat(", &%s)", pipeline->timestampVar.c_str());
     } else {
         builder->appendFormat("meter_execute_packets(&%s, ", instanceName);
-        this->emitIndex(builder, method);
+        this->emitIndex(builder, method, actionParam);
         builder->appendFormat(", &%s)", pipeline->timestampVar.c_str());
     }
 }
 
-void EBPFMeterPSA::emitIndex(CodeBuilder *builder, const P4::ExternMethod* method) const {
-    builder->append("&");
-    if (method->expr->arguments->at(0)->expression->is<IR::Constant>()) {
-        builder->append("(u32){");
-        this->codeGen->visit(method->expr->arguments->at(0)->expression);
-        builder->append("}");
-        return;
+void EBPFMeterPSA::emitIndex(CodeBuilder *builder, const P4::ExternMethod* method, cstring actionParam) const {
+    if (actionParam.isNullOrEmpty()) {
+        builder->append("&");
+        auto argument = method->expr->arguments->at(0);
+        if (argument->expression->is<IR::Constant>()) {
+            builder->append("(u32){");
+            this->codeGen->visit(argument->expression);
+            builder->append("}");
+            return;
+        }
+        codeGen->visit(argument);
+    } else {
+        builder->append("&" + actionParam);
     }
-
-    codeGen->visit(method->expr->arguments->at(0)->expression);
 }
 
 void EBPFMeterPSA::emitDirectExecute(CodeBuilder *builder,

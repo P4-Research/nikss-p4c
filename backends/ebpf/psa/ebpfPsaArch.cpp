@@ -907,9 +907,6 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
         auto hash = new EBPFHashPSA(program, di, name);
         control->hashes.emplace(name, hash);
     } else if (typeName == "Meter") {
-        if (options.arch != "psa") {
-            BUG("Meters are supported only in PSA architecture");
-        }
         auto met = new EBPFMeterPSA(program, name, di, control->codeGen);
         control->meters.emplace(name, met);
     } else if (typeName == "Random") {
