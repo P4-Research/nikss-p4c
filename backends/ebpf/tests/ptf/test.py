@@ -2,8 +2,6 @@
 from common import *
 
 import copy
-import ctypes as c
-import struct
 
 from scapy.fields import ShortField, IntField
 from scapy.layers.l2 import Ether
@@ -294,35 +292,19 @@ class DirectCountersPSATest(P4EbpfTest):
 class DigestPSATest(P4EbpfTest):
 
     p4_file_path = "p4testdata/digest.p4"
-    ctool_file_path = "ptf/tools/read_digest.c"
-
-    def double_to_hex(self, f):
-        return hex(struct.unpack('<Q', struct.pack('<d', f))[0])
-
-    def get_digest_value(self):
-        class Digest(c.Structure):
-            pass
-        Digest._fields_ = [("mac", c.c_long), ("port", c.c_int)]
-        my_functions = c.CDLL(self.so_file_path)
-        my_functions.pop_value.restype = Digest
-
-        return my_functions.pop_value()
 
     def runTest(self):
-        pkt = testutils.simple_ip_packet(eth_src="ff:ff:ff:ff:ff:ff")
+        pkt = testutils.simple_ip_packet(eth_src="fa:fb:fc:fd:fe:f0")
         testutils.send_packet(self, PORT0, pkt)
         testutils.send_packet(self, PORT0, pkt)
         testutils.send_packet(self, PORT0, pkt)
 
-        for i in range(0, 3):
-            value = self.get_digest_value()
-            if hex(value.mac) != "0xffffffffffff" or value.port != 4:
-                self.fail("Digest map stored wrong values: mac->%s, port->%s" %
-                          (hex(value.mac), value.port))
-
-    def tearDown(self):
-        self.remove_map("mac_learn_digest_0")
-        super(DigestPSATest, self).tearDown()
+        digests = self.digest_get("mac_learn_digest_0")
+        if len(digests) != 3:
+            self.fail("Expected 3 digest messages, got {}".format(len(digests)))
+        for d in digests:
+            if d["srcAddr"] != "0xfafbfcfdfef0" or d["ingress_port"] != "0x4":
+                self.fail("Digest map stored wrong values: mac->{}, port->{}".format(d["srcAddr"], d["ingress_port"]))
 
 
 class PSATernaryTest(P4EbpfTest):

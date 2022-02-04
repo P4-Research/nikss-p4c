@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 from common import *
 
-import ctypes as c
-import struct
 from ptf.mask import Mask
 from scapy.layers.l2 import Ether, Dot1Q
 from scapy.layers.inet import IP
@@ -25,20 +23,6 @@ def pkt_add_vlan(pkt, vlan_vid=10, vlan_pcp=0, dl_vlan_cfi=0):
 class L2L3SwitchTest(P4EbpfTest):
 
     p4_file_path = "p4testdata/l2l3_switch.p4"
-
-    ctool_file_path = "ptf/tools/read_digest.c"
-
-    def double_to_hex(self, f):
-        return hex(struct.unpack('<Q', struct.pack('<d', f))[0])
-
-    def get_digest_value(self):
-        class Digest(c.Structure):
-            pass
-        Digest._fields_ = [("mac", c.c_long), ("port", c.c_int)]
-        my_functions = c.CDLL(self.so_file_path)
-        my_functions.pop_value.restype = Digest
-
-        return my_functions.pop_value()
 
     def configure_port(self, port_id, vlan_id=None):
         if vlan_id is None:
@@ -182,8 +166,8 @@ class MACLearningTest(L2L3SwitchTest):
         # should NOT generate learn digest
         pkt = testutils.simple_udp_packet(eth_src='00:06:07:08:09:0a')
         testutils.send_packet(self, PORT0, pkt)
-        value = self.get_digest_value()
-        if value.port != 0 and value.mac != 0:
+        value = self.digest_get("mac_learn_digest_0")
+        if len(value) != 0:
             self.fail("Program should not generate digest")
 
         # should generate learn digest
@@ -197,9 +181,11 @@ class MACLearningTest(L2L3SwitchTest):
         for p in pairs:
             pkt = testutils.simple_udp_packet(eth_src=p[1])
             testutils.send_packet(self, p[0], pkt)
-            value = self.get_digest_value()
-            if value.port != p[0]+4:
+            value = self.digest_get("mac_learn_digest_0")
+            if len(value) != 1:
                 self.fail("Digest not generated")
+            if int(value[0]["port"], 0) != p[0]+4:
+                self.fail("Digest generated invalid port")
 
 
 class BroadcastTest(L2L3SwitchTest):
