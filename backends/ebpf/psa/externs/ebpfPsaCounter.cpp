@@ -140,7 +140,8 @@ void EBPFCounterPSA::emitValueType(CodeBuilder* builder) {
     builder->endOfStatement(true);
 }
 
-void EBPFCounterPSA::emitMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method, cstring actionParam) {
+void EBPFCounterPSA::emitMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method,
+                                          cstring actionParam) {
     if (method->method->name.name != "count") {
         ::error(ErrorType::ERR_UNSUPPORTED, "Unexpected method %1%", method->expr);
         return;

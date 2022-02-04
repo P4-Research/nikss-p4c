@@ -146,7 +146,8 @@ void EBPFMeterPSA::emitInstance(CodeBuilder *builder) const {
     }
 }
 
-void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* method, cstring actionParam) const {
+void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* method,
+                               cstring actionParam) const {
     if (method->expr->arguments->size() == 2) {
         ::warning("Color-Aware mode is not supported");
     }
@@ -168,7 +169,8 @@ void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* met
     }
 }
 
-void EBPFMeterPSA::emitIndex(CodeBuilder *builder, const P4::ExternMethod* method, cstring actionParam) const {
+void EBPFMeterPSA::emitIndex(CodeBuilder *builder, const P4::ExternMethod* method,
+                             cstring actionParam) const {
     if (actionParam.isNullOrEmpty()) {
         builder->append("&");
         auto argument = method->expr->arguments->at(0);
