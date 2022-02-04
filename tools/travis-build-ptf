@@ -87,10 +87,10 @@ if [[ "${IMAGE_TYPE}" == "test" ]] ; then
 fi
 
 function install_psabpf_ctl() {
-  git clone --recursive --branch tatry/digest https://github.com/P4-Research/psabpf.git /tmp/psabpf
+  git clone --recursive https://github.com/P4-Research/psabpf.git /tmp/psabpf
   cd /tmp/psabpf
   # some sort of git tag, but later use git tags when psabpf ready to use
-  git reset --hard 10d5a59
+  git reset --hard 818fcee
   ./build_libbpf.sh
   mkdir build
   cd build
