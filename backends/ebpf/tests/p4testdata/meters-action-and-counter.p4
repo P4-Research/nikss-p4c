@@ -89,18 +89,12 @@ control ingress(inout headers hdr,
 {
     Meter<PortId_t>(100, PSA_MeterType_t.BYTES) meter1;
     Counter<bit<32>, bit<32>>(100, PSA_CounterType_t.BYTES) counter;
-    bit<7> idx;
     PSA_MeterColor_t color1 = PSA_MeterColor_t.RED;
     PortId_t port = (PortId_t)5;
 
     action do_forward(PortId_t egress_port) {
-        idx = (bit<7>) 0;
-        if (idx < 1) {
-            color1 = meter1.execute(egress_port);
-            counter.count((bit<32>)egress_port);
-        } else {
-            color1 = PSA_MeterColor_t.RED;
-        }
+        color1 = meter1.execute(egress_port);
+        counter.count((bit<32>)egress_port);
         port = egress_port;
     }
 
