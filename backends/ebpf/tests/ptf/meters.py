@@ -87,7 +87,7 @@ class MeterActionPSATest(P4EbpfTest):
         super(MeterActionPSATest, self).tearDown()
 
 
-class MeterActionAndPSATest(P4EbpfTest):
+class MeterActionAndCounterPSATest(P4EbpfTest):
     """
     Test Meter and Counter used in action with action parameter. Type BYTES.
     Send 100 B packet and verify if there is 100 tokens less left.
@@ -100,14 +100,15 @@ class MeterActionAndPSATest(P4EbpfTest):
 
         # cir, pir -> 10 Mb/s -> 1,25 MB/s, cbs, pbs -> bs (10 ms) -> 6250 B -> 18 6A
         # period 800 ns -> 03 20,  1 B per period -> 01
-        self.meter_update(name="ingress_meter1", index=0,
+        self.meter_update(name="ingress_meter1", index=5,
                           pir=1250000, pbs=6250, cir=1250000, cbs=6250)
-        self.update_map(name="ingress_tbl_fwd", key="hex 04 00 00 00", value="hex 01 00 00 00 05 00 00 00")
+        self.update_map(name="ingress_tbl_fwd", key="hex 04 00 00 00",
+                        value="hex 01 00 00 00 05 00 00 00")
 
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)
         # Expecting pbs_left, cbs_left 6250 B - 100 B = 6150 B -> 18 06
-        self.verify_map_entry(name="ingress_meter1", key="hex 00",
+        self.verify_map_entry(name="ingress_meter1", key="hex 05 00 00 00",
                               expected_value="hex "
                                              "20 03 00 00 00 00 00 00 "  # pir_period
                                              "01 00 00 00 00 00 00 00 "  # pir_unit_per_period
@@ -121,11 +122,12 @@ class MeterActionAndPSATest(P4EbpfTest):
                                              "00 00 00 00 00 00 00 00 "  # time_c
                                              "00 00 00 00 00 00 00 00",  # Spin lock
                               mask=meter_value_mask)
-        self.verify_map_entry("ingress_counter", key="1 0 0 0", expected_value="64 00 00 00 00 00 00 00")
+        self.verify_map_entry("ingress_counter", key="hex 05 00 00 00",
+                              expected_value="64 00 00 00")
 
     def tearDown(self):
         self.remove_maps(["ingress_meter1", "ingress_counter"])
-        super(MeterActionAndPSATest, self).tearDown()
+        super(MeterActionAndCounterPSATest, self).tearDown()
 
 
 class MeterPacketsPSATest(P4EbpfTest):

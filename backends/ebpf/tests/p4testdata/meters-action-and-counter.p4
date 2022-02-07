@@ -87,7 +87,7 @@ control ingress(inout headers hdr,
                 in    psa_ingress_input_metadata_t  istd,
                 inout psa_ingress_output_metadata_t ostd)
 {
-    Meter<PortId_t>(1, PSA_MeterType_t.BYTES) meter1;
+    Meter<PortId_t>(100, PSA_MeterType_t.BYTES) meter1;
     Counter<bit<32>, bit<32>>(100, PSA_CounterType_t.BYTES) counter;
     bit<7> idx;
     PSA_MeterColor_t color1 = PSA_MeterColor_t.RED;
