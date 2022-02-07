@@ -111,6 +111,14 @@ void PsaStateTranslationVisitor::processMethod(const P4::ExternMethod* ext) {
         return;
     }
 
+    if (externName == p4lib.packetIn.name) {
+        auto method = ext->method->getName().name;
+        if (method == p4lib.packetIn.length.name) {
+            builder->append(parser->program->lengthVar);
+            return;
+        }
+    }
+
     StateTranslationVisitor::processMethod(ext);
 }
 

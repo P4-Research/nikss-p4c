@@ -593,3 +593,27 @@ class TernaryTableCachePSATest(P4EbpfTest):
         self.table_delete(table="ingress_tbl_ternary", keys=["00:11:22:33:44:55"])
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)
+
+
+class PacketInLengthPSATest(P4EbpfTest):
+    """
+
+    """
+    p4_file_path = "p4testdata/packet_in-length.p4"
+
+    def runTest(self):
+        pkt = Ether(dst="11:11:11:11:11:11") / testutils.simple_ip_only_packet(
+            ip_dst="192.168.1.1")
+
+        # check if packet_in.length() works
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
+
+        pkt = pkt / "Message"
+
+        # Packet bigger than 100B is rejected in parser
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_no_packet(self, pkt, PORT1)
+
+    def tearDown(self):
+        super(PacketInLengthPSATest, self).tearDown()
