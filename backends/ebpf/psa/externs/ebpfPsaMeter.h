@@ -5,6 +5,8 @@
 
 namespace EBPF {
 
+class ActionTranslationVisitorPSA;
+
 class EBPFMeterPSA : public EBPFTableBase {
  private:
     static IR::IndexedVector<IR::StructField> getValueFields();
@@ -14,7 +16,8 @@ class EBPFMeterPSA : public EBPFTableBase {
     static cstring getBaseStructName(P4::ReferenceMap* refMap);
     cstring getIndirectStructName() const;
 
-    void emitIndex(CodeBuilder* builder, const P4::ExternMethod *method, cstring actionParam) const;
+    void emitIndex(CodeBuilder* builder, const P4::ExternMethod *method,
+                   ActionTranslationVisitorPSA* actionVisitor) const;
 
  protected:
     const cstring indirectValueField = "value";
@@ -44,7 +47,7 @@ class EBPFMeterPSA : public EBPFTableBase {
     void emitSpinLockField(CodeBuilder* builder) const;
     void emitInstance(CodeBuilder* builder) const;
     void emitExecute(CodeBuilder* builder, const P4::ExternMethod* method,
-                     cstring actionParam) const;
+                     ActionTranslationVisitorPSA* actionVisitor) const;
     void emitDirectExecute(CodeBuilder* builder, const P4::ExternMethod* method,
                            cstring valuePtr) const;
 

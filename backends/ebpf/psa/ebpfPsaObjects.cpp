@@ -68,14 +68,8 @@ void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) 
     } else if (declType->name.name == "Counter") {
         auto ctr = control->to<EBPFControlPSA>()->getCounter(instanceName);
         // Counter count() always has one argument/index
-        auto argumentExpr = method->expr->arguments->at(0)->expression;
         if (ctr != nullptr) {
-            if (this->isActionParameter(argumentExpr)) {
-                auto argument = getActionParamStr(argumentExpr);
-                ctr->to<EBPFCounterPSA>()->emitMethodInvocation(builder, method, argument);
-            } else {
-                ControlBodyTranslatorPSA::processMethod(method);
-            }
+            ctr->to<EBPFCounterPSA>()->emitMethodInvocation(builder, method, this);
         } else {
             ::error(ErrorType::ERR_NOT_FOUND,
                     "%1%: Counter named %2% not found",
@@ -85,14 +79,8 @@ void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) 
     } else if (declType->name.name == "Meter") {
         auto met = control->to<EBPFControlPSA>()->getMeter(instanceName);
         // Meter execute() always has one argument/index
-        auto argumentExpr = method->expr->arguments->at(0)->expression;
         if (met != nullptr) {
-            if (this->isActionParameter(argumentExpr)) {
-                auto argument = getActionParamStr(argumentExpr);
-                met->emitExecute(builder, method, argument);
-            } else {
-                ControlBodyTranslatorPSA::processMethod(method);
-            }
+            met->emitExecute(builder, method, this);
         } else {
             ::error(ErrorType::ERR_NOT_FOUND,
                     "%1%: Meter named %2% not found",

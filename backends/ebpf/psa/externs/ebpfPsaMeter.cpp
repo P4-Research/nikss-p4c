@@ -147,7 +147,7 @@ void EBPFMeterPSA::emitInstance(CodeBuilder *builder) const {
 }
 
 void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* method,
-                               cstring actionParam) const {
+                               ActionTranslationVisitorPSA* actionVisitor) const {
     if (method->expr->arguments->size() == 2) {
         ::warning("Color-Aware mode is not supported");
     }
@@ -160,20 +160,22 @@ void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* met
     if (type == BYTES) {
         builder->appendFormat("meter_execute_bytes(&%s, &%s, ", instanceName,
                             pipeline->lengthVar.c_str());
-        this->emitIndex(builder, method, actionParam);
+        this->emitIndex(builder, method, actionVisitor);
         builder->appendFormat(", &%s)", pipeline->timestampVar.c_str());
     } else {
         builder->appendFormat("meter_execute_packets(&%s, ", instanceName);
-        this->emitIndex(builder, method, actionParam);
+        this->emitIndex(builder, method, actionVisitor);
         builder->appendFormat(", &%s)", pipeline->timestampVar.c_str());
     }
 }
 
 void EBPFMeterPSA::emitIndex(CodeBuilder *builder, const P4::ExternMethod* method,
-                             cstring actionParam) const {
-    if (actionParam.isNullOrEmpty()) {
-        builder->append("&");
-        auto argument = method->expr->arguments->at(0);
+                             ActionTranslationVisitorPSA* actionVisitor) const {
+    auto argument = method->expr->arguments->at(0);
+    builder->append("&");
+    if (actionVisitor != nullptr && actionVisitor->isActionParameter(argument->expression)) {
+        actionVisitor->visit(argument);
+    } else {
         if (argument->expression->is<IR::Constant>()) {
             builder->append("(u32){");
             this->codeGen->visit(argument->expression);
@@ -181,8 +183,6 @@ void EBPFMeterPSA::emitIndex(CodeBuilder *builder, const P4::ExternMethod* metho
             return;
         }
         codeGen->visit(argument);
-    } else {
-        builder->append("&" + actionParam);
     }
 }
 

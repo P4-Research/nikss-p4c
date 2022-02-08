@@ -141,7 +141,7 @@ void EBPFCounterPSA::emitValueType(CodeBuilder* builder) {
 }
 
 void EBPFCounterPSA::emitMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method,
-                                          cstring actionParam) {
+                                          ActionTranslationVisitorPSA* actionVisitor) {
     if (method->method->name.name != "count") {
         ::error(ErrorType::ERR_UNSUPPORTED, "Unexpected method %1%", method->expr);
         return;
@@ -151,7 +151,7 @@ void EBPFCounterPSA::emitMethodInvocation(CodeBuilder* builder, const P4::Extern
               "Expected just 1 argument for %1%", method->expr);
 
     builder->blockStart();
-    this->emitCount(builder, method->expr, actionParam);
+    this->emitCount(builder, method->expr, actionVisitor);
     builder->blockEnd(false);
 }
 
@@ -186,7 +186,7 @@ void EBPFCounterPSA::emitDirectMethodInvocation(CodeBuilder* builder,
 
 void EBPFCounterPSA::emitCount(CodeBuilder* builder,
                                const IR::MethodCallExpression *expression,
-                               cstring actionParam) {
+                               ActionTranslationVisitorPSA* actionVisitor) {
     cstring keyName = program->refMap->newName("key");
     cstring valueName = program->refMap->newName("value");
     cstring msgStr, varStr;
@@ -203,11 +203,11 @@ void EBPFCounterPSA::emitCount(CodeBuilder* builder,
 
     builder->emitIndent();
     builder->appendFormat("%s %s = ", keyTypeName.c_str(), keyName.c_str());
-    if (actionParam.isNullOrEmpty()) {
-        auto index = expression->arguments->at(0);
-        codeGen->visit(index);
+    auto index = expression->arguments->at(0);
+    if (actionVisitor != nullptr && actionVisitor->isActionParameter(index->expression)) {
+        actionVisitor->visit(index);
     } else {
-        builder->append(actionParam);
+        codeGen->visit(index);
     }
     builder->endOfStatement(true);
 
