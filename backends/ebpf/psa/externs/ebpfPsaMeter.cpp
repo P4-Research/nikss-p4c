@@ -1,5 +1,6 @@
 #include "ebpfPsaMeter.h"
 #include "backends/ebpf/psa/ebpfPipeline.h"
+#include "backends/ebpf/psa/ebpfPsaControlTranslators.h"
 
 namespace EBPF {
 
