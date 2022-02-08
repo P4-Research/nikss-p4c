@@ -142,7 +142,7 @@ void EBPFCounterPSA::emitValueType(CodeBuilder* builder) {
 }
 
 void EBPFCounterPSA::emitMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method,
-                                          ActionTranslationVisitorPSA* actionVisitor) {
+                                          ControlBodyTranslatorPSA* translator) {
     if (method->method->name.name != "count") {
         ::error(ErrorType::ERR_UNSUPPORTED, "Unexpected method %1%", method->expr);
         return;
@@ -152,7 +152,7 @@ void EBPFCounterPSA::emitMethodInvocation(CodeBuilder* builder, const P4::Extern
               "Expected just 1 argument for %1%", method->expr);
 
     builder->blockStart();
-    this->emitCount(builder, method->expr, actionVisitor);
+    this->emitCount(builder, method->expr, translator);
     builder->blockEnd(false);
 }
 
@@ -187,7 +187,8 @@ void EBPFCounterPSA::emitDirectMethodInvocation(CodeBuilder* builder,
 
 void EBPFCounterPSA::emitCount(CodeBuilder* builder,
                                const IR::MethodCallExpression *expression,
-                               ActionTranslationVisitorPSA* actionVisitor) {
+                               ControlBodyTranslatorPSA* translator) {
+    BUG_CHECK(translator != nullptr, "Index translator is nullptr!");
     cstring keyName = program->refMap->newName("key");
     cstring valueName = program->refMap->newName("value");
     cstring msgStr, varStr;
@@ -205,11 +206,7 @@ void EBPFCounterPSA::emitCount(CodeBuilder* builder,
     builder->emitIndent();
     builder->appendFormat("%s %s = ", keyTypeName.c_str(), keyName.c_str());
     auto index = expression->arguments->at(0);
-    if (actionVisitor != nullptr && actionVisitor->isActionParameter(index->expression)) {
-        actionVisitor->visit(index);
-    } else {
-        codeGen->visit(index);
-    }
+    translator->visit(index);
     builder->endOfStatement(true);
 
     msgStr = Util::printf_format("Counter: updating %s, id=%%u, packets=1, bytes=%%u",

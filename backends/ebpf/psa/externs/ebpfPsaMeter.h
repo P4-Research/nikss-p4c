@@ -5,7 +5,7 @@
 
 namespace EBPF {
 
-class ActionTranslationVisitorPSA;
+class ControlBodyTranslatorPSA;
 
 class EBPFMeterPSA : public EBPFTableBase {
  private:
@@ -17,7 +17,7 @@ class EBPFMeterPSA : public EBPFTableBase {
     cstring getIndirectStructName() const;
 
     void emitIndex(CodeBuilder* builder, const P4::ExternMethod *method,
-                   ActionTranslationVisitorPSA* actionVisitor) const;
+                   ControlBodyTranslatorPSA* translator) const;
 
  protected:
     const cstring indirectValueField = "value";
@@ -47,7 +47,7 @@ class EBPFMeterPSA : public EBPFTableBase {
     void emitSpinLockField(CodeBuilder* builder) const;
     void emitInstance(CodeBuilder* builder) const;
     void emitExecute(CodeBuilder* builder, const P4::ExternMethod* method,
-                     ActionTranslationVisitorPSA* actionVisitor) const;
+                     ControlBodyTranslatorPSA* translator) const;
     void emitDirectExecute(CodeBuilder* builder, const P4::ExternMethod* method,
                            cstring valuePtr) const;
 

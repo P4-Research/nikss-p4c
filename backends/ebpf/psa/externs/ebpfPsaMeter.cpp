@@ -148,7 +148,7 @@ void EBPFMeterPSA::emitInstance(CodeBuilder *builder) const {
 }
 
 void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* method,
-                               ActionTranslationVisitorPSA* actionVisitor) const {
+                               ControlBodyTranslatorPSA* translator) const {
     if (method->expr->arguments->size() == 2) {
         ::warning("Color-Aware mode is not supported");
     }
@@ -161,30 +161,27 @@ void EBPFMeterPSA::emitExecute(CodeBuilder* builder, const P4::ExternMethod* met
     if (type == BYTES) {
         builder->appendFormat("meter_execute_bytes(&%s, &%s, ", instanceName,
                             pipeline->lengthVar.c_str());
-        this->emitIndex(builder, method, actionVisitor);
+        this->emitIndex(builder, method, translator);
         builder->appendFormat(", &%s)", pipeline->timestampVar.c_str());
     } else {
         builder->appendFormat("meter_execute_packets(&%s, ", instanceName);
-        this->emitIndex(builder, method, actionVisitor);
+        this->emitIndex(builder, method, translator);
         builder->appendFormat(", &%s)", pipeline->timestampVar.c_str());
     }
 }
 
 void EBPFMeterPSA::emitIndex(CodeBuilder *builder, const P4::ExternMethod* method,
-                             ActionTranslationVisitorPSA* actionVisitor) const {
+                             ControlBodyTranslatorPSA* translator) const {
+    BUG_CHECK(translator != nullptr, "Index translator is nullptr!");
     auto argument = method->expr->arguments->at(0);
     builder->append("&");
-    if (actionVisitor != nullptr && actionVisitor->isActionParameter(argument->expression)) {
-        actionVisitor->visit(argument);
-    } else {
-        if (argument->expression->is<IR::Constant>()) {
-            builder->append("(u32){");
-            this->codeGen->visit(argument->expression);
-            builder->append("}");
-            return;
-        }
-        codeGen->visit(argument);
+    if (argument->expression->is<IR::Constant>()) {
+        builder->append("(u32){");
+        this->codeGen->visit(argument->expression);
+        builder->append("}");
+        return;
     }
+    translator->visit(argument);
 }
 
 void EBPFMeterPSA::emitDirectExecute(CodeBuilder *builder,
