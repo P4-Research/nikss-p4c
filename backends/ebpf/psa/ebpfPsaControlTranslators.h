@@ -31,10 +31,9 @@ class ActionTranslationVisitorPSA : public ActionTranslationVisitor,
     cstring getActionParamStr(const IR::Expression *expression) const override;
 
  protected:
-
     const EBPFTablePSA* table;
- public:
 
+ public:
     ActionTranslationVisitorPSA(cstring valueName, const EBPFPipeline* program,
                                 const EBPFTablePSA* table);
     bool preorder(const IR::PathExpression* pe) override;
