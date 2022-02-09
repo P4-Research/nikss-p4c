@@ -155,6 +155,7 @@ class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
         pkt[Ether].src = '00:44:33:22:11:00'
         testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
+
 # FIXME: MulticastPSATest fails if egress optimization is enabled.
 #  We skip it for now, as it is not used for benchmarking.
 @skip_if_pipeline_optimization_enabled
@@ -162,15 +163,9 @@ class MulticastPSATest(P4EbpfTest):
     p4_file_path = "../../../testdata/p4_16_samples/psa-multicast-basic-bmv2.p4"
 
     def runTest(self):
-        # TODO: replace bpftool with prectl
-        self.create_map(name="mcast_grp_8", type="hash", key_size=8, value_size=20, max_entries=64)
-        self.update_map(name="mcast_grp_8", key="02 00 00 00 01 00 00 00",
-                        value="06 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00 00 00 00 00")
-        self.update_map(name="mcast_grp_8", key="01 00 00 00 01 00 00 00",
-                        value="05 00 00 00 00 00 05 00 00 00 00 00 02 00 00 00 01 00 00 00")
-        self.update_map(name="mcast_grp_8", key="00 00 00 00 00 00 00 00",
-                        value="00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00 01 00 00 00")
-        self.update_map(name="multicast_grp_tbl", key="8 0 0 0", value="mcast_grp_8", map_in_map=True)
+        self.multicast_group_create(group=8)
+        self.multicast_group_add_member(group=8, egress_port=5)
+        self.multicast_group_add_member(group=8, egress_port=6)
 
         pkt = testutils.simple_eth_packet(eth_dst='00:00:00:00:00:05')
         testutils.send_packet(self, PORT0, pkt)
@@ -183,7 +178,7 @@ class MulticastPSATest(P4EbpfTest):
         testutils.verify_no_other_packets(self)
 
     def tearDown(self):
-        self.remove_map("mcast_grp_8")
+        self.multicast_group_delete(8)
         super(MulticastPSATest, self).tearDown()
 
 
