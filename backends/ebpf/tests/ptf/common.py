@@ -92,11 +92,6 @@ class EbpfTest(BaseTest):
         for map in maps:
             self.remove_map(map)
 
-    def create_map(self, name, type, key_size, value_size, max_entries):
-        self.exec_ns_cmd("bpftool map create {}/{} type "
-                         "{} key {} value {} entries {} name {}".format(
-            PIPELINE_MAPS_MOUNT_PATH, name, type, key_size, value_size, max_entries, name))
-
     def update_map(self, name, key, value, map_in_map=False):
         if map_in_map:
             value = "pinned {}/{} any".format(PIPELINE_MAPS_MOUNT_PATH, value)
@@ -214,6 +209,16 @@ class P4EbpfTest(EbpfTest):
 
     def clone_session_delete(self, id):
         self.exec_ns_cmd("psabpf-ctl clone-session delete pipe {} id {}".format(TEST_PIPELINE_ID, id))
+
+    def multicast_group_create(self, group):
+        self.exec_ns_cmd("psabpf-ctl multicast-group create pipe {} id {}".format(TEST_PIPELINE_ID, group))
+
+    def multicast_group_add_member(self, group, egress_port, instance=1):
+        self.exec_ns_cmd("psabpf-ctl multicast-group add-member pipe {} id {} egress-port {} instance {}".format(
+            TEST_PIPELINE_ID, group, egress_port, instance))
+
+    def multicast_group_delete(self, group):
+        self.exec_ns_cmd("psabpf-ctl multicast-group delete pipe {} id {}".format(TEST_PIPELINE_ID, group))
 
     def table_write(self, method, table, keys, action=0, data=None, priority=None, references=None):
         """
