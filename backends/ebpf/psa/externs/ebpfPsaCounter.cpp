@@ -1,5 +1,6 @@
 #include "ebpfPsaCounter.h"
 #include "backends/ebpf/psa/ebpfPipeline.h"
+#include "backends/ebpf/psa/ebpfPsaControlTranslators.h"
 
 namespace EBPF {
 
@@ -140,7 +141,8 @@ void EBPFCounterPSA::emitValueType(CodeBuilder* builder) {
     builder->endOfStatement(true);
 }
 
-void EBPFCounterPSA::emitMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method) {
+void EBPFCounterPSA::emitMethodInvocation(CodeBuilder* builder, const P4::ExternMethod* method,
+                                          ControlBodyTranslatorPSA* translator) {
     if (method->method->name.name != "count") {
         ::error(ErrorType::ERR_UNSUPPORTED, "Unexpected method %1%", method->expr);
         return;
@@ -150,7 +152,7 @@ void EBPFCounterPSA::emitMethodInvocation(CodeBuilder* builder, const P4::Extern
               "Expected just 1 argument for %1%", method->expr);
 
     builder->blockStart();
-    this->emitCount(builder, method->expr);
+    this->emitCount(builder, method->expr, translator);
     builder->blockEnd(false);
 }
 
@@ -184,7 +186,9 @@ void EBPFCounterPSA::emitDirectMethodInvocation(CodeBuilder* builder,
 }
 
 void EBPFCounterPSA::emitCount(CodeBuilder* builder,
-                               const IR::MethodCallExpression *expression) {
+                               const IR::MethodCallExpression *expression,
+                               ControlBodyTranslatorPSA* translator) {
+    BUG_CHECK(translator != nullptr, "Index translator is nullptr!");
     cstring keyName = program->refMap->newName("key");
     cstring valueName = program->refMap->newName("value");
     cstring msgStr, varStr;
@@ -202,7 +206,7 @@ void EBPFCounterPSA::emitCount(CodeBuilder* builder,
     builder->emitIndent();
     builder->appendFormat("%s %s = ", keyTypeName.c_str(), keyName.c_str());
     auto index = expression->arguments->at(0);
-    codeGen->visit(index);
+    translator->visit(index);
     builder->endOfStatement(true);
 
     msgStr = Util::printf_format("Counter: updating %s, id=%%u, packets=1, bytes=%%u",
