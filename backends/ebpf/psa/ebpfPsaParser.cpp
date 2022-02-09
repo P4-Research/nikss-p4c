@@ -135,7 +135,8 @@ void PsaStateTranslationVisitor::compileAdvance(const P4::ExternMethod *ext) {
     }
     cstring offsetStr = Util::printf_format("BYTES(%s + %s)",
                                             parser->program->offsetVar, argStr);
-    builder->target->emitTraceMessage(builder, "Parser (advance): check pkt_len=%%d < last_read_byte=%%d", 2,
+    builder->target->emitTraceMessage(builder, "Parser (advance): check pkt_len=%%d < "
+                                               "last_read_byte=%%d", 2,
                                       (parser->program->packetEndVar + " - " +
                                       parser->program->packetStartVar).c_str(),
                                       offsetStr.c_str());
