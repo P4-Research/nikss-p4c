@@ -597,7 +597,7 @@ class TernaryTableCachePSATest(P4EbpfTest):
 
 class PacketInLengthPSATest(P4EbpfTest):
     """
-
+    Sends 114 bytes packet and check this using packet_in.length() in a parser
     """
     p4_file_path = "p4testdata/packet_in-length.p4"
 
@@ -611,9 +611,31 @@ class PacketInLengthPSATest(P4EbpfTest):
 
         pkt = pkt / "Message"
 
-        # Packet bigger than 100B is rejected in parser
+        # Packet bigger than 114B is rejected in parser
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_no_packet(self, pkt, PORT1)
 
     def tearDown(self):
         super(PacketInLengthPSATest, self).tearDown()
+
+
+class PacketInAdvancePSATest(P4EbpfTest):
+    """
+    This test checks if MPLS header is skipped using packet_in.advance()
+    """
+    p4_file_path = "p4testdata/packet_in-advance.p4"
+
+    def runTest(self):
+        pkt = Ether(dst="11:11:11:11:11:11") / MPLS(label=20, cos=5, s=1, ttl=64) / \
+              testutils.simple_ip_only_packet(ip_dst="192.168.1.1")
+
+        exp_pkt = Ether(dst="11:11:11:11:11:11") / \
+                  testutils.simple_ip_only_packet(ip_dst="192.168.1.1")
+
+        # check if MPLS is skipped in parser
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, exp_pkt, PORT1)
+
+    def tearDown(self):
+        super(PacketInAdvancePSATest, self).tearDown()
+

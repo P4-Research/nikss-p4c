@@ -49,18 +49,7 @@ parser IngressParserImpl(packet_in buffer,
     state start {
         buffer.extract(parsed_hdr.ethernet);
 
-        bit<32> len_wo_mpls = 34;
-
-        if (buffer.length() > len_wo_mpls) {
-            buffer.advance((bit<32>) 32); // Skip MPLS header
-            //buffer.extract(parsed_hdr.ipv4);
-        }
-
-        //buffer.length();
-
-        //if (len_wo_mpls > parsed_hdr.ethernet.etherType) {
-        //    buffer.extract(parsed_hdr.ipv4);
-        //}
+        buffer.advance((bit<32>) 32); // Skip MPLS header
 
         transition select(parsed_hdr.ethernet.etherType) {
             0x8847: parse_ipv4; // We skip MPLS headers. No logic. Just tests.
