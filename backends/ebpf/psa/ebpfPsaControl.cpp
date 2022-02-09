@@ -59,7 +59,7 @@ void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
     // TODO: make something similar to EBPFModel instead of hardcoded extern name
     if (declType->name.name == "Counter") {
         auto counterMap = control->getCounter(name);
-        counterMap->emitMethodInvocation(builder, method);
+        counterMap->to<EBPFCounterPSA>()->emitMethodInvocation(builder, method, this);
         return;
     } else if (declType->name.name == "Hash") {
         auto hash = control->to<EBPFControlPSA>()->getHash(name);
@@ -70,8 +70,6 @@ void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
         rand->processMethod(builder, method);
         return;
     } else if (declType->name.name == "Register") {
-        auto di = method->object->to<IR::Declaration_Instance>();
-        name = EBPFObject::externalName(di);
         auto reg = control->to<EBPFControlPSA>()->getRegister(name);
         if (method->method->type->name == "write") {
             reg->emitRegisterWrite(builder, method, this);
@@ -81,10 +79,8 @@ void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
         }
         return;
     } else if (declType->name.name == "Meter") {
-        auto di = decl->to<IR::Declaration_Instance>();
-        name = EBPFObject::externalName(di);
         auto meter = control->to<EBPFControlPSA>()->getMeter(name);
-        meter->emitExecute(builder, method);
+        meter->emitExecute(builder, method, this);
         return;
     }
 

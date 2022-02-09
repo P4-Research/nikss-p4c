@@ -24,26 +24,67 @@ bool ActionTranslationVisitorPSA::preorder(const IR::PathExpression* pe) {
     return ControlBodyTranslator::preorder(pe);
 }
 
+bool ActionTranslationVisitorPSA::isActionParameter(const IR::Expression *expression) const {
+    if (auto path = expression->to<IR::PathExpression>())
+        return ActionTranslationVisitor::isActionParameter(path);
+    else if (auto cast = expression->to<IR::Cast>())
+        return isActionParameter(cast->expr);
+    else
+        return false;
+}
+
+cstring ActionTranslationVisitorPSA::getActionParamStr(const IR::Expression *expression) const {
+    if (auto cast = expression->to<IR::Cast>())
+        return ActionTranslationVisitor::getActionParamStr(cast->expr);
+    else
+        return ActionTranslationVisitor::getActionParamStr(expression);
+}
+
 void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) {
     auto declType = method->originalExternType;
-    auto name = method->object->getName();
+    auto decl = method->object;
+    BUG_CHECK(decl->is<IR::Declaration_Instance>(),
+            "Extern has not been declared");
+    auto di = decl->to<IR::Declaration_Instance>();
+    auto instanceName = EBPFObject::externalName(di);
 
     if (declType->name.name == "DirectCounter") {
-        auto ctr = table->getCounter(name);
+        auto ctr = table->getCounter(instanceName);
         if (ctr != nullptr)
             ctr->emitDirectMethodInvocation(builder, method, valueName);
         else
             ::error(ErrorType::ERR_NOT_FOUND,
                     "%1%: Table %2% do not own DirectCounter named %3%",
-                    method->expr, table->name, name);
+                    method->expr, table->name, instanceName);
     } else if (declType->name.name == "DirectMeter") {
-        auto met = table->getMeter(name);
+        auto met = table->getMeter(instanceName);
         if (met != nullptr) {
             met->emitDirectExecute(builder, method, valueName);
         } else {
             ::error(ErrorType::ERR_NOT_FOUND,
                     "%1%: Table %2% do not own DirectMeter named %3%",
-                    method->expr, table->name, name);
+                    method->expr, table->name, instanceName);
+        }
+    } else if (declType->name.name == "Counter") {
+        auto ctr = control->to<EBPFControlPSA>()->getCounter(instanceName);
+        // Counter count() always has one argument/index
+        if (ctr != nullptr) {
+            ctr->to<EBPFCounterPSA>()->emitMethodInvocation(builder, method, this);
+        } else {
+            ::error(ErrorType::ERR_NOT_FOUND,
+                    "%1%: Counter named %2% not found",
+                    method->expr, instanceName);
+        }
+        return;
+    } else if (declType->name.name == "Meter") {
+        auto met = control->to<EBPFControlPSA>()->getMeter(instanceName);
+        // Meter execute() always has one argument/index
+        if (met != nullptr) {
+            met->emitExecute(builder, method, this);
+        } else {
+            ::error(ErrorType::ERR_NOT_FOUND,
+                    "%1%: Meter named %2% not found",
+                    method->expr, instanceName);
         }
     } else {
         ControlBodyTranslatorPSA::processMethod(method);
@@ -109,8 +150,9 @@ void EBPFTablePSA::initDirectCounters() {
         auto decl = program->refMap->getDeclaration(pe->path, true);
         auto di = decl->to<IR::Declaration_Instance>();
         CHECK_NULL(di);
-        auto ctr = new EBPFCounterPSA(program, di, EBPFObject::externalName(di), codeGen);
-        this->counters.emplace_back(std::make_pair(pe->path->name.name, ctr));
+        auto counterName = EBPFObject::externalName(di);
+        auto ctr = new EBPFCounterPSA(program, di, counterName, codeGen);
+        this->counters.emplace_back(std::make_pair(counterName, ctr));
     };
 
     forEachPropertyEntry("psa_direct_counter", counterAdder);
@@ -128,8 +170,9 @@ void EBPFTablePSA::initDirectMeters() {
                     "Longest Prefix Match key is not supported: %1%", di);
             return;
         }
-        auto met = new EBPFMeterPSA(program, EBPFObject::externalName(di), di, codeGen);
-        this->meters.emplace_back(std::make_pair(pe->path->name.name, met));
+        auto meterName = EBPFObject::externalName(di);
+        auto met = new EBPFMeterPSA(program, meterName, di, codeGen);
+        this->meters.emplace_back(std::make_pair(meterName, met));
     };
 
     forEachPropertyEntry("psa_direct_meter", meterAdder);
