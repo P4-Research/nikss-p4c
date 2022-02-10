@@ -111,62 +111,7 @@ void PsaStateTranslationVisitor::processMethod(const P4::ExternMethod* ext) {
         return;
     }
 
-    if (externName == p4lib.packetIn.name) {
-        auto method = ext->method->getName().name;
-        if (method == p4lib.packetIn.length.name) {
-            builder->append(parser->program->lengthVar);
-            return;
-        } else if (method == p4lib.packetIn.advance.name) {
-            compileAdvance(ext);
-            return;
-        }
-    }
-
     StateTranslationVisitor::processMethod(ext);
-}
-
-void PsaStateTranslationVisitor::compileAdvance(const P4::ExternMethod *ext) {
-    auto argExpr = ext->expr->arguments->at(0)->expression;
-    cstring argStr;
-    if (auto cnst = argExpr->to<IR::Constant>()) {
-        argStr = cstring::to_cstring(cnst->asUnsigned());
-    } else {
-        argStr = argExpr->toString();
-    }
-    cstring offsetStr = Util::printf_format("BYTES(%s + %s)",
-                                            parser->program->offsetVar, argStr);
-    builder->target->emitTraceMessage(builder, "Parser (advance): check pkt_len=%%d < "
-                                               "last_read_byte=%%d", 2,
-                                      (parser->program->packetEndVar + " - " +
-                                      parser->program->packetStartVar).c_str(),
-                                      offsetStr.c_str());
-    builder->emitIndent();
-    builder->appendFormat("if (%s < %s + BYTES(%s + ",
-                          parser->program->packetEndVar.c_str(),
-                          parser->program->packetStartVar.c_str(),
-                          parser->program->offsetVar.c_str());
-    visit(argExpr);
-    builder->appendFormat(")) ");
-    builder->blockStart();
-
-    builder->target->emitTraceMessage(builder, "Parser: invalid packet (packet too short)");
-
-    builder->emitIndent();
-    builder->appendFormat("%s = %s;", parser->program->errorVar.c_str(),
-                          p4lib.packetTooShort.str());
-    builder->newline();
-
-    builder->emitIndent();
-    builder->appendFormat("goto %s;", IR::ParserState::reject.c_str());
-    builder->newline();
-    builder->blockEnd(true);
-
-    builder->emitIndent();
-    builder->appendFormat("%s = %s + ",
-                          parser->program->offsetVar.c_str(),
-                          parser->program->offsetVar.c_str());
-    visit(argExpr);
-    builder->endOfStatement(true);
 }
 
 void PsaStateTranslationVisitor::compileVerify(const IR::MethodCallExpression * expression) {
