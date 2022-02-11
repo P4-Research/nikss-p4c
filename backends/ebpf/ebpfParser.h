@@ -38,6 +38,7 @@ class StateTranslationVisitor : public CodeGenInspector {
                              unsigned alignment, EBPFType* type);
     virtual void compileExtract(const IR::Expression* destination);
     void compileLookahead(const IR::Expression* destination);
+    void compileAdvance(const P4::ExternMethod *ext);
 
     virtual void processFunction(const P4::ExternFunction* function);
     virtual void processMethod(const P4::ExternMethod* method);
