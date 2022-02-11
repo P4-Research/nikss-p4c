@@ -1,5 +1,4 @@
 #include "ebpfPsaControl.h"
-#include "ebpfPsaControlTranslators.h"
 #include "frontends/p4/methodInstance.h"
 
 namespace EBPF {

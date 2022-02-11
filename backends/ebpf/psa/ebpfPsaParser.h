@@ -3,7 +3,7 @@
 
 #include "backends/ebpf/ebpfType.h"
 #include "backends/ebpf/ebpfParser.h"
-#include "backends/ebpf/psa/ebpfPsaObjects.h"
+#include "backends/ebpf/psa/ebpfPsaTable.h"
 #include "backends/ebpf/psa/externs/ebpfPsaChecksum.h"
 
 namespace EBPF {
@@ -32,6 +32,24 @@ class PsaStateTranslationVisitor : public StateTranslationVisitor {
     void processMethod(const P4::ExternMethod* ext) override;
 
     void compileVerify(const IR::MethodCallExpression * expression);
+};
+
+class EBPFValueSetPSA : public EBPFTableBase {
+ protected:
+    size_t size;
+    const IR::P4ValueSet* pvs;
+    std::vector<std::pair<cstring, const IR::Type*>> fieldNames;
+    cstring keyVarName;
+
+ public:
+    EBPFValueSetPSA(const EBPFProgram* program, const IR::P4ValueSet* p4vs,
+                    cstring instanceName, CodeGenInspector* codeGen);
+
+    void emitTypes(CodeBuilder* builder);
+    void emitInstance(CodeBuilder* builder);
+    void emitKeyInitializer(CodeBuilder* builder, const IR::SelectExpression* expression,
+                            cstring varName);
+    void emitLookup(CodeBuilder* builder);
 };
 
 class EBPFPsaParser : public EBPFParser {
