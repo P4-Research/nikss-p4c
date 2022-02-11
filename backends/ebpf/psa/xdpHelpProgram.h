@@ -6,7 +6,6 @@
 namespace EBPF {
 
 class XDPHelpProgram : public EBPFProgram {
-
     cstring XDPProgUsingMetaForXDP2TC =
             "    void *data_end = (void *)(long)skb->data_end;\n"
             "    struct ethhdr *eth = (struct ethhdr *) skb->data;\n"

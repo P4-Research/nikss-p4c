@@ -1,5 +1,5 @@
-#ifndef BACKENDS_EBPF_PSA_EBPFPSAOBJECTS_H_
-#define BACKENDS_EBPF_PSA_EBPFPSAOBJECTS_H_
+#ifndef BACKENDS_EBPF_PSA_EBPFPSATABLE_H_
+#define BACKENDS_EBPF_PSA_EBPFPSATABLE_H_
 
 #include "frontends/p4/methodInstance.h"
 #include "backends/ebpf/ebpfTable.h"
@@ -144,4 +144,4 @@ class EBPFTernaryTablePSA : public EBPFTablePSA {
 
 }  // namespace EBPF
 
-#endif /* BACKENDS_EBPF_PSA_EBPFPSAOBJECTS_H_ */
+#endif /* BACKENDS_EBPF_PSA_EBPFPSATABLE_H_ */
