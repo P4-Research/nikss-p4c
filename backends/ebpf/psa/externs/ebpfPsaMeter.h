@@ -1,7 +1,7 @@
 #ifndef BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAMETER_H_
 #define BACKENDS_EBPF_PSA_EXTERNS_EBPFPSAMETER_H_
 
-#include "backends/ebpf/psa/ebpfPsaObjects.h"
+#include "backends/ebpf/psa/ebpfPsaTable.h"
 
 namespace EBPF {
 

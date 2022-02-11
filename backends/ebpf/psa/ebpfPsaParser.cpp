@@ -158,6 +158,159 @@ void PsaStateTranslationVisitor::compileVerify(const IR::MethodCallExpression * 
     builder->blockEnd(true);
 }
 
+// =====================EBPFValueSetPSA=============================
+EBPFValueSetPSA::EBPFValueSetPSA(const EBPFProgram* program, const IR::P4ValueSet* p4vs,
+                                 cstring instanceName, CodeGenInspector* codeGen)
+        : EBPFTableBase(program, instanceName, codeGen), size(0), pvs(p4vs) {
+    CHECK_NULL(pvs);
+    valueTypeName = "u32";  // value is not used, we will check only if entry exists
+
+    // validate size
+    if (pvs->size->is<IR::Constant>()) {
+        auto sc = pvs->size->to<IR::Constant>();
+        if (sc->value.sign() <= 0) {
+            ::error(ErrorType::ERR_INVALID,
+                    "Invalid number of items in value_set (must be 1 or more): %1%", pvs->size);
+        } else if (sc->fitsUint()) {
+            size = sc->asUnsigned();
+        } else {
+            ::error(ErrorType::ERR_OVERLIMIT,
+                    "Too many items in value_set (must be less than 2^32): %1%", pvs->size);
+        }
+    } else {
+        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                "Size of value_set must be know at compilation time: %1%", pvs->size);
+    }
+
+    // validate type
+    if (pvs->elementType->is<IR::Type_Bits>()) {
+        // no restrictions
+    } else if (pvs->elementType->is<IR::Type_Name>()) {
+        auto type = pvs->elementType->to<IR::Type_Name>();
+        keyTypeName = type->path->name.name;
+
+        auto decl = program->refMap->getDeclaration(type->path, true);
+        if (decl->is<IR::Type_Header>()) {
+            ::warning("Header type may contain additional shadow data: %1%", pvs->elementType);
+            ::warning("Header defined here: %1%", decl);
+        }
+        if (!decl->is<IR::Type_StructLike>()) {
+            ::error(ErrorType::ERR_UNSUPPORTED,
+                    "Unsupported type for value_set (hint: it might be a struct): %1%",
+                    pvs->elementType);
+        }
+    } else if (pvs->elementType->is<IR::Type_Tuple>()) {
+        // no restrictions
+    } else {
+        ::error(ErrorType::ERR_UNSUPPORTED,
+                "Unsupported type with value_set: %1%", pvs->elementType);
+    }
+
+    keyTypeName = "struct " + keyTypeName;
+}
+
+void EBPFValueSetPSA::emitTypes(CodeBuilder* builder) {
+    if (pvs->elementType->is<IR::Type_Name>()) {
+        auto type = pvs->elementType->to<IR::Type_Name>();
+        auto decl = program->refMap->getDeclaration(type->path, true);
+        auto tsl = decl->to<IR::Type_StructLike>();
+        CHECK_NULL(tsl);
+        for (auto field : tsl->fields) {
+            fieldNames.emplace_back(std::make_pair(field->name.name, field->type));
+        }
+        // Do not re-declare this type
+        return;
+    }
+
+    builder->emitIndent();
+    builder->appendFormat("%s ", keyTypeName.c_str());
+    builder->blockStart();
+
+    auto fieldEmitter = [builder](const IR::Type* type, cstring name){
+        auto etype = EBPFTypeFactory::instance->create(type);
+        builder->emitIndent();
+        etype->declare(builder, name, false);
+        builder->endOfStatement(true);
+    };
+
+    if (pvs->elementType->is<IR::Type_Bits>()) {
+        auto type = pvs->elementType->to<IR::Type_Bits>();
+        cstring name = "field0";
+        fieldEmitter(type, name);
+        fieldNames.emplace_back(std::make_pair(name, type));
+    } else if (pvs->elementType->is<IR::Type_Tuple>()) {
+        auto tuple = pvs->elementType->to<IR::Type_Tuple>();
+        int i = 0;
+        for (auto field : tuple->components) {
+            cstring name = Util::printf_format("field%d", i++);
+            fieldEmitter(field, name);
+            fieldNames.emplace_back(std::make_pair(name, field));
+        }
+    } else {
+        BUG("Type for value_set not implemented %1%", pvs->elementType);
+    }
+
+    builder->blockEnd(false);
+    builder->endOfStatement(true);
+}
+
+void EBPFValueSetPSA::emitInstance(CodeBuilder* builder) {
+    builder->target->emitTableDecl(builder, instanceName, TableKind::TableHash,
+                                   keyTypeName, valueTypeName, size);
+}
+
+void EBPFValueSetPSA::emitKeyInitializer(CodeBuilder* builder,
+                                         const IR::SelectExpression* expression,
+                                         cstring varName) {
+    if (fieldNames.size() != expression->select->components.size()) {
+        ::error(ErrorType::ERR_EXPECTED,
+                "Fields number of value_set do not match number of arguments: %1%", expression);
+        return;
+    }
+    keyVarName = varName;
+    builder->emitIndent();
+    builder->appendFormat("%s %s = ", keyTypeName.c_str(), keyVarName.c_str());
+    builder->blockStart();
+
+    // initialize small fields up to 64 bits
+    for (unsigned int i = 0; i < fieldNames.size(); i++) {
+        if (fieldNames.at(i).second->is<IR::Type_Bits>()) {
+            int width = fieldNames.at(i).second->to<IR::Type_Bits>()->width_bits();
+            if (width > 64)
+                continue;
+
+            builder->emitIndent();
+            builder->appendFormat(".%s = ", fieldNames.at(i).first);
+            codeGen->visit(expression->select->components.at(i));
+            builder->appendLine(",");
+        }
+    }
+
+    builder->blockEnd(false);
+    builder->endOfStatement(true);
+
+    // init other bigger fields
+    for (unsigned int i = 0; i < fieldNames.size(); i++) {
+        if (fieldNames.at(i).second->is<IR::Type_Bits>()) {
+            int width = fieldNames.at(i).second->to<IR::Type_Bits>()->width_bits();
+            if (width <= 64)
+                continue;
+        }
+
+        builder->emitIndent();
+        cstring dst = Util::printf_format("%s.%s", keyVarName.c_str(),
+                                          fieldNames.at(i).first.c_str());
+        builder->appendFormat("__builtin_memcpy(&%s, &(", dst.c_str());
+        codeGen->visit(expression->select->components.at(i));
+        builder->appendFormat("), sizeof(%s))", dst.c_str());
+        builder->endOfStatement(true);
+    }
+}
+
+void EBPFValueSetPSA::emitLookup(CodeBuilder* builder) {
+    builder->target->emitTableLookup(builder, instanceName, keyVarName, "");
+}
+
 EBPFPsaParser::EBPFPsaParser(const EBPFProgram* program, const IR::P4Parser* block,
                              const P4::TypeMap* typeMap) : EBPFParser(program, block, typeMap) {
     visitor = new PsaStateTranslationVisitor(program->refMap, program->typeMap, this);
