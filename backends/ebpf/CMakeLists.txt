@@ -49,12 +49,11 @@ set (P4C_EBPF_SRCS
   ../bmv2/common/programStructure.cpp
   ../bmv2/psa_switch/psaSwitch.cpp
   psa/ebpfPsaArch.cpp
-  psa/xdpHelpProgram.cpp
   psa/ebpfPipeline.cpp
   psa/ebpfPsaParser.cpp
   psa/ebpfPsaDeparser.cpp
   psa/ebpfPsaControl.cpp
-  psa/ebpfPsaObjects.cpp
+  psa/ebpfPsaTable.cpp
   psa/externs/ebpfPsaChecksum.cpp
   psa/externs/ebpfPsaCounter.cpp
   psa/externs/ebpfPsaHashAlgorithm.cpp
@@ -107,8 +106,7 @@ set (P4C_EBPF_HDRS
   psa/ebpfPsaParser.h
   psa/ebpfPsaDeparser.h
   psa/ebpfPsaControl.h
-  psa/ebpfPsaControlTranslators.h
-  psa/ebpfPsaObjects.h
+  psa/ebpfPsaTable.h
   psa/externs/ebpfPsaChecksum.h
   psa/externs/ebpfPsaCounter.h
   psa/externs/ebpfPsaHashAlgorithm.h

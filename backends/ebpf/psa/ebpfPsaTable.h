@@ -1,5 +1,5 @@
-#ifndef BACKENDS_EBPF_PSA_EBPFPSAOBJECTS_H_
-#define BACKENDS_EBPF_PSA_EBPFPSAOBJECTS_H_
+#ifndef BACKENDS_EBPF_PSA_EBPFPSATABLE_H_
+#define BACKENDS_EBPF_PSA_EBPFPSATABLE_H_
 
 #include "frontends/p4/methodInstance.h"
 #include "backends/ebpf/ebpfTable.h"
@@ -142,24 +142,6 @@ class EBPFTernaryTablePSA : public EBPFTablePSA {
     void validateKeys() const override;
 };
 
-class EBPFValueSetPSA : public EBPFTableBase {
- protected:
-    size_t size;
-    const IR::P4ValueSet* pvs;
-    std::vector<std::pair<cstring, const IR::Type*>> fieldNames;
-    cstring keyVarName;
-
- public:
-    EBPFValueSetPSA(const EBPFProgram* program, const IR::P4ValueSet* p4vs, cstring instanceName,
-                    CodeGenInspector* codeGen);
-
-    void emitTypes(CodeBuilder* builder);
-    void emitInstance(CodeBuilder* builder);
-    void emitKeyInitializer(CodeBuilder* builder, const IR::SelectExpression* expression,
-                            cstring varName);
-    void emitLookup(CodeBuilder* builder);
-};
-
 }  // namespace EBPF
 
-#endif /* BACKENDS_EBPF_PSA_EBPFPSAOBJECTS_H_ */
+#endif /* BACKENDS_EBPF_PSA_EBPFPSATABLE_H_ */
