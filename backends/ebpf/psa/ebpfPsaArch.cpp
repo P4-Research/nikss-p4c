@@ -716,9 +716,9 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     auto pl = prsr->container->type->applyParams;
 
     if (options.pipelineOptimization && type == XDP_EGRESS) {
-        parser = new EBPFOptimizedEgressParserPSA(program, prsr->container, typemap);
+        parser = new EBPFOptimizedEgressParserPSA(program, prsr, typemap);
     } else {
-        parser = new EBPFPsaParser(program, prsr->container, typemap);
+        parser = new EBPFPsaParser(program, prsr, typemap);
     }
 
     auto it = pl->parameters.begin();
