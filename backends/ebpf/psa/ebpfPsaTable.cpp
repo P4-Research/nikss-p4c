@@ -403,16 +403,11 @@ void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
                     builder->appendFormat("%s(", getByteSwapMethod(width));
                     if (auto km = expr->to<IR::Mask>()) {
                         km->left->apply(cg);
-                    } else {
-                        expr->apply(cg);
-                    }
-                    builder->append(")");
-                    builder->endOfStatement(true);
-                    builder->emitIndent();
-                    builder->appendFormat("%s.%s = ", keyName.c_str(), prefixFieldName.c_str());
-                    unsigned prefixLen = 32;
-                    if (auto km = expr->to<IR::Mask>()) {
-                        auto trailing_zeros = [width](const big_int& n) -> int {
+                        builder->append(")");
+                        builder->endOfStatement(true);
+                        builder->emitIndent();
+                        builder->appendFormat("%s.%s = ", keyName.c_str(), prefixFieldName.c_str());
+                        auto trailing_zeros = [width](const big_int& n) -> unsigned {
                             return (n == 0) ? width : boost::multiprecision::lsb(n); };
                         auto count_ones = [](const big_int& n) -> unsigned {
                             return bitcount(n); };
