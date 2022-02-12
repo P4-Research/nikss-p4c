@@ -403,13 +403,19 @@ void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
                     builder->appendFormat("%s(", getByteSwapMethod(width));
                     if (auto km = expr->to<IR::Mask>()) {
                         km->left->apply(cg);
-                        builder->append(")");
-                        builder->endOfStatement(true);
-                        builder->emitIndent();
-                        builder->appendFormat("%s.%s = ", keyName.c_str(), prefixFieldName.c_str());
-                        auto trailing_zeros = [width](const big_int& n) -> unsigned {
+                    } else {
+                        expr->apply(cg);
+                    }
+                    builder->append(")");
+                    builder->endOfStatement(true);
+                    builder->emitIndent();
+                    builder->appendFormat("%s.%s = ", keyName.c_str(), prefixFieldName.c_str());
+                    unsigned prefixLen = 32;
+
+                    if (auto km = expr->to<IR::Mask>()) {
+                        auto trailing_zeros = [width](const big_int& n) -> int {
                             return (n == 0) ? width : boost::multiprecision::lsb(n); };
-                        auto count_ones = [](const big_int& n) -> unsigned {
+                        auto count_ones = [](const big_int& n) -> int {
                             return bitcount(n); };
                         auto mask = km->right->to<IR::Constant>()->value;
                         auto len = trailing_zeros(mask);
@@ -422,7 +428,6 @@ void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
                     }
                     builder->append(prefixLen);
                     builder->endOfStatement(true);
-
                 } else if (matchType->name.name == P4::P4CoreLibrary::instance.exactMatch.name) {
                     entry->keys->components[index]->apply(cg);
                     builder->endOfStatement(true);
