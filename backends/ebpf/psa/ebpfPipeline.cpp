@@ -6,11 +6,11 @@ namespace EBPF {
 bool EBPFPipeline::isEmpty() const {
     // check if parser doesn't have any state
     // Why 3? Parser will always have at least start, accept and reject states.
-    if (parser->parserBlock->states.size() > 3) {
+    if (parser->parserBlock->container->states.size() > 3) {
         return false;
     }
 
-    auto startState = parser->parserBlock->states.at(0);
+    auto startState = parser->parserBlock->container->states.at(0);
     auto pathExpr = startState->selectExpression->to<IR::PathExpression>()->path;
     if (!startState->components.empty() || pathExpr->name.name != IR::ParserState::accept) {
         return false;

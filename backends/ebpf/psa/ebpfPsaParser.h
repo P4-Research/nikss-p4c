@@ -66,7 +66,7 @@ class EBPFPsaParser : public EBPFParser {
         BUG_CHECK(result != nullptr, "No value_set named %1%", name);
         return result; }
 
-    EBPFPsaParser(const EBPFProgram* program, const IR::P4Parser* block,
+    EBPFPsaParser(const EBPFProgram* program, const IR::ParserBlock* block,
                   const P4::TypeMap* typeMap);
 
     void emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl) override;
@@ -101,7 +101,7 @@ class EBPFOptimizedEgressParserPSA : public EBPFPsaParser {
     std::set<cstring> headersToInvalidate;
     std::map<cstring, const IR::Type_Header *> headersToSkipMovingOffset;
 
-    EBPFOptimizedEgressParserPSA(const EBPFProgram* program, const IR::P4Parser* block,
+    EBPFOptimizedEgressParserPSA(const EBPFProgram* program, const IR::ParserBlock* block,
                                  const P4::TypeMap* typeMap) :
                                  EBPFPsaParser(program, block, typeMap) {
         visitor = new OptimizedEgressParserStateVisitor(program->refMap, program->typeMap, this);

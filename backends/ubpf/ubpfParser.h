@@ -37,7 +37,7 @@ namespace UBPF {
         const IR::Parameter *metadata;
         EBPF::EBPFType *metadataType;
 
-        UBPFParser(const EBPF::EBPFProgram *program, const IR::P4Parser *block,
+        UBPFParser(const EBPF::EBPFProgram *program, const IR::ParserBlock *block,
                    const P4::TypeMap *typeMap) : EBPF::EBPFParser(program, block, typeMap) {}
 
         void emit(EBPF::CodeBuilder *builder);

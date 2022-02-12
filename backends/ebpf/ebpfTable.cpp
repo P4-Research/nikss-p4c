@@ -699,7 +699,7 @@ bool EBPFTable::isLPMTable() {
 
 bool EBPFTable::isTernaryTable() {
     if (keyGenerator != nullptr) {
-        // If any key field is LPM we will generate an LPM table
+        // If any key field is ternary we will generate a ternary table
         for (auto it : keyGenerator->keyElements) {
             auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
