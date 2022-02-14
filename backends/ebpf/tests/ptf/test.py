@@ -367,6 +367,8 @@ class ConstDefaultActionPSATest(P4EbpfTest):
 
     def runTest(self):
         pkt = testutils.simple_ip_packet()
+
+        # Test default action for exact match
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)
 
@@ -377,6 +379,26 @@ class ConstDefaultActionPSATest(P4EbpfTest):
         )
 
         super(P4EbpfTest, self).tearDown()
+
+
+class ActionDefaultTernaryPSATest(P4EbpfTest):
+
+    p4_file_path = "p4testdata/action-default-ternary.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+
+        # Test default action for ternary match
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
+
+    def tearDown(self):
+        self.remove_maps(
+            ["ingress_tbl_ternary",
+             "ingress_tbl_ternary_defaultAction"]
+        )
+
+        super(ActionDefaultTernaryPSATest, self).tearDown()
 
 
 class ConstEntryPSATest(P4EbpfTest):
