@@ -62,7 +62,7 @@ class MeterActionPSATest(P4EbpfTest):
         # period 800 ns -> 03 20,  1 B per period -> 01
         self.meter_update(name="ingress_meter1", index=0,
                           pir=1250000, pbs=6250, cir=1250000, cbs=6250)
-        self.update_map(name="ingress_tbl_fwd", key="hex 04 00 00 00", value="hex 01 00 00 00 05 00 00 00")
+        self.table_add(table="ingress_tbl_fwd", keys=[4], action=1, data=[5])
 
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)
@@ -102,8 +102,7 @@ class MeterActionAndCounterPSATest(P4EbpfTest):
         # period 800 ns -> 03 20,  1 B per period -> 01
         self.meter_update(name="ingress_meter1", index=5,
                           pir=1250000, pbs=6250, cir=1250000, cbs=6250)
-        self.update_map(name="ingress_tbl_fwd", key="hex 04 00 00 00",
-                        value="hex 01 00 00 00 05 00 00 00")
+        self.table_add(table="ingress_tbl_fwd", keys=[4], action=1, data=[5])
 
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)
@@ -122,12 +121,7 @@ class MeterActionAndCounterPSATest(P4EbpfTest):
                                              "00 00 00 00 00 00 00 00 "  # time_c
                                              "00 00 00 00 00 00 00 00",  # Spin lock
                               mask=meter_value_mask)
-        self.verify_map_entry("ingress_counter", key="hex 05 00 00 00",
-                              expected_value="64 00 00 00")
-
-    def tearDown(self):
-        self.remove_maps(["ingress_meter1", "ingress_counter"])
-        super(MeterActionAndCounterPSATest, self).tearDown()
+        self.counter_verify(name="ingress_counter", keys=[5], bytes=100)
 
 
 class MeterPacketsPSATest(P4EbpfTest):
