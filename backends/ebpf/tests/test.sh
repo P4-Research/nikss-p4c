@@ -12,6 +12,7 @@ function print_help() {
   echo "--xdp2tc         A mode to pass metadata from XDP to TC programs <meta|head|cpumap>."
   echo "--table-caching  Use table cache for tables with LPM and/or ternary key <on|off>."
   echo "--pipeline-opt   Apply pipeline-aware optimization <on|off>."
+  echo "--trace          Build P4 programs with tracing logs (disabled by default) <on|off>."
   echo "--help           Print this message."
   echo
 }
@@ -58,6 +59,10 @@ for i in "$@"; do
       ;;
     --pipeline-opt=*)
       PIPELINE_OPT_ARG="${i#*=}"
+      shift # past argument=value
+      ;;
+    --trace=*)
+      TRACE_LOGS_ARGS="${i#*=}"
       shift # past argument=value
       ;;
     *)
@@ -128,6 +133,7 @@ declare -a XDP=("False" "True")
 declare -a XDP2TC_MODE=("head" "cpumap" "meta")
 declare -a TABLE_CACHING=("False" "True")
 declare -a PIPELINE_OPT=("False" "True")
+TRACE_LOGS="False"
 
 if [ ! -z "$BPF_HOOK" ]; then
   if [ "$BPF_HOOK" == "tc" ]; then
@@ -167,6 +173,16 @@ if [ ! -z "$PIPELINE_OPT_ARG" ]; then
   fi
 fi
 
+if [ ! -z "$TRACE_LOGS_ARGS" ]; then
+  if [ "$TRACE_LOGS_ARGS" == "on" ]; then
+    TRACE_LOGS="True"
+  elif [ "$TRACE_LOGS_ARGS" == "off" ]; then
+    TRACE_LOGS="False"
+  else
+    echo "Wrong --trace value provided; running script for disabled trace logs."
+  fi
+fi
+
 TEST_CASE=$@
 for xdp_enabled in "${XDP[@]}" ; do
   for xdp2tc_mode in "${XDP2TC_MODE[@]}" ; do
@@ -176,7 +192,7 @@ for xdp_enabled in "${XDP[@]}" ; do
             echo "Test skipped because pipeline-aware optimization doesn't work in TC yet"
             continue
           fi
-          TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch"'
+          TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch";trace="'"$TRACE_LOGS"'"'
           TEST_PARAMS+=";xdp='$xdp_enabled';xdp2tc='$xdp2tc_mode'"
           TEST_PARAMS+=";table_caching='$table_caching_enabled'"
           TEST_PARAMS+=";pipeline_optimization='$pipeline_opt_enabled'"

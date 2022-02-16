@@ -226,6 +226,7 @@ void CRCChecksumAlgorithm::emitUpdateMethod(CodeBuilder* builder, int crcWidth) 
     cstring code = "static __always_inline\n"
         "void crc%w%_update(u%w% * reg, const u8 * data, u16 data_size, const u%w% poly) {\n"
         "    data += data_size - 1;\n"
+        "    #pragma clang loop unroll(full)\n"
         "    for (u16 i = 0; i < data_size; i++) {\n"
         "        bpf_trace_message(\"CRC%w%: data byte: %x\\n\", *data);\n"
         "        *reg ^= *data;\n"
