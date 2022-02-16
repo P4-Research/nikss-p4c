@@ -60,7 +60,7 @@ class SimpleTunnelingPSATest(P4EbpfTest):
 
 class PSACloneI2E(P4EbpfTest):
 
-    p4_file_path = "../../../testdata/p4_16_samples/psa-i2e-cloning-basic-bmv2.p4"
+    p4_file_path = "p4testdata/clone-i2e.p4"
 
     def runTest(self):
         # create clone session table
@@ -160,7 +160,7 @@ class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
 #  We skip it for now, as it is not used for benchmarking.
 @skip_if_pipeline_optimization_enabled
 class MulticastPSATest(P4EbpfTest):
-    p4_file_path = "../../../testdata/p4_16_samples/psa-multicast-basic-bmv2.p4"
+    p4_file_path = "p4testdata/psa-multicast.p4"
 
     def runTest(self):
         self.multicast_group_create(group=8)
