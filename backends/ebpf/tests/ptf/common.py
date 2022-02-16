@@ -135,6 +135,9 @@ class EbpfTest(BaseTest):
     def is_pipeline_opt_enabled(self):
         return testutils.test_param_get('pipeline_optimization') == 'True'
 
+    def is_trace_logs_enabled(self):
+        return testutils.test_param_get('trace') == 'True'
+
     def setUp(self):
         super(EbpfTest, self).setUp()
         self.dataplane = ptf.dataplane_instance
@@ -178,18 +181,18 @@ class P4EbpfTest(EbpfTest):
         head, tail = os.path.split(self.p4_file_path)
         filename = tail.split(".")[0]
         self.test_prog_image = os.path.join("ptf_out", filename + ".o")
+
         p4args = "--max-ternary-masks 3"
         if "xdp2tc" in testutils.test_params_get():
             p4args += " --xdp2tc=" + testutils.test_param_get("xdp2tc")
-
         if self.is_xdp_test():
             p4args += " --xdp"
-
         if self.is_pipeline_opt_enabled():
             p4args += " --pipeline-opt"
-
         if self.is_table_caching_test():
             p4args += " --table-caching"
+        if self.is_trace_logs_enabled():
+            p4args += " --trace"
 
         logger.info("P4ARGS=" + p4args)
         self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "
