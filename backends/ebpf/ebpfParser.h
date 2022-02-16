@@ -78,7 +78,7 @@ class EBPFParser : public EBPFObject {
  public:
     const EBPFProgram*            program;
     const P4::TypeMap*            typeMap;
-    const IR::P4Parser*           parserBlock;
+    const IR::ParserBlock*        parserBlock;
     std::vector<EBPFParserState*> states;
     const IR::Parameter*          packet;
     const IR::Parameter*          headers;
@@ -87,7 +87,7 @@ class EBPFParser : public EBPFObject {
 
     StateTranslationVisitor*      visitor;
 
-    explicit EBPFParser(const EBPFProgram* program, const IR::P4Parser* block,
+    explicit EBPFParser(const EBPFProgram* program, const IR::ParserBlock* block,
                         const P4::TypeMap* typeMap);
     virtual void emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl);
     void emit(CodeBuilder* builder);

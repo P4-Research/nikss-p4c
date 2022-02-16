@@ -324,7 +324,7 @@ void EBPFValueSetPSA::emitLookup(CodeBuilder* builder) {
     builder->target->emitTableLookup(builder, instanceName, keyVarName, "");
 }
 
-EBPFPsaParser::EBPFPsaParser(const EBPFProgram* program, const IR::P4Parser* block,
+EBPFPsaParser::EBPFPsaParser(const EBPFProgram* program, const IR::ParserBlock* block,
                              const P4::TypeMap* typeMap) : EBPFParser(program, block, typeMap) {
     visitor = new PsaStateTranslationVisitor(program->refMap, program->typeMap, this);
 }
@@ -388,7 +388,7 @@ void EBPFPsaParser::emitRejectState(CodeBuilder* builder) {
 }
 
 bool EBPFPsaParser::isHeaderExtractedByParser(cstring hdrName) {
-    for (auto state : parserBlock->states) {
+    for (auto state : parserBlock->container->states) {
         for (auto c : state->components) {
             if (c->is<IR::MethodCallStatement>()) {
                 auto mce = c->to<IR::MethodCallStatement>()->methodCall;
@@ -416,7 +416,7 @@ bool EBPFPsaParser::isHeaderExtractedByParser(cstring hdrName) {
 }
 
 bool EBPFPsaParser::isHeaderExtractedByParserWithNoLookaheadBefore(cstring hdrName) {
-    for (auto state : parserBlock->states) {
+    for (auto state : parserBlock->container->states) {
         for (auto c : state->components) {
             if (c->is<IR::MethodCallStatement>()) {
                 auto mce = c->to<IR::MethodCallStatement>()->methodCall;
