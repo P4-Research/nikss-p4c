@@ -81,20 +81,6 @@ void ControlBodyTranslator::processFunction(const P4::ExternFunction* function) 
 }
 
 bool ControlBodyTranslator::preorder(const IR::MethodCallExpression* expression) {
-    builder->append("/* ");
-    visit(expression->method);
-    builder->append("(");
-    bool first = true;
-    for (auto a  : *expression->arguments) {
-        if (!first)
-            builder->append(", ");
-        first = false;
-        visit(a);
-    }
-    builder->append(")");
-    builder->append("*/");
-    builder->newline();
-
     auto mi = P4::MethodInstance::resolve(expression,
                                           control->program->refMap,
                                           control->program->typeMap);
@@ -547,7 +533,7 @@ void EBPFControl::emitDeclaration(CodeBuilder* builder, const IR::Declaration* d
         auto etype = EBPFTypeFactory::instance->create(vd->type);
         builder->emitIndent();
         bool isPointer = shouldDeclareAsPointer(decl);
-        etype->declareInit(builder, vd->name, false);
+        etype->declare(builder, vd->name, isPointer);
         builder->endOfStatement(true);
 
         if (!isPointer) {
