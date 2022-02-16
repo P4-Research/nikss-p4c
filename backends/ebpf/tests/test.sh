@@ -167,7 +167,7 @@ if [ ! -z "$PIPELINE_OPT_ARG" ]; then
   fi
 fi
 
-TEST_CASE=$@
+TEST_CASE="test.PSAResubmitTest"
 for xdp_enabled in "${XDP[@]}" ; do
   for xdp2tc_mode in "${XDP2TC_MODE[@]}" ; do
       for table_caching_enabled in "${TABLE_CACHING[@]}" ; do
