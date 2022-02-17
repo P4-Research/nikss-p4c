@@ -491,6 +491,23 @@ bool StateTranslationVisitor::preorder(const IR::MethodCallExpression* expressio
     return false;
 }
 
+bool StateTranslationVisitor::preorder(const IR::StructExpression *expr) {
+    if (commentDescriptionDepth == 0)
+        return CodeGenInspector::preorder(expr);
+
+    // Dump structure for helper comment
+    builder->append("{");
+    bool first = true;
+    for (auto c : expr->components) {
+        if (!first)
+            builder->append(", ");
+        visit(c->expression);
+        first = false;
+    }
+    builder->append("}");
+
+    return false;
+}
 
 bool StateTranslationVisitor::preorder(const IR::Member* expression) {
     if (expression->expr->is<IR::PathExpression>()) {
@@ -532,6 +549,10 @@ void EBPFParser::emitDeclaration(CodeBuilder* builder, const IR::Declaration* de
 void EBPFParser::emit(CodeBuilder* builder) {
     for (auto l : parserBlock->container->parserLocals)
         emitDeclaration(builder, l);
+
+    builder->emitIndent();
+    builder->appendFormat("goto %s;", IR::ParserState::start.c_str());
+    builder->newline();
 
     visitor->setBuilder(builder);
     for (auto s : states) {
