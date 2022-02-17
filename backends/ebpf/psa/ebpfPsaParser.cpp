@@ -397,9 +397,11 @@ bool EBPFPsaParser::isHeaderExtractedByParser(cstring hdrName) {
                                                       program->typeMap);
                 auto extMethod = mi->to<P4::ExternMethod>();
                 if (extMethod != nullptr) {
-                    if (extMethod->originalExternType->getName().name != P4::P4CoreLibrary::instance.packetIn.name)
+                    if (extMethod->originalExternType->getName().name !=
+                        P4::P4CoreLibrary::instance.packetIn.name)
                         continue;
-                    if (extMethod->method->getName().name != P4::P4CoreLibrary::instance.packetIn.extract.name)
+                    if (extMethod->method->getName().name !=
+                        P4::P4CoreLibrary::instance.packetIn.extract.name)
                         continue;
                     auto extractedHdr = extMethod->expr->arguments->at(0)->expression;
                     if (extractedHdr->is<IR::Member>() &&
@@ -429,9 +431,11 @@ bool EBPFPsaParser::isHeaderExtractedByParserWithNoLookaheadBefore(cstring hdrNa
                                                       program->typeMap);
                 auto extMethod = mi->to<P4::ExternMethod>();
                 if (extMethod != nullptr) {
-                    if (extMethod->originalExternType->getName().name != P4::P4CoreLibrary::instance.packetIn.name)
+                    if (extMethod->originalExternType->getName().name !=
+                        P4::P4CoreLibrary::instance.packetIn.name)
                         continue;
-                    if (extMethod->method->getName().name != P4::P4CoreLibrary::instance.packetIn.extract.name)
+                    if (extMethod->method->getName().name !=
+                        P4::P4CoreLibrary::instance.packetIn.extract.name)
                         continue;
                     auto extractedHdr = extMethod->expr->arguments->at(0)->expression;
                     if (extractedHdr->is<IR::Member>() &&
