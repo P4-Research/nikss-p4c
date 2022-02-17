@@ -62,6 +62,7 @@ class StateTranslationVisitor : public CodeGenInspector {
     bool preorder(const IR::MethodCallStatement* stat) override
     { visit(stat->methodCall); return false; }
     bool preorder(const IR::AssignmentStatement* stat) override;
+    bool preorder(const IR::StructExpression *expr) override;
 };
 
 class EBPFParserState : public EBPFObject {
