@@ -547,6 +547,10 @@ void EBPFParser::emit(CodeBuilder* builder) {
     for (auto l : parserBlock->container->parserLocals)
         emitDeclaration(builder, l);
 
+    builder->emitIndent();
+    builder->appendFormat("goto %s;", IR::ParserState::start.c_str());
+    builder->newline();
+
     visitor->setBuilder(builder);
     for (auto s : states) {
         visitor->setState(s);

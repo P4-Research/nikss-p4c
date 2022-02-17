@@ -236,9 +236,6 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
                                       varStr, lengthVar.c_str());
 
     // PARSER
-    builder->emitIndent();
-    builder->appendFormat("goto %s;", IR::ParserState::start.c_str());
-    builder->newline();
     parser->emit(builder);
     builder->newline();
 
@@ -470,9 +467,6 @@ void EBPFEgressPipeline::emit(CodeBuilder *builder) {
                                       varStr, lengthVar.c_str());
 
     // PARSER
-    builder->emitIndent();
-    builder->appendFormat("goto %s;", IR::ParserState::start.c_str());
-    builder->newline();
     parser->emit(builder);
     builder->emitIndent();
 
