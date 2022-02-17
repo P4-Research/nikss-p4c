@@ -362,10 +362,10 @@ void EBPFErrorTypePSA::emit(CodeBuilder* builder) {
         ++id;
         auto sourceFile = decl->srcInfo.getSourceFile();
         // all the error codes are located in core.p4 file, they are defined in psa.h
-        if (sourceFile.endsWith("p4include/core.p4"))
+        if (sourceFile.endsWith("core.p4"))
             continue;
         // for future, also exclude definitions in psa.p4 file
-        if (sourceFile.endsWith("p4include/psa.p4"))
+        if (sourceFile.endsWith("psa.p4"))
             continue;
 
         builder->emitIndent();
