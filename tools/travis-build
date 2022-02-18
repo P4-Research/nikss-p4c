@@ -14,7 +14,7 @@ export P4C_DEPS="bison \
              g++ \
              libboost-dev \
              libboost-graph-dev \
-             libboost-iostreams1.71-dev \
+             libboost-iostreams1.58-dev \
              libfl-dev \
              libgc-dev \
              libgmp-dev \
@@ -32,8 +32,8 @@ export P4C_EBPF_DEPS="libpcap-dev \
              net-tools"
 
 export P4C_RUNTIME_DEPS="cpp \
-                     libboost-graph1.71.0 \
-                     libboost-iostreams1.71.0 \
+                     libboost-graph1.58.0 \
+                     libboost-iostreams1.58.0 \
                      libgc1c2 \
                      libgmp10 \
                      libgmpxx4ldbl \
@@ -46,7 +46,6 @@ export P4C_PIP_PACKAGES="ipaddr \
 
 
 
-export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends \
   ${P4C_DEPS} \

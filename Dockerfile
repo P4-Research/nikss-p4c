@@ -1,4 +1,4 @@
-FROM p4lang/behavioral-model:latest
+FROM p4lang/behavioral-model:old_latest
 
 # Default to using 2 make jobs, which is a good default for CI. If you're
 # building locally or you know there are more cores available, you may want to
