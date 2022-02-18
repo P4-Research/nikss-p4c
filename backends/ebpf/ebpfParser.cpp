@@ -526,6 +526,7 @@ EBPFParser::EBPFParser(const EBPFProgram* program, const IR::ParserBlock* block,
                        const P4::TypeMap* typeMap) :
         program(program), typeMap(typeMap), parserBlock(block),
         packet(nullptr), headers(nullptr), headerType(nullptr) {
+    visitor = new StateTranslationVisitor(program->refMap, program->typeMap);
 }
 
 void EBPFParser::emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl) {
