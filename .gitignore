@@ -40,10 +40,3 @@ build/
 
 # Bazel files
 bazel-*
-
-cmake-*
-**/ptf_out
-.idea
-*.log
-*.pcap
-*.so
