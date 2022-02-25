@@ -423,6 +423,21 @@ void StateTranslationVisitor::processMethod(const P4::ExternMethod* method) {
         }
         BUG("Unhandled packet method %1%", expression->method);
         return;
+    } else if (auto bim = method->to<P4::BuiltInMethod>()) {
+        builder->emitIndent();
+        if (bim->name == IR::Type_Header::isValid) {
+            visit(bim->appliedTo);
+            builder->append(".ebpf_valid");
+            return;
+        } else if (bim->name == IR::Type_Header::setValid) {
+            visit(bim->appliedTo);
+            builder->append(".ebpf_valid = true");
+            return;
+        } else if (bim->name == IR::Type_Header::setInvalid) {
+            visit(bim->appliedTo);
+            builder->append(".ebpf_valid = false");
+            return;
+        }
     }
 
     ::error(ErrorType::ERR_UNEXPECTED,
@@ -491,6 +506,24 @@ bool StateTranslationVisitor::preorder(const IR::MethodCallExpression* expressio
     return false;
 }
 
+bool StateTranslationVisitor::preorder(const IR::StructExpression *expr) {
+    if (commentDescriptionDepth == 0)
+        return CodeGenInspector::preorder(expr);
+
+    // Dump structure for helper comment
+    builder->append("{");
+    bool first = true;
+    for (auto c : expr->components) {
+        if (!first)
+            builder->append(", ");
+        visit(c->expression);
+        first = false;
+    }
+    builder->append("}");
+
+    return false;
+}
+
 bool StateTranslationVisitor::preorder(const IR::Member* expression) {
     if (expression->expr->is<IR::PathExpression>()) {
         auto pe = expression->expr->to<IR::PathExpression>();
@@ -531,6 +564,10 @@ void EBPFParser::emitDeclaration(CodeBuilder* builder, const IR::Declaration* de
 void EBPFParser::emit(CodeBuilder* builder) {
     for (auto l : parserBlock->container->parserLocals)
         emitDeclaration(builder, l);
+
+    builder->emitIndent();
+    builder->appendFormat("goto %s;", IR::ParserState::start.c_str());
+    builder->newline();
 
     visitor->setBuilder(builder);
     for (auto s : states) {

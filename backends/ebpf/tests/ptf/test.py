@@ -60,7 +60,7 @@ class SimpleTunnelingPSATest(P4EbpfTest):
 
 class PSACloneI2E(P4EbpfTest):
 
-    p4_file_path = "../../../testdata/p4_16_samples/psa-i2e-cloning-basic-bmv2.p4"
+    p4_file_path = "p4testdata/clone-i2e.p4"
 
     def runTest(self):
         # create clone session table
@@ -160,7 +160,7 @@ class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
 #  We skip it for now, as it is not used for benchmarking.
 @skip_if_pipeline_optimization_enabled
 class MulticastPSATest(P4EbpfTest):
-    p4_file_path = "../../../testdata/p4_16_samples/psa-multicast-basic-bmv2.p4"
+    p4_file_path = "p4testdata/psa-multicast.p4"
 
     def runTest(self):
         self.multicast_group_create(group=8)
@@ -240,9 +240,9 @@ class CountersPSATest(P4EbpfTest):
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
-        self.verify_map_entry("ingress_test1_cnt", "1 0 0 0", "64 00 00 00 00 00 00 00")
-        self.verify_map_entry("ingress_test2_cnt", "1 0 0 0", "01 00 00 00")
-        self.verify_map_entry("ingress_test3_cnt", "1 0 0 0", "64 00 00 00 01 00 00 00")
+        self.counter_verify(name="ingress_test1_cnt", keys=[1], bytes=100)
+        self.counter_verify(name="ingress_test2_cnt", keys=[1], packets=1)
+        self.counter_verify(name="ingress_test3_cnt", keys=[1], bytes=100, packets=1)
 
         pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55',
                                          eth_src='00:AA:00:00:01:FE',
@@ -250,15 +250,9 @@ class CountersPSATest(P4EbpfTest):
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
-        self.verify_map_entry("ingress_test1_cnt", "hex fe 01 00 00", "c7 00 00 00 00 00 00 00")
-        self.verify_map_entry("ingress_test2_cnt", "hex fe 01 00 00", "01 00 00 00")
-        self.verify_map_entry("ingress_test3_cnt", "hex fe 01 00 00", "c7 00 00 00 01 00 00 00")
-
-    def tearDown(self):
-        self.remove_map("ingress_test1_cnt")
-        self.remove_map("ingress_test2_cnt")
-        self.remove_map("ingress_test3_cnt")
-        super(CountersPSATest, self).tearDown()
+        self.counter_verify(name="ingress_test1_cnt", keys=[0x1fe], bytes=199)
+        self.counter_verify(name="ingress_test2_cnt", keys=[0x1fe], packets=1)
+        self.counter_verify(name="ingress_test3_cnt", keys=[0x1fe], bytes=199, packets=1)
 
 
 class DirectCountersPSATest(P4EbpfTest):

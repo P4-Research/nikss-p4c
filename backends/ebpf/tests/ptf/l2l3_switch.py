@@ -278,5 +278,6 @@ class PortCountersTest(L2L3SwitchTest):
             ig_bytes += len(pkt)
             eg_bytes = ig_bytes + (4*(i+1))
             pkts_cnt = i + 1
-            self.verify_map_entry("ingress_in_pkts", "5 0 0 0", "{} 00 00 00 0{} 00 00 00".format(hex(ig_bytes).split('x')[-1], pkts_cnt))
+            self.counter_verify(name="ingress_in_pkts", keys=[5], bytes=ig_bytes, packets=pkts_cnt)
+            # TODO: DirectCounter
             self.verify_map_entry("egress_tbl_vlan_egress", "8 00 00 00", "02 00 00 00 01 00 00 00 {} 00 00 00 0{} 00 00 00".format(hex(eg_bytes).split('x')[-1], pkts_cnt))

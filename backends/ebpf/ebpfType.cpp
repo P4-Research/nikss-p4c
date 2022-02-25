@@ -362,10 +362,10 @@ void EBPFErrorTypePSA::emit(CodeBuilder* builder) {
         ++id;
         auto sourceFile = decl->srcInfo.getSourceFile();
         // all the error codes are located in core.p4 file, they are defined in psa.h
-        if (sourceFile.endsWith("p4include/core.p4"))
+        if (sourceFile.endsWith("core.p4"))
             continue;
         // for future, also exclude definitions in psa.p4 file
-        if (sourceFile.endsWith("p4include/psa.p4"))
+        if (sourceFile.endsWith("/psa.p4"))
             continue;
 
         builder->emitIndent();
@@ -390,6 +390,10 @@ void EBPFErrorTypePSA::declareInit(CodeBuilder* builder, cstring id, bool asPoin
 void EBPFErrorTypePSA::declare(CodeBuilder* builder, cstring id, bool asPointer) {
     (void) builder; (void) id; (void) asPointer;
     BUG("Error type is not declarable");
+}
+
+void EBPFErrorTypePSA::declareInit(CodeBuilder *builder, cstring id, bool asPointer) {
+    declare(builder, id, asPointer);
 }
 
 void EBPFErrorTypePSA::emitInitializer(CodeBuilder* builder) {
