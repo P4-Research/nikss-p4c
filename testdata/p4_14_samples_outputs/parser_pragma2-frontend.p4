@@ -17,6 +17,13 @@ struct headers {
 parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
     @name("ParserImpl.tmp") bit<32> tmp;
     @name("ParserImpl.tmp_0") bit<32> tmp_0;
+    @name(".$start") state start {
+        transition select((InstanceType_0)standard_metadata.instance_type) {
+            InstanceType_0.START: start_0;
+            InstanceType_0.start_e2e_mirrored: start_e2e_mirrored;
+            InstanceType_0.start_i2e_mirrored: start_i2e_mirrored;
+        }
+    }
     @name(".Cowles") state Cowles {
         transition accept;
     }
@@ -34,29 +41,22 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
     @packet_entry @name(".start_i2e_mirrored") state start_i2e_mirrored {
         transition accept;
     }
-    @name(".$start") state start {
-        transition select((InstanceType_0)standard_metadata.instance_type) {
-            InstanceType_0.START: start_0;
-            InstanceType_0.start_e2e_mirrored: start_e2e_mirrored;
-            InstanceType_0.start_i2e_mirrored: start_i2e_mirrored;
-        }
-    }
 }
 
 control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name(".nop") action nop() {
     }
     @name(".exact") table exact_1 {
         actions = {
             nop();
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_0();
         }
         key = {
             standard_metadata.egress_spec: exact @name("standard_metadata.egress_spec") ;
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     apply {
         exact_1.apply();

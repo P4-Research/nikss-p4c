@@ -4,11 +4,12 @@ header H {
     bit<1> z;
 }
 
-control c<T>(inout T t);
-package top<T>(c<T> _c);
-control my(inout H[2] s) {
+control c();
+package top(c _c);
+control my() {
     apply {
         bit<1> a = 1w0;
+        H[2] s;
         a = f(a, g(a));
         a = f(s[a].z, g(a));
         a = f(s[g(a)].z, a);
@@ -18,5 +19,5 @@ control my(inout H[2] s) {
     }
 }
 
-top<H[2]>(my()) main;
+top(my()) main;
 

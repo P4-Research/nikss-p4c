@@ -35,7 +35,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
 }
 
 control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name(".mooneys") action mooneys() {
         hdr.expressivenesss.breasted = hdr.expressivenesss.breasted - hdr.expressivenesss.peptides;
@@ -44,14 +44,14 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
     @name(".conceptualization") table conceptualization_0 {
         actions = {
             mooneys();
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_0();
         }
         key = {
             hdr.kilometer.isValid()      : exact @name("kilometer.$valid$") ;
             48w0                         : lpm @name("kilometer.flaccidly") ;
             hdr.expressivenesss.isValid(): exact @name("expressivenesss.$valid$") ;
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     apply {
         conceptualization_0.apply();

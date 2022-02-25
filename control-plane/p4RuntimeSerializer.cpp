@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+#include <boost/algorithm/string.hpp>
+#include <boost/optional.hpp>
+#include <boost/range/adaptor/reversed.hpp>
 #include <google/protobuf/text_format.h>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -33,10 +36,6 @@ limitations under the License.
 #include "p4/v1/p4runtime.pb.h"
 #pragma GCC diagnostic pop
 
-#include <boost/algorithm/string.hpp>
-#include <boost/optional.hpp>
-#include <boost/range/adaptor/reversed.hpp>
-
 #include "frontends/common/options.h"
 #include "frontends/common/resolveReferences/referenceMap.h"
 #include "frontends/p4/coreLibrary.h"
@@ -55,6 +54,7 @@ limitations under the License.
 #include "lib/log.h"
 #include "lib/nullstream.h"
 #include "lib/ordered_set.h"
+#include "midend/removeParameters.h"
 
 #include "bytestrings.h"
 #include "flattenHeader.h"
@@ -148,7 +148,7 @@ static bool writeJsonTo(const Message& message, std::ostream* destination) {
     options.add_whitespace = true;
 
     std::string output;
-    if (!MessageToJsonString(message, &output, options).ok()) {
+    if (MessageToJsonString(message, &output, options) != Status::OK) {
         ::error(ErrorType::ERR_IO,
                 "Failed to serialize protobuf message to JSON");
         return false;
@@ -729,11 +729,7 @@ getTypeWidth(const IR::Type* type, TypeMap* typeMap) {
         // W if the type is bit<W>, and 0 if the type is string
         return annotation.controller_type.width;
     }
-    /* Treat error type as string */
-    if (type->is<IR::Type_Error>())
-        return 0;
-
-    return typeMap->widthBits(type, type->getNode(), false);
+    return typeMap->minWidthBits(type, type->getNode());
 }
 
 /// @return the header instance fields matched against by @table's key. The
@@ -1539,16 +1535,11 @@ class P4RuntimeEntriesConverter {
             protoParam->set_param_id(parameterId++);
             auto parameter = actionDecl->parameters->parameters.at(parameterIndex++);
             int width = getTypeWidth(parameter->type, typeMap);
-            auto ei = EnumInstance::resolve(arg->expression, typeMap);
             if (arg->expression->is<IR::Constant>()) {
                 auto value = stringRepr(arg->expression->to<IR::Constant>(), width);
                 protoParam->set_value(*value);
             } else if (arg->expression->is<IR::BoolLiteral>()) {
                 auto value = stringRepr(arg->expression->to<IR::BoolLiteral>(), width);
-                protoParam->set_value(*value);
-            } else if (ei != nullptr && ei->is<SerEnumInstance>()) {
-                auto sei = ei->to<SerEnumInstance>();
-                auto value = stringRepr(sei->value->to<IR::Constant>(), width);
                 protoParam->set_value(*value);
             } else {
                 ::error(ErrorType::ERR_UNSUPPORTED,
@@ -1898,6 +1889,9 @@ P4RuntimeSerializer::generateP4Runtime(const IR::P4Program* program, cstring arc
     auto* evaluator = new P4::EvaluatorPass(&refMap, &typeMap);
     PassManager p4RuntimeFixups = {
         new ControlPlaneAPI::ParseAnnotations(),
+        // We can only handle a very restricted class of action parameters - the
+        // types need to be bit<> or int<> - so we fail without this pass.
+        new P4::RemoveActionParameters(&refMap, &typeMap),
         // Update types and reevaluate the program.
         new P4::TypeChecking(&refMap, &typeMap, /* updateExpressions = */ true),
         evaluator
@@ -2069,7 +2063,6 @@ P4RuntimeSerializer::serializeP4RuntimeIfRequired(const P4RuntimeAPI& p4Runtime,
 P4RuntimeSerializer::P4RuntimeSerializer() {
     registerArch("v1model", new ControlPlaneAPI::Standard::V1ModelArchHandlerBuilder());
     registerArch("psa", new ControlPlaneAPI::Standard::PSAArchHandlerBuilder());
-    registerArch("pna", new ControlPlaneAPI::Standard::PNAArchHandlerBuilder());
     registerArch("ubpf", new ControlPlaneAPI::Standard::UBPFArchHandlerBuilder());
 }
 

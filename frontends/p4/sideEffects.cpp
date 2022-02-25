@@ -38,15 +38,10 @@ const IR::Expression* DoSimplifyExpressions::addAssignment(
     Util::SourceInfo srcInfo,
     cstring varName,
     const IR::Expression* expression) {
-    const IR::PathExpression* left;
-    if (auto pe = expression->to<IR::PathExpression>())
-        left = new IR::PathExpression(IR::ID(varName, pe->path->name.originalName));
-    else
-        left = new IR::PathExpression(IR::ID(varName, nullptr));
+    auto left = new IR::PathExpression(IR::ID(varName, nullptr));
     auto stat = new IR::AssignmentStatement(srcInfo, left, expression);
     statements.push_back(stat);
     auto result = left->clone();
-    added->emplace(result);
     return result;
 }
 
@@ -66,23 +61,16 @@ const IR::Node* DoSimplifyExpressions::preorder(IR::Literal* expression) {
 const IR::Node* DoSimplifyExpressions::preorder(IR::ArrayIndex* expression) {
     LOG3("Visiting " << dbp(expression));
     auto type = typeMap->getType(getOriginal(), true);
-    if (SideEffects::check(getOriginal<IR::Expression>(), this, refMap, typeMap) ||
-        // if the expression appears as part of an argument also use a temporary for the index
-        findContext<IR::Argument>() != nullptr) {
+    if (SideEffects::check(getOriginal<IR::Expression>(), refMap, typeMap)) {
         visit(expression->left);
         CHECK_NULL(expression->left);
         visit(expression->right);
         CHECK_NULL(expression->right);
-        if (added->find(expression->right) == added->end()) {
-            // If the index is a fresh temporary we don't need to replace it again;
-            // we are sure it will not alias anything else.
-            // Otherwise this can lead to an infinite loop.
-            if (!expression->right->is<IR::Constant>()) {
-                auto indexType = typeMap->getType(expression->right, true);
-                auto tmp = createTemporary(indexType);
-                expression->right = addAssignment(expression->srcInfo, tmp, expression->right);
-                typeMap->setType(expression->right, indexType);
-            }
+        if (!expression->right->is<IR::Constant>()) {
+            auto indexType = typeMap->getType(expression->right, true);
+            auto tmp = createTemporary(indexType);
+            expression->right = addAssignment(expression->srcInfo, tmp, expression->right);
+            typeMap->setType(expression->right, indexType);
         }
     }
     typeMap->setType(expression, type);
@@ -102,9 +90,7 @@ const IR::Node* DoSimplifyExpressions::preorder(IR::Member* expression) {
     LOG3("Visiting " << dbp(expression));
     auto type = typeMap->getType(getOriginal(), true);
     const IR::Expression *rv = expression;
-    if (SideEffects::check(getOriginal<IR::Expression>(), this, refMap, typeMap) ||
-        // This may be part of a left-value that is passed as an out argument
-        findContext<IR::Argument>() != nullptr) {
+    if (SideEffects::check(getOriginal<IR::Expression>(), refMap, typeMap)) {
         visit(expression->expr);
         CHECK_NULL(expression->expr);
 
@@ -156,7 +142,7 @@ const IR::Node* DoSimplifyExpressions::preorder(IR::StructExpression* expression
     LOG3("Visiting " << dbp(expression));
     bool foundEffect = false;
     for (auto v : expression->components) {
-        if (SideEffects::check(v->expression, this, refMap, typeMap)) {
+        if (SideEffects::check(v->expression, refMap, typeMap)) {
             foundEffect = true;
             break;
         }
@@ -185,7 +171,7 @@ const IR::Node* DoSimplifyExpressions::preorder(IR::ListExpression* expression) 
     LOG3("Visiting " << dbp(expression));
     bool foundEffect = false;
     for (auto v : expression->components) {
-        if (SideEffects::check(v, this, refMap, typeMap)) {
+        if (SideEffects::check(v, refMap, typeMap)) {
             foundEffect = true;
             break;
         }
@@ -211,8 +197,8 @@ const IR::Node* DoSimplifyExpressions::preorder(IR::Operation_Binary* expression
     LOG3("Visiting " << dbp(expression));
     auto original = getOriginal<IR::Operation_Binary>();
     auto type = typeMap->getType(original, true);
-    if (SideEffects::check(original, this, refMap, typeMap)) {
-        if (SideEffects::check(original->right, this, refMap, typeMap)) {
+    if (SideEffects::check(original, refMap, typeMap)) {
+        if (SideEffects::check(original->right, refMap, typeMap)) {
             // We are a bit conservative here. We handle this case:
             // T f(inout T val) { ... }
             // val + f(val);
@@ -243,7 +229,7 @@ const IR::Node* DoSimplifyExpressions::preorder(IR::Operation_Binary* expression
 const IR::Node* DoSimplifyExpressions::shortCircuit(IR::Operation_Binary* expression) {
     LOG3("Visiting " << dbp(expression));
     auto type = typeMap->getType(getOriginal(), true);
-    if (SideEffects::check(getOriginal<IR::Expression>(), this, refMap, typeMap)) {
+    if (SideEffects::check(getOriginal<IR::Expression>(), refMap, typeMap)) {
         visit(expression->left);
         CHECK_NULL(expression->left);
 
@@ -318,7 +304,7 @@ const IR::Node* DoSimplifyExpressions::preorder(IR::LOr* expression) {
 
 bool DoSimplifyExpressions::mayAlias(const IR::Expression* left,
                                      const IR::Expression* right) const {
-    ReadsWrites rw(refMap);
+    ReadsWrites rw(refMap, true);
     return rw.mayAlias(left, right);
 }
 
@@ -338,60 +324,12 @@ bool DoSimplifyExpressions::containsHeaderType(const IR::Type* type) {
     return false;
 }
 
-namespace {
-
-/// When invoked on an expression computes all expressions that are
-/// modified while evaluating the expression.  This is a list of
-/// left-values.  Also, a table application expression is
-/// assumed to modify everything.
-class GetWrittenExpressions : public Inspector {
-    ReferenceMap* refMap;
-    TypeMap* typeMap;
-
- public:
-    // If this expression is in the set, it means that the expression
-    // may modify everything in the program.  This is an
-    // over-approximation used when the expression is a table
-    // invocation --- for this case it's too complicated to compute
-    // precisely the side effects without an inter-procedural
-    // analysis.
-    static const IR::Expression* everything;
-    std::set<const IR::Expression*> written;
-
-    GetWrittenExpressions(ReferenceMap* refMap, TypeMap* typeMap):
-            refMap(refMap), typeMap(typeMap) {
-        CHECK_NULL(refMap); CHECK_NULL(typeMap); setName("GetWrittenExpressions"); }
-    void postorder(const IR::MethodCallExpression* expression) override {
-        auto mi = MethodInstance::resolve(expression, refMap, typeMap);
-        if (auto a = mi->to<ApplyMethod>()) {
-            if (a->isTableApply()) {
-                written.emplace(everything);
-                return;
-            }
-        }
-        for (auto p : *mi->substitution.getParametersInArgumentOrder()) {
-            if (!p->hasOut()) continue;
-            // The only modified expressions much be left-values
-            // that are substituted to out or inout parameters.
-            auto arg = mi->substitution.lookup(p);
-            LOG3("Expression is modified " << arg->expression);
-            written.emplace(arg->expression);
-        }
-    }
-};
-
-// Some expression that cannot occur in the program.
-const IR::Expression* GetWrittenExpressions::everything = new IR::Constant(0);
-
-}  // namespace
-
 const IR::Node* DoSimplifyExpressions::preorder(IR::MethodCallExpression* mce) {
-    // BUG_CHECK(!isWrite(), "%1%: method on left hand side?", mce);
-    // isWrite is too conservative, so this check may fail for something like f().isValid()
+    BUG_CHECK(!isWrite(), "%1%: method on left hand side?", mce);
     LOG3("Visiting " << dbp(mce));
     auto orig = getOriginal<IR::MethodCallExpression>();
     auto type = typeMap->getType(orig, true);
-    if (!SideEffects::check(orig, this, refMap, typeMap)) {
+    if (!SideEffects::check(orig, refMap, typeMap)) {
         return mce;
     }
 
@@ -406,31 +344,22 @@ const IR::Node* DoSimplifyExpressions::preorder(IR::MethodCallExpression* mce) {
     // large structs.  We want to avoid copying these large
     // structs if possible.
     std::set<const IR::Parameter*> useTemporary;
-    // Set of expressions modified while evaluating this method call.
-    std::set<const IR::Expression*> modifies;
-    GetWrittenExpressions gwe(refMap, typeMap);
-    gwe.setCalledBy(this);
-    mce->apply(gwe);
+    std::set<const IR::Expression*> hasSideEffects;
 
+    bool anyOut = false;
     for (auto p : *mi->substitution.getParametersInArgumentOrder()) {
         if (p->direction == IR::Direction::None)
             continue;
+        if (p->hasOut())
+            anyOut = true;
         auto arg = mi->substitution.lookup(p);
-        if (gwe.written.find(GetWrittenExpressions::everything) != gwe.written.end()) {
-            // just copy everything.
-            LOG3("Detected table application, using temporaries for all parameters " << arg);
-            for (auto p : *mi->substitution.getParametersInArgumentOrder())
-                useTemporary.emplace(p);
-            break;
-        }
-        modifies.insert(gwe.written.begin(), gwe.written.end());
-
         // If an argument evaluation has side-effects then
         // always use a temporary to hold the argument value.
-        if (SideEffects::check(arg->expression, this, refMap, typeMap)) {
+        if (SideEffects::check(arg->expression, refMap, typeMap)) {
             LOG3("Using temporary for " << dbp(mce) <<
                  " param " << dbp(p) << " arg side effect");
             useTemporary.emplace(p);
+            hasSideEffects.emplace(arg->expression);
             continue;
         }
 
@@ -462,24 +391,32 @@ const IR::Node* DoSimplifyExpressions::preorder(IR::MethodCallExpression* mce) {
         }
     }
 
-    // For each argument check to see if it aliases any expression in the written set.
-    for (auto p : *mi->substitution.getParametersInArgumentOrder()) {
-        if (useTemporary.find(p) != useTemporary.end())
-            continue;
-        auto arg = mi->substitution.lookup(p);
-        if (typeMap->isCompileTimeConstant(arg->expression))
-            continue;
-        for (auto e : modifies) {
-            // Here we use just raw equality: equivalent but not equal expressions
-            // should be compared.
-            if (e != arg->expression && mayAlias(arg->expression, e)) {
-                LOG3("Using temporary for " << dbp(mce) <<
-                     " param " << dbp(p) << " aliasing" << dbp(e));
-                if (p->hasOut())
-                    warn(ErrorType::WARN_ORDERING,
-                         "%1%: 'out' argument has fields in common with %2%", arg, e);
-                useTemporary.emplace(p);
-                break;
+    if (anyOut) {
+        // Check aliasing between all pairs of arguments where at
+        // least one of them is out or inout.
+        for (auto p1 : *mi->substitution.getParametersInArgumentOrder()) {
+            auto arg1 = mi->substitution.lookup(p1);
+            if (hasSideEffects.count(arg1->expression))
+                continue;
+            for (auto p2 : *mi->substitution.getParametersInArgumentOrder()) {
+                LOG3("p1=" << dbp(p1) << " p2=" << dbp(p2));
+                if (p2 == p1)
+                    break;
+                if (!p1->hasOut() && !p2->hasOut())
+                    continue;
+                auto arg2 = mi->substitution.lookup(p2);
+                if (hasSideEffects.count(arg2->expression))
+                    continue;
+                if (mayAlias(arg1->expression, arg2->expression)) {
+                    LOG3("Using temporary for " << dbp(mce) <<
+                         " param " << dbp(p1) << " aliasing" << dbp(p2));
+                    if (p1->hasOut() && p2->hasOut())
+                        ::warning(ErrorType::WARN_ORDERING,
+                                  "%1%: 'out' argument has fields in common with %2%", arg1, arg2);
+                    useTemporary.emplace(p1);
+                    useTemporary.emplace(p2);
+                    break;
+                }
             }
         }
     }
@@ -500,39 +437,30 @@ const IR::Node* DoSimplifyExpressions::preorder(IR::MethodCallExpression* mce) {
 
         const IR::Expression* argValue = nullptr;
         visit(arg);  // May mutate arg!  Recursively simplifies arg.
-        auto argex = arg->expression;
-        CHECK_NULL(argex);
+        auto newarg = arg->expression;
+        CHECK_NULL(newarg);
 
         if (useTemp) {
-            // declare temporary variable if this is not already
-            // a temporary
-            if (temporaries.find(argex) == temporaries.end()) {
-                LOG3("Not a temporary " << argex);
-                auto paramtype = typeMap->getType(p, true);
-                if (paramtype->is<IR::Type_Dontcare>())
-                    paramtype = typeMap->getType(arg, true);
-                auto tmp = createTemporary(paramtype);
-                argValue = new IR::PathExpression(IR::ID(tmp, nullptr));
-                typeMap->setType(argValue, paramtype);
-                typeMap->setLeftValue(argValue);
-                if (p->direction != IR::Direction::Out) {
-                    auto clone = argValue->clone();
-                    auto stat = new IR::AssignmentStatement(clone, argex);
-                    LOG3(clone << " = " << argex);
-                    statements.push_back(stat);
-                    typeMap->setType(clone, paramtype);
-                    typeMap->setLeftValue(clone);
-                }
-            } else {
-                LOG3("Already a temporary " << argex);
-                argValue = argex;
+            // declare temporary variable
+            auto paramtype = typeMap->getType(p, true);
+            if (paramtype->is<IR::Type_Dontcare>())
+                paramtype = typeMap->getType(arg, true);
+            auto tmp = createTemporary(paramtype);
+            argValue = new IR::PathExpression(IR::ID(tmp, nullptr));
+            if (p->direction != IR::Direction::Out) {
+                auto clone = argValue->clone();
+                auto stat = new IR::AssignmentStatement(clone, newarg);
+                LOG3(clone << " = " << newarg);
+                statements.push_back(stat);
+                typeMap->setType(clone, paramtype);
+                typeMap->setLeftValue(clone);
             }
         } else {
-            argValue = argex;
+            argValue = newarg;
         }
         if (p->direction != IR::Direction::In && useTemp) {
             auto assign = new IR::AssignmentStatement(
-                cloner.clone<IR::Expression>(argex),
+                cloner.clone<IR::Expression>(newarg),
                 cloner.clone<IR::Expression>(argValue));
             copyBack->push_back(assign);
             LOG3("Will copy out value " << dbp(assign));
@@ -559,10 +487,8 @@ const IR::Node* DoSimplifyExpressions::preorder(IR::MethodCallExpression* mce) {
     // See whether we assign the result of the call to a temporary
     if (type->is<IR::Type_Void>() ||               // no return type
         getParent<IR::MethodCallStatement>()) {    // result of call is not used
-        if (!copyBack->empty()) {
-            statements.push_back(new IR::MethodCallStatement(mce->srcInfo, mce));
-            rv = nullptr;
-        }  // else just return mce
+        statements.push_back(new IR::MethodCallStatement(mce->srcInfo, mce));
+        rv = nullptr;
     } else if (tbl_apply) {
         typeMap->setType(mce, type);
         rv = mce;
@@ -576,8 +502,6 @@ const IR::Node* DoSimplifyExpressions::preorder(IR::MethodCallExpression* mce) {
         auto stat = new IR::AssignmentStatement(left, mce);
         statements.push_back(stat);
         rv = left->clone();
-        LOG3("Is temporary " << rv);
-        temporaries.emplace(rv);
         typeMap->setType(rv, type);
         LOG3(orig << " replaced with " << left << " = " << mce);
     }
@@ -698,98 +622,5 @@ void DoSimplifyExpressions::end_apply(const IR::Node *) {
     BUG_CHECK(toInsert.empty(), "DoSimplifyExpressions::end_apply orphaned declarations");
     BUG_CHECK(statements.empty(), "DoSimplifyExpressions::end_apply orphaned statements");
 }
-
-///////////////////////////////////////////////
-
-const IR::Node* KeySideEffect::preorder(IR::Key* key) {
-    // If any key field has side effects then pull out all
-    // the key field values.
-    LOG3("Visiting " << key);
-    bool complex = false;
-    for (auto k : key->keyElements)
-        complex = complex || P4::SideEffects::check(k->expression, this, refMap, typeMap);
-    if (!complex)
-        // This prune will prevent the postoder(IR::KeyElement*) below from executing
-        prune();
-    else
-        LOG3("Will pull out " << key);
-    return key;
-}
-
-const IR::Node* KeySideEffect::postorder(IR::KeyElement* element) {
-    // If we got here we need to pull the key element out.
-    LOG3("Extracting key element " << element);
-    auto table = findOrigCtxt<IR::P4Table>();
-    CHECK_NULL(table);
-    TableInsertions* insertions;
-    auto it = toInsert.find(table);
-    if (it == toInsert.end()) {
-        insertions = new TableInsertions();
-        toInsert.emplace(table, insertions);
-    } else {
-        insertions = it->second;
-    }
-
-    auto tmp = refMap->newName("key");
-    auto type = typeMap->getType(element->expression, true);
-    auto decl = new IR::Declaration_Variable(tmp, type, nullptr);
-    insertions->declarations.push_back(decl);
-    auto left = new IR::PathExpression(tmp);
-    auto right = element->expression;
-    auto assign = new IR::AssignmentStatement(element->expression->srcInfo, left, right);
-    insertions->statements.push_back(assign);
-
-    auto path = new IR::PathExpression(tmp);
-    // This preserves annotations on the key
-    element->expression = path;
-    LOG2("Created new key expression " << element);
-    return element;
-}
-
-const IR::Node* KeySideEffect::preorder(IR::P4Table* table) {
-    auto orig = getOriginal<IR::P4Table>();
-    if (invokedInKey->find(orig) != invokedInKey->end()) {
-        // if this table is invoked in some key computation do not
-        // analyze its key yet; we will do this in a future iteration.
-        LOG2("Will not analyze key of " << table);
-        prune();
-    }
-    return table;
-}
-
-const IR::Node* KeySideEffect::postorder(IR::P4Table* table) {
-    auto insertions = ::get(toInsert, getOriginal<IR::P4Table>());
-    if (insertions == nullptr)
-        return table;
-
-    auto result = new IR::IndexedVector<IR::Declaration>();
-    for (auto d : insertions->declarations)
-        result->push_back(d);
-    result->push_back(table);
-    return result;
-}
-
-const IR::Node* KeySideEffect::doStatement(const IR::Statement* statement,
-                                           const IR::Expression *expression) {
-    LOG3("Visiting " << getOriginal());
-    HasTableApply hta(refMap, typeMap);
-    hta.setCalledBy(this);
-    (void)expression->apply(hta);
-    if (hta.table == nullptr)
-        return statement;
-    auto insertions = get(toInsert, hta.table);
-    if (insertions == nullptr)
-        return statement;
-
-    auto result = new IR::IndexedVector<IR::StatOrDecl>();
-    for (auto assign : insertions->statements){
-        auto cloneAssign = assign->clone();
-        result->push_back(cloneAssign);
-    }
-    result->push_back(statement);
-    auto block = new IR::BlockStatement(*result);
-    return block;
-}
-
 
 }  // namespace P4

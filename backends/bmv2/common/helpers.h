@@ -64,9 +64,7 @@ namespace Standard {
 /// "traits" for each extern type, templatized by the architecture name (using
 /// the Arch enum class defined below), as a convenient way to access
 /// architecture-specific names in the unified code.
-/// The V1MODEL2020 is the modified v1model.p4 file with a version
-/// >= 20200408
-enum class Arch { V1MODEL, PSA, V1MODEL2020 };
+enum class Arch { V1MODEL, PSA };
 
 /// Traits for the action profile extern, must be specialized for v1model and
 /// PSA.
@@ -82,9 +80,6 @@ template<> struct ActionProfileTraits<Arch::V1MODEL> {
     }
     static const cstring sizeParamName() { return "size"; }
 };
-
-template<> struct ActionProfileTraits<Arch::V1MODEL2020> :
-            public ActionProfileTraits<Arch::V1MODEL> {};
 
 template<> struct ActionProfileTraits<Arch::PSA> {
     static const cstring name() { return "action profile"; }
@@ -108,9 +103,6 @@ template<> struct ActionSelectorTraits<Arch::V1MODEL> : public ActionProfileTrai
     }
 };
 
-template<> struct ActionSelectorTraits<Arch::V1MODEL2020> :
-            public ActionProfileTraits<Arch::V1MODEL2020> {};
-
 template<> struct ActionSelectorTraits<Arch::PSA> : public ActionProfileTraits<Arch::PSA> {
     static const cstring name() { return "action selector"; }
     static const cstring typeName() {
@@ -130,11 +122,9 @@ template<> struct RegisterTraits<Arch::V1MODEL> {
     // the index of the type parameter for the data stored in the register, in
     // the type parameter list of the extern type declaration
     static size_t dataTypeParamIdx() { return 0; }
-    static boost::optional<size_t> indexTypeParamIdx() { return boost::none; }
-};
-
-template<> struct RegisterTraits<Arch::V1MODEL2020> : public RegisterTraits<Arch::V1MODEL> {
-    static boost::optional<size_t> indexTypeParamIdx() { return 1; }
+    static boost::optional<size_t> indexTypeParamIdx() {
+        if (P4V1::V1Model::instance.haveIndexTypeParam()) return 1;
+        return boost::none; }
 };
 
 template<> struct RegisterTraits<Arch::PSA> {
@@ -187,24 +177,9 @@ template<> struct CounterlikeTraits<Standard::CounterExtern<Standard::Arch::V1MO
     static const cstring sizeParamName() {
         return "size";
     }
-    static boost::optional<size_t> indexTypeParamIdx() { return boost::none; }
-};
-
-template<> struct CounterlikeTraits<Standard::CounterExtern<Standard::Arch::V1MODEL2020> > {
-    static const cstring name() { return "counter"; }
-    static const cstring directPropertyName() {
-        return P4V1::V1Model::instance.tableAttributes.counters.name;
-    }
-    static const cstring typeName() {
-        return P4V1::V1Model::instance.counter.name;
-    }
-    static const cstring directTypeName() {
-        return P4V1::V1Model::instance.directCounter.name;
-    }
-    static const cstring sizeParamName() {
-        return "size";
-    }
-    static boost::optional<size_t> indexTypeParamIdx() { return 0; }
+    static boost::optional<size_t> indexTypeParamIdx() {
+        if (P4V1::V1Model::instance.haveIndexTypeParam()) return 0;
+        return boost::none; }
 };
 
 /// @ref CounterlikeTraits<> specialization for @ref CounterExtern for PSA
@@ -242,26 +217,10 @@ template<> struct CounterlikeTraits<Standard::MeterExtern<Standard::Arch::V1MODE
     static const cstring sizeParamName() {
         return "size";
     }
-    static boost::optional<size_t> indexTypeParamIdx() { return boost::none; }
+    static boost::optional<size_t> indexTypeParamIdx() {
+        if (P4V1::V1Model::instance.haveIndexTypeParam()) return 0;
+        return boost::none; }
 };
-
-template<> struct CounterlikeTraits<Standard::MeterExtern<Standard::Arch::V1MODEL2020> > {
-    static const cstring name() { return "meter"; }
-    static const cstring directPropertyName() {
-        return P4V1::V1Model::instance.tableAttributes.meters.name;
-    }
-    static const cstring typeName() {
-        return P4V1::V1Model::instance.meter.name;
-    }
-    static const cstring directTypeName() {
-        return P4V1::V1Model::instance.directMeter.name;
-    }
-    static const cstring sizeParamName() {
-        return "size";
-    }
-    static boost::optional<size_t> indexTypeParamIdx() { return 0; }
-};
-
 
 /// @ref CounterlikeTraits<> specialization for @ref MeterExtern for PSA
 template<> struct CounterlikeTraits<Standard::MeterExtern<Standard::Arch::PSA> > {
@@ -299,8 +258,6 @@ struct ConversionContext {
     P4::ReferenceMap*                refMap;
     P4::TypeMap*                     typeMap;
     const IR::ToplevelBlock*         toplevel;
-    // Block currently being converted
-    BlockConverted                   blockConverted;
     //
     ProgramStructure*                structure;
     // expression converter is used in many places.
@@ -322,14 +279,8 @@ struct ConversionContext {
     ConversionContext(P4::ReferenceMap* refMap, P4::TypeMap* typeMap,
                       const IR::ToplevelBlock* toplevel, ProgramStructure* structure,
                       ExpressionConverter* conv, JsonObjects* json) :
-            refMap(refMap), typeMap(typeMap), toplevel(toplevel),
-            blockConverted(BlockConverted::None), structure(structure), conv(conv), json(json) { }
-
-    void addToFieldList(const IR::Expression* expr, Util::JsonArray* fl);
-    int createFieldList(const IR::Expression* expr, cstring listName, bool learn = false);
-    cstring createCalculation(cstring algo, const IR::Expression* fields,
-                              Util::JsonArray* calculations, bool usePayload, const IR::Node* node);
-    static void modelError(const char* format, const IR::Node* place);
+        refMap(refMap), typeMap(typeMap), toplevel(toplevel), structure(structure),
+        conv(conv), json(json) { }
 };
 
 Util::IJson* nodeName(const CFG::Node* node);
@@ -339,8 +290,6 @@ Util::JsonObject* mkPrimitive(cstring name, Util::JsonArray* appendTo);
 Util::JsonObject* mkPrimitive(cstring name);
 cstring stringRepr(big_int value, unsigned bytes = 0);
 unsigned nextId(cstring group);
-/// Converts expr into a ListExpression or returns nullptr if not possible
-const IR::ListExpression* convertToList(const IR::Expression* expr, P4::TypeMap* typeMap);
 
 }  // namespace BMV2
 

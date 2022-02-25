@@ -18,10 +18,10 @@ limitations under the License.
 
 namespace DPDK {
 // The assumption is compiler can only produce forward jumps.
-const IR::IndexedVector<IR::DpdkAsmStatement> *RemoveRedundantLabel::removeRedundantLabel(
-                                       const IR::IndexedVector<IR::DpdkAsmStatement> &s) {
+const IR::Node *RemoveRedundantLabel::postorder(IR::DpdkListStatement *l) {
+    bool changed = false;
     IR::IndexedVector<IR::DpdkAsmStatement> used_labels;
-    for (auto stmt : s) {
+    for (auto stmt : l->statements) {
         if (auto jmp = stmt->to<IR::DpdkJmpStatement>()) {
             bool found = false;
             for (auto label : used_labels) {
@@ -37,7 +37,7 @@ const IR::IndexedVector<IR::DpdkAsmStatement> *RemoveRedundantLabel::removeRedun
         }
     }
     auto new_l = new IR::IndexedVector<IR::DpdkAsmStatement>;
-    for (auto stmt : s) {
+    for (auto stmt : l->statements) {
         if (auto label = stmt->to<IR::DpdkLabelStatement>()) {
             bool found = false;
             for (auto jmp_label : used_labels) {
@@ -49,54 +49,57 @@ const IR::IndexedVector<IR::DpdkAsmStatement> *RemoveRedundantLabel::removeRedun
             }
             if (found) {
                 new_l->push_back(stmt);
+            } else {
+                changed = true;
             }
         } else {
             new_l->push_back(stmt);
         }
     }
-    return new_l;
+    if (changed)
+        l->statements = *new_l;
+    return l;
 }
 
-const IR::IndexedVector<IR::DpdkAsmStatement> *RemoveConsecutiveJmpAndLabel::removeJmpAndLabel(
-                                            const IR::IndexedVector<IR::DpdkAsmStatement> &s) {
+const IR::Node *
+RemoveConsecutiveJmpAndLabel::postorder(IR::DpdkListStatement *l) {
     const IR::DpdkJmpStatement *cache = nullptr;
-    auto new_l = new IR::IndexedVector<IR::DpdkAsmStatement>;
-    for (auto stmt : s) {
+    bool changed = false;
+    IR::IndexedVector<IR::DpdkAsmStatement> new_l;
+    for (auto stmt : l->statements) {
         if (auto jmp = stmt->to<IR::DpdkJmpStatement>()) {
             if (cache)
-                new_l->push_back(cache);
+                new_l.push_back(cache);
             cache = jmp;
         } else if (auto label = stmt->to<IR::DpdkLabelStatement>()) {
             if (!cache) {
-                new_l->push_back(stmt);
+                new_l.push_back(stmt);
             } else if (cache->label != label->label) {
-                new_l->push_back(cache);
+                new_l.push_back(cache);
                 cache = nullptr;
-                new_l->push_back(stmt);
+                new_l.push_back(stmt);
             } else {
-                new_l->push_back(stmt);
+                new_l.push_back(stmt);
                 cache = nullptr;
+                changed = true;
             }
         } else {
             if (cache) {
-                new_l->push_back(cache);
+                new_l.push_back(cache);
                 cache = nullptr;
             }
-            new_l->push_back(stmt);
+            new_l.push_back(stmt);
         }
     }
-    // Do not remove jump to LABEL_DROP as LABEL_DROP is not part of statement list and
-    // should not be optimized here.
-    if (cache && cache->label == "LABEL_DROP")
-        new_l->push_back(cache);
-    return  new_l;
+    if (changed)
+        l->statements = new_l;
+    return l;
 }
 
-const IR::IndexedVector<IR::DpdkAsmStatement> *ThreadJumps::threadJumps(
-                     const IR::IndexedVector<IR::DpdkAsmStatement> &s) {
+const IR::Node *ThreadJumps::postorder(IR::DpdkListStatement *l) {
     std::map<const cstring, cstring> label_map;
     const IR::DpdkLabelStatement *cache = nullptr;
-    for (auto stmt : s) {
+    for (auto stmt : l->statements) {
         if (!cache) {
             if (auto label = stmt->to<IR::DpdkLabelStatement>()) {
                 LOG1("label " << label);
@@ -112,7 +115,7 @@ const IR::IndexedVector<IR::DpdkAsmStatement> *ThreadJumps::threadJumps(
         }
     }
     auto new_l = new IR::IndexedVector<IR::DpdkAsmStatement>;
-    for (auto stmt : s) {
+    for (auto stmt : l->statements) {
         if (auto jmp = stmt->to<IR::DpdkJmpStatement>()) {
             auto res = label_map.find(jmp->label);
             if (res != label_map.end()) {
@@ -125,35 +128,38 @@ const IR::IndexedVector<IR::DpdkAsmStatement> *ThreadJumps::threadJumps(
             new_l->push_back(stmt);
         }
     }
-    return new_l;
+    if (l->statements.size() != new_l->size())
+        l->statements = *new_l;
+    return l;
 }
 
-
-const IR::IndexedVector<IR::DpdkAsmStatement> *RemoveLabelAfterLabel::removeLabelAfterLabel(
-                                         const IR::IndexedVector<IR::DpdkAsmStatement> &s) {
+const IR::Node *RemoveLabelAfterLabel::postorder(IR::DpdkListStatement *l) {
+    bool changed = false;
     std::map<const cstring, cstring> label_map;
     const IR::DpdkLabelStatement *cache = nullptr;
-    for (auto stmt : s) {
+    for (auto stmt : l->statements) {
         if (!cache) {
             if (auto label = stmt->to<IR::DpdkLabelStatement>()) {
+                LOG1("label " << label);
                 cache = label;
             }
         } else {
             if (auto label = stmt->to<IR::DpdkLabelStatement>()) {
+                LOG1("label " << label);
                 label_map.emplace(cache->label, label->label);
             } else {
                 cache = nullptr;
             }
         }
     }
-
     auto new_l = new IR::IndexedVector<IR::DpdkAsmStatement>;
-    for (auto stmt : s) {
+    for (auto stmt : l->statements) {
         if (auto jmp = stmt->to<IR::DpdkJmpStatement>()) {
             auto res = label_map.find(jmp->label);
             if (res != label_map.end()) {
                 ((IR::DpdkJmpStatement *)stmt)->label = res->second;
                 new_l->push_back(stmt);
+                changed = true;
             } else {
                 new_l->push_back(stmt);
             }
@@ -161,6 +167,9 @@ const IR::IndexedVector<IR::DpdkAsmStatement> *RemoveLabelAfterLabel::removeLabe
             new_l->push_back(stmt);
         }
     }
-    return new_l;
+    if (changed)
+        l->statements = *new_l;
+    return l;
 }
+
 }  // namespace DPDK

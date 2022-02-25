@@ -81,6 +81,7 @@ control c(out bit<32> v) {
             default: {
             }
         }
+
         touched = !touched;
         if (e > 32w0) {
             t.apply();

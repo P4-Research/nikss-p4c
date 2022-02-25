@@ -32,22 +32,22 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
 @name(".cntDum") counter<bit<8>>(32w200, CounterType.packets) cntDum;
 
 control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
-    @name(".act") action act(@name("port") bit<9> port, @name("idx") bit<8> idx) {
+    @name(".act") action act(bit<9> port, bit<8> idx) {
         standard_metadata.egress_spec = port;
         cntDum.count(idx);
     }
     @name(".tab1") table tab1_0 {
         actions = {
             act();
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_0();
         }
         key = {
             hdr.ethernet.dstAddr: exact @name("ethernet.dstAddr") ;
         }
         size = 70000;
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     apply {
         tab1_0.apply();

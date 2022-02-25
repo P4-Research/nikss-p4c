@@ -18,16 +18,16 @@ parser p(packet_in pkt, out Headers hdr) {
 }
 
 control ingress(inout Headers h) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("ingress.simple_table") table simple_table_0 {
         key = {
             16w1: exact @name("key") ;
         }
         actions = {
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_0();
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     apply {
         exit;

@@ -25,7 +25,7 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
 }
 
 control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("ingress.my_extern_inst") extern_test() my_extern_inst_0;
     @name(".a") action a() {
@@ -34,9 +34,9 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
     @name(".t") table t_0 {
         actions = {
             a();
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_0();
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     apply {
         t_0.apply();

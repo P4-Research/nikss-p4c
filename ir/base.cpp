@@ -21,10 +21,6 @@ namespace IR {
 cstring Annotation::getName() const {
     BUG_CHECK(name == IR::Annotation::nameAnnotation,
               "%1%: Only works on name annotations", this);
-    if (needsParsing)
-        // This can happen if this method is invoked before we have parsed
-        // annotation bodies.
-        return name;
     return getSingleString();
 }
 

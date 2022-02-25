@@ -27,9 +27,7 @@ set (MIDEND_SRCS
   fillEnumMap.cpp
   flattenHeaders.cpp
   flattenInterfaceStructs.cpp
-  hsIndexSimplify.cpp
   interpreter.cpp
-  global_copyprop.cpp
   local_copyprop.cpp
   nestedStructs.cpp
   noMatch.cpp
@@ -37,10 +35,10 @@ set (MIDEND_SRCS
   parserUnroll.cpp
   predication.cpp
   removeAssertAssume.cpp
-  removeComplexExpressions.cpp
   removeExits.cpp
   removeLeftSlices.cpp
   removeMiss.cpp
+  removeParameters.cpp
   removeSelectBooleans.cpp
   replaceSelectRange.cpp
   removeUnusedParameters.cpp
@@ -56,11 +54,9 @@ set (MIDEND_SRCS
 set (MIDEND_HDRS
   actionSynthesis.h
   checkSize.h
-  checkExternInvocationCommon.h
   compileTimeOps.h
   complexComparison.h
   convertEnums.h
-  convertErrors.h
   copyStructures.h
   eliminateNewtype.h
   eliminateSerEnums.h
@@ -75,7 +71,6 @@ set (MIDEND_HDRS
   flattenInterfaceStructs.h
   has_side_effects.h
   interpreter.h
-  global_copyprop.h
   local_copyprop.h
   midEndLast.h
   nestedStructs.h
@@ -84,10 +79,10 @@ set (MIDEND_HDRS
   parserUnroll.h
   predication.h
   removeAssertAssume.h
-  removeComplexExpressions.h
   removeExits.h
   removeLeftSlices.h
   removeMiss.h
+  removeParameters.h
   removeSelectBooleans.h
   removeUnusedParameters.h
   replaceSelectRange.h

@@ -25,17 +25,19 @@ parser p(packet_in b, out Headers h, inout Meta m, inout standard_metadata_t sm)
 register<bit<8>>(32w256) r;
 
 control ingress(inout Headers h, inout Meta m, inout standard_metadata_t sm) {
-    @hidden action issue10972bmv2l52() {
+    @name("ingress.x") bit<8> x_0;
+    @hidden action issue10972bmv2l51() {
+        r.read(x_0, (bit<32>)h.myhdr.reg_idx_to_update);
         r.write((bit<32>)h.myhdr.reg_idx_to_update, 8w0x2a);
     }
-    @hidden table tbl_issue10972bmv2l52 {
+    @hidden table tbl_issue10972bmv2l51 {
         actions = {
-            issue10972bmv2l52();
+            issue10972bmv2l51();
         }
-        const default_action = issue10972bmv2l52();
+        const default_action = issue10972bmv2l51();
     }
     apply {
-        tbl_issue10972bmv2l52.apply();
+        tbl_issue10972bmv2l51.apply();
     }
 }
 

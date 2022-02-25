@@ -74,9 +74,6 @@ class HierarchicalNames : public Transform {
     { visit(table->annotations); prune(); return table; }
 
     const IR::Node* postorder(IR::Annotation* annotation) override;
-    // Do not change name annotations on parameters
-    const IR::Node* preorder(IR::Parameter* parameter) override
-    { prune(); return parameter; }
 };
 
 }  // namespace P4

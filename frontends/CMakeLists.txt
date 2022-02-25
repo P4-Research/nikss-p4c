@@ -16,7 +16,6 @@ set (P4_FRONTEND_SRCS
   p4/actionsInlining.cpp
   p4/callGraph.cpp
   p4/checkConstants.cpp
-  p4/checkCoreMethods.cpp
   p4/checkNamedArgs.cpp
   p4/createBuiltins.cpp
   p4/def_use.cpp
@@ -44,7 +43,6 @@ set (P4_FRONTEND_SRCS
   p4/parserCallGraph.cpp
   p4/parserControlFlow.cpp
   p4/reassociation.cpp
-  p4/removeParameters.cpp
   p4/removeReturns.cpp
   p4/reservedWords.cpp
   p4/resetHeaders.cpp
@@ -53,7 +51,6 @@ set (P4_FRONTEND_SRCS
   p4/simplify.cpp
   p4/simplifyDefUse.cpp
   p4/simplifyParsers.cpp
-  p4/simplifySwitch.cpp
   p4/specialize.cpp
   p4/specializeGenericFunctions.cpp
   p4/specializeGenericTypes.cpp
@@ -83,7 +80,6 @@ set (P4_FRONTEND_HDRS
   p4/alias.h
   p4/callGraph.h
   p4/checkConstants.h
-  p4/checkCoreMethods.h
   p4/checkNamedArgs.h
   p4/cloner.h
   p4/commonInlining.h
@@ -114,7 +110,6 @@ set (P4_FRONTEND_HDRS
   p4/parserCallGraph.h
   p4/parserControlFlow.h
   p4/reassociation.h
-  p4/removeParameters.h
   p4/removeReturns.h
   p4/reservedWords.h
   p4/resetHeaders.h
@@ -123,7 +118,6 @@ set (P4_FRONTEND_HDRS
   p4/simplify.h
   p4/simplifyDefUse.h
   p4/simplifyParsers.h
-  p4/simplifySwitch.h
   p4/specialize.h
   p4/specializeGenericFunctions.h
   p4/specializeGenericTypes.h
@@ -155,7 +149,6 @@ set (COMMON_FRONTEND_SRCS
   common/constantFolding.cpp
   common/constantParsing.cpp
   common/options.cpp
-  common/parser_options.cpp
   common/parseInput.cpp
   common/resolveReferences/referenceMap.cpp
   common/resolveReferences/resolveReferences.cpp
@@ -168,7 +161,6 @@ set (COMMON_FRONTEND_HDRS
   common/model.h
   common/name_gateways.h
   common/options.h
-  common/parser_options.h
   common/parseInput.h
   common/programMap.h
   common/resolveReferences/referenceMap.h
@@ -229,7 +221,6 @@ macro(add_parser pname)
     ${FLEX_${pname}Lexer_OUTPUTS}
     ${BISON_${pname}Parser_OUTPUTS}
     )
-  set_source_files_properties(${pname}PARSER_GEN_SRCS PROPERTIES GENERATED TRUE)
 endmacro(add_parser)
 
 add_parser(v1)
@@ -254,6 +245,8 @@ set (FRONTEND_SOURCES
   )
 
 set_source_files_properties(${IR_GENERATED_SRCS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${v1PARSER_GEN_SRCS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${p4PARSER_GEN_SRCS} PROPERTIES GENERATED TRUE)
 
 set (FRONTEND_CPPLINT_FILES
   ${P4_FRONTEND_SRCS} ${P4_FRONTEND_HDRS}

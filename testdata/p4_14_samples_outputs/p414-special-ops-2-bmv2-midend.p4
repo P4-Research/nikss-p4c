@@ -10,15 +10,10 @@ struct intrinsic_metadata_t {
 }
 
 struct mymeta_t {
-    @field_list(8w1, 8w2, 8w3) 
     bit<8> resubmit_count;
-    @field_list(8w1, 8w2, 8w3) 
     bit<8> recirculate_count;
-    @field_list(8w1, 8w2, 8w3) 
     bit<8> clone_e2e_count;
-    @field_list(8w1, 8w2, 8w3) 
     bit<8> last_ing_instance_type;
-    @field_list(8w1, 8w2, 8w3) 
     bit<8> f1;
 }
 
@@ -33,15 +28,10 @@ header ethernet_t {
 }
 
 struct metadata {
-    @field_list(8w1, 8w2, 8w3) 
     bit<8>  _mymeta_resubmit_count0;
-    @field_list(8w1, 8w2, 8w3) 
     bit<8>  _mymeta_recirculate_count1;
-    @field_list(8w1, 8w2, 8w3) 
     bit<8>  _mymeta_clone_e2e_count2;
-    @field_list(8w1, 8w2, 8w3) 
     bit<8>  _mymeta_last_ing_instance_type3;
-    @field_list(8w1, 8w2, 8w3) 
     bit<8>  _mymeta_f14;
     bit<48> _temporaries_temp15;
 }
@@ -61,18 +51,22 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
     }
 }
 
+struct tuple_0 {
+    mymeta_t f0;
+}
+
 control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
     @name(".do_clone_e2e") action do_clone_e2e() {
         hdr.ethernet.srcAddr = hdr.ethernet.srcAddr + 48w281474976710633;
         meta._mymeta_f14 = meta._mymeta_f14 + 8w23;
         meta._mymeta_clone_e2e_count2 = meta._mymeta_clone_e2e_count2 + 8w1;
-        clone_preserving_field_list(CloneType.E2E, 32w1, 8w1);
+        clone3<tuple_0>(CloneType.E2E, 32w1, { (mymeta_t){resubmit_count = meta._mymeta_resubmit_count0,recirculate_count = meta._mymeta_recirculate_count1,clone_e2e_count = meta._mymeta_clone_e2e_count2,last_ing_instance_type = meta._mymeta_last_ing_instance_type3,f1 = meta._mymeta_f14} });
     }
     @name(".do_recirculate") action do_recirculate() {
         hdr.ethernet.srcAddr = hdr.ethernet.srcAddr + 48w281474976710637;
         meta._mymeta_f14 = meta._mymeta_f14 + 8w19;
         meta._mymeta_recirculate_count1 = meta._mymeta_recirculate_count1 + 8w1;
-        recirculate_preserving_field_list(8w2);
+        recirculate<tuple_0>({ (mymeta_t){resubmit_count = meta._mymeta_resubmit_count0,recirculate_count = meta._mymeta_recirculate_count1,clone_e2e_count = meta._mymeta_clone_e2e_count2,last_ing_instance_type = meta._mymeta_last_ing_instance_type3,f1 = meta._mymeta_f14} });
     }
     @name("._nop") action _nop() {
     }
@@ -259,11 +253,11 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         hdr.ethernet.srcAddr = hdr.ethernet.srcAddr + 48w281474976710639;
         meta._mymeta_f14 = meta._mymeta_f14 + 8w17;
         meta._mymeta_resubmit_count0 = meta._mymeta_resubmit_count0 + 8w1;
-        resubmit_preserving_field_list(8w3);
+        resubmit<tuple_0>({ (mymeta_t){resubmit_count = meta._mymeta_resubmit_count0,recirculate_count = meta._mymeta_recirculate_count1,clone_e2e_count = meta._mymeta_clone_e2e_count2,last_ing_instance_type = meta._mymeta_last_ing_instance_type3,f1 = meta._mymeta_f14} });
     }
-    @name("._nop") action _nop_3() {
+    @name("._nop") action _nop_5() {
     }
-    @name("._nop") action _nop_4() {
+    @name("._nop") action _nop_6() {
     }
     @name(".set_port_to_mac_da_lsbs") action set_port_to_mac_da_lsbs() {
         standard_metadata.egress_spec = (bit<9>)hdr.ethernet.dstAddr & 9w0xf;
@@ -284,7 +278,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
     }
     @name(".t_ing_debug_table1") table t_ing_debug_table1_0 {
         actions = {
-            _nop_3();
+            _nop_5();
         }
         key = {
             standard_metadata.ingress_port            : exact @name("standard_metadata.ingress_port") ;
@@ -305,11 +299,11 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
             hdr.ethernet.srcAddr                      : exact @name("ethernet.srcAddr") ;
             hdr.ethernet.etherType                    : exact @name("ethernet.etherType") ;
         }
-        default_action = _nop_3();
+        default_action = _nop_5();
     }
     @name(".t_ing_debug_table2") table t_ing_debug_table2_0 {
         actions = {
-            _nop_4();
+            _nop_6();
         }
         key = {
             standard_metadata.ingress_port            : exact @name("standard_metadata.ingress_port") ;
@@ -330,7 +324,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
             hdr.ethernet.srcAddr                      : exact @name("ethernet.srcAddr") ;
             hdr.ethernet.etherType                    : exact @name("ethernet.etherType") ;
         }
-        default_action = _nop_4();
+        default_action = _nop_6();
     }
     @name(".t_ing_mac_da") table t_ing_mac_da_0 {
         actions = {

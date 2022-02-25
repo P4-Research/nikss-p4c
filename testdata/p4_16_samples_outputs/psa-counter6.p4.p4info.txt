@@ -9,7 +9,7 @@ tables {
   }
   match_fields {
     id: 1
-    name: "hdr.ethernet.srcAddr"
+    name: "a.srcAddr"
     bitwidth: 48
     match_type: EXACT
   }
@@ -31,7 +31,7 @@ tables {
   }
   match_fields {
     id: 1
-    name: "hdr.ethernet.srcAddr"
+    name: "a.srcAddr"
     bitwidth: 48
     match_type: EXACT
   }

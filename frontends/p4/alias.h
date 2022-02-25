@@ -125,9 +125,12 @@ class SetOfLocations : public IHasDbPrint {
 class ReadsWrites : public Inspector {
     const ReferenceMap* refMap;
     std::map<const IR::Expression*, const SetOfLocations*> rw;
+    bool noMethodCalls;  /// If this flag is true we do not expect to see
+    /// method calls in the expressions - except calls to isValid().
 
  public:
-    explicit ReadsWrites(const ReferenceMap* refMap) : refMap(refMap)
+    ReadsWrites(const ReferenceMap* refMap, bool noMethodCalls) :
+            refMap(refMap), noMethodCalls(noMethodCalls)
     { setName("ReadsWrites"); }
 
     void postorder(const IR::Operation_Binary* expression) override {
@@ -161,8 +164,7 @@ class ReadsWrites : public Inspector {
             int index = expression->right->to<IR::Constant>()->asInt();
             result = e->append(Util::toString(index));
         } else {
-            auto index = ::get(rw, expression->right);
-            result = e->append("*")->join(index);
+            result = e->append("*");
         }
         rw.emplace(expression, result);
     }
@@ -188,12 +190,22 @@ class ReadsWrites : public Inspector {
     }
 
     void postorder(const IR::MethodCallExpression* expression) override {
-        auto e = ::get(rw, expression->method);
-        for (auto a : *expression->arguments) {
-            auto s = ::get(rw, a->expression);
-            e = e->join(s);
+        if (noMethodCalls) {
+            auto member = expression->method->to<IR::Member>();
+            BUG_CHECK(member, "%1%: Expected isValid()", expression);
+            auto obj = member->expr;
+            auto e = ::get(rw, obj);
+            BUG_CHECK(member->member == IR::Type_Header::isValid,
+                      "%1%: expected isValid()", expression);
+            rw.emplace(expression, e->append("$valid"));
+        } else {
+            auto e = ::get(rw, expression->method);
+            for (auto a : *expression->arguments) {
+                auto s = ::get(rw, a->expression);
+                e = e->join(s);
+            }
+            rw.emplace(expression, e);
         }
-        rw.emplace(expression, e);
     }
 
     void postorder(const IR::ConstructorCallExpression* expression) override {

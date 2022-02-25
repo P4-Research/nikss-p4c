@@ -55,6 +55,7 @@ control ingress(inout Headers h, inout Meta m, inout standard_metadata_t sm) {
         const entries = {
                         9w0 : NoAction();
         }
+
         size = 10;
         default_action = NoAction();
     }

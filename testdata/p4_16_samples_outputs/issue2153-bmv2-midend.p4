@@ -38,7 +38,7 @@ parser p(packet_in pkt, out Parsed_packet hdr, inout Metadata meta, inout standa
 
 control ingress(inout Parsed_packet hdr, inout Metadata meta, inout standard_metadata_t stdmeta) {
     @name("ingress.tmp_condition") bit<8> tmp_condition_0;
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("ingress.do_something") action do_something() {
         stdmeta.egress_spec = 9w1;
@@ -48,10 +48,10 @@ control ingress(inout Parsed_packet hdr, inout Metadata meta, inout standard_met
             hdr.h.b: exact @name("hdr.h.b") ;
         }
         actions = {
-            NoAction_1();
+            NoAction_0();
             do_something();
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     @hidden action issue2153bmv2l74() {
         tmp_condition_0 = 8w1;
@@ -90,6 +90,7 @@ control ingress(inout Parsed_packet hdr, inout Metadata meta, inout standard_met
             default: {
             }
         }
+
         if (tmp_condition_0 > 8w0) {
             tbl_issue2153bmv2l79.apply();
         }

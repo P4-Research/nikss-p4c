@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef _LIB_ALGORITHM_H_
-#define _LIB_ALGORITHM_H_
+#ifndef P4C_LIB_ALGORITHM_H_
+#define P4C_LIB_ALGORITHM_H_
 
 #include <algorithm>
 #include <set>
@@ -76,4 +76,4 @@ inline Fn for_each(std::pair<Iter, Iter> range, Fn fn) {
 template<class Iter> Iter begin(std::pair<Iter, Iter> pr) { return pr.first; }
 template<class Iter> Iter end(std::pair<Iter, Iter> pr) { return pr.second; }
 
-#endif /* _LIB_ALGORITHM_H_ */
+#endif /* P4C_LIB_ALGORITHM_H_ */

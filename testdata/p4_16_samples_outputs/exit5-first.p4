@@ -30,6 +30,7 @@ control ctrl() {
                 c = 32w4;
             }
         }
+
         c = 32w5;
     }
 }

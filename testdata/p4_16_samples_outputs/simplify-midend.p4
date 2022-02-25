@@ -4,27 +4,27 @@ control c(out bool x) {
     @name("c.tmp") bool tmp;
     @name("c.tmp_0") bool tmp_0;
     @name("c.tmp_1") bool tmp_1;
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
-    @noWarn("unused") @name(".NoAction") action NoAction_2() {
+    @noWarn("unused") @name(".NoAction") action NoAction_3() {
     }
     @name("c.t1") table t1_0 {
         key = {
             x: exact @name("x") ;
         }
         actions = {
-            NoAction_1();
+            NoAction_0();
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     @name("c.t2") table t2_0 {
         key = {
             x: exact @name("x") ;
         }
         actions = {
-            NoAction_2();
+            NoAction_3();
         }
-        default_action = NoAction_2();
+        default_action = NoAction_3();
     }
     @hidden action act() {
         tmp = true;

@@ -51,7 +51,8 @@ struct Filter_Model : public ::Model::Elem {
 // Keep this in sync with ebpf_model.p4
 class EBPFModel : public ::Model::Model {
  protected:
-    EBPFModel() : counterArray(),
+    EBPFModel() : Model("0.1"),
+                  counterArray(),
                   array_table("array_table"),
                   hash_table("hash_table"),
                   tableImplProperty("implementation"),

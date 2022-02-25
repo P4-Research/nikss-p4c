@@ -16,7 +16,7 @@ parser ParserI(packet_in pk, out H hdr, inout M meta, inout standard_metadata_t 
 }
 
 control IngressI(inout H hdr, inout M meta, inout standard_metadata_t smeta) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("IngressI.do_something") action do_something() {
         mark_to_drop(smeta);
@@ -27,9 +27,9 @@ control IngressI(inout H hdr, inout M meta, inout standard_metadata_t smeta) {
         }
         actions = {
             do_something();
-            NoAction_1();
+            NoAction_0();
         }
-        const default_action = NoAction_1();
+        const default_action = NoAction_0();
     }
     apply {
         do_something_2.apply();

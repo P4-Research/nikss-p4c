@@ -28,6 +28,12 @@ header Nested {
 }
 
 struct S {
+    H    h1;
+    H1   h2;
+    H[3] h3;
+}
+
+header_union HU {
     H  h1;
     H1 h2;
 }
@@ -35,24 +41,13 @@ struct S {
 header Empty {
 }
 
-bit<32> v(in H h1, in H1 h2) {
+bool v(in HU h) {
     Empty e;
     Nested n;
     S s;
-    bool b1 = h2.minSizeInBits == 32;
-    const bit<32> se = e.minSizeInBits() + n.minSizeInBits();
-    const bit<32> sz = h1.minSizeInBits() + h2.minSizeInBits() + h2.minSizeInBytes();
-    return h1.isValid + (b1 ? h2.minSizeInBits() + (5 + h1.minSizeInBits()) : se + sz);
+    const bool b = h.minSizeInBits() == 32;
+    bool b1 = h.h2.minSizeInBits == 32;
+    const bit<32> se = e.minSizeInBits() + n.minSizeInBits() + s.h3.minSizeInBytes();
+    const bit<32> sz = h.h1.minSizeInBits() + h.h2.minSizeInBits() + h.h2.minSizeInBytes();
+    return h.isValid() && h.h1.isValid == 0 && b && b1 && h.h2.minSizeInBits() < 5 + h.h1.minSizeInBits() && se < sz && s.h3.minSizeInBytes() << 3 == s.h3.minSizeInBits();
 }
-control c(out bit<32> size) {
-    apply {
-        H h1;
-        H1 h2;
-        size = v(h1, h2);
-    }
-}
-
-control _c(out bit<32> s);
-package top(_c c);
-top(c()) main;
-

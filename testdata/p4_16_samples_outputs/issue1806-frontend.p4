@@ -19,7 +19,7 @@ parser prs(packet_in p, out Headers h) {
 }
 
 control c(inout Headers h, inout standard_metadata_t sm) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("c.do_act") action do_act() {
     }
@@ -29,9 +29,9 @@ control c(inout Headers h, inout standard_metadata_t sm) {
         }
         actions = {
             do_act();
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_0();
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     apply {
         tns_0.apply();

@@ -29,7 +29,6 @@ limitations under the License.
 #include "frontends/p4/unusedDeclarations.h"
 #include "midend/actionSynthesis.h"
 #include "midend/complexComparison.h"
-#include "midend/copyStructures.h"
 #include "midend/convertEnums.h"
 #include "midend/eliminateNewtype.h"
 #include "midend/eliminateTuples.h"
@@ -38,6 +37,7 @@ limitations under the License.
 #include "midend/noMatch.h"
 #include "midend/removeLeftSlices.h"
 #include "midend/removeMiss.h"
+#include "midend/removeParameters.h"
 #include "midend/removeSelectBooleans.h"
 #include "midend/simplifyKey.h"
 #include "midend/simplifySelectCases.h"
@@ -80,6 +80,7 @@ MidEnd::run(EbpfOptions& options, const IR::P4Program* program, std::ostream* ou
                 new P4::ClearTypeMap(&typeMap),
                 new P4::EliminateNewtype(&refMap, &typeMap),
                 new P4::SimplifyControlFlow(&refMap, &typeMap),
+                new P4::RemoveActionParameters(&refMap, &typeMap),
                 new P4::SimplifyKey(&refMap, &typeMap,
                                     new P4::OrPolicy(
                                             new P4::IsValid(&refMap, &typeMap),
@@ -91,12 +92,11 @@ MidEnd::run(EbpfOptions& options, const IR::P4Program* program, std::ostream* ou
                 new P4::SimplifyParsers(&refMap),
                 new P4::StrengthReduction(&refMap, &typeMap),
                 new P4::SimplifyComparisons(&refMap, &typeMap),
-                new P4::CopyStructures(&refMap, &typeMap),
                 new P4::LocalCopyPropagation(&refMap, &typeMap),
                 new P4::SimplifySelectList(&refMap, &typeMap),
                 new P4::MoveDeclarations(),  // more may have been introduced
                 new P4::RemoveSelectBooleans(&refMap, &typeMap),
-                new P4::SingleArgumentSelect(&refMap, &typeMap),
+                new P4::SingleArgumentSelect(),
                 new P4::ConstantFolding(&refMap, &typeMap),
                 new P4::SimplifyControlFlow(&refMap, &typeMap),
                 new P4::TableHit(&refMap, &typeMap),
@@ -129,3 +129,4 @@ MidEnd::run(EbpfOptions& options, const IR::P4Program* program, std::ostream* ou
     return evaluator->getToplevelBlock();
 }
 }  // namespace UBPF
+

@@ -72,16 +72,16 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
 }
 
 control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @noWarn("unused") @name(".NoAction") action NoAction_2() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
-    @noWarn("unused") @name(".NoAction") action NoAction_3() {
+    @noWarn("unused") @name(".NoAction") action NoAction_1() {
     }
-    @name("MyIngress.set_dmac") action set_dmac(@name("dstAddr") EthernetAddr_t dstAddr_2) {
-        hdr.ethernet.dstAddr = dstAddr_2;
+    @name("MyIngress.set_dmac") action set_dmac(EthernetAddr_t dstAddr) {
+        hdr.ethernet.dstAddr = dstAddr;
     }
     @name("MyIngress.drop") action drop() {
     }
-    @name("MyIngress.drop") action drop_1() {
+    @name("MyIngress.drop") action drop_2() {
     }
     @name("MyIngress.forward") table forward_0 {
         key = {
@@ -90,13 +90,13 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         actions = {
             set_dmac();
             drop();
-            NoAction_2();
+            NoAction_0();
         }
         size = 1024;
-        default_action = NoAction_2();
+        default_action = NoAction_0();
     }
-    @name("MyIngress.set_nhop") action set_nhop(@name("dstAddr") IPv4Addr_t dstAddr_3, @name("port") egressSpec_t port) {
-        hdr.ipv4.dstAddr = dstAddr_3;
+    @name("MyIngress.set_nhop") action set_nhop(IPv4Addr_t dstAddr, egressSpec_t port) {
+        hdr.ipv4.dstAddr = dstAddr;
         standard_metadata.egress_spec = port;
     }
     @name("MyIngress.ipv4_lpm") table ipv4_lpm_0 {
@@ -105,11 +105,11 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         }
         actions = {
             set_nhop();
-            drop_1();
-            NoAction_3();
+            drop_2();
+            NoAction_1();
         }
         size = 1024;
-        default_action = NoAction_3();
+        default_action = NoAction_1();
     }
     @name("MyIngress.send_digest") action send_digest() {
         meta._test_digest_in_mac_srcAddr0 = hdr.ethernet.srcAddr;
@@ -132,10 +132,10 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 }
 
 control MyEgress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @noWarn("unused") @name(".NoAction") action NoAction_4() {
+    @noWarn("unused") @name(".NoAction") action NoAction_5() {
     }
-    @name("MyEgress.rewrite_mac") action rewrite_mac(@name("srcAddr") EthernetAddr_t srcAddr_1) {
-        hdr.ethernet.srcAddr = srcAddr_1;
+    @name("MyEgress.rewrite_mac") action rewrite_mac(EthernetAddr_t srcAddr) {
+        hdr.ethernet.srcAddr = srcAddr;
         hdr.ipv4.ttl = hdr.ipv4.ttl + 8w255;
     }
     @name("MyEgress.send_frame") table send_frame_0 {
@@ -144,10 +144,10 @@ control MyEgress(inout headers hdr, inout metadata meta, inout standard_metadata
         }
         actions = {
             rewrite_mac();
-            NoAction_4();
+            NoAction_5();
         }
         size = 1024;
-        default_action = NoAction_4();
+        default_action = NoAction_5();
     }
     apply {
         send_frame_0.apply();
@@ -170,7 +170,7 @@ struct tuple_0 {
 
 control MyComputeChecksum(inout headers hdr, inout metadata meta) {
     apply {
-        update_checksum<tuple_0, bit<16>>(hdr.ipv4.isValid(), (tuple_0){f0 = hdr.ipv4.version,f1 = hdr.ipv4.ihl,f2 = hdr.ipv4.diffserv,f3 = hdr.ipv4.totalLen,f4 = hdr.ipv4.identification,f5 = hdr.ipv4.flags,f6 = hdr.ipv4.fragOffset,f7 = hdr.ipv4.ttl,f8 = hdr.ipv4.protocol,f9 = hdr.ipv4.srcAddr,f10 = hdr.ipv4.dstAddr}, hdr.ipv4.hdrChecksum, HashAlgorithm.csum16);
+        update_checksum<tuple_0, bit<16>>(hdr.ipv4.isValid(), { hdr.ipv4.version, hdr.ipv4.ihl, hdr.ipv4.diffserv, hdr.ipv4.totalLen, hdr.ipv4.identification, hdr.ipv4.flags, hdr.ipv4.fragOffset, hdr.ipv4.ttl, hdr.ipv4.protocol, hdr.ipv4.srcAddr, hdr.ipv4.dstAddr }, hdr.ipv4.hdrChecksum, HashAlgorithm.csum16);
     }
 }
 

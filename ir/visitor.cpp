@@ -14,12 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-
 #include <time.h>
 #include "ir.h"
 #include "lib/log.h"
-
-#include "visitor.h"
 
 /** @class Visitor::ChangeTracker
  *  @brief Assists visitors in traversing the IR.
@@ -66,7 +63,7 @@ class Visitor::ChangeTracker {
      * `start(@final); finish(@final);` were invoked.
      *
      * @return true if the node has changed or been removed or coalesced.
-     *
+     * 
      * @exception Util::CompilerBug This method fails if `start(@orig)` has not
      * previously been invoked.
      */
@@ -116,7 +113,7 @@ class Visitor::ChangeTracker {
      *  and we don't want to visit @n again the next time we see it.
      * That is, `start(@n)` has been invoked, followed by `finish(@n)`,
      * and the visitOnce field is true.
-     *
+     * 
      * @return true if @n has been visited and the visitor is finished and visitOnce is true
      */
     bool done(const IR::Node *n) const {
@@ -136,28 +133,6 @@ class Visitor::ChangeTracker {
         return visited.at(n).result;
     }
 };
-
-// static
-bool Visitor::warning_enabled(const Visitor* visitor, int warning_kind) {
-    auto errorString = ErrorCatalog::getCatalog().getName(warning_kind);
-    while (visitor != nullptr) {
-        auto crt = visitor->ctxt;
-        while (crt != nullptr) {
-            if (auto annotated = crt->node->to<IR::IAnnotated>()) {
-                for (auto a : annotated->getAnnotations()->annotations) {
-                    if (a->name.name == IR::Annotation::noWarnAnnotation) {
-                        auto arg = a->getSingleString();
-                        if (arg == errorString)
-                            return false;
-                    }
-                }
-            }
-            crt = crt->parent;
-        }
-        visitor = visitor->called_by;
-    }
-    return true;
-}
 
 Visitor::profile_t Visitor::init_apply(const IR::Node *root) {
     ctxt = nullptr;
@@ -530,42 +505,3 @@ cstring Visitor::demangle(const char *str) {
     return str;
 }
 #endif
-
-#if HAVE_LIBGC
-/** There's a bad interaction between the garbage collector and gcc's exception handling --
- * the exception support code in glibstdc++ (specifically __cxa_allocate_exception) allocates
- * space for exceptions being throw with malloc (NOT with ::operrator new for some reason),
- * and the garbage collector does not scan the malloc heap for roots when garbage collecting
- * (it knows nothing of its existance).  As a result, if you throw an exception AND that
- * exception object contains pointers to things on the GC heap, AND GC is triggered while
- * the exception is being thrown, AND those are the only pointers to those things, then
- * the objects might be garbage collected, leaving danglins pointers in the exception object.
- *
- * To avoid this problem, at least for backtracking exceptions, we track exception objects that
- * get created NOT on the GC heap and treat them as roots.
- */
-
-static std::map<const Backtrack::trigger *, size_t> trigger_gc_roots;
-#endif /* HAVE_LIBGC */
-
-void Backtrack::trigger::register_for_gc(size_t
-#if HAVE_LIBGC
-                                         sz
-#endif /* HAVE_LIBGC */
-                                         ) {
-#if HAVE_LIBGC
-    if (!GC_is_heap_ptr(this)) {
-        trigger_gc_roots[this] = sz;
-        GC_add_roots(this, reinterpret_cast<char *>(this) + sz);
-    }
-#endif /* HAVE_LIBGC */
-}
-
-Backtrack::trigger::~trigger() {
-#if HAVE_LIBGC
-    if (auto sz = ::get(trigger_gc_roots, this)) {
-        GC_remove_roots(this, reinterpret_cast<char *>(this) + sz);
-        trigger_gc_roots.erase(this);
-    }
-#endif /* HAVE_LIBGC */
-}

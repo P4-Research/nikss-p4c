@@ -242,6 +242,8 @@ class StructField : Declaration, IAnnotated {
 }
 
 abstract Type_StructLike : Type_Declaration, INestedNamespace, ISimpleNamespace, IAnnotated, IMayBeGenericType {
+    static const cstring minSizeInBits;
+    static const cstring minSizeInBytes;
     optional Annotations annotations = Annotations::empty;
     optional TypeParameters typeParameters = new TypeParameters();
     optional inline IndexedVector<StructField>  fields;
@@ -258,22 +260,6 @@ abstract Type_StructLike : Type_Declaration, INestedNamespace, ISimpleNamespace,
             if (f->name == name)
                 return index_pos;
 	    index_pos++;
-        }
-        return -1;
-    }
-    /// This function returns start offset of the given field name in bits.
-    /// If the given name is not a valid field name, -1 is returned.
-    /// The given offset may not be correct if varbit field(s) present in between.
-    /// Offset for all fields will be correct if:
-    ///  - the type has only fixed width fields
-    ///  - the type has fixed width fields with only one varbit field as a last member.
-    int getFieldBitOffset(cstring name) const {
-        int offset = 0;
-        for (auto f : fields) {
-            if (f->name == name) {
-                return offset;
-            }
-            offset += f->type->width_bits();
         }
         return -1;
     }
@@ -311,14 +297,6 @@ class Type_HeaderUnion : Type_StructLike {
         for (auto f : fields)
             rv = std::max(rv, f->type->width_bits());
         return rv; }
-    /// start offset of any field in a union is 0
-    int getFieldBitOffset(cstring name) const {
-        for (auto f : fields) {
-            if (f->name == name) {
-                return 0;
-            }
-        }
-        return -1; }
 }
 
 class Type_Header : Type_StructLike {
@@ -340,19 +318,11 @@ class Type_Set : Type {
         return elementType->width_bits(); }
 }
 
-interface Type_Indexed {
-    // Probably this sohuld be called 'size()', but some subclasses already
-    // have a 'size' field.
-    virtual size_t getSize() const = 0;
-    Type at(size_t index) const;
-}
-
 /// Base class for Type_List and Type_Tuple
-abstract Type_BaseList : Type, Type_Indexed {
+abstract Type_BaseList : Type {
     optional inline Vector<Type> components;
     validate{ components.check_null(); }
-    size_t getSize() const override { return components.size(); }
-    Type at(size_t index) const { return components.at(index); }
+    size_t size() const { return components.size(); }
     int width_bits() const override {
         /// returning sum of the width of the elements
         int rv = 0;
@@ -360,28 +330,22 @@ abstract Type_BaseList : Type, Type_Indexed {
             rv += f->width_bits();
         }
         return rv; }
-    toString{
-        std::string result = "tuple<";
-        bool first = true;
-        for (auto t : components) {
-            if (!first)
-                result += ", ";
-            first = false;
-            result += t->toString();
-        }
-        return result + ">";
-    }
 }
 
 /// The type of an expressionList; can be unified with both Type_Tuple and Type_Struct
 class Type_List : Type_BaseList {
     // In error messages this is shown as if it is a Tuple
+    toString{ return "Tuple(" + Util::toString(components.size()) + ")"; }
     const Type* getP4Type() const override;
 }
 
 /// The type of a tuple.
 class Type_Tuple : Type_BaseList {
+    toString{ return "Tuple(" + Util::toString(components.size()) + ")"; }
     const Type* getP4Type() const override;
+    /// Return a field index if given a legal tuple field name.
+    /// Otherwise return -1.
+    int fieldNameValid(cstring name) const;
 }
 
 /// The type of an architectural block.
@@ -398,7 +362,6 @@ abstract Type_ArchBlock : Type_Declaration, IMayBeGenericType, IAnnotated, ISimp
 }
 
 class Type_Package : Type_ArchBlock, IContainer, ISimpleNamespace {
-    Type getType() const override { return this; }
     ParameterList constructorParams;
     Type_Method getConstructorMethodType() const override;
     ParameterList getConstructorParameters() const override { return constructorParams; }
@@ -438,15 +401,14 @@ class Type_Name : Type {
     }
 }
 
-class Type_Stack : Type_Indexed, Type {
+class Type_Stack : Type {
     Type        elementType;
     Expression  size;
     toString{ return elementType->toString() + "[" +
                 (sizeKnown() ? Util::toString(getSize()) : "?") + "]"; }
     dbprint{ out << elementType << "[" << size << "]"; }
     bool sizeKnown() const;
-    size_t getSize() const override;
-    Type at(size_t index) const;
+    unsigned getSize() const;
     static const cstring next;
     static const cstring last;
     static const cstring arraySize;
@@ -461,22 +423,13 @@ class Type_Stack : Type_Indexed, Type {
    extern E<T> { ... }
    Type_Specialized represents a type such
    E<bit<32>>
-   baseType is Type_Name E, arguments is a vector containing Type_Bits(32) */
+   baseType is Type_Extern E, arguments is a vector containing Type_Bits(32) */
 class Type_Specialized : Type {
     Type_Name    baseType;
     Vector<Type> arguments;
+    toString{ return baseType->toString() + "<...>"; }
     validate{ arguments->check_null(); }
     const Type* getP4Type() const override;
-    toString{
-        cstring result = baseType->toString() + "<";
-        cstring sep = "";
-        for (auto t : *arguments) {
-            result += sep + t->toString();
-            sep = ", ";
-        }
-        result += ">";
-        return result;
-    }
 }
 
 /** Canonical representation of a Type_Specialized;
@@ -494,7 +447,6 @@ class Type_SpecializedCanonical : Type {
         BUG_CHECK(substituted->is<IMayBeGenericType>(), "substituted %1% is not generic", substituted);
     }
     const Type* getP4Type() const override;
-    toString{ return baseType->toString() + "<...>"; }
 }
 
 /// A declaration that consists of just an identifier, e.g., an enum member

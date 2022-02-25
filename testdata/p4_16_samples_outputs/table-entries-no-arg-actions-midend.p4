@@ -3,7 +3,7 @@
 control C(inout bit<2> x);
 package S(C c);
 control MyC(inout bit<2> x) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("MyC.a") action a() {
     }
@@ -16,7 +16,7 @@ control MyC(inout bit<2> x) {
         actions = {
             a();
             b();
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_0();
         }
         const entries = {
                         2w0 : a();
@@ -24,7 +24,8 @@ control MyC(inout bit<2> x) {
                         2w2 : a();
                         2w3 : b();
         }
-        default_action = NoAction_1();
+
+        default_action = NoAction_0();
     }
     apply {
         t_0.apply();

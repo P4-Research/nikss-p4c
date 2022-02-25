@@ -26,8 +26,11 @@ const IR::Node* DoInstantiateCalls::postorder(IR::MethodCallExpression* expressi
         return expression;
 
     auto ref = refMap->getDeclaration(tn->typeName->path, true);
-    if (!ref->is<IR::P4Control>() && !ref->is<IR::P4Parser>())
+    if (!ref->is<IR::P4Control>() && !ref->is<IR::P4Parser>()) {
+        ::error(ErrorType::ERR_INVALID,
+                "%1%: cannot invoke method of %2%", expression, ref);
         return expression;
+    }
 
     auto name = refMap->newName(tn->typeName->path->name + "_inst");
     LOG3("Inserting instance " << name);

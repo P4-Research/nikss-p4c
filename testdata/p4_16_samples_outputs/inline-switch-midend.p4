@@ -18,6 +18,7 @@ control d(out bit<32> x) {
             default: {
             }
         }
+
     }
 }
 

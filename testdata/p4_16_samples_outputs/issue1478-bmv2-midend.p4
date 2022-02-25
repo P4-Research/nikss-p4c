@@ -38,29 +38,30 @@ control deparser(packet_out b, in Headers h) {
 }
 
 control ingress(inout Headers h, inout Meta m, inout standard_metadata_t sm) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
-    @noWarn("unused") @name(".NoAction") action NoAction_2() {
+    @noWarn("unused") @name(".NoAction") action NoAction_3() {
     }
     @name("ingress.t1") table t1_0 {
         size = 3;
         actions = {
-            NoAction_1();
+            NoAction_0();
         }
-        const default_action = NoAction_1();
+        const default_action = NoAction_0();
     }
     @name("ingress.t2") table t2_0 {
         key = {
             sm.ingress_port: exact @name("sm.ingress_port") ;
         }
         actions = {
-            NoAction_2();
+            NoAction_3();
         }
         const entries = {
-                        9w0 : NoAction_2();
+                        9w0 : NoAction_3();
         }
+
         size = 10;
-        default_action = NoAction_2();
+        default_action = NoAction_3();
     }
     apply {
         t1_0.apply();

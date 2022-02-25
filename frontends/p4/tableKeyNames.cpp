@@ -130,7 +130,6 @@ const IR::Node* DoTableKeyNames::postorder(IR::KeyElement* keyElement) {
         // already present: no changes
         return keyElement;
     KeyNameGenerator kng(typeMap);;
-    kng.setCalledBy(this);
     (void)keyElement->expression->apply(kng);
     cstring name = kng.getName(keyElement->expression);
 

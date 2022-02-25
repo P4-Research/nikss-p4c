@@ -1,13 +1,11 @@
 control c(inout bit<16> y) {
     @name("c.x") bit<32> x_0;
-    @name("c.arg") bit<32> arg_0;
-    @name("c.a") action a() {
-        arg_0 = x_0;
-        y = (bit<16>)arg_0;
+    @name("c.a") action a(bit<32> arg) {
+        y = (bit<16>)arg;
     }
     apply {
         x_0 = 32w10;
-        a();
+        a(x_0);
     }
 }
 

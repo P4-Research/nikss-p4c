@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef _LIB_ALLOC_H_
-#define _LIB_ALLOC_H_
+#ifndef P4C_LIB_ALLOC_H_
+#define P4C_LIB_ALLOC_H_
 
 #include <stdlib.h>
 #include <stdexcept>
@@ -25,9 +25,11 @@ template<class T> class Alloc1Dbase {
     int         size;
     T           *data;
  protected:
-    Alloc1Dbase(int sz, T* data) : size(sz), data(data) {}
+    explicit Alloc1Dbase(int sz) : size(sz) {
+        data = new T[sz];
+        for (int i = 0; i < sz; i++) data[i] = T(); }
     Alloc1Dbase(Alloc1Dbase &&a) : size(a.size), data(a.data) { a.data = 0; }
-    ~Alloc1Dbase() = default;
+    virtual ~Alloc1Dbase() { delete [] data; }
 
  public:
     typedef T *iterator;
@@ -44,9 +46,8 @@ template<class T> class Alloc1Dbase {
 };
 
 template<class T, int S> class Alloc1D : public Alloc1Dbase<T> {
-    std::array<T, S> data;
  public:
-    Alloc1D() : Alloc1Dbase<T>(S, data.data()), data{} {}
+    Alloc1D() : Alloc1Dbase<T>(S) {}
     Alloc1Dbase<T> &base() { return *this; }
 };
 
@@ -70,9 +71,12 @@ template<class T> class Alloc2Dbase {
     };
 
  protected:
-    Alloc2Dbase(int r, int c, T* data) : nrows(r), ncols(c), data(data) {}
+    Alloc2Dbase(int r, int c) : nrows(r), ncols(c) {
+        size_t sz = r*c;
+        data = new T[sz];
+        for (size_t i = 0; i < sz; i++) data[i] = T(); }
     Alloc2Dbase(Alloc2Dbase &&a) : nrows(a.nrows), ncols(a.ncols), data(a.data) { a.data = 0; }
-    ~Alloc2Dbase() = default;
+    virtual ~Alloc2Dbase() { delete [] data; }
 
  public:
     rowref<T> operator[](int i) {
@@ -100,10 +104,9 @@ template<class T> class Alloc2Dbase {
 };
 
 template<class T, int R, int C> class Alloc2D : public Alloc2Dbase<T> {
-    std::array<T, R*C> data;
  public:
-    Alloc2D() : Alloc2Dbase<T>(R, C, data.data()), data{} {}
+    Alloc2D() : Alloc2Dbase<T>(R, C) {}
     Alloc2Dbase<T> &base() { return *this; }
 };
 
-#endif /* _LIB_ALLOC_H_ */
+#endif /* P4C_LIB_ALLOC_H_ */

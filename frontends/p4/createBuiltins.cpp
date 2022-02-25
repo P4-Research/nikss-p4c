@@ -57,7 +57,7 @@ void CreateBuiltins::postorder(IR::Entry* entry) {
 
 void CreateBuiltins::postorder(IR::ParserState* state) {
     if (state->selectExpression == nullptr) {
-        warn(ErrorType::WARN_PARSER_TRANSITION, "%1%: implicit transition to `reject'", state);
+        warning(ErrorType::WARN_PARSER_TRANSITION, "%1%: implicit transition to `reject'", state);
         state->selectExpression = new IR::PathExpression(IR::ParserState::reject);
     }
 }

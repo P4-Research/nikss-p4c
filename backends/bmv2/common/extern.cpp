@@ -221,10 +221,22 @@ ExternConverter::createCalculation(ConversionContext* ctxt,
     if (sourcePositionNode != nullptr)
         calc->emplace_non_null("source_info", sourcePositionNode->sourceInfoJsonObj());
     calc->emplace("algo", algo);
-    fields = convertToList(fields, ctxt->typeMap);
-    if (!fields) {
-        modelError("%1%: expected a struct", fields);
-        return calcName;
+    if (!fields->is<IR::ListExpression>()) {
+        // expand it into a list
+        auto list = new IR::ListExpression({});
+        auto type = ctxt->typeMap->getType(fields, true);
+        if (!type->is<IR::Type_StructLike>()) {
+            modelError("%1%: expected a struct", fields);
+            return calcName;
+        }
+        for (auto f : type->to<IR::Type_StructLike>()->fields) {
+            auto e = new IR::Member(fields, f->name);
+            auto ftype = ctxt->typeMap->getType(f);
+            ctxt->typeMap->setType(e, ftype);
+            list->push_back(e);
+        }
+        fields = list;
+        ctxt->typeMap->setType(fields, type);
     }
     auto jright = ctxt->conv->convertWithConstantWidths(fields);
     if (withPayload) {

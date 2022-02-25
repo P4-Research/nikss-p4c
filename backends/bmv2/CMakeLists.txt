@@ -36,7 +36,6 @@ set (BMV2_PSA_SWITCH_SRCS
     psa_switch/midend.cpp
     psa_switch/midend.h
     psa_switch/psaSwitch.cpp
-    psa_switch/options.cpp
     psa_switch/psaSwitch.h
     psa_switch/options.h
     )
@@ -84,7 +83,7 @@ set (IR_DEF_FILES ${IR_DEF_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/bmv2.def PARENT_SC
 add_cpplint_files (${CMAKE_CURRENT_SOURCE_DIR} "${BMV2_BACKEND_COMMON_SRCS};${BMV2_BACKEND_COMMON_HDRS}")
 
 build_unified(BMV2_BACKEND_COMMON_SRCS)
-add_library(bmv2backend ${P4C_STATIC_BUILD} ${BMV2_BACKEND_COMMON_SRCS})
+add_library(bmv2backend ${BMV2_BACKEND_COMMON_SRCS})
 add_dependencies(bmv2backend genIR frontend)
 
 build_unified(BMV2_SIMPLE_SWITCH_SRCS)
@@ -149,7 +148,7 @@ set (BMV2_PSA_TEST_SUITES
 
 # -p to use psa switch model
 # -a to pass flags to compiler
-set (testExtraFlags "${testExtraFlags} -p -a='--target bmv2 --arch psa'")
+set (testExtraFlags "${testExtraFlags} -p -a '--target bmv2 --arch psa'")
 
 set (XFAIL_TESTS
   # This test defines two lpm keys for a table.
@@ -158,6 +157,17 @@ set (XFAIL_TESTS
   testdata/p4_14_samples/issue60.p4
   # compiler claims (incorrectly?) that c2 has mulitple successors, so is not supported
   testdata/p4_14_samples/issue-1426.p4
+  # As of 2019-Feb-04 latest p4c code, this program fails due to the
+  # root cause of both issues #1694 and #1669.  I have tested it with
+  # the proposed fix for issue #1694 that is on PR #1704, and while
+  # that does make the produced BMv2 JSON file able to cause packets
+  # to be recirculated, resubmitted, etc. it still has the bug of not
+  # preserving the metadata specified in the program's field_lists, so
+  # the STF tests fail because of issue #1669.  As of this writing,
+  # this program is the _only_ p4c test program that relies for its
+  # successful execution on the preservation of metadata across
+  # resubmit, recirculate, and/or clone operations.
+  testdata/p4_14_samples/p414-special-ops-2-bmv2.p4
   # This test uses a feature currently unsupported in the BMv2 back-end.
   testdata/p4_16_samples/issue907-bmv2.p4
   # This test uses a table graph that is not implementable in BMv2
@@ -178,22 +188,17 @@ set (XFAIL_TESTS
   # These test use computations in the verify/update checksum controls - unsupported
   testdata/p4_16_samples/issue1765-bmv2.p4
   testdata/p4_16_samples/issue1765-1-bmv2.p4
-  # Next three use unknown externs
+  # Next two use unknown externs
   testdata/p4_16_samples/issue1882-bmv2.p4
   testdata/p4_16_samples/issue1882-1-bmv2.p4
-  testdata/p4_16_samples/issue2664-bmv2.p4
   # This one uses arguments of incorrect types to log_msg
   testdata/p4_16_samples/issue2201-bmv2.p4
 )
 
-set (BMV2_PARSER_INLINE_TESTS "${P4C_SOURCE_DIR}/testdata/p4_16_samples/parser-inline/*.p4")
-
 if (HAVE_SIMPLE_SWITCH)
   p4c_add_tests("bmv2" ${BMV2_DRIVER} "${BMV2_V1MODEL_TEST_SUITES}" "${XFAIL_TESTS}")
   add_library(extern_func_module MODULE EXCLUDE_FROM_ALL "${P4C_SOURCE_DIR}/testdata/extern_modules/extern-funcs-bmv2.cpp" )
-  p4c_add_test_with_args("bmv2" ${BMV2_DRIVER} FALSE "bmv2_emit_externs" "testdata/p4_16_samples/extern-funcs-bmv2.p4" "-a=--emit-externs --target-specific-switch-arg=\"--load-modules ${CMAKE_CURRENT_BINARY_DIR}/libextern_func_module.so\" --init=\"make extern_func_module\"" "")
-  p4c_add_tests("bmv2-parser-inline-opt-disabled" ${BMV2_DRIVER} "${BMV2_PARSER_INLINE_TESTS}" "")
-  p4c_add_tests("bmv2-parser-inline-opt-enabled" ${BMV2_DRIVER} "${BMV2_PARSER_INLINE_TESTS}" "" "-a=--parser-inline-opt")
+  p4c_add_test_with_args("bmv2" ${BMV2_DRIVER} FALSE "bmv2_emit_externs" "testdata/p4_16_samples/extern-funcs-bmv2.p4" "-a --emit-externs --target-specific-switch-arg \"--load-modules ${CMAKE_CURRENT_BINARY_DIR}/libextern_func_module.so\" --init \"make extern_func_module\"" "")
 else()
   MESSAGE(WARNING "BMv2 simple switch is not available, not adding v1model BMv2 tests")
 endif()

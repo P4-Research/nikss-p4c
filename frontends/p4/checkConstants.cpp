@@ -35,7 +35,7 @@ void DoCheckConstants::postorder(const IR::MethodCallExpression* expression) {
 
 void DoCheckConstants::postorder(const IR::KeyElement* key) {
     if (key->expression->is<IR::Literal>())
-        warn(ErrorType::WARN_MISMATCH, "%1%: Constant key field", key->expression);
+        ::warning(ErrorType::WARN_MISMATCH, "%1%: Constant key field", key->expression);
 }
 
 void DoCheckConstants::postorder(const IR::P4Table* table) {

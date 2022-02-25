@@ -13,16 +13,18 @@ parser p1(packet_in p, out Header h) {
     @name("p1.tmp") bit<32> tmp;
     @name("p1.tmp_0") bit<32> tmp_0;
     @name("p1.tmp_1") bit<32> tmp_1;
+    @name("p1.tmp_2") bit<32> tmp_2;
     state start {
-        stack_0[0].setInvalid();
-        stack_0[1].setInvalid();
         h.data1 = 32w0;
         func(h);
         tmp = h.data2;
         tmp_0 = h.data2;
-        tmp_1 = g(h.data2, tmp_0);
-        g(tmp, tmp_1);
+        tmp_1 = g(tmp, tmp_0);
+        h.data2 = tmp;
+        tmp_2 = tmp_1;
+        g(h.data2, tmp_2);
         h.data2 = h.data3 + 32w1;
+        stack_0[1].isValid();
         transition select(h.isValid()) {
             true: next1;
             false: next2;
@@ -43,7 +45,7 @@ control c(out bit<32> v) {
     @name("c.e") bit<32> e_0;
     @name("c.a1") action a1() {
     }
-    @name("c.a1") action a1_1() {
+    @name("c.a1") action a1_2() {
     }
     @name("c.a2") action a2() {
     }
@@ -70,7 +72,7 @@ control c(out bit<32> v) {
         if (e_0 > 32w0) {
             t_0.apply();
         } else {
-            a1_1();
+            a1_2();
         }
     }
 }

@@ -39,6 +39,7 @@ control c(in hdr h, inout standard_metadata_t standard_meta) {
                         0x1 : a();
                         0x2 : b();
         }
+
     }
     apply {
         t.apply();

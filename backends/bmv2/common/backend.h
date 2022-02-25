@@ -32,7 +32,6 @@ limitations under the License.
 #include "JsonObjects.h"
 #include "metermap.h"
 #include "midend/convertEnums.h"
-#include "midend/removeComplexExpressions.h"
 #include "midend/actionSynthesis.h"
 #include "midend/removeLeftSlices.h"
 #include "sharedActionSelectorCheck.h"
@@ -96,7 +95,7 @@ are in the specified set.
 For example, we expect that the code in ingress and egress will have complex
 expression removed.
 */
-class ProcessControls : public P4::RemoveComplexExpressionsPolicy {
+class ProcessControls : public BMV2::RemoveComplexExpressionsPolicy {
     const std::set<cstring> *process;
 
  public:
@@ -122,7 +121,6 @@ class RenameUserMetadata : public Transform {
     // Used as a prefix for the fields of the userMetadata structure
     // and also as a name for the userMetadata type clone.
     cstring namePrefix;
-    bool renamed = false;
 
  public:
     RenameUserMetadata(P4::ReferenceMap* refMap,
@@ -132,13 +130,11 @@ class RenameUserMetadata : public Transform {
 
     const IR::Node* postorder(IR::Type_Struct* type) override {
         // Clone the user metadata type
-        auto orig = getOriginal<IR::Type_Struct>();
-        if (userMetaType->name != orig->name)
+        if (userMetaType != getOriginal())
             return type;
 
         auto vec = new IR::IndexedVector<IR::Node>();
-        LOG2("Creating clone of " << orig);
-        renamed = true;
+        LOG2("Creating clone" << getOriginal());
         auto clone = type->clone();
         clone->name = namePrefix;
         vec->push_back(clone);
@@ -182,11 +178,6 @@ class RenameUserMetadata : public Transform {
             type->path = new IR::Path(type->path->srcInfo, IR::ID(type->path->srcInfo, namePrefix));
         LOG2("Replacing reference with " << type);
         return type;
-    }
-
-    void end_apply(const IR::Node*) override {
-        BUG_CHECK(renamed, "Could not identify user metadata type declaration %1%",
-                  userMetaType);
     }
 };
 

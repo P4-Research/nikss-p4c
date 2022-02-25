@@ -29,9 +29,8 @@ class HasInfInt : public Inspector {
         return false;
     }
     void postorder(const IR::Type_InfInt*) override { found = true; }
-    static bool find(const IR::Node* node, const Visitor* calledBy) {
+    static bool find(const IR::Node* node) {
         HasInfInt hii;
-        hii.setCalledBy(calledBy);
         node->apply(hii);
         return hii.found;
     }
@@ -43,12 +42,10 @@ class HasInfInt : public Inspector {
 /// Type_InfInt inside.
 /// Return nullptr if the type is not suitable to assign to a type variable.
 static const IR::Type* validateType(
-    const IR::Type* type, const TypeMap* typeMap,
-    const IR::Node* errorPosition, const Visitor* calledBy) {
+    const IR::Type* type, const TypeMap* typeMap, const IR::Node* errorPosition) {
     auto repl = type ? type->getP4Type() : nullptr;
-    if (type == nullptr || repl == nullptr || HasInfInt::find(type, calledBy)) {
+    if (type == nullptr || repl == nullptr || HasInfInt::find(type)) {
         auto eoi = new ErrorOnInfInt(typeMap);
-        eoi->setCalledBy(calledBy);
         errorPosition->apply(*eoi);
         return nullptr;
     }
@@ -64,7 +61,7 @@ const IR::Type* DoBindTypeVariables::getVarValue(
                 errorPosition, var);
         return nullptr;
     }
-    auto result = validateType(type, typeMap, errorPosition, this);
+    auto result = validateType(type, typeMap, errorPosition);
     LOG2("Replacing " << var << " with " << result);
     return result;
 }
@@ -81,8 +78,6 @@ const IR::Node* DoBindTypeVariables::postorder(IR::Declaration_Instance* decl) {
     if (decl->type->is<IR::Type_Specialized>())
         return decl;
     auto type = typeMap->getType(getOriginal(), true);
-    if (auto tsc = type->to<IR::Type_SpecializedCanonical>())
-        type = tsc->substituted;
     BUG_CHECK(type->is<IR::IMayBeGenericType>(), "%1%: unexpected type %2% for declaration",
               decl, type);
     auto mt = type->to<IR::IMayBeGenericType>();

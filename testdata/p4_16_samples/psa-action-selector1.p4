@@ -1,5 +1,5 @@
 #include <core.p4>
-#include <bmv2/psa.p4>
+#include <psa.p4>
 
 struct EMPTY { };
 
@@ -15,20 +15,16 @@ header ethernet_t {
     bit<16>         etherType;
 }
 
-struct headers_t {
-    ethernet_t ethernet;
-}
-
 parser MyIP(
     packet_in buffer,
-    out headers_t hdr,
+    out ethernet_t eth,
     inout user_meta_t b,
     in psa_ingress_parser_input_metadata_t c,
     in EMPTY d,
     in EMPTY e) {
 
     state start {
-        buffer.extract(hdr.ethernet);
+        buffer.extract(eth);
         transition accept;
     }
 }
@@ -47,17 +43,17 @@ parser MyEP(
 }
 
 control MyIC(
-    inout headers_t hdr,
+    inout ethernet_t a,
     inout user_meta_t b,
     in psa_ingress_input_metadata_t c,
     inout psa_ingress_output_metadata_t d) {
 
     ActionSelector(PSA_HashAlgorithm_t.CRC32, 32w1024, 32w16) as;
-    action a1(bit<48> param) { hdr.ethernet.dstAddr = param; }
-    action a2(bit<16> param) { hdr.ethernet.etherType = param; }
+    action a1(bit<48> param) { a.dstAddr = param; }
+    action a2(bit<16> param) { a.etherType = param; }
     table tbl {
         key = {
-            hdr.ethernet.srcAddr : exact;
+            a.srcAddr : exact;
             b.data : selector;
         }
         actions = { NoAction; a1; a2; }
@@ -82,11 +78,11 @@ control MyID(
     out EMPTY a,
     out EMPTY b,
     out EMPTY c,
-    inout headers_t hdr,
+    inout ethernet_t d,
     in user_meta_t e,
     in psa_ingress_output_metadata_t f) {
     apply {
-        buffer.emit(hdr.ethernet);
+        buffer.emit(d);
     }
 }
 

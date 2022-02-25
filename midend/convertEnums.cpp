@@ -42,13 +42,11 @@ const IR::Node* DoConvertEnums::postorder(IR::Member* expression) {
     if (!ei)
         return expression;
     if (ei->is<SimpleEnumInstance>()) {
-        auto type = ei->type->to<IR::Type_Enum>();
-        auto r = ::get(repr, type);
+        auto r = ::get(repr, ei->type->to<IR::Type_Enum>());
         if (r == nullptr)
             return expression;
         unsigned value = r->get(ei->name.name);
-        unsigned encoded_value = policy->encoding(type, value);
-        auto cst = new IR::Constant(expression->srcInfo, r->type, encoded_value);
+        auto cst = new IR::Constant(expression->srcInfo, r->type, value);
         return cst;
     }
     return expression;

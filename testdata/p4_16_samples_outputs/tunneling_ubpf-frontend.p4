@@ -60,9 +60,9 @@ parser prs(packet_in p, out Headers_t headers, inout metadata meta, inout standa
 }
 
 control pipe(inout Headers_t headers, inout metadata meta, inout standard_metadata std_meta) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
-    @noWarn("unused") @name(".NoAction") action NoAction_2() {
+    @noWarn("unused") @name(".NoAction") action NoAction_3() {
     }
     @name("pipe.mpls_encap") action mpls_encap() {
         headers.mpls.setValid();
@@ -82,9 +82,9 @@ control pipe(inout Headers_t headers, inout metadata meta, inout standard_metada
         }
         actions = {
             mpls_decap();
-            NoAction_1();
+            NoAction_0();
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     @name("pipe.downstream_tbl") table downstream_tbl_0 {
         key = {
@@ -92,9 +92,9 @@ control pipe(inout Headers_t headers, inout metadata meta, inout standard_metada
         }
         actions = {
             mpls_encap();
-            NoAction_2();
+            NoAction_3();
         }
-        default_action = NoAction_2();
+        default_action = NoAction_3();
     }
     apply {
         if (headers.mpls.isValid()) {

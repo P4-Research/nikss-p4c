@@ -116,7 +116,6 @@ const IR::Node* ActionsInliner::preorder(IR::MethodCallStatement* statement) {
     }
 
     SubstituteParameters sp(refMap, &subst, &tvs);
-    sp.setCalledBy(this);
     auto clone = callee->apply(sp);
     if (::errorCount() > 0)
         return statement;

@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef _LIB_ERROR_CATALOG_H_
-#define _LIB_ERROR_CATALOG_H_
+#ifndef P4C_LIB_ERROR_CATALOG_H_
+#define P4C_LIB_ERROR_CATALOG_H_
 
 #include <map>
 #include <string>
@@ -72,7 +72,6 @@ class ErrorType {
     static const int WARN_UNREACHABLE;        // parser state unreachable
     static const int WARN_SHADOWING;          // instance shadowing
     static const int WARN_IGNORE;             // simply ignore
-    static const int WARN_INVALID_HEADER;     // access to fields of an invalid header
 
     static const int WARN_MAX_WARNINGS;
 };
@@ -111,4 +110,4 @@ class ErrorCatalog {
     static std::map<int, cstring> errorCatalog;
 };
 
-#endif  // _LIB_ERROR_CATALOG_H_
+#endif  // P4C_LIB_ERROR_CATALOG_H_

@@ -1,6 +1,4 @@
-[![Main Build](https://github.com/p4lang/p4c/actions/workflows/ci-test.yml/badge.svg)](https://github.com/p4lang/p4c/actions/workflows/ci-test.yml)
-[![Bazel Build](https://github.com/p4lang/p4c/actions/workflows/ci-bazel.yml/badge.svg)](https://github.com/p4lang/p4c/actions/workflows/ci-bazel.yml)
-[![Validation](https://github.com/p4lang/p4c/actions/workflows/ci-validation.yml/badge.svg)](https://github.com/p4lang/p4c/actions/workflows/ci-validation.yml)
+[![Build Status](https://travis-ci.com/p4lang/p4c.svg?branch=master)](https://travis-ci.com/p4lang/p4c)
 
 # p4c
 
@@ -19,17 +17,15 @@ make adding new backends easy.
 
 The code contains five sample backends:
 * p4c-bm2-ss: can be used to target the P4 `simple_switch` written using
-  the BMv2 behavioral model https://github.com/p4lang/behavioral-model,
-* p4c-dpdk: can be used to target the DPDK software switch (SWX) pipeline
-  https://doc.dpdk.org/guides/rel_notes/release_20_11.html,
-* p4c-ebpf: can be used to generate C code which can be compiled to eBPF
+  the BMv2 behavioral model https://github.com/p4lang/behavioral-model
+* p4c-ebpf: can be used to generate C code which can be compiled to EBPF
   https://en.wikipedia.org/wiki/Berkeley_Packet_Filter and then loaded
-  in the Linux kernel for packet filtering,
+  in the Linux kernel for packet filtering
 * p4test: a source-to-source P4 translator which can be used for
-  testing, learning compiler internals and debugging,
+  testing, learning compiler internals and debugging.
 * p4c-graphs: can be used to generate visual representations of a P4 program;
-  for now it only supports generating graphs of top-level control flows, and
-* p4c-ubfp: can be used to generate eBPF code that runs in user-space.
+  for now it only supports generating graphs of top-level control flows.
+* p4c-ubfp: can be used to generate ebpf code that runs in user-space
 
 Sample command lines:
 
@@ -101,47 +97,6 @@ dot -Tpdf ParserImpl.dot > ParserImpl.pdf
 
 # Getting started
 
-## Installing packaged versions of p4c
-
-p4c has package support for several Ubuntu and Debian distributions.
-
-### Ubuntu
-
-For Ubuntu 20.04 and Ubuntu 21.04 it can be installed as follows:
-
-```bash
-. /etc/os-release
-echo "deb http://download.opensuse.org/repositories/home:/p4lang/xUbuntu_${VERSION_ID}/ /" | sudo tee /etc/apt/sources.list.d/home:p4lang.list
-curl -L "http://download.opensuse.org/repositories/home:/p4lang/xUbuntu_${VERSION_ID}/Release.key" | sudo apt-key add -
-sudo apt-get update
-sudo apt install p4lang-p4c
-```
-
-### Debian
-
-For Debian 11 (Bullseye) it can be installed as follows:
-
-```bash
-echo 'deb http://download.opensuse.org/repositories/home:/p4lang/Debian_11/ /' | sudo tee /etc/apt/sources.list.d/home:p4lang.list
-curl -fsSL https://download.opensuse.org/repositories/home:p4lang/Debian_11/Release.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/home_p4lang.gpg > /dev/null
-sudo apt update
-sudo apt install p4lang-p4c
-```
-
-If you cannot use a repository to install p4c, you can download the `.deb` file
-for your release and install it manually. You need to download a new file each
-time you want to upgrade p4c.
-
-1. Go to https://build.opensuse.org/package/show/home:p4lang/p4lang-p4c, click on
-"Download package" and choose your operating system version.
-
-2. Install p4c, changing the path below to the path where you downloaded the package.
-
-```bash
-sudo dpkg -i /path/to/package.deb
-```
-
-## Installing p4c from source
 1.  Clone the repository. It includes submodules, so be sure to use
     `--recursive` to pull them in:
     ```
@@ -153,9 +108,9 @@ sudo dpkg -i /path/to/package.deb
     ```
 
 2.  Install [dependencies](#dependencies). You can find specific instructions
-    for Ubuntu 20.04 [here](#ubuntu-dependencies) and for macOS 10.12
+    for Ubuntu 16.04 [here](#ubuntu-dependencies) and for macOS 10.12
     [here](#macos-dependencies).  You can also look at the
-    [CI installation script](tools/ci-build.sh).
+    [travis installation script](tools/travis-build).
 
 3.  Build. Building should also take place in a subdirectory named `build`.
     ```
@@ -172,18 +127,10 @@ sudo dpkg -i /path/to/package.deb
       symbols to run in gdb. Default is RELEASE.
      - `-DCMAKE_INSTALL_PREFIX=<path>` -- set the directory where
        `make install` installs the compiler. Defaults to /usr/local.
-     - `-DENABLE_BMV2=ON|OFF`. Enable [the bmv2
-       backend](backends/bmv2/README.md). Default ON.
-     - `-DENABLE_EBPF=ON|OFF`. Enable [the ebpf
-       backend](backends/ebpf/README.md). Default ON.
-     - `-DENABLE_UBPF=ON|OFF`. Enable [the ubpf
-       backend](backends/ubpf/README.md). Default ON.
-     - `-DENABLE_DPDK=ON|OFF`. Enable [the DPDK
-       backend](backends/dpdk/README.md). Default ON.
-     - `-DENABLE_P4C_GRAPHS=ON|OFF`. Enable [the p4c-graphs
-       backend](backends/graphs/README.md). Default ON.
-     - `-DENABLE_P4TEST=ON|OFF`. Enable [the p4test
-       backend](backends/p4test/README.md). Default ON.
+     - `-DENABLE_BMV2=ON|OFF`. Enable the bmv2 backend. Default ON.
+     - `-DENABLE_EBPF=ON|OFF`. Enable the ebpf backend. Default ON.
+     - `-DENABLE_P4C_GRAPHS=ON|OFF`. Enable the p4c-graphs backend. Default ON.
+     - `-DENABLE_P4TEST=ON|OFF`. Enable the p4test backend. Default ON.
      - `-DENABLE_DOCS=ON|OFF`. Build documentation. Default is OFF.
      - `-DENABLE_GC=ON|OFF`. Enable the use of the garbage collection
        library. Default is ON.
@@ -191,9 +138,6 @@ sudo dpkg -i /path/to/package.deb
        Default is ON.
      - `-DENABLE_PROTOBUF_STATIC=ON|OFF`. Enable the use of static
        protobuf libraries. Default is ON.
-     - `-DENABLE_MULTITHREAD=ON|OFF`. Use multithreading.  Default is
-       OFF.
-     - `-DENABLE_GMP=ON|OFF`. Use the GMP library.  Default is ON.
 
     If adding new targets to this build system, please see
     [instructions](#defining-new-cmake-targets).
@@ -217,7 +161,7 @@ If you plan to contribute to p4c, you'll find more useful information
 
 # Dependencies
 
-Ubuntu 20.04 is the officially supported platform for p4c. There's also
+Ubuntu 16.04 is the officially supported platform for p4c. There's also
 unofficial support for macOS 10.12. Other platforms are untested; you can try to
 use them, but YMMV.
 
@@ -239,7 +183,7 @@ use them, but YMMV.
 
 - C++ boost library (minimally used)
 
-- Python 3 for scripting and running tests
+- Python 2.7 for scripting and running tests
 
 - Optional: Documentation generation (enabled when configuring with
   --enable-doxygen-doc) requires Doxygen (1.8.10 or higher) and Graphviz
@@ -256,50 +200,34 @@ included with `p4c` are documented here:
 Most dependencies can be installed using `apt-get install`:
 
 ```bash
-sudo apt-get install cmake g++ git automake libtool libgc-dev bison flex \
-libfl-dev libgmp-dev libboost-dev libboost-iostreams-dev \
-libboost-graph-dev llvm pkg-config python3 python3-pip \
+$ sudo apt-get install cmake g++ git automake libtool libgc-dev bison flex
+libfl-dev libgmp-dev libboost-dev libboost-iostreams-dev
+libboost-graph-dev llvm pkg-config python python-scapy python-ipaddr python-ply python3-pip
 tcpdump
 
-pip3 install ipaddr scapy ply
+$ pip3 install scapy ply
 ```
 
 For documentation building:
 `sudo apt-get install -y doxygen graphviz texlive-full`
 
-`p4c` also depends on Google Protocol Buffers (Protobuf). `p4c` requires version
-3.0 or higher, so the packaged version provided in Ubuntu 20.04 **should**
-work. However, all our CI testing is done with a more recent version of Protobuf
-(at the moment, 3.18.1), which we install from source. If you are experiencing
-issues with the Protobuf version shipped with your OS distribution, we recommend
-that we install Protobuf 3.18.1 from source. You can find instructions
-[here](https://github.com/google/protobuf/blob/master/src/README.md). After
-cloning Protobuf and before you build, check-out version 3.18.1:
+An exception is Google Protocol Buffers; `p4c` depends on version 3.0 or higher,
+which is not available until Ubuntu 16.10. For earlier releases of Ubuntu,
+you'll need to install from source. You can find instructions
+[here](https://github.com/google/protobuf/blob/master/src/README.md). **We
+recommend that you use version
+[3.6.1](https://github.com/google/protobuf/releases/tag/v3.6.1)**. Earlier
+versions in the 3 series may not be supported by other p4lang projects, such as
+[p4lang/PI](https://github.com/p4lang/PI). More recent versions may work as
+well, but all our CI testing is done with version 3.6.1. After cloning protobuf
+and before you build, check-out version 3.6.1:
 
-`git checkout v3.18.1`
+`git checkout v3.6.1`
 
-Please note that while all Protobuf versions newer than 3.0 should work for
+Please note that while all protobuf versions newer than 3.0 should work for
 `p4c` itself, you may run into trouble with some extensions and other p4lang
-projects unless you install version 3.18.1.
-
-## Fedora dependencies
-
-```bash
-sudo dnf install -y cmake g++ git automake libtool gc-devel bison flex \
-libfl-devel gmp-devel boost-devel boost-iostreams boost-graph llvm pkg-config \
-python3 python3-pip tcpdump protobuf-devel protobuf-static
-
-sudo pip3 install scapy ply
-```
-
-For documentation building:
-
-```bash
-sudo dnf install -y doxygen graphviz texlive-scheme-full
-```
-
-You can also look at the [dependencies installation script](tools/install_fedora_deps.sh)
-for a fresh Fedora instance.
+projects unless you install version 3.6.1, so you may want to install from
+source even on newer releases of Ubuntu.
 
 ## macOS dependencies
 
@@ -510,18 +438,6 @@ arguments to these macros.
 To pass custom arguments to p4c, you can set the environment variable `P4C_ARGS`:
 ```
 make check P4C_ARGS="-Xp4c=MY_CUSTOM_FLAG"
-```
-
-When making changes to p4c, it is sometimes useful to be able to run
-the tests while overwriting the expected output files that are saved
-in this repository.  One such situation is when your changes to p4c
-cause the names of compiler-generated local variables to change.  To
-force the expected output files to be rewritten while running the
-tests, assign a value to the shell environment variable
-`P4TEST_REPLACE`.  Here is one example Bash command to do so:
-
-```
-P4TEST_REPLACE=1 make check
 ```
 
 ### Installation

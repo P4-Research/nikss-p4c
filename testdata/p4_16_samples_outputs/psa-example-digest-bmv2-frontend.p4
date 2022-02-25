@@ -1,5 +1,5 @@
 #include <core.p4>
-#include <bmv2/psa.p4>
+#include <psa.p4>
 
 enum bit<16> EthTypes {
     IPv4 = 16w0x800,
@@ -97,15 +97,11 @@ parser EgressParserImpl(packet_in buffer, out headers parsed_hdr, inout metadata
 }
 
 control ingress(inout headers hdr, inout metadata meta, in psa_ingress_input_metadata_t istd, inout psa_ingress_output_metadata_t ostd) {
-    @name("ingress.meta") psa_ingress_output_metadata_t meta_1;
-    @name("ingress.egress_port") PortId_t egress_port_1;
-    @name("ingress.meta") psa_ingress_output_metadata_t meta_2;
-    @name("ingress.egress_port") PortId_t egress_port_2;
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
-    @noWarn("unused") @name(".NoAction") action NoAction_2() {
+    @noWarn("unused") @name(".NoAction") action NoAction_4() {
     }
-    @noWarn("unused") @name(".NoAction") action NoAction_3() {
+    @noWarn("unused") @name(".NoAction") action NoAction_5() {
     }
     @name("ingress.unknown_source") action unknown_source() {
         meta.send_mac_learn_msg = true;
@@ -117,25 +113,25 @@ control ingress(inout headers hdr, inout metadata meta, in psa_ingress_input_met
             hdr.ethernet.srcAddr: exact @name("hdr.ethernet.srcAddr") ;
         }
         actions = {
-            NoAction_1();
+            NoAction_0();
             unknown_source();
         }
         default_action = unknown_source();
     }
-    @name("ingress.do_L2_forward") action do_L2_forward(@name("egress_port") PortId_t egress_port_3) {
+    @name("ingress.do_L2_forward") action do_L2_forward(PortId_t egress_port) {
         @noWarnUnused {
-            meta_1 = ostd;
-            egress_port_1 = egress_port_3;
+            @name("ingress.meta_1") psa_ingress_output_metadata_t meta_1 = ostd;
+            @name("ingress.egress_port_1") PortId_t egress_port_1 = egress_port;
             meta_1.drop = false;
             meta_1.multicast_group = (MulticastGroup_t)32w0;
             meta_1.egress_port = egress_port_1;
             ostd = meta_1;
         }
     }
-    @name("ingress.do_tst") action do_tst(@name("egress_port") PortId_t egress_port_4, @name("serEnumT") EthTypes serEnumT) {
+    @name("ingress.do_tst") action do_tst(PortId_t egress_port, EthTypes serEnumT) {
         @noWarnUnused {
-            meta_2 = ostd;
-            egress_port_2 = egress_port_4;
+            @name("ingress.meta_2") psa_ingress_output_metadata_t meta_2 = ostd;
+            @name("ingress.egress_port_2") PortId_t egress_port_2 = egress_port;
             meta_2.drop = false;
             meta_2.multicast_group = (MulticastGroup_t)32w0;
             meta_2.egress_port = egress_port_2;
@@ -148,9 +144,9 @@ control ingress(inout headers hdr, inout metadata meta, in psa_ingress_input_met
         }
         actions = {
             do_L2_forward();
-            NoAction_2();
+            NoAction_4();
         }
-        default_action = NoAction_2();
+        default_action = NoAction_4();
     }
     @name("ingress.tst_tbl") table tst_tbl_0 {
         key = {
@@ -158,9 +154,9 @@ control ingress(inout headers hdr, inout metadata meta, in psa_ingress_input_met
         }
         actions = {
             do_tst();
-            NoAction_3();
+            NoAction_5();
         }
-        default_action = NoAction_3();
+        default_action = NoAction_5();
     }
     apply {
         meta.send_mac_learn_msg = false;

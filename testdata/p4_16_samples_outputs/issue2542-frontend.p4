@@ -9,16 +9,16 @@ struct Headers {
 }
 
 control ingress(inout Headers h) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("ingress.sub.dummy") table sub_dummy {
         key = {
             16w2: exact @name("dummy_key") ;
         }
         actions = {
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_0();
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     apply {
         sub_dummy.apply();

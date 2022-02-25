@@ -39,6 +39,10 @@ void RenameMap::markActionCall(const IR::P4Action* action, const IR::MethodCallE
     actionCall.emplace(call, action);
 }
 
+void RenameMap::foundInTable(const IR::P4Action* action) {
+    inTable.emplace(action);
+}
+
 namespace {
 
 class FindActionCalls : public Inspector {
@@ -56,6 +60,10 @@ class FindActionCalls : public Inspector {
             return;
         auto ac = mi->to<P4::ActionCall>();
         renameMap->markActionCall(ac->action, getOriginal<IR::MethodCallExpression>());
+
+        auto table = findContext<IR::P4Table>();
+        if (table != nullptr)
+            renameMap->foundInTable(ac->action);
     }
 };
 
@@ -121,10 +129,8 @@ const IR::Node* RenameSymbols::postorder(IR::Declaration_Constant* decl) {
 
 const IR::Node* RenameSymbols::postorder(IR::Parameter* param) {
     auto name = getName();
-    if (name != nullptr && *name != param->name.name) {
-        param->annotations = addNameAnnotation(param->name, param->annotations);
+    if (name != nullptr && *name != param->name.name)
         param->name = IR::ID(param->name.srcInfo, *name, param->name.originalName);
-    }
     return param;
 }
 
@@ -135,12 +141,12 @@ const IR::Node* RenameSymbols::postorder(IR::PathExpression* expression) {
     // This should be a local name.
     BUG_CHECK(!expression->path->absolute,
               "%1%: renaming absolute path", expression);
+    LOG2("Renaming " << expression->path);
     auto newName = renameMap->getName(decl);
     auto name = IR::ID(expression->path->name.srcInfo, newName,
                        expression->path->name.originalName);
-    LOG2("Renaming " << dbp(expression->path) << " to " << name);
-    expression->path = new IR::Path(name);
-    return expression;
+    auto result = new IR::PathExpression(name);
+    return result;
 }
 
 const IR::Node* RenameSymbols::postorder(IR::Declaration_Instance* decl) {

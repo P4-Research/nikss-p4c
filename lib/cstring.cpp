@@ -17,7 +17,6 @@ limitations under the License.
 #include "cstring.h"
 
 #include <algorithm>
-#include <ios>
 #include <string>
 #include <unordered_set>
 
@@ -232,30 +231,15 @@ cstring cstring::replace(cstring search, cstring replace) const {
     return cstring(s_str);
 }
 
-// See https://stackoverflow.com/a/33799784/4538702
 cstring cstring::escapeJson() const {
-    std::ostringstream o;
+    std::string out;
     for (size_t i = 0; i < size(); i++) {
         char c = get(i);
-        switch (c) {
-            case '"': o << "\\\""; break;
-            case '\\': o << "\\\\"; break;
-            case '\b': o << "\\b"; break;
-            case '\f': o << "\\f"; break;
-            case '\n': o << "\\n"; break;
-            case '\r': o << "\\r"; break;
-            case '\t': o << "\\t"; break;
-            default: {
-                if ('\x00' <= c && c <= '\x1f') {
-                    o << "\\u"
-                      << std::hex << std::setw(4) << std::setfill('0') << static_cast<int>(c);
-                } else {
-                    o << c;
-                }
-            }
-        }
+        if (c == '\\' || c == '"')
+            out += "\\";
+        out += c;
     }
-    return cstring(o.str());
+    return cstring(out);
 }
 
 cstring cstring::toUpper() {
