@@ -46,7 +46,7 @@ EBPFType* EBPFTypeFactory::create(const IR::Type* type) {
         if (et == nullptr)
             return nullptr;
         result = new EBPFStackType(ts, et);
-    } else if (auto terr = type->to<IR::Type_Error>()) {
+    } else if (type->is<IR::Type_Error>()) {
         // EBPF target implements error type as scalar of witdh 8 bits
         result = new EBPFScalarType(new IR::Type_Bits(8, false));
     } else {
