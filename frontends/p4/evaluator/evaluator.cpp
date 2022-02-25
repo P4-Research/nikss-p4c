@@ -100,7 +100,7 @@ bool Evaluator::preorder(const IR::P4Program* program) {
 bool Evaluator::preorder(const IR::Declaration_Constant* decl) {
     LOG2("Evaluating " << dbp(decl));
     visit(decl->initializer);
-    auto value = getValue(decl);
+    auto value = getValue(decl->initializer);
     setValue(decl, value);
     return false;
 }
@@ -235,9 +235,14 @@ bool Evaluator::preorder(const IR::Member* expression) {
         auto ns = type->to<IR::ISimpleNamespace>();
         decl = ns->getDeclByName(expression->member.name);
     }
-    if (decl == nullptr || !decl->is<IR::Declaration_ID>())
-        return false;
-    setValue(expression, decl->to<IR::Declaration_ID>());
+    if (decl != nullptr) {
+        if (decl->is<IR::Declaration_ID>()) {
+            setValue(expression, decl->to<IR::Declaration_ID>());
+        } else if (decl->is<IR::SerEnumMember>()) {
+            setValue(expression, decl->to<IR::SerEnumMember>());
+        }
+    }
+
     return false;
 }
 

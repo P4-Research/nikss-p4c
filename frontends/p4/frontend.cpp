@@ -30,6 +30,7 @@ limitations under the License.
 // Passes
 #include "actionsInlining.h"
 #include "checkConstants.h"
+#include "checkCoreMethods.h"
 #include "checkNamedArgs.h"
 #include "createBuiltins.h"
 #include "defaultArguments.h"
@@ -47,6 +48,7 @@ limitations under the License.
 #include "parseAnnotations.h"
 #include "parserControlFlow.h"
 #include "reassociation.h"
+#include "removeParameters.h"
 #include "removeReturns.h"
 #include "resetHeaders.h"
 #include "setHeaders.h"
@@ -54,6 +56,7 @@ limitations under the License.
 #include "simplify.h"
 #include "simplifyDefUse.h"
 #include "simplifyParsers.h"
+#include "simplifySwitch.h"
 #include "specialize.h"
 #include "specializeGenericFunctions.h"
 #include "specializeGenericTypes.h"
@@ -72,6 +75,13 @@ limitations under the License.
 namespace P4 {
 
 namespace {
+
+/* Base class for inspectors that do not really visit the program. */
+class NoVisit : public Inspector {
+    // prune visit
+    bool preorder(const IR::P4Program*) override { return false; }
+};
+
 /**
 This pass outputs the program as a P4 source file.
 */
@@ -96,14 +106,13 @@ class PrettyPrint : public Inspector {
         return false;  // prune
     }
 };
-}  // namespace
 
 /**
  * This pass is a no-op whose purpose is to mark the end of the
  * front-end, which is useful for debugging. It is implemented as an
  * empty @ref PassManager (instead of a @ref Visitor) for efficiency.
  */
-class FrontEndLast : public PassManager {
+class FrontEndLast : public NoVisit {
  public:
     FrontEndLast() { setName("FrontEndLast"); }
 };
@@ -112,10 +121,25 @@ class FrontEndLast : public PassManager {
  * This pass is a no-op whose purpose is to mark a point in the
  * front-end, used for testing.
  */
-class FrontEndDump : public PassManager {
+class FrontEndDump : public NoVisit {
  public:
     FrontEndDump() { setName("FrontEndDump"); }
 };
+
+/** Changes the value of strictStruct in the typeMap */
+class SetStrictStruct : public NoVisit {
+    TypeMap* typeMap;
+    bool strictStruct;
+ public:
+    SetStrictStruct(TypeMap* typeMap, bool strict):
+            typeMap(typeMap), strictStruct(strict) {}
+    Visitor::profile_t init_apply(const IR::Node* node) override {
+        typeMap->setStrictStruct(strictStruct);
+        return Inspector::init_apply(node);
+    }
+};
+
+}  // namespace
 
 // TODO: remove skipSideEffectOrdering flag
 const IR::P4Program *FrontEnd::run(const CompilerOptions &options, const IR::P4Program* program,
@@ -150,14 +174,19 @@ const IR::P4Program *FrontEnd::run(const CompilerOptions &options, const IR::P4P
         new CheckNamedArgs(),
         // Type checking and type inference.  Also inserts
         // explicit casts where implicit casts exist.
-        new TypeInference(&refMap, &typeMap, false),  // insert casts
+        new SetStrictStruct(&typeMap, true),  // Next pass uses strict struct checking
+        new TypeInference(&refMap, &typeMap, false, false),  // insert casts, dont' check arrays
+        new SetStrictStruct(&typeMap, false),
         new ValidateMatchAnnotations(&typeMap),
         new BindTypeVariables(&refMap, &typeMap),
         new SpecializeGenericTypes(&refMap, &typeMap),
         new DefaultArguments(&refMap, &typeMap),  // add default argument values to parameters
         new ResolveReferences(&refMap),
+        new SetStrictStruct(&typeMap, true),  // Next pass uses strict struct checking
         new TypeInference(&refMap, &typeMap, false),  // more casts may be needed
-        new RemoveParserControlFlow(&refMap, &typeMap),
+        new SetStrictStruct(&typeMap, false),
+        new CheckCoreMethods(&refMap, &typeMap),
+        new RemoveParserIfs(&refMap, &typeMap),
         new StructInitializers(&refMap, &typeMap),
         new SpecializeGenericFunctions(&refMap, &typeMap),
         new TableKeyNames(&refMap, &typeMap),
@@ -178,6 +207,7 @@ const IR::P4Program *FrontEnd::run(const CompilerOptions &options, const IR::P4P
         new MoveInitializers(&refMap),
         new SideEffectOrdering(&refMap, &typeMap, skipSideEffectOrdering),
         new SimplifyControlFlow(&refMap, &typeMap),
+        new SimplifySwitch(&refMap, &typeMap),
         new MoveDeclarations(),  // Move all local declarations to the beginning
         new SimplifyDefUse(&refMap, &typeMap),
         new UniqueParameters(&refMap, &typeMap),
@@ -190,18 +220,23 @@ const IR::P4Program *FrontEnd::run(const CompilerOptions &options, const IR::P4P
         new RemoveAllUnusedDeclarations(&refMap),
         new ClearTypeMap(&typeMap),
         evaluator,
-        new Inline(&refMap, &typeMap, evaluator),
+        new Inline(&refMap, &typeMap, evaluator, options.optimizeParserInlining),
         new InlineActions(&refMap, &typeMap),
+        new LocalizeAllActions(&refMap),
+        new UniqueNames(&refMap),
+        new UniqueParameters(&refMap, &typeMap),
+        // Must be done before inlining functions, to allow
+        // function calls used as action arguments to be inlined
+        // in the proper place.
+        new RemoveActionParameters(&refMap, &typeMap),
         new InlineFunctions(&refMap, &typeMap),
         new SetHeaders(&refMap, &typeMap),
         // Check for constants only after inlining
         new CheckConstants(&refMap, &typeMap),
         new SimplifyControlFlow(&refMap, &typeMap),
-        new RemoveParserControlFlow(&refMap, &typeMap),
-        new UniqueNames(&refMap),
-        new LocalizeAllActions(&refMap),
+        new RemoveParserControlFlow(&refMap, &typeMap),  // more ifs may have been added to parsers
         new UniqueNames(&refMap),  // needed again after inlining
-        new UniqueParameters(&refMap, &typeMap),
+        new MoveDeclarations(),  // needed again after inlining
         new SimplifyControlFlow(&refMap, &typeMap),
         new HierarchicalNames(),
         new FrontEndLast(),

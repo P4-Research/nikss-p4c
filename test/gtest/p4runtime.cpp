@@ -16,13 +16,14 @@ limitations under the License.
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/optional.hpp>
 #include <google/protobuf/util/message_differencer.h>
 
 #include <iterator>
 #include <string>
 #include <vector>
+
+#include <boost/algorithm/string/replace.hpp>
+#include <boost/optional.hpp>
 
 #include "control-plane/p4/config/v1/p4info.pb.h"
 #include "control-plane/p4/config/v1/p4types.pb.h"
@@ -990,7 +991,8 @@ TEST_F(P4Runtime, PSADigests) {
     )"), CompilerOptions::FrontendVersion::P4_16, "psa");
 
     ASSERT_TRUE(test);
-    EXPECT_EQ(0u, ::diagnosticCount());
+    // 2 warnings
+    EXPECT_EQ(2u, ::diagnosticCount());
     const auto &typeInfo = test->p4Info->type_info();
 
     // Verify that that the digest() instances match the ones we expect from the

@@ -29,6 +29,9 @@ class EBPFParserState;
 
 class StateTranslationVisitor : public CodeGenInspector {
  protected:
+    // stores the result of evaluating the select argument
+    cstring selectValue;
+
     bool hasDefault;
     P4::P4CoreLibrary& p4lib;
     const EBPFParserState* state;

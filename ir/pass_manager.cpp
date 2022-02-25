@@ -18,6 +18,8 @@ limitations under the License.
 #include "lib/gc.h"
 #include "lib/n4.h"
 
+#include "pass_manager.h"
+
 void PassManager::removePasses(const std::vector<cstring> &exclude) {
     for (auto it : exclude) {
         bool excluded = false;
@@ -37,7 +39,7 @@ void PassManager::removePasses(const std::vector<cstring> &exclude) {
 void PassManager::listPasses(std::ostream &out, cstring sep) const {
     bool first = true;
     for (auto p : passes) {
-        if (first) out << sep;
+        if (!first) out << sep;
         out << p->name();
         first = false; }
 }

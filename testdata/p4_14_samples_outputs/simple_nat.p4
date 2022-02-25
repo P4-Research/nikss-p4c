@@ -2,6 +2,11 @@
 #define V1MODEL_VERSION 20200408
 #include <v1model.p4>
 
+enum bit<8> FieldLists {
+    none = 0,
+    copy_to_cpu_fields = 1
+}
+
 struct intrinsic_metadata_t {
     bit<4> mcast_grp;
     bit<4> egress_rid;
@@ -177,7 +182,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         hdr.ipv4.ttl = hdr.ipv4.ttl - 8w1;
     }
     @name(".nat_miss_int_to_ext") action nat_miss_int_to_ext() {
-        clone3(CloneType.I2E, (bit<32>)32w250, { standard_metadata });
+        clone_preserving_field_list(CloneType.I2E, (bit<32>)32w250, (bit<8>)FieldLists.copy_to_cpu_fields);
     }
     @name(".nat_miss_ext_to_int") action nat_miss_ext_to_int() {
         meta.meta.do_forward = 1w0;

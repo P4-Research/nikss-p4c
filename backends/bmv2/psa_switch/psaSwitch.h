@@ -167,6 +167,7 @@ class PsaProgramStructure : public ProgramStructure {
     void createControls(ConversionContext* ctxt);
     void createDeparsers(ConversionContext* ctxt);
     void createGlobals();
+    cstring convertHashAlgorithm(cstring algo);
 
     std::set<cstring> non_pipeline_controls;
     std::set<cstring> pipeline_controls;
@@ -190,7 +191,7 @@ class ParsePsaArchitecture : public Inspector {
 
     void modelError(const char* format, const IR::INode* node) {
         ::error(ErrorType::ERR_MODEL,
-                (cstring(format) + "Are you using an up-to-date 'psa.p4'?").c_str(),
+                (cstring(format) + "\nAre you using an up-to-date 'psa.p4'?").c_str(),
                 node->getNode());
     }
 

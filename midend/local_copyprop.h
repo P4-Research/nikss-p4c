@@ -66,6 +66,12 @@ class DoLocalCopyPropagation : public ControlFlowVisitor, Transform, P4WriteCont
     struct FuncInfo {
         std::set<cstring>       reads, writes;
         int                     apply_count = 0;
+
+        /// This field is used in assignments. If is_first_write_insert is true, then the
+        /// last inserted expression into the writes set was not in that set before. In
+        /// that case, that expression will be removed from it if, after propagation of the
+        /// values on the left and the right side, the assignment becomes a self-assignment
+        bool                    is_first_write_insert = false;
     };
     std::map<cstring, VarInfo>          available;
     std::map<cstring, TableInfo>        &tables;
@@ -89,7 +95,7 @@ class DoLocalCopyPropagation : public ControlFlowVisitor, Transform, P4WriteCont
     void visit_local_decl(const IR::Declaration_Variable *);
     const IR::Node *postorder(IR::Declaration_Variable *) override;
     IR::Expression *preorder(IR::Expression *m) override;
-    const IR::Expression *copyprop_name(cstring name);
+    const IR::Expression *copyprop_name(cstring name, const Util::SourceInfo& srcInfo);
     const IR::Expression *postorder(IR::PathExpression *) override;
     const IR::Expression *preorder(IR::Member *) override;
     const IR::Expression *preorder(IR::ArrayIndex *) override;
@@ -110,6 +116,7 @@ class DoLocalCopyPropagation : public ControlFlowVisitor, Transform, P4WriteCont
     const IR::P4Parser *postorder(IR::P4Parser *) override;
     IR::ParserState *preorder(IR::ParserState *) override;
     IR::ParserState *postorder(IR::ParserState *) override;
+    Visitor::profile_t init_apply(const IR::Node* node) override;
     class ElimDead;
     class RewriteTableKeys;
 
