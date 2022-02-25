@@ -17,9 +17,9 @@ limitations under the License.
 #ifndef CONTROL_PLANE_P4RUNTIMEARCHHANDLER_H_
 #define CONTROL_PLANE_P4RUNTIMEARCHHANDLER_H_
 
-#include <boost/optional.hpp>
-
 #include <set>
+
+#include <boost/optional.hpp>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -92,7 +92,7 @@ class P4RuntimeSymbolType {
  private:
     // even if the constructor is protected, the static functions in the derived
     // classes cannot access it, which is why we use the make factory function
-    constexpr P4RuntimeSymbolType(p4rt_id_t id) noexcept
+    explicit constexpr P4RuntimeSymbolType(p4rt_id_t id) noexcept
         : id(id) { }
 
     /// The 8-bit id prefix for that type, as per the p4info.proto file.
@@ -397,7 +397,13 @@ struct Counterlike {
         }
 
         auto size = instance->getParameterValue(CounterlikeTraits<Kind>::sizeParamName());
-        if (!size->template is<IR::Constant>()) {
+        big_int val;
+        if (size->template is<IR::Constant>()) {
+            val = size->template to<IR::Constant>()->value;
+        } else if (size->template is<IR::SerEnumMember>()) {
+            auto sem = size->template to<IR::SerEnumMember>();
+            val = sem->value->template to<IR::Constant>()->value;
+        } else {
             ::error(ErrorType::ERR_INVALID, "%1% '%2%' has a non-constant size: %3%",
                     CounterlikeTraits<Kind>::name(), declaration, size);
             return boost::none;
@@ -424,7 +430,7 @@ struct Counterlike {
         return Counterlike<Kind>{declaration->controlPlaneName(),
                                  declaration->to<IR::IAnnotated>(),
                                  unit->to<IR::Declaration_ID>()->name,
-                                 int(size->template to<IR::Constant>()->value),
+                                 int(val),
                                  boost::none,
                                  index_type_name};
     }

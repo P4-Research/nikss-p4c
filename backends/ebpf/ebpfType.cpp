@@ -65,9 +65,18 @@ EBPFBoolType::declare(CodeBuilder* builder, cstring id, bool asPointer) {
     builder->appendFormat(" %s", id.c_str());
 }
 
+void
+EBPFBoolType::declareInit(CodeBuilder* builder, cstring id, bool asPointer) {
+    declare(builder, id, asPointer);
+}
+
 /////////////////////////////////////////////////////////////
 
 void EBPFStackType::declare(CodeBuilder* builder, cstring id, bool) {
+    elementType->declareArray(builder, id, size);
+}
+
+void EBPFStackType::declareInit(CodeBuilder* builder, cstring id, bool) {
     elementType->declareArray(builder, id, size);
 }
 
@@ -136,6 +145,23 @@ EBPFScalarType::declare(CodeBuilder* builder, cstring id, bool asPointer) {
     }
 }
 
+void
+EBPFScalarType::declareInit(CodeBuilder* builder, cstring id, bool asPointer) {
+    if (EBPFScalarType::generatesScalar(width)) {
+        emit(builder);
+        if (asPointer)
+            builder->append("*");
+        builder->spc();
+        id = id + cstring(" = 0");
+        builder->append(id);
+    } else {
+        if (asPointer)
+            builder->append("u8*");
+        else
+            builder->appendFormat("uint8_t %s[%d]", id.c_str(), bytesRequired());
+    }
+}
+
 //////////////////////////////////////////////////////////
 
 EBPFStructType::EBPFStructType(const IR::Type_StructLike* strct) :
@@ -173,6 +199,10 @@ EBPFStructType::declare(CodeBuilder* builder, cstring id, bool asPointer) {
     if (asPointer)
         builder->append("*");
     builder->appendFormat("%s", id.c_str());
+}
+
+void EBPFStructType::declareInit(CodeBuilder* builder, cstring id, bool asPointer) {
+    declare(builder, id, asPointer);
 }
 
 void EBPFStructType::emitInitializer(CodeBuilder* builder) {
@@ -259,6 +289,10 @@ void EBPFTypeName::declare(CodeBuilder* builder, cstring id, bool asPointer) {
         canonical->declare(builder, id, asPointer);
 }
 
+void EBPFTypeName::declareInit(CodeBuilder* builder, cstring id, bool asPointer) {
+    declare(builder, id, asPointer);
+}
+
 void EBPFTypeName::emitInitializer(CodeBuilder* builder) {
     if (canonical != nullptr)
         canonical->emitInitializer(builder);
@@ -301,6 +335,10 @@ void EBPFEnumType::declare(EBPF::CodeBuilder* builder, cstring id, bool asPointe
     builder->append(id);
 }
 
+void EBPFEnumType::declareInit(CodeBuilder* builder, cstring id, bool asPointer) {
+    declare(builder, id, asPointer);
+}
+
 void EBPFEnumType::emit(EBPF::CodeBuilder* builder) {
     builder->append("enum ");
     auto et = getType();
@@ -324,10 +362,10 @@ void EBPFErrorTypePSA::emit(CodeBuilder* builder) {
         ++id;
         auto sourceFile = decl->srcInfo.getSourceFile();
         // all the error codes are located in core.p4 file, they are defined in psa.h
-        if (sourceFile.endsWith("p4include/core.p4"))
+        if (sourceFile.endsWith("core.p4"))
             continue;
         // for future, also exclude definitions in psa.p4 file
-        if (sourceFile.endsWith("p4include/psa.p4"))
+        if (sourceFile.endsWith("/psa.p4"))
             continue;
 
         builder->emitIndent();
@@ -348,6 +386,10 @@ void EBPFErrorTypePSA::emit(CodeBuilder* builder) {
 void EBPFErrorTypePSA::declare(CodeBuilder* builder, cstring id, bool asPointer) {
     (void) builder; (void) id; (void) asPointer;
     BUG("Error type is not declarable");
+}
+
+void EBPFErrorTypePSA::declareInit(CodeBuilder *builder, cstring id, bool asPointer) {
+    declare(builder, id, asPointer);
 }
 
 void EBPFErrorTypePSA::emitInitializer(CodeBuilder* builder) {

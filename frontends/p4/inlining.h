@@ -100,12 +100,186 @@ struct PerInstanceSubstitutions {
 struct InlineSummary : public IHasDbPrint {
     /// Various substitutions that must be applied for each instance
     struct PerCaller {  // information for each caller
+        /**
+         * Pair identifying all the invocations of the subparser which can use the same
+         * inlined states because the path after returning from the subparser is identical
+         * for all such invocations.
+         *
+         * Invocations are characterized by:
+         * - Pointer to the apply method call statement (comparing apply method call statement
+         *   ensures that the same instance is invoked and same arguments are passed to the call)
+         * - Pointer to the transition statement expression which has to be the name of
+         *   the state (select expression is not allowed)
+         *
+         * Additional conditions which need to be met:
+         * - there is no other statement between the invocation of the subparser and
+         *   the transition statement
+         * - transition statement has to be the name of the state (select expression is
+         *   not allowed)
+         *
+         * @attention
+         * Note that local variables declared in states calling subparser and passed to
+         * the subparser as arguments need to be eliminated before Inline pass.
+         * Currently this condition is met as passes UniqueNames and MoveDeclarations are
+         * called before Inline pass in FrontEnd.
+         * Otherwise (if this condition was not met) there could be different variables
+         * with the same names passed as arguments to the apply method and additional
+         * checks would have to be introduced to avoid optimization in such case.
+         *
+         * @see field invocationToState
+         */
+        typedef std::pair<const IR::MethodCallStatement*,
+                           const IR::PathExpression*> InlinedInvocationInfo;
+
+        /**
+         * Hash for InlinedInvocationInfo used as a key for unordered_map
+         *
+         * @see field invocationToState
+         */
+        struct key_hash {
+            std::size_t operator() (const InlinedInvocationInfo &k) const {
+                std::ostringstream oss;
+                std::get<0>(k)->dbprint(oss);
+                std::get<1>(k)->dbprint(oss);
+                return std::hash<std::string>{}(oss.str());
+            }
+        };
+
+        /**
+         * Binary equality predicate for InlinedInvocationInfo used as a key for unordered_map
+         *
+         * @see field invocationToState
+         */
+        struct key_equal {
+            bool operator() (const InlinedInvocationInfo &v0,
+                    const InlinedInvocationInfo &v1) const {
+                return std::get<0>(v0)->equiv(*std::get<0>(v1)) &&
+                        std::get<1>(v0)->equiv(*std::get<1>(v1));
+            }
+        };
+
         /// For each instance (key) the container that is intantiated.
         std::map<const IR::Declaration_Instance*, const IR::IContainer*> declToCallee;
         /// For each instance (key) we must apply a bunch of substitutions
         std::map<const IR::Declaration_Instance*, PerInstanceSubstitutions*> substitutions;
         /// For each invocation (key) call the instance that is invoked.
         std::map<const IR::MethodCallStatement*, const IR::Declaration_Instance*> callToInstance;
+
+        /**
+         * For each distinct invocation of the subparser identified by InlinedInvocationInfo
+         * we store the ID of the next caller parser state which is a new state replacing
+         * the start state of the callee parser (subparser).
+         * Transition to this state is used in case there is another subparser invocation
+         * which has the equivalent InlinedInvocationInfo.
+         *
+         * Subparser invocations are considered to be equivalent when following conditions
+         * are met (which means that the path in the parse graph is the same after returning
+         * from subparser call):
+         * - apply method call statements of the invocations are equivalent (which means that
+         *   the same subparser instance is invoked and the same arguments are passed to
+         *   the apply method)
+         * - there is no statement between apply method call statement and transition statement
+         * - transition statement is a name of the state (not a select expression)
+         * - name of the state in transition statement is the same
+         *
+         *
+         * Example of the optimization
+         *
+         * Parser and subparser before Inline pass:
+         * @code{.p4}
+         * parser Subparser(packet_in packet, inout data_t hdr) {
+         *     state start {
+         *         hdr.f = 8w42;
+         *         transition accept;
+         *     }
+         * }
+         * parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta,
+         *                   inout standard_metadata_t standard_metadata) {
+         *     @name("p") Subparser() p_0;
+         *     state start {
+         *         transition select(standard_metadata.ingress_port) {
+         *             9w0: p0;
+         *             default: p1;
+         *         }
+         *     }
+         *     state p0 {
+         *         p_0.apply(packet, hdr.h1);
+         *         transition accept;
+         *     }
+         *     state p1 {
+         *         p_0.apply(packet, hdr.h1);
+         *         transition accept;
+         *     }
+         * }
+         * @endcode
+         *
+         * Parser after Inline pass without optimization:
+         * @code{.p4}
+         * parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
+         *     state start {
+         *         transition select(standard_metadata.ingress_port) {
+         *             9w0: p0;
+         *             default: p1;
+         *         }
+         *     }
+         *     state p0 {
+         *         transition Subparser_start;
+         *     }
+         *     state Subparser_start {
+         *         hdr.h1.f = 8w42;
+         *         transition p0_0;
+         *     }
+         *     state p0_0 {
+         *         transition accept;
+         *     }
+         *     state p1 {
+         *         transition Subparser_start_0;
+         *     }
+         *     state Subparser_start_0 {
+         *         hdr.h1.f = 8w42;
+         *         transition p1_0;
+         *     }
+         *     state p1_0 {
+         *         transition accept;
+         *     }
+         * }
+         * @endcode
+         *
+         * Parser after Inline pass with optimization:
+         * @code{.p4}
+         * parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
+         *     state start {
+         *         transition select(standard_metadata.ingress_port) {
+         *             9w0: p0;
+         *             default: p1;
+         *         }
+         *     }
+         *     state p0 {
+         *         transition Subparser_start;
+         *     }
+         *     state Subparser_start {
+         *         hdr.h1.f = 8w42;
+         *         transition p0_0;
+         *     }
+         *     state p0_0 {
+         *         transition accept;
+         *     }
+         *     state p1 {
+         *         transition Subparser_start;
+         *     }
+         * }
+         * @endcode
+         *
+         * @attention
+         * This field is used only when the optimization of parser inlining is enabled,
+         * otherwise it is not used.
+         * The optimization is disabled by default.
+         * The optimization can be enabled using command line option
+         * --parser-inline-opt.
+         */
+        std::unordered_map<const InlinedInvocationInfo, const IR::ID, key_hash, key_equal>
+                invocationToState;
+
         /// @returns nullptr if there isn't exactly one caller,
         /// otherwise the single caller of this instance.
         const IR::MethodCallStatement* uniqueCaller(
@@ -216,16 +390,26 @@ class GeneralInliner : public AbstractInliner<InlineList, InlineSummary> {
     ReferenceMap* refMap;
     TypeMap* typeMap;
     InlineSummary::PerCaller* workToDo;
+    bool optimizeParserInlining;
+
  public:
-    explicit GeneralInliner(bool isv1) :
-            refMap(new ReferenceMap()), typeMap(new TypeMap()), workToDo(nullptr) {
+    explicit GeneralInliner(bool isv1, bool _optimizeParserInlining) :
+            refMap(new ReferenceMap()), typeMap(new TypeMap()), workToDo(nullptr),
+            optimizeParserInlining(_optimizeParserInlining) {
         setName("GeneralInliner");
         refMap->setIsV1(isv1);
         visitDagOnce = false;
     }
     // controlled visiting order
     const IR::Node* preorder(IR::MethodCallStatement* statement) override;
-    template<class T> void inline_subst(T *caller, IR::IndexedVector<IR::Declaration> T::*locals);
+    /** Build the substitutions needed for args and locals of the thing being inlined.
+      * P4Block here should be either P4Control or P4Parser.
+      * P4BlockType should be either Type_Control or Type_Parser to match the P4Block.
+      */
+    template<class P4Block, class P4BlockType>
+    void inline_subst(P4Block *caller,
+                      IR::IndexedVector<IR::Declaration> P4Block::*blockLocals,
+                      const P4BlockType *P4Block::*blockType);
     const IR::Node* preorder(IR::P4Control* caller) override;
     const IR::Node* preorder(IR::P4Parser* caller) override;
     const IR::Node* preorder(IR::ParserState* state) override;
@@ -235,13 +419,16 @@ class GeneralInliner : public AbstractInliner<InlineList, InlineSummary> {
 /// Performs one round of inlining bottoms-up
 class InlinePass : public PassManager {
     InlineList toInline;
+
  public:
-    InlinePass(ReferenceMap* refMap, TypeMap* typeMap, EvaluatorPass* evaluator)
+    InlinePass(ReferenceMap* refMap, TypeMap* typeMap, EvaluatorPass* evaluator,
+            bool optimizeParserInlining)
     : PassManager({
         new TypeChecking(refMap, typeMap),
         new DiscoverInlining(&toInline, refMap, typeMap, evaluator),
-        new InlineDriver<InlineList, InlineSummary>(&toInline, new GeneralInliner(refMap->isV1())),
-        new RemoveAllUnusedDeclarations(refMap) }) { }
+        new InlineDriver<InlineList, InlineSummary>(&toInline, new GeneralInliner(refMap->isV1(),
+            optimizeParserInlining)),
+        new RemoveAllUnusedDeclarations(refMap) }) { setName("InlinePass"); }
 };
 
 /**
@@ -250,13 +437,26 @@ will be enough.  Multiple iterations are necessary only when instances are
 passed as arguments using constructor arguments.
 */
 class Inline : public PassRepeated {
+    static std::set<cstring> noPropagateAnnotations;
+
  public:
-    Inline(ReferenceMap* refMap, TypeMap* typeMap, EvaluatorPass* evaluator)
+    Inline(ReferenceMap* refMap, TypeMap* typeMap, EvaluatorPass* evaluator,
+            bool optimizeParserInlining)
     : PassManager({
-        new InlinePass(refMap, typeMap, evaluator),
+        new InlinePass(refMap, typeMap, evaluator, optimizeParserInlining),
         // After inlining the output of the evaluator changes, so
         // we have to run it again
-        evaluator }) {}
+        evaluator }) { setName("Inline"); }
+
+    /// Do not propagate annotation \p name during inlining
+    static void setAnnotationNoPropagate(cstring name) {
+        noPropagateAnnotations.emplace(name);
+    }
+
+    /// Is annotation \p name excluded from inline propagation?
+    static bool isAnnotationNoPropagate(cstring name) {
+        return noPropagateAnnotations.count(name);
+    }
 };
 
 }  // namespace P4

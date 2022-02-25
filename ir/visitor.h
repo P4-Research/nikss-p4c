@@ -57,7 +57,11 @@ class Visitor {
     virtual ~Visitor() = default;
 
     mutable cstring internalName;
+    // Some visitors are created and applied by other visitors.
+    // This field keeps track of the caller.
+    const Visitor* called_by = nullptr;
 
+    const Visitor& setCalledBy(const Visitor* visitor) { called_by = visitor; return *this; }
     // init_apply is called (once) when apply is called on an IR tree
     // it expects to allocate a profile record which will be destroyed
     // when the traversal completes.  Visitor subclasses may extend this
@@ -191,6 +195,10 @@ class Visitor {
     template <class T> inline const T *findOrigCtxt() const {
         const Context *c = ctxt;
         return findOrigCtxt<T>(c); }
+    inline bool isInContext(const IR::Node *n) const {
+        for (auto *c = ctxt; c; c = c->parent) {
+            if (c->node == n || c->original == n) return true; }
+        return false; }
 
     /// @return the current node - i.e., the node that was passed to preorder()
     /// or postorder(). For Modifiers and Transforms, this is a clone of the
@@ -199,6 +207,34 @@ class Visitor {
     template <class T>
     const T* getCurrentNode() const {
         return ctxt->node ? ctxt->node->to<T>() : nullptr; }
+
+    /// True if the warning with this kind is enabled at this point.
+    /// Warnings can be disabled by using the @noWarn("unused") annotation
+    /// in an enclosing environment.
+    bool warning_enabled(int warning_kind) const {
+        return warning_enabled(this, warning_kind);
+    }
+    /// Static version of the above function, which can be called
+    /// even if not directly in a visitor
+    static bool warning_enabled(const Visitor* visitor, int warning_kind);
+    template<class T,
+             typename = typename std::enable_if<
+                 std::is_base_of<Util::IHasSourceInfo, T>::value>::type,
+             class... Args>
+    void warn(const int kind, const char *format, const T *node, Args... args) {
+        if (warning_enabled(kind))
+            ::warning(kind, format, node, std::forward<Args>(args)...);
+    }
+
+    /// The const ref variant of the above
+    template<class T,
+             typename = typename std::enable_if<
+                 std::is_base_of<Util::IHasSourceInfo, T>::value>::type,
+             class... Args>
+    void warn(const int kind, const char *format, const T &node, Args... args) {
+        if (warning_enabled(kind))
+            ::warning(kind, format, node, std::forward<Args>(args)...);
+    }
 
  protected:
     // if visitDagOnce is set to 'false' (usually in the derived Visitor
@@ -322,11 +358,11 @@ class Transform : public virtual Visitor {
 };
 
 class ControlFlowVisitor : public virtual Visitor {
-    std::map<const IR::Node *, std::pair<ControlFlowVisitor *, int>> *flow_join_points = 0;
     std::map<cstring, ControlFlowVisitor &>     &globals;
 
  protected:
     ControlFlowVisitor* clone() const override = 0;
+    std::map<const IR::Node *, std::pair<ControlFlowVisitor *, int>> *flow_join_points = 0;
     void init_join_flows(const IR::Node *root) override;
     bool join_flows(const IR::Node *n) override;
 
@@ -368,11 +404,17 @@ class Backtrack : public virtual Visitor {
     struct trigger {
         enum type_t { OK, OTHER }       type;
         explicit trigger(type_t t) : type(t) {}
+        virtual ~trigger();
         virtual void dbprint(std::ostream &out) const { out << demangle(typeid(*this).name()); }
         template<class T> T *to() { return dynamic_cast<T *>(this); }
         template<class T> const T *to() const { return dynamic_cast<const T *>(this); }
         template<class T> bool is() { return to<T>() != nullptr; }
         template<class T> bool is() const { return to<T>() != nullptr; }
+
+     protected:
+        // must call this from the constructor if a trigger subclass contains pointers
+        // or references to GC objects
+        void register_for_gc(size_t);
     };
     virtual bool backtrack(trigger &trig) = 0;
     virtual bool never_backtracks() { return false; }  // generally not overridden

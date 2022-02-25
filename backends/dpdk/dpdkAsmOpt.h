@@ -17,16 +17,6 @@ limitations under the License.
 #ifndef BACKEND_DPDK_OPTIMIZATION_H_
 #define BACKEND_DPDK_OPTIMIZATION_H_
 
-#include "backends/bmv2/common/action.h"
-#include "backends/bmv2/common/control.h"
-#include "backends/bmv2/common/deparser.h"
-#include "backends/bmv2/common/extern.h"
-#include "backends/bmv2/common/header.h"
-#include "backends/bmv2/common/helpers.h"
-#include "backends/bmv2/common/lower.h"
-#include "backends/bmv2/common/parser.h"
-#include "backends/bmv2/common/programStructure.h"
-#include "backends/bmv2/psa_switch/psaSwitch.h"
 #include "frontends/common/constantFolding.h"
 #include "frontends/common/resolveReferences/referenceMap.h"
 #include "frontends/p4/coreLibrary.h"
@@ -43,7 +33,22 @@ namespace DPDK {
 // This pass removes label that no jmps jump to
 class RemoveRedundantLabel : public Transform {
   public:
-    const IR::Node *postorder(IR::DpdkListStatement *l) override;
+    const IR::IndexedVector<IR::DpdkAsmStatement> *removeRedundantLabel(
+                      const IR::IndexedVector<IR::DpdkAsmStatement> &s);
+
+    const IR::Node *postorder(IR::DpdkListStatement *l) override {
+        const IR::IndexedVector<IR::DpdkAsmStatement> *newStmts;
+        newStmts = removeRedundantLabel(l->statements);
+        l->statements = *newStmts;
+        return l;
+    }
+
+    const IR::Node *postorder(IR::DpdkAction *l) override {
+        const IR::IndexedVector<IR::DpdkAsmStatement> *newStmts;
+        newStmts = removeRedundantLabel(l->statements);
+        l->statements = *newStmts;
+        return l;
+    }
 };
 
 // This pass removes jmps that jump to a label that is immediately after it.
@@ -55,7 +60,21 @@ class RemoveRedundantLabel : public Transform {
 
 class RemoveConsecutiveJmpAndLabel : public Transform {
   public:
-    const IR::Node *postorder(IR::DpdkListStatement *l) override;
+    const IR::IndexedVector<IR::DpdkAsmStatement> *removeJmpAndLabel(
+                   const IR::IndexedVector<IR::DpdkAsmStatement> &s);
+    const IR::Node *postorder(IR::DpdkListStatement *l) override {
+        const IR::IndexedVector<IR::DpdkAsmStatement> *newStmts;
+        newStmts = removeJmpAndLabel(l->statements);
+        l->statements = *newStmts;
+        return l;
+    }
+
+    const IR::Node *postorder(IR::DpdkAction *l) override {
+        const IR::IndexedVector<IR::DpdkAsmStatement> *newStmts;
+        newStmts = removeJmpAndLabel(l->statements);
+        l->statements = *newStmts;
+        return l;
+    }
 };
 
 // This pass removes labels whose next instruction is a jmp statement. This pass
@@ -75,7 +94,22 @@ class RemoveConsecutiveJmpAndLabel : public Transform {
 
 class ThreadJumps : public Transform {
   public:
-    const IR::Node *postorder(IR::DpdkListStatement *l) override;
+    const IR::IndexedVector<IR::DpdkAsmStatement> *threadJumps(
+             const IR::IndexedVector<IR::DpdkAsmStatement> &s);
+
+    const IR::Node *postorder(IR::DpdkListStatement *l) override {
+        const IR::IndexedVector<IR::DpdkAsmStatement> *newStmts;
+        newStmts = threadJumps(l->statements);
+        l->statements = *newStmts;
+        return l;
+    }
+
+    const IR::Node *postorder(IR::DpdkAction *l) override {
+        const IR::IndexedVector<IR::DpdkAsmStatement> *newStmts;
+        newStmts = threadJumps(l->statements);
+        l->statements = *newStmts;
+        return l;
+    }
 };
 
 // This pass removes labels whose next instruction is a label. In addition, it
@@ -83,9 +117,26 @@ class ThreadJumps : public Transform {
 
 class RemoveLabelAfterLabel : public Transform {
   public:
-    const IR::Node *postorder(IR::DpdkListStatement *l) override;
+    const IR::IndexedVector<IR::DpdkAsmStatement> *removeLabelAfterLabel(
+                  const IR::IndexedVector<IR::DpdkAsmStatement> &s);
+
+    const IR::Node *postorder(IR::DpdkListStatement *l) override {
+        const IR::IndexedVector<IR::DpdkAsmStatement> *newStmts;
+        newStmts = removeLabelAfterLabel(l->statements);
+        l->statements = *newStmts;
+        return l;
+    }
+
+    const IR::Node *postorder(IR::DpdkAction *l) override {
+        const IR::IndexedVector<IR::DpdkAsmStatement> *newStmts;
+        newStmts = removeLabelAfterLabel(l->statements);
+        l->statements = *newStmts;
+        return l;
+    }
 };
 
+// Instructions can only appear in actions and apply block of .spec file.
+// All these individual passes work on the actions and apply block of .spec file.
 class DpdkAsmOptimization : public PassRepeated {
   private:
   public:

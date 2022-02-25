@@ -37,10 +37,11 @@ struct H2_0 {
 
 typedef H2_0 R;
 struct H3<T> {
-    R         r;
-    T         s;
-    H2<T>     h2;
-    H4<H2<T>> h3;
+    R           r;
+    T           s;
+    H2<T>       h2;
+    H4<H2<T>>   h3;
+    tuple<T, T> t;
 }
 
 header GH<T> {
@@ -65,10 +66,11 @@ struct H4_0 {
 }
 
 struct H3_0 {
-    R    r;
-    S    s;
-    H2_0 h2;
-    H4_0 h3;
+    R           r;
+    S           s;
+    H2_0        h2;
+    H4_0        h3;
+    tuple<S, S> t;
 }
 
 header_union HU<T> {
@@ -84,11 +86,14 @@ header_union HU_0 {
 control c(out bit<1> x) {
     @name("c.gh") GH_1 gh_0;
     @name("c.s") Stack s_0;
+    @name("c.z") HU_0 z_0;
     apply {
-        gh_0.isValid();
-        s_0[0].setValid();
-        s_0[0] = (GH_1){data = (S){b = 32w1}};
-        s_0[0].isValid();
+        gh_0.setInvalid();
+        s_0[0].setInvalid();
+        s_0[1].setInvalid();
+        s_0[2].setInvalid();
+        z_0.xu.setInvalid();
+        z_0.h3u.setInvalid();
         x = 1w0;
     }
 }

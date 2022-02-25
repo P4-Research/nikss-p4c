@@ -88,7 +88,7 @@ control egress(inout headers hdr,
                inout psa_egress_output_metadata_t ostd)
 {
     apply {
-        hdr.ethernet.srcAddr[47:32] = 0x0044;
+        hdr.ethernet.srcAddr = 0x004433221100;
         if (istd.packet_path == PSA_PacketPath_t.RECIRCULATE) {
             hdr.ethernet.dstAddr = (EthernetAddress) 0;
         }
