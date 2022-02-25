@@ -31,7 +31,7 @@ class StateTranslationVisitor : public CodeGenInspector {
  protected:
     // stores the result of evaluating the select argument
     cstring selectValue;
-    bool hasDefault;
+
     P4::P4CoreLibrary& p4lib;
     const EBPFParserState* state;
     int commentDescriptionDepth;
@@ -48,7 +48,7 @@ class StateTranslationVisitor : public CodeGenInspector {
  public:
     explicit StateTranslationVisitor(P4::ReferenceMap* refMap, P4::TypeMap* typeMap) :
             CodeGenInspector(refMap, typeMap),
-            hasDefault(false), p4lib(P4::P4CoreLibrary::instance),
+            p4lib(P4::P4CoreLibrary::instance),
             state(nullptr), commentDescriptionDepth(0) {}
 
     void setState(const EBPFParserState* state) {
