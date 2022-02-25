@@ -3,6 +3,5 @@
 **/.travis.yml
 **/Dockerfile
 **/*.md
-cmake-*
 
 docs
