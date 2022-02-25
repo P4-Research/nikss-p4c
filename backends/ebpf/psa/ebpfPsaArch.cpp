@@ -476,7 +476,7 @@ const PSAArch * ConvertToEbpfPSA::build(const IR::ToplevelBlock *tlb) {
             !d->is<IR::Type_Error>()) {
             if (d->srcInfo.isValid()) {
                 auto sourceFile = d->srcInfo.getSourceFile();
-                if (sourceFile.endsWith("psa.p4")) {
+                if (sourceFile.endsWith("/psa.p4")) {
                     // do not generate standard PSA types
                     continue;
                 }

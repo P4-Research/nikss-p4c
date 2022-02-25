@@ -365,7 +365,7 @@ void EBPFErrorTypePSA::emit(CodeBuilder* builder) {
         if (sourceFile.endsWith("core.p4"))
             continue;
         // for future, also exclude definitions in psa.p4 file
-        if (sourceFile.endsWith("psa.p4"))
+        if (sourceFile.endsWith("/psa.p4"))
             continue;
 
         builder->emitIndent();
