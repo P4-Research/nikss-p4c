@@ -49,7 +49,7 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
 }
 
 control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("._drop") action _drop() {
         mark_to_drop(standard_metadata);
@@ -63,13 +63,13 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         actions = {
             _drop();
             route();
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_0();
         }
         key = {
             hdr.easyroute_port.isValid(): exact @name("easyroute_port.$valid$") ;
         }
         size = 1;
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     apply {
         route_pkt_0.apply();

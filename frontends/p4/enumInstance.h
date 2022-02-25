@@ -26,28 +26,22 @@ namespace P4 {
 // helps resolving references to compile-time enum fields, e.g., X.a
 class EnumInstance : public InstanceBase {
  protected:
-    EnumInstance(const IR::ID name, const IR::Type* type, const P4::TypeMap* typeMap):
-            name(name), type(type), typeMap(typeMap) {}
+    EnumInstance(const IR::ID name, const IR::Type* type): name(name), type(type) {}
 
  public:
     const IR::ID         name;
     const IR::Type*      type;
-    const P4::TypeMap*   typeMap;
 
     /// Returns nullptr if the expression is not a compile-time constant
     /// referring to an enum
     static EnumInstance* resolve(const IR::Expression* expression, const P4::TypeMap* typeMap);
-    bool equals(const EnumInstance* other) const {
-        return typeMap->equivalent(type, other->type) &&
-                name.name == other->name.name;
-    }
 };
 
 /// An instance of a simple enum, e.g., X.A from enum X { A, B }
 class SimpleEnumInstance : public EnumInstance {
  public:
-    SimpleEnumInstance(const IR::Type_Enum* type, const IR::ID name, const P4::TypeMap* typeMap) :
-            EnumInstance(name, type, typeMap) {}
+    SimpleEnumInstance(const IR::Type_Enum* type, const IR::ID name) :
+            EnumInstance(name, type) {}
 };
 
 /// An instance of a serializable enum, e.g.,
@@ -55,9 +49,8 @@ class SimpleEnumInstance : public EnumInstance {
 class SerEnumInstance : public EnumInstance {
  public:
     const IR::Expression* value;
-    SerEnumInstance(const IR::Type_SerEnum* type, const IR::ID name,
-                    const IR::Expression* value, const P4::TypeMap* typeMap) :
-            EnumInstance(name, type, typeMap), value(value) {}
+    SerEnumInstance(const IR::Type_SerEnum* type, const IR::ID name, const IR::Expression* value) :
+            EnumInstance(name, type), value(value) {}
 };
 
 }  // namespace P4

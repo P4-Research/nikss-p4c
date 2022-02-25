@@ -19,9 +19,9 @@ parser prs(packet_in p, out Headers_t headers) {
 }
 
 control pipe(inout Headers_t headers, out bool pass) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
-    @name("pipe.match") action match(@name("act") bool act) {
+    @name("pipe.match") action match(bool act) {
         pass = act;
     }
     @name("pipe.tbl") table tbl_0 {
@@ -30,14 +30,15 @@ control pipe(inout Headers_t headers, out bool pass) {
         }
         actions = {
             match();
-            NoAction_1();
+            NoAction_0();
         }
         const entries = {
                         16w0x800 : match(true);
                         16w0xd000 : match(false);
         }
+
         implementation = hash_table(32w64);
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     apply {
         pass = true;

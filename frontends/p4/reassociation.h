@@ -41,10 +41,6 @@ class Reassociation final : public Transform {
     { return reassociate(expr); }
     const IR::Node* postorder(IR::BXor* expr) override
     { return reassociate(expr); }
-    const IR::BlockStatement *preorder(IR::BlockStatement *bs) override {
-        if (bs->annotations->getSingle("disable_optimization"))
-            prune();
-        return bs; }
 };
 
 }  // namespace P4

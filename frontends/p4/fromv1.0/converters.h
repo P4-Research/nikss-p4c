@@ -152,7 +152,7 @@ class PrimitiveConverter {
     class PrimitiveConverter_##NAME##_##__VA_ARGS__ : public PrimitiveConverter {               \
         const IR::Statement *convert(ProgramStructure *, const IR::Primitive *) override;       \
         PrimitiveConverter_##NAME##_##__VA_ARGS__()                                             \
-        : PrimitiveConverter(#NAME, __VA_ARGS__ + 0) {}                                       \
+        : PrimitiveConverter(#NAME, __VA_ARGS__ + 0) {}                                         \
         static PrimitiveConverter_##NAME##_##__VA_ARGS__ singleton;                             \
     } PrimitiveConverter_##NAME##_##__VA_ARGS__::singleton;                                     \
     const IR::Statement *PrimitiveConverter_##NAME##_##__VA_ARGS__::convert(                    \
@@ -187,8 +187,8 @@ class DiscoverStructure : public Inspector {
     { CHECK_NULL(structure); setName("DiscoverStructure"); }
 
     void postorder(const IR::ParserException* ex) override {
-        warn(ErrorType::WARN_UNSUPPORTED, "%1%: parser exception is not translated to P4-16",
-             ex); }
+        ::warning(ErrorType::WARN_UNSUPPORTED, "%1%: parser exception is not translated to P4-16",
+                  ex); }
     void postorder(const IR::Metadata* md) override
     { structure->metadata.emplace(md); checkReserved(md, md->name, "metadata"); }
     void postorder(const IR::Header* hd) override
@@ -596,7 +596,6 @@ class FixExtracts final : public Transform {
 
         // Create actual extract
         RewriteLength rewrite(fixed->fixedHeaderType, var);
-        rewrite.setCalledBy(this);
         auto length = fixed->headerLength->apply(rewrite);
         auto args = new IR::Vector<IR::Argument>();
         args->push_back(arg->clone());
@@ -729,7 +728,7 @@ class CheckIfMultiEntryPoint: public Inspector {
 class InsertCompilerGeneratedStartState: public Transform {
     ProgramStructure* structure;
     IR::Vector<IR::Node>               allTypeDecls;
-    IR::IndexedVector<IR::ParserState> parserStates;
+    IR::IndexedVector<IR::Declaration> varDecls;
     IR::Vector<IR::SelectCase>         selCases;
     cstring newStartState;
     cstring newInstanceType;
@@ -793,11 +792,11 @@ class InsertCompilerGeneratedStartState: public Transform {
         auto annos = new IR::Annotations();
         annos->add(new IR::Annotation(IR::Annotation::nameAnnotation, ".$start"));
         auto startState = new IR::ParserState(IR::ParserState::start, annos, selects);
-        parserStates.push_back(startState);
+        varDecls.push_back(startState);
 
-        if (!parserStates.empty()) {
-            parser->states.append(parserStates);
-            parserStates.clear();
+        if (!varDecls.empty()) {
+            parser->parserLocals.append(varDecls);
+            varDecls.clear();
         }
         return parser;
     }

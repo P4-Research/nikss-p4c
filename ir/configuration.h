@@ -17,30 +17,13 @@ limitations under the License.
 #ifndef IR_CONFIGURATION_H_
 #define IR_CONFIGURATION_H_
 
-/// A P4CConfiguration is a set of parameters to the compiler that cannot be changed via user
-/// options. Implementations should be singleton classes.
-class P4CConfiguration {
- public:
-    /// Maximum width supported for a bit field or integer.
-    virtual int maximumWidthSupported() const = 0;
+namespace P4CConfiguration {
 
-    /// Maximum size for a header stack array.
-    virtual int maximumArraySize() const = 0;
-};
+// Maximum width supported for a bit-field or integer
+const int MaximumWidthSupported = 2048;
+// Maximum size for a header stack array
+const int MaximumArraySize = 256;
 
-class DefaultP4CConfiguration : public P4CConfiguration {
- public:
-    int maximumWidthSupported() const { return 2048; }
-    int maximumArraySize() const { return 256; }
-
-    /// @return the singleton instance.
-    static const DefaultP4CConfiguration& get() {
-        static DefaultP4CConfiguration instance;
-        return instance;
-    }
-
- protected:
-    DefaultP4CConfiguration() {}
-};
+}
 
 #endif /* IR_CONFIGURATION_H_ */

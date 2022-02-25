@@ -3,7 +3,6 @@
 #include <v1model.p4>
 
 struct HasBool {
-    @field_list(0)
     bool x;
 }
 
@@ -23,7 +22,7 @@ control ingress(inout parsed_packet_t h, inout local_metadata_t local_metadata, 
     apply {
         HasBool b;
         b.x = true;
-        clone_preserving_field_list(CloneType.I2E, 0, 0);
+        clone3(CloneType.I2E, 0, b);
     }
 }
 
@@ -48,3 +47,4 @@ control compute_checksum(inout parsed_packet_t hdr, inout local_metadata_t local
 }
 
 V1Switch(parse(), verifyChecksum(), ingress(), egress(), compute_checksum(), deparser()) main;
+

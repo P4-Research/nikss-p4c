@@ -158,10 +158,6 @@ class ToP4 : public Inspector {
     bool preorder(const IR::Type_Extern* t) override;
     bool preorder(const IR::Type_Unknown* t) override;
     bool preorder(const IR::Type_BaseList* t) override;
-    bool preorder(const IR::Type* t) override {
-        builder.append(t->toString());
-        return false;
-    }
 
     // declarations
     bool preorder(const IR::Declaration_Constant* cst) override;
@@ -250,9 +246,6 @@ class ToP4 : public Inspector {
     // in case it is accidentally called on a V1Program
     bool preorder(const IR::V1Program*) override { return false; }
 };
-
-std::string toP4(const IR::INode* node);
-void dumpP4(const IR::INode* node);
 
 }  // namespace P4
 

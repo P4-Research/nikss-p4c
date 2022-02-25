@@ -41,9 +41,9 @@ limitations under the License.
 #include "midend/replaceSelectRange.h"
 #include "midend/local_copyprop.h"
 #include "midend/nestedStructs.h"
-#include "midend/parserUnroll.h"
 #include "midend/removeLeftSlices.h"
 #include "midend/removeMiss.h"
+#include "midend/removeParameters.h"
 #include "midend/removeUnusedParameters.h"
 #include "midend/simplifyKey.h"
 #include "midend/simplifySelectCases.h"
@@ -75,6 +75,7 @@ SimpleSwitchMidEnd::SimpleSwitchMidEnd(CompilerOptions& options, std::ostream* o
             new P4::RemoveMiss(&refMap, &typeMap),
             new P4::EliminateNewtype(&refMap, &typeMap),
             new P4::EliminateSerEnums(&refMap, &typeMap),
+            new P4::RemoveActionParameters(&refMap, &typeMap),
             convertEnums,
             [this, convertEnums]() { enumMap = convertEnums->getEnumMapping(); },
             new P4::OrderArguments(&refMap, &typeMap),
@@ -124,10 +125,9 @@ SimpleSwitchMidEnd::SimpleSwitchMidEnd(CompilerOptions& options, std::ostream* o
             // control plane API, we remove them as well for P4-14 programs.
             isv1 ? new P4::RemoveUnusedActionParameters(&refMap) : nullptr,
             new P4::TypeChecking(&refMap, &typeMap),
-            options.loopsUnrolling ? new P4::ParsersUnroll(true, &refMap, &typeMap) : nullptr,
+            new P4::MidEndLast(),
             evaluator,
             [this, evaluator]() { toplevel = evaluator->getToplevelBlock(); },
-            new P4::MidEndLast()
         });
         if (options.listMidendPasses) {
             listPasses(*outStream, "\n");

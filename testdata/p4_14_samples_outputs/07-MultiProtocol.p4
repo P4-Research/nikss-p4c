@@ -268,6 +268,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
                 l2_match.apply();
             }
         }
+
         if (hdr.tcp.isValid()) {
             tcp_check.apply();
         } else {

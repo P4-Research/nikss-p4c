@@ -29,8 +29,6 @@ enum XDP2TC {
 
 class EbpfOptions : public CompilerOptions {
  public:
-    // file to output to
-    cstring outputFile = nullptr;
     // read from json
     bool loadIRFromJson = false;
     // Externs generation

@@ -8,18 +8,18 @@ struct tuple_0 {
 }
 
 control c(inout bit<32> x, inout bit<32> y) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("c.a") action a() {
         log_msg("Logging message.");
-        log_msg<tuple_0>("Logging values {} and {}", (tuple_0){f0 = x,f1 = y});
+        log_msg<tuple_0>("Logging values {} and {}", { x, y });
     }
     @name("c.t") table t_0 {
         actions = {
             a();
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_0();
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     apply {
         t_0.apply();

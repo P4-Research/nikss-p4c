@@ -24,6 +24,7 @@ limitations under the License.
 #include "frontends/p4/strengthReduction.h"
 #include "frontends/p4/toP4/toP4.h"
 #include "frontends/p4/typeMap.h"
+#include "frontends/p4/uniqueNames.h"
 #include "frontends/p4/unusedDeclarations.h"
 #include "midend.h"
 #include "midend/actionSynthesis.h"
@@ -36,19 +37,17 @@ limitations under the License.
 #include "midend/eliminateSwitch.h"
 #include "midend/flattenHeaders.h"
 #include "midend/flattenInterfaceStructs.h"
-#include "midend/hsIndexSimplify.h"
 #include "midend/replaceSelectRange.h"
 #include "midend/expandEmit.h"
 #include "midend/expandLookahead.h"
-#include "midend/global_copyprop.h"
 #include "midend/local_copyprop.h"
 #include "midend/midEndLast.h"
 #include "midend/nestedStructs.h"
-#include "midend/parserUnroll.h"
 #include "midend/noMatch.h"
 #include "midend/predication.h"
 #include "midend/removeExits.h"
 #include "midend/removeMiss.h"
+#include "midend/removeParameters.h"
 #include "midend/removeSelectBooleans.h"
 #include "midend/simplifyKey.h"
 #include "midend/simplifySelectCases.h"
@@ -83,6 +82,7 @@ MidEnd::MidEnd(CompilerOptions& options, std::ostream* outStream) {
         new P4::RemoveMiss(&refMap, &typeMap),
         new P4::EliminateNewtype(&refMap, &typeMap),
         new P4::EliminateSerEnums(&refMap, &typeMap),
+        new P4::RemoveActionParameters(&refMap, &typeMap),
         new P4::SimplifyKey(&refMap, &typeMap,
                             new P4::OrPolicy(
                                 new P4::IsValid(&refMap, &typeMap),
@@ -107,11 +107,8 @@ MidEnd::MidEnd(CompilerOptions& options, std::ostream* outStream) {
         new P4::Predication(&refMap),
         new P4::MoveDeclarations(),  // more may have been introduced
         new P4::ConstantFolding(&refMap, &typeMap),
-        new P4::GlobalCopyPropagation(&refMap, &typeMap),
-        new PassRepeated({
-            new P4::LocalCopyPropagation(&refMap, &typeMap),
-            new P4::ConstantFolding(&refMap, &typeMap),
-        }),
+        new P4::LocalCopyPropagation(&refMap, &typeMap),
+        new P4::ConstantFolding(&refMap, &typeMap),
         new P4::StrengthReduction(&refMap, &typeMap),
         new P4::MoveDeclarations(),  // more may have been introduced
         new P4::SimplifyControlFlow(&refMap, &typeMap),
@@ -143,10 +140,8 @@ MidEnd::MidEnd(CompilerOptions& options, std::ostream* outStream) {
                 v1controls->emplace(deparser->to<IR::ControlBlock>()->container->name);
             }
             return root; },
-        new P4::HSIndexSimplifier(&refMap, &typeMap),
         new P4::SynthesizeActions(&refMap, &typeMap, new SkipControls(v1controls)),
         new P4::MoveActionsToTables(&refMap, &typeMap),
-        options.loopsUnrolling ? new P4::ParsersUnroll(true, &refMap, &typeMap) : nullptr,
         evaluator,
         [this, evaluator]() { toplevel = evaluator->getToplevelBlock(); },
         new P4::MidEndLast()

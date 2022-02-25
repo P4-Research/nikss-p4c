@@ -93,7 +93,7 @@ bool StateTranslationVisitor::preorder(const IR::ParserState* parserState) {
         if (!parserState->selectExpression->is<IR::PathExpression>())
             BUG("Expected a PathExpression, got a %1%", parserState->selectExpression);
         builder->emitIndent();
-        builder->append(" goto ");
+        builder->append("goto ");
         visit(parserState->selectExpression);
         builder->endOfStatement(true);
     }
@@ -103,48 +103,41 @@ bool StateTranslationVisitor::preorder(const IR::ParserState* parserState) {
 }
 
 bool StateTranslationVisitor::preorder(const IR::SelectExpression* expression) {
-    BUG_CHECK(expression->select->components.size() == 1,
-              "%1%: tuple not eliminated in select",
-              expression->select);
-    selectValue = state->parser->program->refMap->newName("select");
-    auto type = state->parser->program->typeMap->getType(expression->select, true);
-    if (auto list = type->to<IR::Type_List>()) {
-        BUG_CHECK(list->components.size() == 1, "%1% list type with more than 1 element", list);
-        type = list->components.at(0);
+    hasDefault = false;
+    if (expression->select->components.size() != 1) {
+        // TODO: this does not handle correctly tuples
+        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                "%1%: only supporting a single argument for select", expression->select);
+        return false;
     }
-    auto etype = EBPFTypeFactory::instance->create(type);
     builder->emitIndent();
-    etype->declare(builder, selectValue, false);
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->appendFormat("%s = ", selectValue);
+    builder->append("switch (");
     visit(expression->select);
-    builder->endOfStatement(true);
+    builder->append(") ");
+    builder->blockStart();
+
     for (auto e : expression->selectCases)
         visit(e);
 
-    builder->emitIndent();
-    builder->appendFormat("else goto %s;", IR::ParserState::reject.c_str());
-    builder->newline();
+    if (!hasDefault) {
+        builder->emitIndent();
+        builder->appendFormat("default: goto %s;", IR::ParserState::reject.c_str());
+        builder->newline();
+    }
+
+    builder->blockEnd(true);
     return false;
 }
 
 bool StateTranslationVisitor::preorder(const IR::SelectCase* selectCase) {
     builder->emitIndent();
-    if (auto mask = selectCase->keyset->to<IR::Mask>()) {
-        builder->appendFormat("if ((%s", selectValue);
-        builder->append(" & ");
-        visit(mask->right);
-        builder->append(") == (");
-        visit(mask->left);
-        builder->append(" & ");
-        visit(mask->right);
-        builder->append("))");
+    if (selectCase->keyset->is<IR::DefaultExpression>()) {
+        hasDefault = true;
+        builder->append("default: ");
     } else {
-        builder->appendFormat("if (%s", selectValue);
-        builder->append(" == ");
+        builder->append("case ");
         visit(selectCase->keyset);
-        builder->append(")");
+        builder->append(": ");
     }
     builder->append("goto ");
     visit(selectCase->state);
@@ -169,15 +162,14 @@ StateTranslationVisitor::compileExtractField(
         if (wordsToRead <= 1) {
             helper = "load_byte";
             loadSize = 8;
-        } else if (wordsToRead <= 2)  {
+        } else if (widthToExtract <= 16)  {
             helper = "load_half";
             loadSize = 16;
-        } else if (wordsToRead <= 4) {
+        } else if (widthToExtract <= 32) {
             helper = "load_word";
             loadSize = 32;
         } else {
-            // TODO: this is wrong, since a 60-bit unaligned read may require 9 words.
-            if (wordsToRead > 64) BUG("Unexpected width %d", widthToExtract);
+            if (widthToExtract > 64) BUG("Unexpected width %d", widthToExtract);
             helper = "load_dword";
             loadSize = 64;
         }
@@ -423,21 +415,6 @@ void StateTranslationVisitor::processMethod(const P4::ExternMethod* method) {
         }
         BUG("Unhandled packet method %1%", expression->method);
         return;
-    } else if (auto bim = method->to<P4::BuiltInMethod>()) {
-        builder->emitIndent();
-        if (bim->name == IR::Type_Header::isValid) {
-            visit(bim->appliedTo);
-            builder->append(".ebpf_valid");
-            return;
-        } else if (bim->name == IR::Type_Header::setValid) {
-            visit(bim->appliedTo);
-            builder->append(".ebpf_valid = true");
-            return;
-        } else if (bim->name == IR::Type_Header::setInvalid) {
-            visit(bim->appliedTo);
-            builder->append(".ebpf_valid = false");
-            return;
-        }
     }
 
     ::error(ErrorType::ERR_UNEXPECTED,
@@ -489,24 +466,6 @@ bool StateTranslationVisitor::preorder(const IR::MethodCallExpression* expressio
     return false;
 }
 
-bool StateTranslationVisitor::preorder(const IR::StructExpression *expr) {
-    if (commentDescriptionDepth == 0)
-        return CodeGenInspector::preorder(expr);
-
-    // Dump structure for helper comment
-    builder->append("{");
-    bool first = true;
-    for (auto c : expr->components) {
-        if (!first)
-            builder->append(", ");
-        visit(c->expression);
-        first = false;
-    }
-    builder->append("}");
-
-    return false;
-}
-
 bool StateTranslationVisitor::preorder(const IR::Member* expression) {
     if (expression->expr->is<IR::PathExpression>()) {
         auto pe = expression->expr->to<IR::PathExpression>();
@@ -547,10 +506,6 @@ void EBPFParser::emitDeclaration(CodeBuilder* builder, const IR::Declaration* de
 void EBPFParser::emit(CodeBuilder* builder) {
     for (auto l : parserBlock->container->parserLocals)
         emitDeclaration(builder, l);
-
-    builder->emitIndent();
-    builder->appendFormat("goto %s;", IR::ParserState::start.c_str());
-    builder->newline();
 
     visitor->setBuilder(builder);
     for (auto s : states) {

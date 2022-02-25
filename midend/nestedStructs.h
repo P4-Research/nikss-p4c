@@ -47,18 +47,14 @@ class ComplexValues final {
 
     struct FieldsMap : public Component {
         ordered_map<cstring, Component*> members;
-        const IR::Type* type;
-        explicit FieldsMap(const IR::Type* type): type(type) {
-            CHECK_NULL(type);
-            BUG_CHECK(type->is<IR::Type_Struct>(), "%1%: expected a struct", type);
-        }
+        FieldsMap() = default;
         const IR::Expression* convertToExpression() override {
-            IR::IndexedVector<IR::NamedExpression> vec;
+            auto vec = new IR::ListExpression({});
             for (auto m : members) {
                 auto e = m.second->convertToExpression();
-                vec.push_back(new IR::NamedExpression(m.first, e));
+                vec->push_back(e);
             }
-            return new IR::StructExpression(type->getP4Type(), vec);
+            return vec;
         }
         Component* getComponent(cstring name) override
         { return ::get(members, name); }

@@ -123,21 +123,20 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
         tmp_1 = packet.lookahead<bit<8>>();
         tmp_0 = tmp_1;
         transition select(tmp, tmp_0) {
-            (8w0x0, 8w0x0 &&& 8w0x0): accept;
-            (8w0x0 &&& 8w0x0, 8w0x0): parse_ipv4_option_EOL;
-            (8w0x0 &&& 8w0x0, 8w0x1): parse_ipv4_option_NOP;
-            (8w0x0 &&& 8w0x0, 8w0x82): parse_ipv4_option_security;
-            (8w0x0 &&& 8w0x0, 8w0x44): parse_ipv4_option_timestamp;
+            (8w0x0 &&& 8w0xff, 8w0x0 &&& 8w0x0): accept;
+            (8w0x0 &&& 8w0x0, 8w0x0 &&& 8w0xff): parse_ipv4_option_EOL;
+            (8w0x0 &&& 8w0x0, 8w0x1 &&& 8w0xff): parse_ipv4_option_NOP;
+            (8w0x0 &&& 8w0x0, 8w0x82 &&& 8w0xff): parse_ipv4_option_security;
+            (8w0x0 &&& 8w0x0, 8w0x44 &&& 8w0xff): parse_ipv4_option_timestamp;
         }
     }
     @header_ordering("ethernet", "ipv4_base", "ipv4_option_security", "ipv4_option_NOP", "ipv4_option_timestamp", "ipv4_option_EOL") @name(".start") state start {
-        tmp_hdr_0.setInvalid();
         transition parse_ethernet;
     }
 }
 
 control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name(".format_options_security") action format_options_security() {
         hdr.ipv4_option_NOP.pop_front(3);
@@ -167,14 +166,14 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
             format_options_timestamp();
             format_options_both();
             _nop();
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_0();
         }
         key = {
             hdr.ipv4_option_security.isValid() : exact @name("ipv4_option_security.$valid$") ;
             hdr.ipv4_option_timestamp.isValid(): exact @name("ipv4_option_timestamp.$valid$") ;
         }
         size = 4;
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     apply {
         format_options_0.apply();

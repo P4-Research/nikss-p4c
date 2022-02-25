@@ -14,20 +14,6 @@ bool PsaStateTranslationVisitor::preorder(const IR::Expression* expression) {
     return CodeGenInspector::preorder(expression);
 }
 
-bool PsaStateTranslationVisitor::preorder(const IR::Mask *mask) {
-    CHECK_NULL(currentSelectExpression);
-    builder->append("(");
-    visit(currentSelectExpression->select->components.at(0));
-    builder->append(" & ");
-    visit(mask->right);
-    builder->append(") == (");
-    visit(mask->left);
-    builder->append(" & ");
-    visit(mask->right);
-    builder->append(")");
-    return false;
-}
-
 bool PsaStateTranslationVisitor::preorder(const IR::SelectCase* selectCase) {
     if (!selectHasValueSet)
         return StateTranslationVisitor::preorder(selectCase);
@@ -40,23 +26,24 @@ bool PsaStateTranslationVisitor::preorder(const IR::SelectCase* selectCase) {
     else
         selectFirstIfStatement = false;
 
-    builder->append("if (");
-
-    if (selectCase->keyset->is<IR::PathExpression>()) {
-        cstring pvsName = selectCase->keyset->to<IR::PathExpression>()->path->name.name;
-        auto pvs = parser->getValueSet(pvsName);
-        pvs->emitLookup(builder);
-        builder->append(" != NULL");
-    } else if (selectCase->keyset->is<IR::Mask>()) {
-        visit(selectCase->keyset);
+    if (selectCase->keyset->is<IR::DefaultExpression>()) {
+        selectHasDefault = true;
     } else {
-        visit(selectCase->keyset);
-        builder->append(" == ");
-        visit(currentSelectExpression->select->components.at(0));
+        builder->append("if (");
+
+        if (selectCase->keyset->is<IR::PathExpression>()) {
+            cstring pvsName = selectCase->keyset->to<IR::PathExpression>()->path->name.name;
+            auto pvs = parser->getValueSet(pvsName);
+            pvs->emitLookup(builder);
+            builder->append(" != NULL");
+        } else {
+            visit(selectCase->keyset);
+            builder->append(" == ");
+            visit(currentSelectExpression->select->components.at(0));
+        }
+
+        builder->append(") ");
     }
-
-    builder->append(") ");
-
 
     builder->append("goto ");
     visit(selectCase->state);
@@ -397,12 +384,6 @@ bool EBPFPsaParser::isHeaderExtractedByParser(cstring hdrName) {
                                                       program->typeMap);
                 auto extMethod = mi->to<P4::ExternMethod>();
                 if (extMethod != nullptr) {
-                    if (extMethod->originalExternType->getName().name !=
-                        P4::P4CoreLibrary::instance.packetIn.name)
-                        continue;
-                    if (extMethod->method->getName().name !=
-                        P4::P4CoreLibrary::instance.packetIn.extract.name)
-                        continue;
                     auto extractedHdr = extMethod->expr->arguments->at(0)->expression;
                     if (extractedHdr->is<IR::Member>() &&
                         extractedHdr->to<IR::Member>()->expr->is<IR::PathExpression>()) {
@@ -431,12 +412,6 @@ bool EBPFPsaParser::isHeaderExtractedByParserWithNoLookaheadBefore(cstring hdrNa
                                                       program->typeMap);
                 auto extMethod = mi->to<P4::ExternMethod>();
                 if (extMethod != nullptr) {
-                    if (extMethod->originalExternType->getName().name !=
-                        P4::P4CoreLibrary::instance.packetIn.name)
-                        continue;
-                    if (extMethod->method->getName().name !=
-                        P4::P4CoreLibrary::instance.packetIn.extract.name)
-                        continue;
                     auto extractedHdr = extMethod->expr->arguments->at(0)->expression;
                     if (extractedHdr->is<IR::Member>() &&
                         extractedHdr->to<IR::Member>()->expr->is<IR::PathExpression>()) {

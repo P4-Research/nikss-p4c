@@ -18,8 +18,8 @@ limitations under the License.
 
 /* Source-level information for a P4 program */
 
-#ifndef _LIB_SOURCE_FILE_H_
-#define _LIB_SOURCE_FILE_H_
+#ifndef P4C_LIB_SOURCE_FILE_H_
+#define P4C_LIB_SOURCE_FILE_H_
 
 #include <vector>
 
@@ -231,9 +231,9 @@ class SourceInfo final {
     { return !this->operator< (rhs); }
 
  private:
-    const InputSources* sources = nullptr;
-    SourcePosition start = SourcePosition();
-    SourcePosition end = SourcePosition();
+    const InputSources* sources;
+    SourcePosition start;
+    SourcePosition end;
 };
 
 class IHasSourceInfo {
@@ -350,4 +350,4 @@ class InputSources final {
 inline void dbprint(const IHasDbPrint* o)
 { o->dbprint(std::cout); }
 
-#endif /* _LIB_SOURCE_FILE_H_ */
+#endif /* P4C_LIB_SOURCE_FILE_H_ */

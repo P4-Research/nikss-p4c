@@ -31,7 +31,7 @@ limitations under the License.
 %define parse.assert true
 
 // Enable verbose error reporting.
-%define parse.error verbose
+%error-verbose
 
 // Declare dependencies.
 %code requires {
@@ -670,15 +670,18 @@ instantiation
       | typeRef "(" argumentList ")" name ";"
                      { $$ = new IR::Declaration_Instance(@5, *$5, $1, $3);
                        driver.structure->declareObject(*$5, $1->toString()); }
+      /* experimental */
       | annotations typeRef "(" argumentList ")" name "=" objInitializer ";"
                      { $$ = new IR::Declaration_Instance(@6, *$6, new IR::Annotations(*$1),
                                                          $2, $4, $8);
                        driver.structure->declareObject(*$6, $2->toString()); }
+      /* experimental */
       | typeRef "(" argumentList ")" name "=" objInitializer ";"
                      { $$ = new IR::Declaration_Instance(@5, *$5, $1, $3, $7);
                        driver.structure->declareObject(*$5, $1->toString()); }
     ;
 
+/* experimental; includes the following 3 productions */
 objInitializer
     : "{" { driver.structure->pushNamespace(@1, false); } objDeclarations "}"
                                { driver.structure->pop();
@@ -762,7 +765,7 @@ parserStatement
     | variableDeclaration             { $$ = $1; }
     | constantDeclaration             { $$ = $1; }
     | parserBlockStatement            { $$ = $1; }
-    | conditionalStatement            { $$ = $1; }
+    | conditionalStatement            { $$ = $1; }  // experimental
     ;
 
 parserBlockStatement
@@ -923,7 +926,7 @@ methodPrototype
     | optAnnotations ABSTRACT functionPrototype ";" {
             driver.structure->pop();
             $$ = $3; $$->setAbstract();
-            $3->annotations = $1; }
+            $3->annotations = $1; }  // experimental
     | optAnnotations TYPE_IDENTIFIER "(" parameterList ")" ";"  // constructor
                                         { auto par = new IR::ParameterList(@4, *$4);
                                           auto mt = new IR::Type_Method(@2, par, $2);
@@ -1055,6 +1058,7 @@ derivedTypeDeclaration
 
 headerTypeDeclaration
     : optAnnotations HEADER name { driver.structure->pushContainerType(*$3, true); } optTypeParameters {
+        // type parameters are experimental
         driver.structure->markAsTemplate(*$3);
         driver.structure->declareTypes(&$5->parameters); }
       "{" structFieldList "}" { $$ = new IR::Type_Header(@3, *$3, $1, $5, *$8);
@@ -1063,6 +1067,7 @@ headerTypeDeclaration
 
 structTypeDeclaration
     : optAnnotations STRUCT name  { driver.structure->pushContainerType(*$3, true); } optTypeParameters {
+        // type parameters are experimental
         driver.structure->markAsTemplate(*$3);
         driver.structure->declareTypes(&$5->parameters); }
       "{" structFieldList "}" { $$ = new IR::Type_Struct(@3, *$3, $1, $5, *$8);
@@ -1071,6 +1076,7 @@ structTypeDeclaration
 
 headerUnionDeclaration
     : optAnnotations HEADER_UNION name { driver.structure->pushContainerType(*$3, true); } optTypeParameters {
+        // type parameters are experimental
         driver.structure->markAsTemplate(*$3);
         driver.structure->declareTypes(&$5->parameters); }
       "{" structFieldList "}" { $$ = new IR::Type_HeaderUnion(@3, *$3, $1, $5, *$8);
@@ -1301,7 +1307,7 @@ entry
     ;
 
 entriesList
-    : %empty                         { $$ = new IR::Vector<IR::Entry>(); }
+    : entry                          { $$ = new IR::Vector<IR::Entry>(); $$->push_back($1); }
     | entriesList entry              { $$ = $1; $$->push_back($2); }
     ;
 
@@ -1384,7 +1390,7 @@ dot_name:
 
 lvalue
     : prefixedNonTypeName                { $$ = new IR::PathExpression($1); }
-    | THIS                               { $$ = new IR::This(@1); }
+    | THIS                               { $$ = new IR::This(@1); }  // experimental
     | lvalue dot_name %prec DOT          { $$ = new IR::Member(@1 + @2, $1, *$2); }
     | lvalue "[" expression "]"          { $$ = new IR::ArrayIndex(@1 + @4, $1, $3); }
     | lvalue "[" expression ":" expression "]" { $$ = new IR::Slice(@1 + @6, $1, $3, $5); }
@@ -1395,7 +1401,7 @@ expression
     | STRING_LITERAL                     { $$ = new IR::StringLiteral(@1, $1); }
     | TRUE                               { $$ = new IR::BoolLiteral(@1, true); }
     | FALSE                              { $$ = new IR::BoolLiteral(@1, false); }
-    | THIS                               { $$ = new IR::This(@1); }
+    | THIS                               { $$ = new IR::This(@1); }  // experimental
     | nonTypeName                        { $$ = new IR::PathExpression(*$1); }
     | dotPrefix nonTypeName              { $$ = new IR::PathExpression(new IR::Path(*$2, true)); driver.structure->clearPath(); }
     | expression "[" expression "]"      { $$ = new IR::ArrayIndex(@1 + @4, $1, $3); }
@@ -1452,7 +1458,7 @@ nonBraceExpression
     | STRING_LITERAL                     { $$ = new IR::StringLiteral(@1, $1); }
     | TRUE                               { $$ = new IR::BoolLiteral(@1, true); }
     | FALSE                              { $$ = new IR::BoolLiteral(@1, false); }
-    | THIS                               { $$ = new IR::This(@1); }
+    | THIS                               { $$ = new IR::This(@1); }  // experimental
     | nonTypeName                        { $$ = new IR::PathExpression(*$1); }
     | dotPrefix nonTypeName              { $$ = new IR::PathExpression(new IR::Path(*$2, true)); driver.structure->clearPath(); }
     | nonBraceExpression "[" expression "]"      { $$ = new IR::ArrayIndex(@1 + @4, $1, $3); }

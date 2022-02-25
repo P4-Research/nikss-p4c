@@ -27,8 +27,6 @@ void DoExpandLookahead::expand(
     const IR::Expression* destination,    // result is assigned to this expression
     IR::IndexedVector<IR::StatOrDecl>* output) {  // add here new assignments
     if (type->is<IR::Type_Struct>() || type->is<IR::Type_Header>()) {
-        if (type->is<IR::Type_Header>() && !expandHeader)
-            return;
         if (type->is<IR::Type_Header>()) {
             auto setValid = new IR::Member(destination, IR::Type_Header::setValid);
             auto mc = new IR::MethodCallExpression(setValid);
@@ -86,10 +84,7 @@ DoExpandLookahead::convertLookahead(const IR::MethodCallExpression* expression) 
     if (!typearg->is<IR::Type_StructLike>() && !typearg->is<IR::Type_Tuple>())
         return nullptr;
 
-    if (typearg->is<IR::Type_Header>() && !expandHeader)
-        return nullptr;
-
-    int width = typeMap->widthBits(typearg, expression, false);
+    int width = typeMap->minWidthBits(typearg, expression);
     if (width < 0)
         return nullptr;
 

@@ -1,7 +1,7 @@
 #include <core.p4>
 
 control c(inout bit<16> x) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("c.incx") action incx() {
         x = x + 16w1;
@@ -12,9 +12,9 @@ control c(inout bit<16> x) {
         actions = {
             incx();
             nop();
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_0();
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     apply {
         x_0.apply();

@@ -16,6 +16,7 @@ control c(out bit<1> arun) {
                 arun = 1;
             }
         }
+
     }
 }
 

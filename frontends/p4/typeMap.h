@@ -46,13 +46,13 @@ class TypeMap final : public ProgramMap {
     std::vector<const IR::Type*> canonicalLists;
 
     // Map each node to its canonical type
-    ordered_map<const IR::Node*, const IR::Type*> typeMap;
+    std::map<const IR::Node*, const IR::Type*> typeMap;
     // All left-values in the program.
-    ordered_set<const IR::Expression*> leftValues;
+    std::set<const IR::Expression*> leftValues;
     // All compile-time constants.  A compile-time constant
     // is not necessarily a constant - it could be a directionless
     // parameter as well.
-    ordered_set<const IR::Expression*> constants;
+    std::set<const IR::Expression*> constants;
     // For each type variable in the program the actual
     // type that is substituted for it.
     TypeVariableSubstitution allTypeVariables;
@@ -61,12 +61,8 @@ class TypeMap final : public ProgramMap {
     void checkPrecondition(const IR::Node* element, const IR::Type* type) const;
 
  public:
-    TypeMap() : ProgramMap("TypeMap"), strictStruct(false) {}
+    TypeMap() : ProgramMap("TypeMap") {}
 
-    /// If true we require structs to have the same name to be
-    /// equivalent, if false only that the have the same fields.
-    bool strictStruct;
-    void setStrictStruct(bool value) { strictStruct = value; }
     bool contains(const IR::Node* element) { return typeMap.count(element) != 0; }
     void setType(const IR::Node* element, const IR::Type* type);
     const IR::Type* getType(const IR::Node* element, bool notNull = false) const;
@@ -90,23 +86,17 @@ class TypeMap final : public ProgramMap {
     const TypeVariableSubstitution* getSubstitutions() const { return &allTypeVariables; }
 
     /// Check deep structural equivalence; defined between canonical types only.
-    /// @param strict  If true use strict equivalence checks, irrespective
-    ///        of the strictStruct flag, else use the strictStruct flag value.
-    bool equivalent(const IR::Type* left, const IR::Type* right, bool strict = false) const;
+    static bool equivalent(const IR::Type* left, const IR::Type* right);
     /// This is the same as equivalence, but it also allows some legal
     /// implicit conversions, such as a tuple type to a struct type, which
     /// is used when initializing a struct with a list expression.
-    bool implicitlyConvertibleTo(const IR::Type* from, const IR::Type* to) const;
+    static bool implicitlyConvertibleTo(const IR::Type* from, const IR::Type* to);
 
     // Used for tuples and stacks only
     const IR::Type* getCanonical(const IR::Type* type);
-    /// The width in bits of this type.  If the width is not
+    /// The minimum width in bits of this type.  If the width is not
     /// well-defined this will report an error and return -1.
-    /// max indicates whether we want the max width or min width.
-    int widthBits(const IR::Type* type, const IR::Node* errorPosition, bool max);
-
-    /// True is type occupies no storage.
-    bool typeIsEmpty(const IR::Type* type) const;
+    int minWidthBits(const IR::Type* type, const IR::Node* errorPosition);
 };
 }  // namespace P4
 

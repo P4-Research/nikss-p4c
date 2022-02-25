@@ -79,6 +79,7 @@ control c(out bit<32> v) {
                 touched = true;
             }
         }
+
         touched = !touched;
         if (e > 0) {
             t.apply();

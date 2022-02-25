@@ -28,54 +28,54 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
 }
 
 control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
-    @noWarn("unused") @name(".NoAction") action NoAction_2() {
+    @noWarn("unused") @name(".NoAction") action NoAction_4() {
     }
-    @noWarn("unused") @name(".NoAction") action NoAction_3() {
+    @noWarn("unused") @name(".NoAction") action NoAction_5() {
     }
-    @name(".setb1") action setb1(@name("val") bit<8> val, @name("port") bit<9> port) {
+    @name(".setb1") action setb1(bit<8> val, bit<9> port) {
         hdr.data.b1 = val;
         standard_metadata.egress_spec = port;
     }
-    @name(".setb1") action setb1_1(@name("val") bit<8> val_1, @name("port") bit<9> port_1) {
-        hdr.data.b1 = val_1;
-        standard_metadata.egress_spec = port_1;
+    @name(".setb1") action setb1_2(bit<8> val, bit<9> port) {
+        hdr.data.b1 = val;
+        standard_metadata.egress_spec = port;
     }
     @name(".noop") action noop() {
     }
-    @name(".noop") action noop_1() {
+    @name(".noop") action noop_3() {
     }
-    @name(".noop") action noop_2() {
+    @name(".noop") action noop_4() {
     }
     @name(".test1") table test1_0 {
         actions = {
             setb1();
             noop();
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_0();
         }
         key = {
             hdr.data.f1: ternary @name("data.f1") ;
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     @name(".test2") table test2_0 {
         actions = {
-            setb1_1();
-            noop_1();
-            @defaultonly NoAction_2();
+            setb1_2();
+            noop_3();
+            @defaultonly NoAction_4();
         }
         key = {
             hdr.data.f2: ternary @name("data.f2") ;
         }
-        default_action = NoAction_2();
+        default_action = NoAction_4();
     }
     @name(".test4") table test4_0 {
         actions = {
-            noop_2();
-            @defaultonly NoAction_3();
+            noop_4();
+            @defaultonly NoAction_5();
         }
-        default_action = NoAction_3();
+        default_action = NoAction_5();
     }
     apply {
         if (test1_0.apply().hit) {

@@ -3,7 +3,7 @@ control ctrl(out bit<32> c) {
     @name("ctrl.e") action e() {
         exit;
     }
-    @name("ctrl.e") action e_1() {
+    @name("ctrl.e") action e_2() {
         exit;
     }
     apply {
@@ -12,7 +12,7 @@ control ctrl(out bit<32> c) {
         if (a_0 == 32w0) {
             e();
         } else {
-            e_1();
+            e_2();
         }
         c = 32w5;
     }

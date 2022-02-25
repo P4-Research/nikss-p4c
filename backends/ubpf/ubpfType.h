@@ -53,7 +53,6 @@ namespace UBPF {
         cstring getAsString();
 
         void declare(EBPF::CodeBuilder *builder, cstring id, bool asPointer) override;
-        void declareInit(EBPF::CodeBuilder *builder, cstring id, bool asPointer) override;
     };
 
     class UBPFStructType : public EBPF::EBPFStructType {
@@ -61,7 +60,6 @@ namespace UBPF {
         UBPFStructType(const IR::Type_StructLike* strct) : EBPF::EBPFStructType(strct) {}
         void emit(EBPF::CodeBuilder* builder) override;
         void declare(EBPF::CodeBuilder* builder, cstring id, bool asPointer) override;
-        void declareInit(EBPF::CodeBuilder *builder, cstring id, bool asPointer) override;
     };
 
     class UBPFEnumType : public EBPF::EBPFEnumType {
@@ -102,7 +100,6 @@ namespace UBPF {
         explicit UBPFListType(const IR::Type_List *lst);
         void emitPadding(EBPF::CodeBuilder* builder, Padding* padding);
         void declare(EBPF::CodeBuilder* builder, cstring id, bool asPointer) override;
-        void declareInit(EBPF::CodeBuilder *builder, cstring id, bool asPointer) override;
         void emitInitializer(EBPF::CodeBuilder* builder) override;
         unsigned widthInBits() override { return width; }
         unsigned implementationWidthInBits() override { return implWidth; }

@@ -15,9 +15,8 @@ limitations under the License.
 */
 
 #include "resolveReferences.h"
-
-#include <sstream>
 #include <boost/range/adaptor/reversed.hpp>
+#include <sstream>
 #include "frontends/common/options.h"
 
 namespace P4 {

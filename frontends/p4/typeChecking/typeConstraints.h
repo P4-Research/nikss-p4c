@@ -17,11 +17,9 @@ limitations under the License.
 #ifndef _TYPECHECKING_TYPECONSTRAINTS_H_
 #define _TYPECHECKING_TYPECONSTRAINTS_H_
 
-#include <sstream>
-
 #include <boost/optional.hpp>
 #include <boost/algorithm/string.hpp>
-
+#include <sstream>
 #include "ir/ir.h"
 #include "typeUnification.h"
 #include "typeConstraints.h"
@@ -51,7 +49,6 @@ class Explain : public Inspector {
             return;
         explanation += "Where '" + tv->toString() + "' is bound to '" + val->toString() + "'\n";
         Explain erec(subst);  // recursive explain variables in this substitution
-        erec.setCalledBy(this);
         val->apply(erec);
         explanation += erec.explanation;
     }
@@ -87,25 +84,25 @@ class TypeConstraint : public IHasDbPrint {
         boost::format fmt = boost::format(errFormat);
         switch (errArguments.size()) {
             case 0:
-               message = boost::str(fmt);
+                message = ::error_helper(fmt, "", "", "", "");
                 break;
             case 1:
                 explanation += explain(0, explainer);
-                message = ::error_helper(fmt, errArguments.at(0)).toString();
+                message = ::error_helper(fmt, "", "", "", "", errArguments.at(0));
                 break;
             case 2:
                 explanation += explain(0, explainer);
                 explanation += explain(1, explainer);
                 message = ::error_helper(
-                    fmt, errArguments.at(0), errArguments.at(1)).toString();
+                    fmt, "", "", "", "", errArguments.at(0), errArguments.at(1));
                 break;
             case 3:
                 explanation += explain(0, explainer);
                 explanation += explain(1, explainer);
                 explanation += explain(2, explainer);
                 message = ::error_helper(
-                    fmt, errArguments.at(0), errArguments.at(1),
-                    errArguments.at(2)).toString();
+                    fmt, "", "", "", "",
+                    errArguments.at(0), errArguments.at(1), errArguments.at(2));
                 break;
             case 4:
                 explanation += explain(0, explainer);
@@ -113,8 +110,8 @@ class TypeConstraint : public IHasDbPrint {
                 explanation += explain(2, explainer);
                 explanation += explain(3, explainer);
                 message = ::error_helper(
-                    fmt, errArguments.at(0), errArguments.at(1),
-                    errArguments.at(2), errArguments.at(3)).toString();
+                    fmt, "", "", "", "", errArguments.at(0), errArguments.at(1),
+                    errArguments.at(2), errArguments.at(3));
                 break;
             default:
                 BUG("Unexpected argument count for error message");
@@ -137,7 +134,7 @@ class TypeConstraint : public IHasDbPrint {
         /// the analysis started.
         boost::format fmt(format);
         cstring message = cstring("  ---- Actual error:\n") +
-                ::error_helper(fmt, args...).toString();
+                ::error_helper(fmt, "", "", "", "", args...);
         auto o = origin;
         auto constraint = this;
         Explain explainer(subst);
@@ -229,11 +226,11 @@ class TypeConstraints final {
  public:
     TypeVariableSubstitutionVisitor replaceVariables;
 
-    TypeConstraints(const TypeVariableSubstitution* definedVariables, const P4::TypeMap* typeMap):
-            unification(new TypeUnification(this, typeMap)),
-            definedVariables(definedVariables),
-            currentSubstitution(new TypeVariableSubstitution()),
-            replaceVariables(definedVariables) {}
+    explicit TypeConstraints(const TypeVariableSubstitution* definedVariables) :
+            unification(new TypeUnification(this)), definedVariables(definedVariables),
+            replaceVariables(definedVariables),
+            currentSubstitution(new TypeVariableSubstitution()) {}
+
     // Mark this variable as being free.
     void addUnifiableTypeVariable(const IR::ITypeVar* typeVariable)
     { unifiableTypeVariables.insert(typeVariable); }

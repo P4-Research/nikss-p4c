@@ -60,13 +60,6 @@ class TypeChecking : public PassManager {
                  bool updateExpressions = false);
 };
 
-template<typename... T>
-void typeError(const char* format, T... args) {
-    ::error(ErrorType::ERR_TYPE_ERROR, format, args...);
-}
-/// True if the type contains any varbit or header_union subtypes
-bool hasVarbitsOrUnions(const TypeMap* typeMap, const IR::Type* type);
-
 // Actual type checking algorithm.
 // In general this pass should not be called directly; call TypeChecking instead.
 // It is a transform because it may convert implicit casts into explicit casts.
@@ -74,9 +67,6 @@ bool hasVarbitsOrUnions(const TypeMap* typeMap, const IR::Type* type);
 // with readOnly = true, it will assert that the program is not changed.
 // It is expected that once a program has been type-checked and all casts have
 // been inserted it will not need to change ever again during type-checking.
-// In fact, several passes do modify the program such that types are invalidated.
-// For example, enum elimination converts enum values into integers.  After such
-// changes the typemap has to be cleared and types must be recomputed from scratch.
 class TypeInference : public Transform {
     // Input: reference map
     ReferenceMap* refMap;
@@ -85,15 +75,14 @@ class TypeInference : public Transform {
     const IR::Node* initialNode;
 
  public:
-    // @param readOnly If true it will assert that it behaves like
-    //        an Inspector.
+    // If readOnly=true it will assert that it behaves like
+    // an Inspector.
     TypeInference(ReferenceMap* refMap, TypeMap* typeMap,
-                  bool readOnly = false, bool checkArrays = true);
+                  bool readOnly = false);
 
  protected:
     // If true we expect to leave the program unchanged
     bool readOnly;
-    bool checkArrays = true;
     const IR::Type* getType(const IR::Node* element) const;
     const IR::Type* getTypeType(const IR::Node* element) const;
     void setType(const IR::Node* element, const IR::Type* type);
@@ -129,7 +118,6 @@ class TypeInference : public Transform {
     bool checkAbstractMethods(const IR::Declaration_Instance* inst, const IR::Type_Extern* type);
     void addSubstitutions(const TypeVariableSubstitution* tvs);
 
-    const IR::Expression* constantFold(const IR::Expression* expression);
 
     /** Converts each type to a canonical representation.
      *  Made virtual to enable private midend passes to extend standard IR with custom IR classes.
@@ -141,7 +129,10 @@ class TypeInference : public Transform {
     virtual const IR::ParameterList* canonicalizeParameters(const IR::ParameterList* params);
 
     // various helpers
+    bool hasVarbitsOrUnions(const IR::Type* type) const;
     bool onlyBitsOrBitStructs(const IR::Type* type) const;
+    void checkCorelibMethods(const ExternMethod* em) const;
+    void checkEmitType(const IR::Expression* emit, const IR::Type* type) const;
     bool containsHeader(const IR::Type* canonType);
     bool validateFields(const IR::Type* type,
                         std::function<bool(const IR::Type*)> checker) const;
@@ -183,6 +174,10 @@ class TypeInference : public Transform {
     using Transform::postorder;
     using Transform::preorder;
 
+    template<typename... T>
+    static void typeError(const char* format, T... args) {
+        ::error(ErrorType::ERR_TYPE_ERROR, format, args...);
+    }
     static const IR::Type* specialize(const IR::IMayBeGenericType* type,
                                       const IR::Vector<IR::Type>* arguments);
     const IR::Node* pruneIfDone(const IR::Node* node)

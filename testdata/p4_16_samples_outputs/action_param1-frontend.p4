@@ -1,11 +1,9 @@
 control c(inout bit<32> x) {
-    @name("c.arg") bit<32> arg_0;
-    @name("c.a") action a() {
-        arg_0 = 32w15;
-        x = arg_0;
+    @name("c.a") action a(in bit<32> arg_1) {
+        x = arg_1;
     }
     apply {
-        a();
+        a(32w15);
     }
 }
 

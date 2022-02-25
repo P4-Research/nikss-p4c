@@ -119,7 +119,7 @@ Happy writing! Should you have any questions, please don't hesitate to ask.
 
 ```
 git fetch upstream
-git rebase upstream/main
+git rebase upstream/master
 git push -f
 ```
 
@@ -190,9 +190,6 @@ The testing infrastructure is based on small python and shell scripts.
   check-p4`.
 
 * To rerun the tests that failed last time run `make recheck`
-
-* To run a single test case execute `ctest --output-on-failure -R '<test>'`.
-  Example: `ctest --output-on-failure -R 'psa-switch-expression-without-default'`
 
 * Add unit tests in `test/gtest`
 

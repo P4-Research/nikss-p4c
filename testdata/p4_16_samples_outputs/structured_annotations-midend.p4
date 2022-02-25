@@ -20,7 +20,7 @@ control verifyChecksum(inout headers_t hdr, inout metadata_t meta) {
 }
 
 control ingressImpl(inout headers_t hdr, inout metadata_t meta, inout standard_metadata_t stdmeta) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("ingressImpl.my_drop") action my_drop() {
         mark_to_drop(stdmeta);
@@ -34,9 +34,9 @@ control ingressImpl(inout headers_t hdr, inout metadata_t meta, inout standard_m
         actions = {
             @myid[1] redirect();
             @myid[2] my_drop();
-            NoAction_1();
+            NoAction_0();
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     apply {
         t_0.apply();

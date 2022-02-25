@@ -50,7 +50,7 @@ parser prs(packet_in p, out Headers_t headers, inout metadata meta, inout standa
 }
 
 control pipe(inout Headers_t headers, inout metadata meta, inout standard_metadata std_meta) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("pipe.Reject") action Reject() {
         mark_to_drop();
@@ -61,9 +61,9 @@ control pipe(inout Headers_t headers, inout metadata meta, inout standard_metada
         }
         actions = {
             Reject();
-            NoAction_1();
+            NoAction_0();
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     @hidden action parenthesistest_ubpf95() {
         meta.qfi = 8w3;

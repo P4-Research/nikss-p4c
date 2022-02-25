@@ -61,7 +61,8 @@ namespace UBPF {
 
     class UBPFModel : public ::Model::Model {
     protected:
-        UBPFModel() : CPacketName("pkt"),
+        UBPFModel() : Model("0.1"),
+                      CPacketName("pkt"),
                       packet("packet", P4::P4CoreLibrary::instance.packetIn, 0),
                       pipeline(),
                       registerModel(),

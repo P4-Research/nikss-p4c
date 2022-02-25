@@ -17,10 +17,8 @@ limitations under the License.
 #ifndef FRONTENDS_COMMON_APPLYOPTIONSPRAGMAS_H_
 #define FRONTENDS_COMMON_APPLYOPTIONSPRAGMAS_H_
 
-#include <vector>
-
 #include <boost/optional.hpp>
-
+#include <vector>
 #include "ir/ir.h"
 #include "ir/visitor.h"
 #include "lib/cstring.h"

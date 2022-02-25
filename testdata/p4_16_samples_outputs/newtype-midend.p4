@@ -13,16 +13,16 @@ header H {
 
 control c(out B32 x) {
     @name("c.k") N32 k_0;
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("c.t") table t_0 {
         actions = {
-            NoAction_1();
+            NoAction_0();
         }
         key = {
             k_0: exact @name("k") ;
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     @hidden action newtype34() {
         k_0 = 32w0;

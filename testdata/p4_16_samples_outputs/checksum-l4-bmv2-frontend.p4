@@ -135,9 +135,9 @@ parser parserI(packet_in pkt, out headers hdr, inout metadata meta, inout standa
 }
 
 control cIngress(inout headers hdr, inout metadata meta, inout standard_metadata_t stdmeta) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
-    @noWarn("unused") @name(".NoAction") action NoAction_2() {
+    @noWarn("unused") @name(".NoAction") action NoAction_3() {
     }
     @name("cIngress.foot") action foot() {
         hdr.tcp.srcPort = hdr.tcp.srcPort + 16w1;
@@ -155,12 +155,13 @@ control cIngress(inout headers hdr, inout metadata meta, inout standard_metadata
         }
         actions = {
             foot();
-            NoAction_1();
+            NoAction_0();
         }
-        const default_action = NoAction_1();
+        const default_action = NoAction_0();
         const entries = {
                         16w80 : foot();
         }
+
     }
     @name("cIngress.huh") table huh_0 {
         key = {
@@ -168,12 +169,13 @@ control cIngress(inout headers hdr, inout metadata meta, inout standard_metadata
         }
         actions = {
             foou();
-            NoAction_2();
+            NoAction_3();
         }
-        const default_action = NoAction_2();
+        const default_action = NoAction_3();
         const entries = {
                         16w80 : foou();
         }
+
     }
     apply {
         if (hdr.tcp.isValid()) {

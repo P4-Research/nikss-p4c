@@ -82,21 +82,21 @@ parser TopParser(packet_in b, out Parsed_packet p) {
 control TopPipe(inout Parsed_packet headers, in error parseError, in InControl inCtrl, out OutControl outCtrl) {
     @name("TopPipe.nextHop") IPv4Address nextHop_0;
     @name("TopPipe.hasReturned") bool hasReturned;
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("TopPipe.Drop_action") action Drop_action() {
         outCtrl.outputPort = 4w0xf;
     }
-    @name("TopPipe.Drop_action") action Drop_action_1() {
+    @name("TopPipe.Drop_action") action Drop_action_4() {
         outCtrl.outputPort = 4w0xf;
     }
-    @name("TopPipe.Drop_action") action Drop_action_2() {
+    @name("TopPipe.Drop_action") action Drop_action_5() {
         outCtrl.outputPort = 4w0xf;
     }
-    @name("TopPipe.Drop_action") action Drop_action_3() {
+    @name("TopPipe.Drop_action") action Drop_action_6() {
         outCtrl.outputPort = 4w0xf;
     }
-    @name("TopPipe.Set_nhop") action Set_nhop(@name("ipv4_dest") IPv4Address ipv4_dest, @name("port") PortId port) {
+    @name("TopPipe.Set_nhop") action Set_nhop(IPv4Address ipv4_dest, PortId port) {
         nextHop_0 = ipv4_dest;
         headers.ip.ttl = headers.ip.ttl + 8w255;
         outCtrl.outputPort = port;
@@ -121,37 +121,37 @@ control TopPipe(inout Parsed_packet headers, in error parseError, in InControl i
         }
         actions = {
             Send_to_cpu();
-            NoAction_1();
+            NoAction_0();
         }
-        const default_action = NoAction_1();
+        const default_action = NoAction_0();
     }
-    @name("TopPipe.Set_dmac") action Set_dmac(@name("dmac") EthernetAddress dmac_0) {
-        headers.ethernet.dstAddr = dmac_0;
+    @name("TopPipe.Set_dmac") action Set_dmac(EthernetAddress dmac) {
+        headers.ethernet.dstAddr = dmac;
     }
-    @name("TopPipe.dmac") table dmac_1 {
+    @name("TopPipe.dmac") table dmac_0 {
         key = {
             nextHop_0: exact @name("nextHop") ;
         }
         actions = {
-            Drop_action_1();
+            Drop_action_4();
             Set_dmac();
         }
         size = 1024;
-        default_action = Drop_action_1();
+        default_action = Drop_action_4();
     }
-    @name("TopPipe.Set_smac") action Set_smac(@name("smac") EthernetAddress smac_0) {
-        headers.ethernet.srcAddr = smac_0;
+    @name("TopPipe.Set_smac") action Set_smac(EthernetAddress smac) {
+        headers.ethernet.srcAddr = smac;
     }
-    @name("TopPipe.smac") table smac_1 {
+    @name("TopPipe.smac") table smac_0 {
         key = {
             outCtrl.outputPort: exact @name("outCtrl.outputPort") ;
         }
         actions = {
-            Drop_action_2();
+            Drop_action_5();
             Set_smac();
         }
         size = 16;
-        default_action = Drop_action_2();
+        default_action = Drop_action_5();
     }
     @hidden action vssexample191() {
         hasReturned = true;
@@ -176,9 +176,9 @@ control TopPipe(inout Parsed_packet headers, in error parseError, in InControl i
     }
     @hidden table tbl_Drop_action {
         actions = {
-            Drop_action_3();
+            Drop_action_6();
         }
-        const default_action = Drop_action_3();
+        const default_action = Drop_action_6();
     }
     @hidden table tbl_vssexample191 {
         actions = {
@@ -229,7 +229,7 @@ control TopPipe(inout Parsed_packet headers, in error parseError, in InControl i
         if (hasReturned) {
             ;
         } else {
-            dmac_1.apply();
+            dmac_0.apply();
             if (outCtrl.outputPort == 4w0xf) {
                 tbl_vssexample201.apply();
             }
@@ -237,7 +237,7 @@ control TopPipe(inout Parsed_packet headers, in error parseError, in InControl i
         if (hasReturned) {
             ;
         } else {
-            smac_1.apply();
+            smac_0.apply();
         }
     }
 }
@@ -284,4 +284,3 @@ control TopDeparser(inout Parsed_packet p, packet_out b) {
 }
 
 VSS<Parsed_packet>(TopParser(), TopPipe(), TopDeparser()) main;
-

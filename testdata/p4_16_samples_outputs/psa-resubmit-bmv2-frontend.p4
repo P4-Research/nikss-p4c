@@ -1,5 +1,5 @@
 #include <core.p4>
-#include <bmv2/psa.p4>
+#include <psa.p4>
 
 typedef bit<48> EthernetAddress;
 header ethernet_t {
@@ -35,15 +35,10 @@ parser IngressParserImpl(packet_in pkt, out headers_t hdr, inout metadata_t user
 }
 
 control cIngress(inout headers_t hdr, inout metadata_t user_meta, in psa_ingress_input_metadata_t istd, inout psa_ingress_output_metadata_t ostd) {
-    @name("cIngress.meta") psa_ingress_output_metadata_t meta_0;
-    @name("cIngress.egress_port") PortId_t egress_port_0;
-    @noWarnUnused @name(".send_to_port") action send_to_port_0() {
-        meta_0 = ostd;
-        egress_port_0 = (PortId_t)(PortIdUint_t)hdr.ethernet.dstAddr;
-        meta_0.drop = false;
-        meta_0.multicast_group = (MulticastGroup_t)32w0;
-        meta_0.egress_port = egress_port_0;
-        ostd = meta_0;
+    @noWarnUnused @name(".send_to_port") action send_to_port(inout psa_ingress_output_metadata_t meta_1, in PortId_t egress_port_1) {
+        meta_1.drop = false;
+        meta_1.multicast_group = (MulticastGroup_t)32w0;
+        meta_1.egress_port = egress_port_1;
     }
     apply {
         ostd.drop = false;
@@ -52,7 +47,7 @@ control cIngress(inout headers_t hdr, inout metadata_t user_meta, in psa_ingress
             ostd.resubmit = true;
         } else {
             hdr.ethernet.etherType = 16w0xf00d;
-            send_to_port_0();
+            send_to_port(ostd, (PortId_t)(PortIdUint_t)hdr.ethernet.dstAddr);
             hdr.output_data.word0 = 32w8;
             if (istd.packet_path == PSA_PacketPath_t.NORMAL) {
                 hdr.output_data.word0 = 32w1;

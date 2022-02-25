@@ -21,23 +21,15 @@ control c(out bool b) {
     @name("c.b_0") bool b_0;
     @name("c.x_2") bit<16> x_2;
     @name("c.b_1") bool b_1;
-    @name("c.bi") bit<16> bi_0;
-    @name("c.mb") bit<16> mb_0;
-    @name("c.bi") bit<16> bi_2;
-    @name("c.mb") bit<16> mb_2;
-    @name("c.a") action a() {
-        bi_0 = 16w3;
-        mb_0 = -bi_0;
-        xv_0 = mb_0;
+    @name("c.a") action a(in bit<16> bi, out bit<16> mb) {
+        mb = -bi;
     }
-    @name("c.a") action a_1() {
-        bi_2 = 16w0;
-        mb_2 = -bi_2;
-        xv_0 = mb_2;
+    @name("c.a") action a_2(in bit<16> bi_1, out bit<16> mb_1) {
+        mb_1 = -bi_1;
     }
     apply {
-        a();
-        a_1();
+        a(bi = 16w3, mb = xv_0);
+        a_2(mb_1 = xv_0, bi_1 = 16w0);
         x_1 = xv_0;
         b_0 = x_1 == 16w0;
         b = b_0;

@@ -26,9 +26,7 @@ namespace UBPF {
 
 namespace {
 class UBPFStateTranslationVisitor : public EBPF::CodeGenInspector {
-    // stores the result of evaluating the select argument
-    cstring selectValue;
-
+    bool hasDefault;
     P4::P4CoreLibrary& p4lib;
     const UBPFParserState* state;
 
@@ -51,7 +49,7 @@ class UBPFStateTranslationVisitor : public EBPF::CodeGenInspector {
  public:
     explicit UBPFStateTranslationVisitor(const UBPFParserState* state) :
             CodeGenInspector(state->parser->program->refMap, state->parser->program->typeMap),
-            p4lib(P4::P4CoreLibrary::instance), state(state) {}
+            hasDefault(false), p4lib(P4::P4CoreLibrary::instance), state(state) {}
     bool preorder(const IR::ParserState* state) override;
     bool preorder(const IR::SelectCase* selectCase) override;
     bool preorder(const IR::SelectExpression* expression) override;
@@ -107,7 +105,7 @@ bool UBPFStateTranslationVisitor::preorder(const IR::ParserState* parserState) {
     visit(parserState->components, "components");
     if (parserState->selectExpression == nullptr) {
         builder->emitIndent();
-        builder->append(" goto ");
+        builder->append("goto ");
         builder->append(IR::ParserState::reject);
         builder->endOfStatement(true);
     } else if (parserState->selectExpression->is<IR::SelectExpression>()) {
@@ -128,20 +126,13 @@ bool UBPFStateTranslationVisitor::preorder(const IR::ParserState* parserState) {
 
 bool UBPFStateTranslationVisitor::preorder(const IR::SelectCase* selectCase) {
     builder->emitIndent();
-    if (auto mask = selectCase->keyset->to<IR::Mask>()) {
-        builder->appendFormat("if ((%s", selectValue);
-        builder->append(" & ");
-        visit(mask->right);
-        builder->append(") == (");
-        visit(mask->left);
-        builder->append(" & ");
-        visit(mask->right);
-        builder->append("))");
+    if (selectCase->keyset->is<IR::DefaultExpression>()) {
+        hasDefault = true;
+        builder->append("default: ");
     } else {
-        builder->appendFormat("if (%s", selectValue);
-        builder->append(" == ");
+        builder->append("case ");
         visit(selectCase->keyset);
-        builder->append(")");
+        builder->append(": ");
     }
     builder->append("goto ");
     visit(selectCase->state);
@@ -150,29 +141,29 @@ bool UBPFStateTranslationVisitor::preorder(const IR::SelectCase* selectCase) {
 }
 
 bool UBPFStateTranslationVisitor::preorder(const IR::SelectExpression* expression) {
-    BUG_CHECK(expression->select->components.size() == 1,
-              "%1%: tuple not eliminated in select",
-              expression->select);
-    selectValue = state->parser->program->refMap->newName("select");
-    auto type = state->parser->program->typeMap->getType(expression->select, true);
-    if (auto list = type->to<IR::Type_List>()) {
-        BUG_CHECK(list->components.size() == 1, "%1% list type with more than 1 element", list);
-        type = list->components.at(0);
+    hasDefault = false;
+    if (expression->select->components.size() != 1) {
+        // TODO: this does not handle correctly tuples
+        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                "%1%: only supporting a single argument for select", expression->select);
+        return false;
     }
-    auto etype = UBPFTypeFactory::instance->create(type);
     builder->emitIndent();
-    etype->declare(builder, selectValue, false);
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->appendFormat("%s = ", selectValue);
+    builder->append("switch (");
     visit(expression->select);
-    builder->endOfStatement(true);
+    builder->append(") ");
+    builder->blockStart();
+
     for (auto e : expression->selectCases)
         visit(e);
 
-    builder->emitIndent();
-    builder->appendFormat("else goto %s;", IR::ParserState::reject.c_str());
-    builder->newline();
+    if (!hasDefault) {
+        builder->emitIndent();
+        builder->appendFormat("default: goto %s;", IR::ParserState::reject.c_str());
+        builder->newline();
+    }
+
+    builder->blockEnd(true);
     return false;
 }
 
@@ -209,10 +200,10 @@ UBPFStateTranslationVisitor::compileExtractField(
         if (wordsToRead <= 1) {
             helper = "load_byte";
             loadSize = 8;
-        } else if (wordsToRead <= 2)  {
+        } else if (widthToExtract <= 16)  {
             helper = "load_half";
             loadSize = 16;
-        } else if (wordsToRead <= 4) {
+        } else if (widthToExtract <= 32) {
             helper = "load_word";
             loadSize = 32;
         } else {

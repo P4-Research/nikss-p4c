@@ -23,6 +23,7 @@ control c(inout bit<32> b) {
                 tbl_issue15951l12.apply();
             }
         }
+
     }
 }
 

@@ -30,21 +30,19 @@ control c2(inout headers hdr, inout metadata meta, inout standard_metadata_t std
 }
 
 control c3(inout headers hdr, inout metadata meta, inout standard_metadata_t std_meta) {
-    @name("c3.b") bool b_0;
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
-    @name("c3.a") action a() {
-        b_0 = hdr.h.isValid() || true;
+    @name("c3.a") action a(in bool b_1) {
         hdr.h.x = 8w0;
     }
     @name("c3.t") table t_0 {
         key = {
         }
         actions = {
-            a();
-            @defaultonly NoAction_1();
+            a(hdr.h.isValid() || true);
+            @defaultonly NoAction_0();
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     apply {
         t_0.apply();

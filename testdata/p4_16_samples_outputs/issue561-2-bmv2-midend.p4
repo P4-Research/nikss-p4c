@@ -50,7 +50,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
 }
 
 control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("ingress.debug_hdr") table debug_hdr_0 {
         key = {
@@ -59,36 +59,34 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
             hdr.u.byte.isValid() : exact @name("hdr.u.byte.$valid$") ;
         }
         actions = {
-            NoAction_1();
+            NoAction_0();
         }
-        const default_action = NoAction_1();
+        const default_action = NoAction_0();
     }
-    @hidden action issue5612bmv2l69() {
-        hdr.u.short.data = 16w0xffff;
+    @hidden action issue5612bmv2l70() {
         hdr.u.short.setInvalid();
     }
-    @hidden action issue5612bmv2l73() {
-        hdr.u.byte.data = 8w0xff;
+    @hidden action issue5612bmv2l74() {
         hdr.u.byte.setInvalid();
     }
-    @hidden table tbl_issue5612bmv2l69 {
+    @hidden table tbl_issue5612bmv2l70 {
         actions = {
-            issue5612bmv2l69();
+            issue5612bmv2l70();
         }
-        const default_action = issue5612bmv2l69();
+        const default_action = issue5612bmv2l70();
     }
-    @hidden table tbl_issue5612bmv2l73 {
+    @hidden table tbl_issue5612bmv2l74 {
         actions = {
-            issue5612bmv2l73();
+            issue5612bmv2l74();
         }
-        const default_action = issue5612bmv2l73();
+        const default_action = issue5612bmv2l74();
     }
     apply {
         debug_hdr_0.apply();
         if (hdr.u.short.isValid()) {
-            tbl_issue5612bmv2l69.apply();
+            tbl_issue5612bmv2l70.apply();
         } else if (hdr.u.byte.isValid()) {
-            tbl_issue5612bmv2l73.apply();
+            tbl_issue5612bmv2l74.apply();
         }
     }
 }

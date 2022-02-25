@@ -29,7 +29,6 @@ class ParseAnnotations : public P4::ParseAnnotations {
  public:
     ParseAnnotations() : P4::ParseAnnotations("BMV2", false, {
                 PARSE_EMPTY("metadata"),
-                PARSE_EXPRESSION_LIST("field_list"),
                 PARSE("alias", StringLiteral),
                 PARSE("priority", Constant)
             }) { }

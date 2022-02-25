@@ -11,10 +11,10 @@ EBPFHashAlgorithmPSA::argumentsList EBPFHashAlgorithmPSA::unpackArguments(
 
     std::vector<const IR::Expression *> arguments;
 
-    if (expr->arguments->at(dataPos)->expression->is<IR::StructExpression>()) {
-        auto argList = expr->arguments->at(dataPos)->expression->to<IR::StructExpression>();
+    if (expr->arguments->at(dataPos)->expression->is<IR::ListExpression>()) {
+        auto argList = expr->arguments->at(dataPos)->expression->to<IR::ListExpression>();
         for (auto field : argList->components)
-            arguments.push_back(field->expression);
+            arguments.push_back(field);
     } else {
         arguments.push_back(expr->arguments->at(dataPos)->expression);
     }

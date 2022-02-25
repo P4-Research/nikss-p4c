@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef _LIB_ERROR_REPORTER_H_
-#define _LIB_ERROR_REPORTER_H_
+#ifndef P4C_LIB_ERROR_REPORTER_H_
+#define P4C_LIB_ERROR_REPORTER_H_
 
 #include "error_helper.h"
 #include "error_catalog.h"
@@ -34,21 +34,16 @@ enum class DiagnosticAction {
 // that use boost::format format strings, i.e.,
 // %1%, %2%, etc (starting at 1, not at 0).
 // Some compatibility for printf-style arguments is also supported.
-class ErrorReporter {
- protected:
+class ErrorReporter final {
+ private:
     std::ostream* outputstream;
 
     /// Track errors or warnings that have already been issued for a particular source location
     std::set<std::pair<int, const Util::SourceInfo>> errorTracker;
 
     /// Output the message and flush the stream
-    virtual void emit_message(const ErrorMessage &msg) {
-        *outputstream << msg.toString();
-        outputstream->flush();
-    }
-
-    virtual void emit_message(const ParserErrorMessage &msg) {
-        *outputstream << msg.toString();
+    void emit_message(cstring message) {
+        *outputstream << message;
         outputstream->flush();
     }
 
@@ -57,8 +52,6 @@ class ErrorReporter {
     /// If the error has been reported, return true. Otherwise, insert add the error to the
     /// list of seen errors, and return false.
     bool error_reported(int err, const Util::SourceInfo source) {
-        if (!source.isValid())
-            return false;
         auto p = errorTracker.emplace(err, source);
         return !p.second;  // if insertion took place, then we have not seen the error.
     }
@@ -87,7 +80,7 @@ class ErrorReporter {
     template <typename... T>
     std::string format_message(const char* format, T... args) {
         boost::format fmt(format);
-        std::string message = ::error_helper(fmt, args...).toString();
+        std::string message = ::error_helper(fmt, "", "", "", "", args...);
         return message;
     }
 
@@ -134,24 +127,34 @@ class ErrorReporter {
                   const char* format, const char* suffix, T... args) {
         if (action == DiagnosticAction::Ignore) return;
 
-        ErrorMessage::MessageType msgType = ErrorMessage::MessageType::None;
+        std::string prefix;
         if (action == DiagnosticAction::Warn) {
             // Avoid burying errors in a pile of warnings: don't emit any more warnings if we've
             // emitted errors.
             if (errorCount > 0) return;
 
             warningCount++;
-            msgType = ErrorMessage::MessageType::Warning;
+            if (diagnosticName != nullptr) {
+                prefix.append("[--Wwarn=");
+                prefix.append(diagnosticName);
+                prefix.append("] warning: ");
+            } else {
+                prefix.append("warning: ");
+            }
         } else if (action == DiagnosticAction::Error) {
             errorCount++;
-            msgType = ErrorMessage::MessageType::Error;
+            if (diagnosticName != nullptr) {
+                prefix.append("[--Werror=");
+                prefix.append(diagnosticName);
+                prefix.append("] error: ");
+            } else {
+                prefix.append("error: ");
+            }
         }
 
         boost::format fmt(format);
-        ErrorMessage msg(msgType, diagnosticName ? diagnosticName : "", suffix);
-        msg = ::error_helper(fmt, msg, args...);
-        emit_message(msg);
-
+        std::string message = ::error_helper(fmt, prefix, "", "", suffix, args...);
+        emit_message(message);
         if (errorCount >= maxErrorCount)
             FATAL_ERROR("Number of errors exceeded set maximum of %1%", maxErrorCount);
     }
@@ -182,11 +185,8 @@ class ErrorReporter {
     template <typename T>
     void parser_error(const Util::SourceInfo& location, const T& message) {
         errorCount++;
-        std::stringstream ss;
-        ss << message;
-
-        ParserErrorMessage msg(location, ss.str());
-        emit_message(msg);
+        *outputstream << location.toPositionString() << ":" << message << std::endl;
+        emit_message(location.toSourceFragment());  // This flushes the stream.
     }
 
     /**
@@ -203,11 +203,12 @@ class ErrorReporter {
 
         Util::SourcePosition position = sources->getCurrentPosition();
         position--;
-        cstring message = Util::vprintf_format(fmt, args);
-
-        Util::SourceInfo info(sources, position);
-        ParserErrorMessage msg(info, message);
-        emit_message(msg);
+        Util::SourceFileLine fileError =
+                sources->getSourceLine(position.getLineNumber());
+        cstring msg = Util::vprintf_format(fmt, args);
+        *outputstream << fileError.toString() << ":" << msg << std::endl;
+        cstring sourceFragment = sources->getSourceFragment(position);
+        emit_message(sourceFragment);
 
         va_end(args);
     }
@@ -253,4 +254,4 @@ class ErrorReporter {
     std::unordered_map<cstring, DiagnosticAction> diagnosticActions;
 };
 
-#endif /* _LIB_ERROR_REPORTER_H_ */
+#endif /* P4C_LIB_ERROR_REPORTER_H_ */

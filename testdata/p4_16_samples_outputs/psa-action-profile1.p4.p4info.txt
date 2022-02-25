@@ -9,7 +9,7 @@ tables {
   }
   match_fields {
     id: 1
-    name: "hdr.ethernet.srcAddr"
+    name: "a.srcAddr"
     bitwidth: 48
     match_type: EXACT
   }
@@ -22,7 +22,6 @@ tables {
   action_refs {
     id: 23466264
   }
-  implementation_id: 298015716
   size: 1024
 }
 actions {
@@ -63,7 +62,6 @@ action_profiles {
     name: "MyIC.ap"
     alias: "ap"
   }
-  table_ids: 39967501
   size: 1024
 }
 type_info {

@@ -15,7 +15,6 @@ struct Headers {
 parser prs(packet_in p, out Headers h) {
     @name("prs.e") Ethernet e_0;
     state start {
-        e_0.setInvalid();
         p.extract<Ethernet>(e_0);
         transition select(e_0.type) {
             16w0x800: accept;
@@ -26,10 +25,10 @@ parser prs(packet_in p, out Headers h) {
 }
 
 control c(inout Headers h, inout standard_metadata_t sm) {
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
-    @name("c.do_act") action do_act(@name("type") bit<32> type_1) {
-        sm.instance_type = type_1;
+    @name("c.do_act") action do_act(bit<32> type) {
+        sm.instance_type = type;
     }
     @name("c.tns") table tns_0 {
         key = {
@@ -37,13 +36,14 @@ control c(inout Headers h, inout standard_metadata_t sm) {
         }
         actions = {
             do_act();
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_0();
         }
         const entries = {
                         16w0x800 : do_act(32w0x800);
                         16w0x8100 : do_act(32w0x8100);
         }
-        default_action = NoAction_1();
+
+        default_action = NoAction_0();
     }
     apply {
         tns_0.apply();

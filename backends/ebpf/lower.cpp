@@ -53,7 +53,7 @@ const IR::Node* LowerExpressions::postorder(IR::Slice* expression) {
     int l = expression->getL();
     const IR::Expression* expr;
     if (l != 0) {
-        expr = new IR::Shr(expression->e0->srcInfo, expression->e0, new IR::Constant(l, 16));
+        expr = new IR::Shr(expression->e0->srcInfo, expression->e0, new IR::Constant(l));
         auto e0type = typeMap->getType(expression->e0, true);
         typeMap->setType(expr, e0type);
     } else {
@@ -80,7 +80,7 @@ const IR::Node* LowerExpressions::postorder(IR::Concat* expression) {
     auto cast1 = new IR::Cast(expression->right->srcInfo, resulttype, expression->right);
 
     auto sh = new IR::Shl(cast0->srcInfo, cast0, new IR::Constant(sizeofb));
-    big_int m = Util::maskFromSlice(sizeofb-1, 0);
+    big_int m = Util::maskFromSlice(sizeofb, 0);
     auto mask = new IR::Constant(expression->right->srcInfo,
                                  IR::Type_Bits::get(sizeofresult), m, 16);
     auto and0 = new IR::BAnd(expression->right->srcInfo, cast1, mask);

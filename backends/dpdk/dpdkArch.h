@@ -16,16 +16,12 @@ limitations under the License.
 
 #ifndef BACKENDS_CONVERT_TO_DPDK_ARCH_H_
 #define BACKENDS_CONVERT_TO_DPDK_ARCH_H_
-
+#include "dpdkVarCollector.h"
 #include "frontends/common/resolveReferences/resolveReferences.h"
 #include "frontends/p4/evaluator/evaluator.h"
 #include "frontends/p4/typeMap.h"
-#include "frontends/p4/sideEffects.h"
 #include <ir/ir.h>
 #include "lib/error.h"
-#include "lib/ordered_map.h"
-#include "dpdkProgramStructure.h"
-
 namespace DPDK {
 
 cstring TypeStruct2Name(const cstring *s);
@@ -33,6 +29,32 @@ bool isSimpleExpression(const IR::Expression *e);
 bool isNonConstantSimpleExpression(const IR::Expression *e);
 void expressionUnrollSanityCheck(const IR::Expression *e);
 
+enum gress_t {
+    INGRESS = 0,
+    EGRESS = 1,
+};
+
+enum block_t {
+    PARSER = 0,
+    PIPELINE,
+    DEPARSER,
+};
+
+struct BlockInfo {
+    cstring pipe;
+    gress_t gress;
+    block_t block;
+
+    BlockInfo(cstring p, gress_t g, block_t b) : pipe(p), gress(g), block(b) {}
+
+    void dbprint(std::ostream &out) {
+        out << "pipe" << pipe << " ";
+        out << "gress " << gress << " ";
+        out << "block" << block << std::endl;
+    }
+};
+
+using BlockInfoMapping = std::map<const IR::Node *, BlockInfo>;
 using UserMeta = std::set<cstring>;
 
 class CollectMetadataHeaderInfo;
@@ -43,149 +65,38 @@ class CollectMetadataHeaderInfo;
  * pass the type checking. In addition, this pass changes the definition of
  * P4Control and P4Parser(parameter list) in the P4 program provided by the
  * user.
- *
- * This pass also modifies all metadata references and header reference. For
- * metadata, struct_name.field_name -> m.struct_name_field_name. For header
- * headers.header_name.field_name -> h.header_name.field_name The parameter
- * named for header and metadata are also updated to "h" and "m" respectively.
  */
 class ConvertToDpdkArch : public Transform {
-    P4::ReferenceMap *refMap;
-    DpdkProgramStructure *structure;
+    BlockInfoMapping *block_info;
 
-    const IR::Type_Control *rewriteControlType(const IR::Type_Control *, cstring);
+    const IR::Type_Control *rewriteControlType(const IR::Type_Control *,
+                                               cstring);
     const IR::Type_Parser *rewriteParserType(const IR::Type_Parser *, cstring);
-    const IR::Type_Control *rewriteDeparserType(const IR::Type_Control *, cstring);
+    const IR::Node *postorder(IR::P4Program *prog) override;
     const IR::Node *postorder(IR::Type_Control *c) override;
     const IR::Node *postorder(IR::Type_Parser *p) override;
-    const IR::Node *preorder(IR::Member *m) override;
-    const IR::Node *preorder(IR::PathExpression *pe) override;
+    const IR::Node *postorder(IR::P4Control *c) override;
+    const IR::Node *postorder(IR::P4Parser *c) override;
 
   public:
-    ConvertToDpdkArch(P4::ReferenceMap *refMap, DpdkProgramStructure *structure) :
-        refMap(refMap), structure(structure) {
-        CHECK_NULL(structure);
-    }
+    ConvertToDpdkArch(BlockInfoMapping *b) : block_info(b) {}
 };
 
-/**
- * DPDK target supports lookahead instruction only with header operand.
- * This pass transforms usage of lookahead method with type parameters
- * of other than header type (IR::Type_Header) to lookahead with header
- * type using the following transformation:
- *
- * This parser code:
- *
- * T var_name;
- *
- * state state_name {
- *   var_name = pkt.lookahead<T>();
- * }
- *
- * is transformed to this:
- *
- * - new header definition:
- *
- * header lookahead_tmp_hdr {
- *   T f;
- * }
- *
- * - modification in parser code:
- *
- * T var_name;
- * lookahead_tmp_hdr lookahead_tmp;
- *
- * state state_name {
- *   lookahead_tmp = pkt.lookahead<lookahead_tmp_hdr>();
- *   var_name = lookahead_tmp;
- * }
+/* This Pass collects information about the name of Ingress, IngressParser,
+ * IngressDeparser, Egress, EgressParser and EgressDeparser.
  */
-struct ConvertLookahead : public PassManager {
-    class ReplacementMap {
-        std::unordered_map<const IR::P4Program *, IR::IndexedVector<IR::Node>> newHeaderMap;
-        std::unordered_map<const IR::P4Parser *,
-                IR::IndexedVector<IR::Declaration>> newLocalVarMap;
-        std::unordered_map<const IR::AssignmentStatement *,
-                IR::IndexedVector<IR::StatOrDecl>> newStatMap;
-      public:
-        void insertHeader(const IR::P4Program *p, const IR::Type_Header *h) {
-            if (newHeaderMap.count(p)) {
-                newHeaderMap.at(p).push_back(h);
-            } else {
-                newHeaderMap.emplace(p, IR::IndexedVector<IR::Node>(h));
-            }
-            LOG5("Program: " << dbp(p));
-            LOG2("Adding new header:" << std::endl << " " << h);
-        }
-        IR::IndexedVector<IR::Node> *getHeaders(const IR::P4Program *p) {
-            if (newHeaderMap.count(p)) {
-                return new IR::IndexedVector<IR::Node>(newHeaderMap.at(p));
-            }
-            return nullptr;
-        }
-        void insertVar(const IR::P4Parser *p, const IR::Declaration_Variable *v) {
-            if (newLocalVarMap.count(p)) {
-                newLocalVarMap.at(p).push_back(v);
-            } else {
-                newLocalVarMap.emplace(p, IR::IndexedVector<IR::Declaration>(v));
-            }
-            LOG5("Parser: " << dbp(p));
-            LOG2("Adding new local variable:" << std::endl << " " << v);
-        }
-        IR::IndexedVector<IR::Declaration> *getVars(const IR::P4Parser *p) {
-            if (newLocalVarMap.count(p)) {
-                return new IR::IndexedVector<IR::Declaration>(newLocalVarMap.at(p));
-            }
-            return nullptr;
-        }
-        void insertStatements(const IR::AssignmentStatement *as,
-                IR::IndexedVector<IR::StatOrDecl> *vec) {
-            BUG_CHECK(newStatMap.count(as) == 0,
-                    "Unexpectedly converting statement %1% multiple times!", as);
-            newStatMap.emplace(as, *vec);
-            LOG5("AssignmentStatement: " << dbp(as));
-            LOG2("Adding new statements:");
-            for (auto s : *vec) {
-                LOG2(" " << s);
-            }
-        }
-        IR::IndexedVector<IR::StatOrDecl> *getStatements(const IR::AssignmentStatement *as) {
-            if (newStatMap.count(as)) {
-                return new IR::IndexedVector<IR::StatOrDecl>(newStatMap.at(as));
-            }
-            return nullptr;
-        }
-    };
+class ParsePsa : public Inspector {
 
-    ReplacementMap repl;
+  public:
+    ParsePsa() {}
 
-    class Collect : public Inspector {
-        P4::ReferenceMap *refMap;
-        P4::TypeMap *typeMap;
-        ReplacementMap *repl;
-      public:
-        Collect(P4::ReferenceMap *refMap, P4::TypeMap *typeMap, ReplacementMap *repl) :
-                refMap(refMap), typeMap(typeMap), repl(repl) {}
-        void postorder(const IR::AssignmentStatement *statement) override;
-    };
+    void parseIngressPipeline(const IR::PackageBlock *block);
+    void parseEgressPipeline(const IR::PackageBlock *block);
+    bool preorder(const IR::PackageBlock *block) override;
 
-    class Replace : public Transform {
-        DpdkProgramStructure *structure;
-        ReplacementMap *repl;
-      public:
-        Replace(DpdkProgramStructure *structure, ReplacementMap *repl) :
-                structure(structure), repl(repl) {}
-        const IR::Node *postorder(IR::AssignmentStatement *as) override;
-        const IR::Node *postorder(IR::Type_Struct *s) override;
-        const IR::Node *postorder(IR::P4Parser *parser) override;
-    };
-
-    ConvertLookahead(P4::ReferenceMap *refMap, P4::TypeMap *typeMap, DpdkProgramStructure *s) {
-        passes.push_back(new P4::TypeChecking(refMap, typeMap));
-        passes.push_back(new Collect(refMap, typeMap, &repl));
-        passes.push_back(new Replace(s, &repl));
-        passes.push_back(new P4::ClearTypeMap(typeMap));
-    }
+  public:
+    BlockInfoMapping toBlockInfo;
+    UserMeta userMeta;
 };
 
 // This Pass collects infomation about the name of all metadata and header
@@ -193,38 +104,44 @@ struct ConvertLookahead : public PassManager {
 // according to the metadata struct name. Eventually, the reference of a fields
 // will become m.$(struct_name)_$(field_name).
 class CollectMetadataHeaderInfo : public Inspector {
-    DpdkProgramStructure *structure;
-
+    BlockInfoMapping *toBlockInfo;
+    IR::Vector<IR::Type> used_metadata;
     void pushMetadata(const IR::Parameter *p);
     void pushMetadata(const IR::ParameterList*, std::list<int> indices);
 
   public:
-    CollectMetadataHeaderInfo(DpdkProgramStructure *structure)
-        : structure(structure) {}
+    CollectMetadataHeaderInfo(BlockInfoMapping *toBlockInfo)
+        : toBlockInfo(toBlockInfo) {}
     bool preorder(const IR::P4Program *p) override;
     bool preorder(const IR::Type_Struct *s) override;
+    cstring local_metadata_type;
+    cstring header_type;
+    IR::IndexedVector<IR::StructField> fields;
+};
+
+// This pass modifies all metadata references and header reference. For
+// metadata, struct_name.field_name -> m.struct_name_field_name. For header
+// headers.header_name.field_name -> h.header_name.field_name
+class ReplaceMetadataHeaderName : public Transform {
+    P4::ReferenceMap *refMap;
+    CollectMetadataHeaderInfo *info;
+
+  public:
+    ReplaceMetadataHeaderName(P4::ReferenceMap *refMap,
+                              CollectMetadataHeaderInfo *info)
+        : refMap(refMap), info(info) {}
+    const IR::Node *preorder(IR::Member *m) override;
+    const IR::Node *preorder(IR::Parameter *p) override;
 };
 
 // Previously, we have collected the information about how the single metadata
 // struct looks like in CollectMetadataHeaderInfo. This pass finds a suitable
 // place to inject this struct.
 class InjectJumboStruct : public Transform {
-    DpdkProgramStructure *structure;
+    CollectMetadataHeaderInfo *info;
 
   public:
-    InjectJumboStruct(DpdkProgramStructure *structure) : structure(structure) {}
-    const IR::Node *preorder(IR::Type_Struct *s) override;
-};
-
-// This pass injects metadata field which is used as port for 'tx' instruction
-// into the single metadata struct.
-// This pass has to be applied after CollectMetadataHeaderInfo fills
-// local_metadata_type field in DpdkProgramStructure which is passed to the constructor.
-class InjectOutputPortMetadataField : public Transform {
-    DpdkProgramStructure *structure;
-
-  public:
-    InjectOutputPortMetadataField(DpdkProgramStructure *structure) : structure(structure) {}
+    InjectJumboStruct(CollectMetadataHeaderInfo *info) : info(info) {}
     const IR::Node *preorder(IR::Type_Struct *s) override;
 };
 
@@ -288,12 +205,12 @@ class DeclarationInjector {
 class StatementUnroll : public Transform {
   private:
     P4::ReferenceMap *refMap;
-    DpdkProgramStructure *structure;
+    DpdkVariableCollector *collector;
     DeclarationInjector injector;
 
   public:
-    StatementUnroll(P4::ReferenceMap *refMap, DpdkProgramStructure *structure) :
-        refMap(refMap), structure(structure) {}
+    StatementUnroll(P4::ReferenceMap *refMap, DpdkVariableCollector *collector) :
+        refMap(refMap), collector(collector) {}
     const IR::Node *preorder(IR::AssignmentStatement *a) override;
     const IR::Node *postorder(IR::P4Control *a) override;
     const IR::Node *postorder(IR::P4Parser *a) override;
@@ -310,13 +227,14 @@ class StatementUnroll : public Transform {
  */
 class ExpressionUnroll : public Inspector {
     P4::ReferenceMap *refMap;
+    DpdkVariableCollector *collector;
 
   public:
     IR::IndexedVector<IR::StatOrDecl> stmt;
     IR::IndexedVector<IR::Declaration> decl;
     IR::PathExpression *root;
-    ExpressionUnroll(P4::ReferenceMap *refMap, DpdkProgramStructure *) :
-        refMap(refMap) {
+    ExpressionUnroll(P4::ReferenceMap *refMap, DpdkVariableCollector *collector) :
+        refMap(refMap), collector(collector) {
         setName("ExpressionUnroll");
     }
     bool preorder(const IR::Operation_Unary *a) override;
@@ -334,15 +252,14 @@ class ExpressionUnroll : public Inspector {
 class IfStatementUnroll : public Transform {
   private:
     P4::ReferenceMap *refMap;
-    DpdkProgramStructure *structure;
+    DpdkVariableCollector *collector;
     DeclarationInjector injector;
 
   public:
-    IfStatementUnroll(P4::ReferenceMap* refMap, DpdkProgramStructure *structure) :
-        refMap(refMap), structure(structure) {
+    IfStatementUnroll(P4::ReferenceMap* refMap, DpdkVariableCollector *collector) :
+        refMap(refMap), collector(collector) {
         setName("IfStatementUnroll");
     }
-    const IR::Node *postorder(IR::SwitchStatement *a) override;
     const IR::Node *postorder(IR::IfStatement *a) override;
     const IR::Node *postorder(IR::P4Control *a) override;
 };
@@ -353,7 +270,7 @@ class IfStatementUnroll : public Transform {
  */
 class LogicalExpressionUnroll : public Inspector {
     P4::ReferenceMap* refMap;
-    DpdkProgramStructure *structure;
+    DpdkVariableCollector *collector;
 
   public:
     IR::IndexedVector<IR::StatOrDecl> stmt;
@@ -362,14 +279,16 @@ class LogicalExpressionUnroll : public Inspector {
     static bool is_logical(const IR::Operation_Binary *bin) {
         if (bin->is<IR::LAnd>() || bin->is<IR::LOr>() || bin->is<IR::Leq>() ||
             bin->is<IR::Equ>() || bin->is<IR::Neq>() || bin->is<IR::Grt>() ||
-            bin->is<IR::Lss>() || bin->is<IR::Geq>() || bin->is<IR::Leq>())
+            bin->is<IR::Lss>())
             return true;
-          else
+        else if (bin->is<IR::Geq>() or bin->is<IR::Leq>()) {
+            BUG("%1%: not implemented", bin);
+        } else
             return false;
     }
 
-    LogicalExpressionUnroll(P4::ReferenceMap* refMap, DpdkProgramStructure *structure)
-        : refMap(refMap), structure(structure) {visitDagOnce = false;}
+    LogicalExpressionUnroll(P4::ReferenceMap* refMap, DpdkVariableCollector *collector)
+        : refMap(refMap), collector(collector) {}
     bool preorder(const IR::Operation_Unary *a) override;
     bool preorder(const IR::Operation_Binary *a) override;
     bool preorder(const IR::MethodCallExpression *a) override;
@@ -391,34 +310,19 @@ class ConvertBinaryOperationTo2Params : public Transform {
     const IR::Node *postorder(IR::P4Control *a) override;
     const IR::Node *postorder(IR::P4Parser *a) override;
 };
-
-// Since in dpdk asm, there is no local variable declaration, we need to collect
+// Since in dpdk asm, there is no local variable declaraion, we need to collect
 // all local variables and inject them into the metadata struct.
-// Local variables which are of header types are injected into headers struct
-// instead of metadata struct, so that they can be instantiated as headers in the
-// resulting dpdk asm file.
-class CollectLocalVariables : public Transform {
-    ordered_map<const IR::Declaration_Variable *, const cstring> localsMap;
+class CollectLocalVariableToMetadata : public Transform {
+    BlockInfoMapping *toBlockInfo;
+    CollectMetadataHeaderInfo *info;
+    std::map<const cstring, IR::IndexedVector<IR::Declaration>> locals_map;
     P4::ReferenceMap *refMap;
-    P4::TypeMap* typeMap;
-    DpdkProgramStructure *structure;
-
-    void insert(const cstring prefix, const IR::IndexedVector<IR::Declaration> *locals) {
-        for (auto d : *locals) {
-            if (auto dv = d->to<IR::Declaration_Variable>()) {
-                const cstring name = refMap->newName(prefix + "_" + dv->name.name);
-                localsMap.emplace(dv, name);
-            } else if (!d->is<IR::P4Action>() && !d->is<IR::P4Table>() &&
-                       !d->is<IR::Declaration_Instance>()) {
-                BUG("%1%: Unhandled declaration type", d);
-            }
-        }
-    }
 
   public:
-    CollectLocalVariables(P4::ReferenceMap *refMap, P4::TypeMap *typeMap,
-                                   DpdkProgramStructure *structure)
-        : refMap(refMap), typeMap(typeMap), structure(structure) {}
+    CollectLocalVariableToMetadata(BlockInfoMapping *toBlockInfo,
+                                   CollectMetadataHeaderInfo *info,
+                                   P4::ReferenceMap *refMap)
+        : toBlockInfo(toBlockInfo), info(info), refMap(refMap) {}
     const IR::Node *preorder(IR::P4Program *p) override;
     const IR::Node *postorder(IR::Type_Struct *s) override;
     const IR::Node *postorder(IR::PathExpression *path) override;
@@ -429,25 +333,24 @@ class CollectLocalVariables : public Transform {
 // According to dpdk spec, action parameters should prepend a p. In order to
 // respect this, we need at first make all action parameter lists into separate
 // structs and declare that struct in the P4 program. Then we modify the action
-// parameter list. Eventually, it will only contain one parameter `t`, which is a
+// parameter list. Eventuall, it will only contain one parameter `t`, which is a
 // struct containing all parameters previously defined. Next, we prepend t. in
 // front of action parameters. Please note that it is possible that the user
 // defines a struct paremeter himself or define multiple struct parameters in
 // action parameterlist. Current implementation does not support this.
 class PrependPDotToActionArgs : public Transform {
-    P4::TypeMap* typeMap;
     P4::ReferenceMap *refMap;
-    DpdkProgramStructure* structure;
+    BlockInfoMapping *toBlockInfo;
 
   public:
-    PrependPDotToActionArgs(P4::TypeMap* typeMap,
-                            P4::ReferenceMap *refMap,
-                            DpdkProgramStructure* structure)
-        : typeMap(typeMap), refMap(refMap), structure(structure) {}
+    std::map<const cstring, IR::IndexedVector<IR::Parameter> *> args_struct_map;
+
+    PrependPDotToActionArgs(BlockInfoMapping *toBlockInfo,
+                            P4::ReferenceMap *refMap)
+        : refMap(refMap), toBlockInfo(toBlockInfo) {}
     const IR::Node *postorder(IR::P4Action *a) override;
     const IR::Node *postorder(IR::P4Program *s) override;
     const IR::Node *preorder(IR::PathExpression *path) override;
-    const IR::Node *preorder(IR::MethodCallExpression*) override;
 };
 
 // For dpdk asm, there is not object-oriented. Therefore, we cannot define a
@@ -458,22 +361,23 @@ class PrependPDotToActionArgs : public Transform {
 // x. For dst = cksum.get(), it will be translated to mov dst state. This pass
 // collects checksum instances and index them.
 class CollectInternetChecksumInstance : public Inspector {
-    P4::TypeMap* typeMap;
-    DpdkProgramStructure *structure;
+    std::map<const IR::Declaration_Instance *, cstring> *csum_map;
     int index = 0;
 
   public:
     CollectInternetChecksumInstance(
-            P4::TypeMap *typeMap,
-            DpdkProgramStructure *structure)
-        : typeMap(typeMap), structure(structure) {}
+        std::map<const IR::Declaration_Instance *, cstring> *csum_map)
+        : csum_map(csum_map) {}
     bool preorder(const IR::Declaration_Instance *d) override {
-        auto type = typeMap->getType(d, true);
-        if (auto extn = type->to<IR::Type_Extern>()) {
-            if (extn->name == "InternetChecksum") {
-                std::ostringstream s;
-                s << "state_" << index++;
-                structure->csum_map.emplace(d, s.str());
+        if (d->type->is<IR::Type_Name>()) {
+            if (d->type->to<IR::Type_Name>()->path->name.name ==
+                "InternetChecksum") {
+                if (findContext<IR::P4Control>() or
+                    findContext<IR::P4Parser>()) {
+                    std::ostringstream s;
+                    s << "state_" << index++;
+                    csum_map->emplace(d, s.str());
+                }
             }
         }
         return false;
@@ -484,11 +388,14 @@ class CollectInternetChecksumInstance : public Inspector {
 // state into header instead of metadata is due to the implementation of dpdk
 // side(a question related to endianness)
 class InjectInternetChecksumIntermediateValue : public Transform {
-    DpdkProgramStructure *structure;
+    CollectMetadataHeaderInfo *info;
+    std::map<const IR::Declaration_Instance *, cstring> *csum_map;
 
   public:
-    InjectInternetChecksumIntermediateValue(DpdkProgramStructure *structure) :
-        structure(structure) {}
+    InjectInternetChecksumIntermediateValue(
+        CollectMetadataHeaderInfo *info,
+        std::map<const IR::Declaration_Instance *, cstring> *csum_map)
+        : info(info), csum_map(csum_map) {}
 
     const IR::Node *postorder(IR::P4Program *p) override {
         auto new_objs = new IR::Vector<IR::Node>;
@@ -496,9 +403,9 @@ class InjectInternetChecksumIntermediateValue : public Transform {
         for (auto obj : p->objects) {
             if (obj->to<IR::Type_Header>() and not inserted) {
                 inserted = true;
-                if (structure->csum_map.size() > 0) {
+                if (csum_map->size() > 0) {
                     auto fields = new IR::IndexedVector<IR::StructField>;
-                    for (auto kv : structure->csum_map) {
+                    for (auto kv : *csum_map) {
                         fields->push_back(new IR::StructField(
                             IR::ID(kv.second), new IR::Type_Bits(16, false)));
                     }
@@ -513,8 +420,8 @@ class InjectInternetChecksumIntermediateValue : public Transform {
     }
 
     const IR::Node *postorder(IR::Type_Struct *s) override {
-        if (s->name.name == structure->header_type) {
-            if (structure->csum_map.size() > 0)
+        if (s->name.name == info->header_type) {
+            if (csum_map->size() > 0)
                 s->fields.push_back(new IR::StructField(
                     IR::ID("cksum_state"),
                     new IR::Type_Name(IR::ID("cksum_state_t"))));
@@ -525,48 +432,11 @@ class InjectInternetChecksumIntermediateValue : public Transform {
 
 class ConvertInternetChecksum : public PassManager {
   public:
-    ConvertInternetChecksum(P4::TypeMap *typeMap, DpdkProgramStructure *structure) {
-        passes.push_back(new CollectInternetChecksumInstance(typeMap, structure));
-        passes.push_back(new InjectInternetChecksumIntermediateValue(structure));
-    }
-};
-
-/* This pass collects PSA extern meter, counter and register declaration instances and
-   push them to a vector for emitting to the .spec file later */
-class CollectExternDeclaration : public Inspector {
-    DpdkProgramStructure *structure;
-
-  public:
-    CollectExternDeclaration(DpdkProgramStructure *structure) :
-        structure(structure) {}
-    bool preorder(const IR::Declaration_Instance *d) override {
-        if (auto type = d->type->to<IR::Type_Specialized>()) {
-            auto externTypeName = type->baseType->path->name.name;
-            if (externTypeName == "Meter") {
-                if (d->arguments->size() != 2) {
-                    ::error("%1%: expected number of meters and type of meter as arguments", d);
-                } else {
-                    /* Check if the meter is of PACKETS (0) type */
-                    if (d->arguments->at(1)->expression->to<IR::Constant>()->asUnsigned() == 0)
-                        warn(ErrorType::WARN_UNSUPPORTED,
-                             "%1%: Packet metering is not supported."
-                             " Falling back to byte metering.", d);
-                }
-            } else if (externTypeName == "Counter") {
-                if (d->arguments->size() != 2 ) {
-                    ::error("%1%: expected number of_counters and type of counter as arguments", d);
-                }
-            } else if (externTypeName == "Register") {
-                if (d->arguments->size() != 1 and d->arguments->size() != 2 ) {
-                    ::error("%1%: expected size and optionally init_val as arguments", d);
-                }
-            } else {
-                // unsupported extern type
-                return false;
-            }
-            structure->externDecls.push_back(d);
-         }
-         return false;
+    std::map<const IR::Declaration_Instance *, cstring> csum_map;
+    ConvertInternetChecksum(CollectMetadataHeaderInfo *info) {
+        passes.push_back(new CollectInternetChecksumInstance(&csum_map));
+        passes.push_back(
+            new InjectInternetChecksumIntermediateValue(info, &csum_map));
     }
 };
 
@@ -577,14 +447,13 @@ class CollectExternDeclaration : public Inspector {
 class BreakLogicalExpressionParenthesis : public Transform {
   public:
     const IR::Node *postorder(IR::LAnd *land) {
+        std::cout << land << std::endl;
         if (auto land2 = land->left->to<IR::LAnd>()) {
             auto sub = new IR::LAnd(land2->right, land->right);
             return new IR::LAnd(land2->left, sub);
         } else if (not land->left->is<IR::LOr>() and
                    not land->left->is<IR::Equ>() and
                    not land->left->is<IR::Neq>() and
-                   not land->left->is<IR::Leq>() and
-                   not land->left->is<IR::Geq>() and
                    not land->left->is<IR::Lss>() and
                    not land->left->is<IR::Grt>() and
                    not land->left->is<IR::MethodCallExpression>() and
@@ -595,6 +464,7 @@ class BreakLogicalExpressionParenthesis : public Transform {
         return land;
     }
     const IR::Node *postorder(IR::LOr *lor) {
+        std::cout << lor << std::endl;
         if (auto lor2 = lor->left->to<IR::LOr>()) {
             auto sub = new IR::LOr(lor2->right, lor->right);
             return new IR::LOr(lor2->left, sub);
@@ -619,9 +489,8 @@ class BreakLogicalExpressionParenthesis : public Transform {
 class SwapSimpleExpressionToFrontOfLogicalExpression : public Transform {
     bool is_simple(const IR::Node *n) {
         if (n->is<IR::Equ>() or n->is<IR::Neq>() or n->is<IR::Lss>() or
-            n->is<IR::Grt>() or n->is<IR::Geq>() or n->is<IR::Leq>() or
-            n->is<IR::MethodCallExpression>() or n->is<IR::PathExpression>() or
-            n->is<IR::Member>()) {
+            n->is<IR::Grt>() or n->is<IR::MethodCallExpression>() or
+            n->is<IR::PathExpression>() or n->is<IR::Member>()) {
             return true;
         } else if (not n->is<IR::LAnd>() and not n->is<IR::LOr>()) {
             BUG("Logical Expression Unroll pass failed");
@@ -675,160 +544,20 @@ class ConvertLogicalExpression : public PassManager {
     }
 };
 
-// This Pass collects infomation about the table keys for each table. This information
-// is later used for generating the context JSON output for use by the control plane
-// software.
-class CollectTableInfo : public Inspector {
-    DpdkProgramStructure *structure;
-
+class RewriteToDpdkArch : public PassManager {
   public:
-    CollectTableInfo(DpdkProgramStructure *structure)
-        : structure(structure) {setName("CollectTableInfo");}
-    bool preorder(const IR::Key *key) override;
-};
-
-// This pass transforms the tables such that all the Match keys are part of the same
-// header/metadata struct. If the match keys are from different headers, this pass creates
-// mirror copies of the struct field into the metadata struct and updates the table to use
-// the metadata copy.
-class CopyMatchKeysToSingleStruct : public P4::KeySideEffect {
- public:
-    CopyMatchKeysToSingleStruct(P4::ReferenceMap* refMap, P4::TypeMap* typeMap,
-             std::set<const IR::P4Table*>* invokedInKey)
-             : P4::KeySideEffect(refMap, typeMap, invokedInKey)
-    { setName("CopyMatchKeysToSinSgleStruct"); }
-
-    const IR::Node* preorder(IR::Key* key) override;
-    const IR::Node* postorder(IR::KeyElement* element) override;
-    const IR::Node* doStatement(const IR::Statement* statement,
-                                const IR::Expression* expression) override;
-};
-
-/**
- * Common code between SplitActionSelectorTable and SplitActionProfileTable
- */
-class SplitP4TableCommon : public Transform {
-  public:
-    enum class TableImplementation { DEFAULT, ACTION_PROFILE, ACTION_SELECTOR };
-    P4::ReferenceMap* refMap;
-    P4::TypeMap* typeMap;
-    DpdkProgramStructure *structure;
-    TableImplementation implementation;
-    std::set<cstring> match_tables;
-    std::map<cstring, cstring> group_tables;
-    std::map<cstring, cstring> member_tables;
-    std::map<cstring, cstring> member_ids;
-    std::map<cstring, cstring> group_ids;
-
-    SplitP4TableCommon(P4::ReferenceMap *refMap, P4::TypeMap* typeMap,
-        DpdkProgramStructure *structure) : refMap(refMap), typeMap(typeMap), structure(structure) {
-        implementation = TableImplementation::DEFAULT;
-    }
-
-    const IR::Node* postorder(IR::MethodCallStatement* ) override;
-    const IR::Node* postorder(IR::IfStatement* ) override;
-    const IR::Node* postorder(IR::SwitchStatement* ) override;
-
-    std::tuple<const IR::P4Table*, cstring> create_match_table(const IR::P4Table* /* tbl */);
-    const IR::P4Action* create_action(cstring /* actionName */, cstring /* id */, cstring);
-    const IR::P4Table* create_member_table(const IR::P4Table*, cstring, cstring);
-    const IR::P4Table* create_group_table(const IR::P4Table*, cstring, cstring, cstring, int, int);
-};
-
-/**
- * Split ActionSelector into three tables:
- *   match table that matches on exact/ternary key and generates a group id
- *   group table that matches on group id and generates a member id
- *   member table that runs an action based on member id.
- */
-class SplitActionSelectorTable : public SplitP4TableCommon {
-  public:
-
-    SplitActionSelectorTable(P4::ReferenceMap *refMap, P4::TypeMap* typeMap,
-        DpdkProgramStructure *structure) : SplitP4TableCommon(refMap, typeMap, structure) {
-        implementation = TableImplementation::ACTION_SELECTOR; }
-    const IR::Node* postorder(IR::P4Table* tbl) override;
-};
-
-/**
- * Split ActionProfile into two tables:
- *   match table that matches on exact/ternary key and generates a member id
- *   member table that runs an action based on member id.
- */
-class SplitActionProfileTable : public SplitP4TableCommon {
- public:
-    SplitActionProfileTable(P4::ReferenceMap* refMap, P4::TypeMap* typeMap,
-        DpdkProgramStructure *structure) : SplitP4TableCommon(refMap, typeMap, structure) {
-        implementation = TableImplementation::ACTION_PROFILE; }
-    const IR::Node* postorder(IR::P4Table* tbl) override;
-};
-
-/**
- * Handle ActionSelector and ActionProfile extern in PSA
- */
-class ConvertActionSelectorAndProfile : public PassManager {
-    DpdkProgramStructure *structure;
- public:
-    ConvertActionSelectorAndProfile(P4::ReferenceMap *refMap, P4::TypeMap* typeMap,
-                                    DpdkProgramStructure *structure) {
-        passes.emplace_back(new P4::TypeChecking(refMap, typeMap));
-        passes.emplace_back(new SplitActionSelectorTable(refMap, typeMap, structure));
-        passes.push_back(new P4::ClearTypeMap(typeMap));
-        passes.emplace_back(new P4::TypeChecking(refMap, typeMap, true));
-        passes.emplace_back(new SplitActionProfileTable(refMap, typeMap, structure));
-        passes.push_back(new P4::ClearTypeMap(typeMap));
-        passes.emplace_back(new P4::TypeChecking(refMap, typeMap, true));
-    }
-};
-
-class CollectAddOnMissTable : public Inspector {
-    P4::ReferenceMap* refMap;
-    P4::TypeMap* typeMap;
-    DpdkProgramStructure* structure;
-
- public:
-    CollectAddOnMissTable(P4::ReferenceMap *refMap, P4::TypeMap *typeMap,
-            DpdkProgramStructure* structure) :
-    refMap(refMap), typeMap(typeMap), structure(structure) {}
-
-    void postorder(const IR::P4Table* t) override;
-    void postorder(const IR::MethodCallStatement*) override;
-};
-
-class CollectErrors : public Inspector {
-    DpdkProgramStructure *structure;
-
- public:
-    CollectErrors(DpdkProgramStructure* structure) :
-    structure(structure) { CHECK_NULL(structure); }
-    void postorder(const IR::Type_Error* error) override {
-        int id = 0;
-        for (auto err : error->members) {
-            if (structure->error_map.count(err->name.name) == 0) {
-                structure->error_map.emplace(err->name.name, id++);
-            }
-        }
-    }
-};
-
-class DpdkArchFirst : public PassManager {
- public:
-    DpdkArchFirst() { setName("DpdkArchFirst"); }
-};
-
-class DpdkArchLast : public PassManager {
- public:
-    DpdkArchLast() { setName("DpdkArchLast"); }
-};
-
-class CollectProgramStructure : public PassManager {
- public:
-    CollectProgramStructure(P4::ReferenceMap * refMap, P4::TypeMap* typeMap,
-                            DpdkProgramStructure* structure) {
+    CollectMetadataHeaderInfo *info;
+    std::map<const cstring, IR::IndexedVector<IR::Parameter> *>
+        *args_struct_map;
+    std::map<const IR::Declaration_Instance *, cstring> *csum_map;
+    RewriteToDpdkArch(P4::ReferenceMap *refMap, P4::TypeMap *typeMap,
+                      DpdkVariableCollector *collector) {
+        setName("RewriteToDpdkArch");
         auto *evaluator = new P4::EvaluatorPass(refMap, typeMap);
-        auto *parseDpdk = new ParseDpdkArchitecture(structure);
+        auto *parsePsa = new ParsePsa();
+        info = new CollectMetadataHeaderInfo(&parsePsa->toBlockInfo);
         passes.push_back(evaluator);
-        passes.push_back(new VisitFunctor([evaluator, parseDpdk]() {
+        passes.push_back(new VisitFunctor([evaluator, parsePsa]() {
             auto toplevel = evaluator->getToplevelBlock();
             auto main = toplevel->getMain();
             if (main == nullptr) {
@@ -836,9 +565,39 @@ class CollectProgramStructure : public PassManager {
                     "Could not locate top-level block; is there a %1% module?",
                     IR::P4Program::main);
                 return; }
-            main->apply(*parseDpdk);
+            main->apply(*parsePsa);
         }));
-     }
+        passes.push_back(info);
+        passes.push_back(new ConvertToDpdkArch(&parsePsa->toBlockInfo));
+        passes.push_back(new ReplaceMetadataHeaderName(refMap, info));
+        passes.push_back(new InjectJumboStruct(info));
+        passes.push_back(new StatementUnroll(refMap, collector));
+        passes.push_back(new IfStatementUnroll(refMap, collector));
+        passes.push_back(new P4::ClearTypeMap(typeMap));
+        passes.push_back(new P4::TypeChecking(refMap, typeMap, true));
+        passes.push_back(new ConvertBinaryOperationTo2Params());
+        parsePsa = new ParsePsa();
+        passes.push_back(evaluator);
+        passes.push_back(new VisitFunctor([evaluator, parsePsa]() {
+            auto toplevel = evaluator->getToplevelBlock();
+            auto main = toplevel->getMain();
+            if (main == nullptr) {
+                ::error(ErrorType::ERR_NOT_FOUND,
+                    "Could not locate top-level block; is there a %1% module?",
+                    IR::P4Program::main);
+                return; }
+            main->apply(*parsePsa);
+        }));
+        passes.push_back(new CollectLocalVariableToMetadata(
+            &parsePsa->toBlockInfo, info, refMap));
+        auto checksum_convertor = new ConvertInternetChecksum(info);
+        passes.push_back(checksum_convertor);
+        csum_map = &checksum_convertor->csum_map;
+        auto p = new PrependPDotToActionArgs(&parsePsa->toBlockInfo, refMap);
+        args_struct_map = &p->args_struct_map;
+        passes.push_back(p);
+        passes.push_back(new ConvertLogicalExpression);
+    }
 };
 
 }; // namespace DPDK

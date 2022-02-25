@@ -23,8 +23,7 @@ parser p(packet_in pkt, out Headers hdr, inout Meta m, inout standard_metadata_t
 }
 
 control ingress(inout Headers h, inout Meta m, inout standard_metadata_t sm) {
-    @name("ingress.hasReturned") bool hasReturned;
-    @noWarn("unused") @name(".NoAction") action NoAction_1() {
+    @noWarn("unused") @name(".NoAction") action NoAction_0() {
     }
     @name("ingress.dummy_action") action dummy_action() {
     }
@@ -34,12 +33,12 @@ control ingress(inout Headers h, inout Meta m, inout standard_metadata_t sm) {
         }
         actions = {
             dummy_action();
-            @defaultonly NoAction_1();
+            @defaultonly NoAction_0();
         }
-        default_action = NoAction_1();
+        default_action = NoAction_0();
     }
     apply {
-        hasReturned = false;
+        @name("ingress.hasReturned") bool hasReturned = false;
         switch (simple_table_0.apply().action_run) {
             dummy_action: {
                 h.eth_hdr.eth_type = 16w1;

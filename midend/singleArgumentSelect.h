@@ -18,53 +18,24 @@ limitations under the License.
 #define _MIDEND_SINGLEARGUMENTSELECT_H_
 
 #include "ir/ir.h"
-#include "frontends/p4/typeChecking/typeChecker.h"
 
 namespace P4 {
 
 /**
-   Converts select(a, b, c) into select(a ++ b ++ c) &&& (maska ++ maskb ++ maskc).
+   Converts select(a, b, c) into select(a ++ b ++ c).
    A similar transformation is done for the labels.
    @pre
    This should be run after SimplifySelectList and RemoveSelectBooleans.
-   It assumes that all select arguments are scalar values of type Type_Bits.
+   It assumes that all select arguments are scalar values.
 */
-class DoSingleArgumentSelect : public Modifier {
-    TypeMap* typeMap;
-    const IR::Type* selectListType;
+class SingleArgumentSelect : public Modifier {
  public:
-    explicit DoSingleArgumentSelect(TypeMap* typeMap):
-            typeMap(typeMap), selectListType(nullptr) {
-        setName("DoSingleArgumentSelect");
+    SingleArgumentSelect() {
+        setName("SingleArgumentSelect");
     }
-
-    /// A pair of expression representing an expression and a mask
-    struct Pair {
-        const IR::Expression* expr;
-        const IR::Expression* mask;
-        bool hasMask;
-
-        Pair(const IR::Expression* source, const IR::Type* type);
-    };
-
-    // Validate that the expression contains only subexpressions
-    // of supported types.
-    void checkExpressionType(const IR::Expression* expression);
 
     bool preorder(IR::SelectCase* selCase) override;
     bool preorder(IR::SelectExpression* expression) override;
-};
-
-class SingleArgumentSelect : public PassManager {
- public:
-    SingleArgumentSelect(ReferenceMap* refMap, TypeMap* typeMap,
-                         TypeChecking* typeChecking = nullptr) {
-        if (!typeChecking)
-            typeChecking = new TypeChecking(refMap, typeMap);
-        passes.push_back(typeChecking);
-        passes.push_back(new DoSingleArgumentSelect(typeMap));
-        setName("SingleArgumentSelect");
-    }
 };
 
 }  // namespace P4

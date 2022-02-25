@@ -22,6 +22,7 @@ control c(out bit<32> x) {
                 return;
             }
         }
+
     }
 }
 

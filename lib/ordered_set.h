@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef _LIB_ORDERED_SET_H_
-#define _LIB_ORDERED_SET_H_
+#ifndef P4C_LIB_ORDERED_SET_H_
+#define P4C_LIB_ORDERED_SET_H_
 
 #include <functional>
 #include <initializer_list>
@@ -205,8 +205,7 @@ class ordered_set {
         auto old = find(*it);
         if (old != data.end()) {
             data.erase(old); }
-        data_map.emplace(&*it, it);
-        return std::make_pair(it, true); }
+        data_map.emplace(&*it, it); }
 
     /* should be erase(const_iterator), but glibc++ std::list::erase is broken */
     iterator erase(iterator pos) {
@@ -222,15 +221,15 @@ class ordered_set {
 };
 
 template<class T, class C1, class A1, class U> inline
-auto operator|=(ordered_set<T, C1, A1> &a, const U &b) -> decltype(b.begin(), a) {
+auto operator|=(ordered_set<T, C1, A1> &a, U &b) -> decltype(b.begin(), a) {
     for (auto &el : b) a.insert(el);
     return a; }
 template<class T, class C1, class A1, class U> inline
-auto operator-=(ordered_set<T, C1, A1> &a, const U &b) -> decltype(b.begin(), a) {
+auto operator-=(ordered_set<T, C1, A1> &a, U &b) -> decltype(b.begin(), a) {
     for (auto &el : b) a.erase(el);
     return a; }
 template<class T, class C1, class A1, class U> inline
-auto operator&=(ordered_set<T, C1, A1> &a, const U &b) -> decltype(b.begin(), a) {
+auto operator&=(ordered_set<T, C1, A1> &a, U &b) -> decltype(b.begin(), a) {
     for (auto it = a.begin(); it != a.end();) {
         if (b.count(*it))
             ++it;
@@ -247,4 +246,4 @@ auto intersects(const ordered_set<T, C1, A1> &a, const U &b) -> decltype(b.begin
     for (auto &el : b) if (a.count(el)) return true;
     return false; }
 
-#endif /* _LIB_ORDERED_SET_H_ */
+#endif /* P4C_LIB_ORDERED_SET_H_ */

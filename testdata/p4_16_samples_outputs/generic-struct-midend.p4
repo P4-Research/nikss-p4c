@@ -37,11 +37,10 @@ struct H2_0 {
 
 typedef H2_0 R;
 struct H3<T> {
-    R           r;
-    T           s;
-    H2<T>       h2;
-    H4<H2<T>>   h3;
-    tuple<T, T> t;
+    R         r;
+    T         s;
+    H2<T>     h2;
+    H4<H2<T>> h3;
 }
 
 header GH<T> {
@@ -65,17 +64,11 @@ struct H4_0 {
     H2_0 x;
 }
 
-struct tuple_0 {
-    S f0;
-    S f1;
-}
-
 struct H3_0 {
-    R       r;
-    S       s;
-    H2_0    h2;
-    H4_0    h3;
-    tuple_0 t;
+    R    r;
+    S    s;
+    H2_0 h2;
+    H4_0 h3;
 }
 
 header_union HU<T> {
@@ -91,24 +84,21 @@ header_union HU_0 {
 control c(out bit<1> x) {
     @name("c.gh") GH_1 gh_0;
     @name("c.s") Stack s_0;
-    @name("c.z") HU_0 z_0;
-    @hidden action genericstruct90() {
-        gh_0.setInvalid();
-        s_0[0].setInvalid();
-        s_0[1].setInvalid();
-        s_0[2].setInvalid();
-        z_0.xu.setInvalid();
-        z_0.h3u.setInvalid();
+    @hidden action genericstruct89() {
+        gh_0.isValid();
+        s_0[0].setValid();
+        s_0[0]._data_b0 = 32w1;
+        s_0[0].isValid();
         x = 1w0;
     }
-    @hidden table tbl_genericstruct90 {
+    @hidden table tbl_genericstruct89 {
         actions = {
-            genericstruct90();
+            genericstruct89();
         }
-        const default_action = genericstruct90();
+        const default_action = genericstruct89();
     }
     apply {
-        tbl_genericstruct90.apply();
+        tbl_genericstruct89.apply();
     }
 }
 

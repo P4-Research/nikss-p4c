@@ -1,14 +1,9 @@
 # uninstall
-find_file (
-  INSTALL_MANIFEST_LOCATION "install_manifest.txt"
-  PATHS "${CMAKE_BINARY_DIR}" "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_BINARY_DIR}/.."
-)
+if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/install_manifest.txt")
+  message(FATAL_ERROR "Cannot find install manifest: ${CMAKE_CURRENT_BINARY_DIR}/install_manifest.txt")
+endif(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/install_manifest.txt")
 
-if(NOT INSTALL_MANIFEST_LOCATION)
-  message(FATAL_ERROR "Cannot find install_manifest.txt")
-endif(NOT INSTALL_MANIFEST_LOCATION)
-
-file(READ "${INSTALL_MANIFEST_LOCATION}" files)
+file(READ "${CMAKE_CURRENT_BINARY_DIR}/install_manifest.txt" files)
 string(REGEX REPLACE "\n" ";" files "${files}")
 foreach(file ${files})
   message(STATUS "Uninstalling $ENV{DESTDIR}${file}")

@@ -170,21 +170,6 @@ class SpecializeGenericTypes : public PassRepeated {
     }
 };
 
-/// Removes all structs or stacks that are generic
-//  Note: this pass is currently not used, but some
-//  back-ends may find it useful.
-class RemoveGenericTypes : public Transform {
- public:
-    const IR::Node* postorder(IR::Type_StructLike* type) override {
-        if (!type->typeParameters->empty()) return nullptr;
-        return type;
-    }
-    const IR::Node* postorder(IR::Type_Stack* type) override {
-        if (type->elementType->is<IR::Type_Specialized>()) return nullptr;
-        return type;
-    }
-};
-
 }  // namespace P4
 
 #endif /* _FRONTENDS_P4_SPECIALIZEGENERICTYPES_H_ */

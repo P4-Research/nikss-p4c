@@ -21,6 +21,7 @@ control c() {
         const entries = {
                         (true, 1, true) : multicast(2);
         }
+
     }
     apply {
         forward.apply();

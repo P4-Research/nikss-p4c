@@ -28,7 +28,6 @@ ParseAnnotations::HandlerMap ParseAnnotations::standardHandlers() {
             PARSE_EMPTY(IR::Annotation::optionalAnnotation),
             PARSE_EMPTY(IR::Annotation::pureAnnotation),
             PARSE_EMPTY(IR::Annotation::noSideEffectsAnnotation),
-            PARSE_EMPTY("disable_optimization"),
 
             // string literal argument.
             PARSE(IR::Annotation::nameAnnotation, StringLiteral),
@@ -43,8 +42,6 @@ ParseAnnotations::HandlerMap ParseAnnotations::standardHandlers() {
 
             // @synchronous has a list of method names
             PARSE_EXPRESSION_LIST(IR::Annotation::synchronousAnnotation),
-            // @field_list also has a list of expressions
-            PARSE_EXPRESSION_LIST(IR::Annotation::fieldListAnnotation),
 
             // @match has an expression argument
             PARSE(IR::Annotation::matchAnnotation, Expression),
@@ -146,7 +143,7 @@ void ParseAnnotations::postorder(IR::Annotation* annotation) {
         // Unknown annotation. Leave as is, but warn if desired.
         if (warnUnknown && warned.count(name) == 0) {
             warned.insert(name);
-            warn(ErrorType::WARN_UNKNOWN, "Unknown annotation: %1%", annotation->name);
+            ::warning(ErrorType::WARN_UNKNOWN, "Unknown annotation: %1%", annotation->name);
         }
         return;
     }

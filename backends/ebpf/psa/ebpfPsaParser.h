@@ -27,7 +27,6 @@ class PsaStateTranslationVisitor : public StateTranslationVisitor {
     bool preorder(const IR::Expression* expression) override;
     bool preorder(const IR::SelectCase* selectCase) override;
     bool preorder(const IR::SelectExpression* expression) override;
-    bool preorder(const IR::Mask* expression) override;
 
     void processFunction(const P4::ExternFunction* function) override;
     void processMethod(const P4::ExternMethod* ext) override;
