@@ -383,6 +383,10 @@ void EBPFErrorTypePSA::emit(CodeBuilder* builder) {
     builder->newline();
 }
 
+void EBPFErrorTypePSA::declareInit(CodeBuilder* builder, cstring id, bool asPointer) {
+    declare(builder, id, asPointer);
+}
+
 void EBPFErrorTypePSA::declare(CodeBuilder* builder, cstring id, bool asPointer) {
     (void) builder; (void) id; (void) asPointer;
     BUG("Error type is not declarable");

@@ -182,6 +182,7 @@ class EBPFErrorTypePSA : public EBPFType {
 
     void emit(CodeBuilder* builder) override;
     void declare(CodeBuilder* builder, cstring id, bool asPointer) override;
+    void declareInit(CodeBuilder* builder, cstring id, bool asPointer) override;
     void emitInitializer(CodeBuilder* builder) override;
 
     const IR::Type_Error* getType() const { return type->to<IR::Type_Error>(); }

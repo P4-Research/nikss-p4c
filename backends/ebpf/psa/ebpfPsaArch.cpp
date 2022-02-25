@@ -1,3 +1,4 @@
+#include "backends/ebpf/ebpfType.h"
 #include "ebpfPsaArch.h"
 #include "ebpfPsaParser.h"
 #include "ebpfPsaDeparser.h"
