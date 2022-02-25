@@ -17,6 +17,7 @@ limitations under the License.
 #include "local_copyprop.h"
 #include "has_side_effects.h"
 #include "expr_uses.h"
+#include "frontends/common/copySrcInfo.h"
 
 namespace P4 {
 
@@ -121,7 +122,7 @@ class DoLocalCopyPropagation::ElimDead : public Transform {
         return act; }
 
  public:
-    explicit ElimDead(DoLocalCopyPropagation &self) : self(self) {}
+    explicit ElimDead(DoLocalCopyPropagation &self) : self(self) { setCalledBy(&self); }
 };
 
 class DoLocalCopyPropagation::RewriteTableKeys : public Transform {
@@ -154,7 +155,7 @@ class DoLocalCopyPropagation::RewriteTableKeys : public Transform {
         return exp; }
 
  public:
-    explicit RewriteTableKeys(DoLocalCopyPropagation &self) : self(self) {}
+    explicit RewriteTableKeys(DoLocalCopyPropagation &self) : self(self) { setCalledBy(&self); }
 };
 
 void DoLocalCopyPropagation::flow_merge(Visitor &a_) {
@@ -235,7 +236,8 @@ IR::Expression *DoLocalCopyPropagation::preorder(IR::Expression *exp) {
     return exp;
 }
 
-const IR::Expression *DoLocalCopyPropagation::copyprop_name(cstring name) {
+const IR::Expression *DoLocalCopyPropagation::copyprop_name(
+    cstring name, const Util::SourceInfo& srcInfo) {
     if (!name) return nullptr;
     if (inferForTable) {
         const Visitor::Context *ctxt = nullptr;
@@ -245,8 +247,8 @@ const IR::Expression *DoLocalCopyPropagation::copyprop_name(cstring name) {
     LOG6("  copyprop_name(" << name << ")" << (isWrite() ? " (write)" : ""));
     if (isWrite()) {
         dropValuesUsing(name);
-        if (inferForFunc)
-            inferForFunc->writes.insert(name);
+        if (inferForFunc) {
+            inferForFunc->is_first_write_insert = inferForFunc->writes.insert(name).second; }
         if (isRead() || findContext<IR::MethodCallExpression>()) {
             /* If this is being used as an 'out' param of a method call, its not really
              * read, but we can't dead-code eliminate it without eliminating the entire
@@ -262,7 +264,8 @@ const IR::Expression *DoLocalCopyPropagation::copyprop_name(cstring name) {
         if (var->val) {
             if (policy(getChildContext(), var->val)) {
                 LOG3("  propagating value for " << name << ": " << var->val);
-                return var->val; }
+                CopySrcInfo copy(srcInfo);
+                return var->val->apply(copy); }
             LOG3("  policy rejects propagation of " << name << ": " << var->val);
         } else {
             LOG4("  using " << name << " with no propagated value"); }
@@ -276,7 +279,7 @@ const IR::Expression *DoLocalCopyPropagation::copyprop_name(cstring name) {
 }
 
 const IR::Expression *DoLocalCopyPropagation::postorder(IR::PathExpression *path) {
-    auto rv = copyprop_name(path->path->name);
+    auto rv = copyprop_name(path->path->name, path->srcInfo);
     return rv ? rv : path;
 }
 
@@ -284,7 +287,7 @@ const IR::Expression *DoLocalCopyPropagation::preorder(IR::Member *member) {
     visitAgain();
     if (auto name = expr_name(member)) {
         prune();
-        if (auto rv = copyprop_name(name))
+        if (auto rv = copyprop_name(name, member->srcInfo))
             return rv; }
     return member;
 }
@@ -293,7 +296,7 @@ const IR::Expression *DoLocalCopyPropagation::preorder(IR::ArrayIndex *arr) {
     visitAgain();
     if (auto name = expr_name(arr)) {
         prune();
-        if (auto rv = copyprop_name(name))
+        if (auto rv = copyprop_name(name, arr->srcInfo))
             return rv; }
     return arr;
 }
@@ -322,6 +325,9 @@ IR::AssignmentStatement *DoLocalCopyPropagation::preorder(IR::AssignmentStatemen
 IR::AssignmentStatement *DoLocalCopyPropagation::postorder(IR::AssignmentStatement *as) {
     if (as->left->equiv(*as->right)) {
         LOG3("  removing noop assignment " << *as);
+        if (inferForFunc && inferForFunc->is_first_write_insert) {
+            inferForFunc->writes.erase(expr_name(as->left));
+            inferForFunc->is_first_write_insert = false; }
         return nullptr; }
     // FIXME -- if as->right is an uninitialized value, we could legally eliminate this
     // assignment, which would simplify (and minimize) the code.  This could be a separate
@@ -656,6 +662,26 @@ IR::ParserState *DoLocalCopyPropagation::postorder(IR::ParserState *state) {
     LOG3("DoLocalCopyPropagation finished parser state " << state->name);
     LOG4(state);
     return state;
+}
+
+// Reset the state of internal data structures after traversing IR,
+// needed for this pass to function correctly when used in a PassRepeated
+Visitor::profile_t DoLocalCopyPropagation::init_apply(const IR::Node* node) {
+    // clear maps
+    available.clear();
+    tables.clear();
+    actions.clear();
+    methods.clear();
+    states.clear();
+    // reset pointers
+    inferForFunc = nullptr;
+    inferForTable = nullptr;
+    // reset flags
+    need_key_rewrite = false;
+    elimUnusedTables = false;
+    working = false;
+
+    return Transform::init_apply(node);
 }
 
 }  // namespace P4

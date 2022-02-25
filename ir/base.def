@@ -25,6 +25,10 @@ interface CompileTimeValue {
 
 /// Base class for P4 types
 abstract Type {
+    static const cstring minSizeInBits;
+    static const cstring minSizeInBytes;
+    static const cstring maxSizeInBits;
+    static const cstring maxSizeInBytes;
 #emit
     typedef Type_Unknown        Unknown;
     typedef Type_Boolean        Boolean;
@@ -100,6 +104,7 @@ interface ITypeVar {
 
 /// Implemented by P4Parser, P4Control and Type_Package
 interface IContainer : IMayBeGenericType, IDeclaration, IFunctional {
+    virtual Type getType() const = 0;
     /// The type of the constructor as a method
     virtual Type_Method getConstructorMethodType() const = 0;
     virtual ParameterList getConstructorParameters() const = 0;
@@ -283,6 +288,7 @@ class Annotation {
     static const cstring noSideEffectsAnnotation;  /// extern function/method annotation.
     static const cstring noWarnAnnotation;  /// noWarn annotation.
     static const cstring matchAnnotation;  /// Match annotation (for value sets).
+    static const cstring fieldListAnnotation;  /// Used for recirculate, etc.
     toString{ return cstring("@") + name; }
     validate{
         BUG_CHECK(!name.name.isNullOrEmpty(), "empty annotation name");
@@ -341,6 +347,13 @@ class Annotations {
     // already present.
     Annotations addAnnotationIfNew(cstring name, Expression expr, bool structured = false) const {
         return getSingle(name) ? this : addAnnotation(name, expr, structured); }
+    Annotations append(Annotations other) {
+        if (other == nullptr)
+            return this;
+        for (auto a : other->annotations)
+            add(a);
+        return this;
+    }
     // If annotations with the same name are already present, remove them.
     // Add this annotation.
     Annotations addOrReplace(cstring name, Expression expr, bool structured = false) const {

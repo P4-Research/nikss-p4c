@@ -45,7 +45,7 @@ const IR::Node* ExpressionConverter::postorder(IR::Mask* expression) {
     auto cst = expression->right->to<IR::Constant>();
     big_int value = cst->value;
     if (value == 0) {
-        ::warning(ErrorType::WARN_INVALID, "%1%: zero mask", expression->right);
+        warn(ErrorType::WARN_INVALID, "%1%: zero mask", expression->right);
         return cst;
     }
     auto range = Util::findOnes(value);
@@ -454,14 +454,18 @@ class ValidateLenExpr : public Inspector {
 }  // namespace
 
 const IR::StructField *TypeConverter::postorder(IR::StructField *field) {
-    if (!field->type->is<IR::Type_Varbits>()) return field;
+    auto type = findContext<IR::Type_StructLike>();
+    if (type == nullptr)
+        return field;
+
     // given a struct with length and max_length, the
     // varbit field size is max_length * 8 - struct_size
-    if (auto type = findContext<IR::Type_StructLike>()) {
+    if (field->type->is<IR::Type_Varbits>()) {
         if (auto len = type->getAnnotation("length")) {
             if (len->expr.size() == 1) {
                 auto lenexpr = len->expr[0];
                 ValidateLenExpr vle(type, field);
+                vle.setCalledBy(this);
                 lenexpr->apply(vle);
                 auto scale = new IR::Mul(lenexpr->srcInfo, lenexpr, new IR::Constant(8));
                 auto fieldlen = new IR::Sub(
@@ -471,6 +475,9 @@ const IR::StructField *TypeConverter::postorder(IR::StructField *field) {
             }
         }
     }
+    if (auto vec = structure->listIndexes(type->name.name, field->name.name))
+        field->annotations = field->annotations->add(
+            new IR::Annotation("field_list", *vec));
     return field;
 }
 
@@ -652,6 +659,7 @@ Converter::Converter() {
     passes.emplace_back(new TypeCheck());
     // Convert
     passes.emplace_back(new DiscoverStructure(structure));
+    passes.emplace_back(new FindRecirculated(structure));
     passes.emplace_back(new ComputeCallGraph(structure));
     passes.emplace_back(new ComputeTableCallGraph(structure));
     passes.emplace_back(new Rewriter(structure));

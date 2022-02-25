@@ -8,8 +8,18 @@ fi
 
 $BREW update
 $BREW install autoconf automake bdw-gc bison boost ccache cmake git \
-      libtool openssl pkg-config protobuf python
+      libtool openssl pkg-config python
 $BREW install gmp --c++11
+
+# Install specific version of Protobuf, since newer versions break compatibility
+wget https://github.com/protocolbuffers/protobuf/releases/download/v3.6.1/protobuf-all-3.6.1.tar.gz
+tar xfz protobuf-all-3.6.1.tar.gz
+cd protobuf-3.6.1
+./configure
+make
+sudo make install
+cd ..
+rm -rf protobuf-3.6.1
 
 # Prefer Homebrew's bison over the macOS-provided version
 $BREW link --force bison
@@ -19,4 +29,5 @@ export PATH="/usr/local/opt/bison/bin:$PATH"
 # install pip and required pip packages
 # curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
 # python get-pip.py --user
-pip3 install --user scapy==2.4.0 ply==3.8
+# use scapy 2.4.5, which is the version on which ptf depends
+pip3 install --user scapy==2.4.5 ply==3.8

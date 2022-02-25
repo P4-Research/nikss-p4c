@@ -152,7 +152,7 @@ class PrimitiveConverter {
     class PrimitiveConverter_##NAME##_##__VA_ARGS__ : public PrimitiveConverter {               \
         const IR::Statement *convert(ProgramStructure *, const IR::Primitive *) override;       \
         PrimitiveConverter_##NAME##_##__VA_ARGS__()                                             \
-        : PrimitiveConverter(#NAME, __VA_ARGS__ + 0) {}                                         \
+        : PrimitiveConverter(#NAME, __VA_ARGS__ + 0) {}                                       \
         static PrimitiveConverter_##NAME##_##__VA_ARGS__ singleton;                             \
     } PrimitiveConverter_##NAME##_##__VA_ARGS__::singleton;                                     \
     const IR::Statement *PrimitiveConverter_##NAME##_##__VA_ARGS__::convert(                    \
@@ -187,8 +187,8 @@ class DiscoverStructure : public Inspector {
     { CHECK_NULL(structure); setName("DiscoverStructure"); }
 
     void postorder(const IR::ParserException* ex) override {
-        ::warning(ErrorType::WARN_UNSUPPORTED, "%1%: parser exception is not translated to P4-16",
-                  ex); }
+        warn(ErrorType::WARN_UNSUPPORTED, "%1%: parser exception is not translated to P4-16",
+             ex); }
     void postorder(const IR::Metadata* md) override
     { structure->metadata.emplace(md); checkReserved(md, md->name, "metadata"); }
     void postorder(const IR::Header* hd) override
@@ -596,6 +596,7 @@ class FixExtracts final : public Transform {
 
         // Create actual extract
         RewriteLength rewrite(fixed->fixedHeaderType, var);
+        rewrite.setCalledBy(this);
         auto length = fixed->headerLength->apply(rewrite);
         auto args = new IR::Vector<IR::Argument>();
         args->push_back(arg->clone());
@@ -728,7 +729,7 @@ class CheckIfMultiEntryPoint: public Inspector {
 class InsertCompilerGeneratedStartState: public Transform {
     ProgramStructure* structure;
     IR::Vector<IR::Node>               allTypeDecls;
-    IR::IndexedVector<IR::Declaration> varDecls;
+    IR::IndexedVector<IR::ParserState> parserStates;
     IR::Vector<IR::SelectCase>         selCases;
     cstring newStartState;
     cstring newInstanceType;
@@ -792,11 +793,11 @@ class InsertCompilerGeneratedStartState: public Transform {
         auto annos = new IR::Annotations();
         annos->add(new IR::Annotation(IR::Annotation::nameAnnotation, ".$start"));
         auto startState = new IR::ParserState(IR::ParserState::start, annos, selects);
-        varDecls.push_back(startState);
+        parserStates.push_back(startState);
 
-        if (!varDecls.empty()) {
-            parser->parserLocals.append(varDecls);
-            varDecls.clear();
+        if (!parserStates.empty()) {
+            parser->states.append(parserStates);
+            parserStates.clear();
         }
         return parser;
     }
@@ -920,6 +921,47 @@ class MoveIntrinsicMetadata : public Transform {
                                     structure->v1model.standardMetadata.name)));
         }
         return member;
+    }
+};
+
+/// This visitor finds all field lists that participate in
+/// recirculation, resubmission, and cloning
+class FindRecirculated : public Inspector {
+    ProgramStructure* structure;
+
+    void add(const IR::Primitive* primitive, unsigned operand) {
+        if (primitive->operands.size() <= operand) {
+            // not enough arguments, do nothing.
+            // resubmit and recirculate have optional arguments
+            return;
+        }
+        auto expression = primitive->operands.at(operand);
+        if (!expression->is<IR::PathExpression>()) {
+            ::error("%1%: expected a field list", expression);
+            return;
+        }
+        auto nr = expression->to<IR::PathExpression>();
+        auto fl = structure->field_lists.get(nr->path->name);
+        if (fl == nullptr) {
+            ::error("%1%: Expected a field list", expression);
+            return;
+        }
+        LOG3("Recirculated " << nr->path->name);
+        structure->allFieldLists.emplace(fl);
+    }
+
+ public:
+    explicit FindRecirculated(ProgramStructure* structure): structure(structure)
+    { CHECK_NULL(structure); setName("FindRecirculated"); }
+
+    void postorder(const IR::Primitive* primitive) override {
+        if (primitive->name == "recirculate") {
+            add(primitive, 0);
+        } else if (primitive->name == "resubmit") {
+            add(primitive, 0);
+        } else if (primitive->name.startsWith("clone") && primitive->operands.size() == 2) {
+            add(primitive, 1);
+        }
     }
 };
 
