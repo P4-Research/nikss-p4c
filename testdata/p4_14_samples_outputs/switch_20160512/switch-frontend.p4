@@ -5917,9 +5917,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
             _ingress_bd_stats.apply();
             _acl_stats.apply();
             _storm_control_stats_0.apply();
-            if (meta.ingress_metadata.bypass_lookups == 16w0xffff) {
-                ;
-            } else {
+            if (meta.ingress_metadata.bypass_lookups != 16w0xffff) {
                 _fwd_result.apply();
             }
             if (meta.nexthop_metadata.nexthop_type == 1w1) {
