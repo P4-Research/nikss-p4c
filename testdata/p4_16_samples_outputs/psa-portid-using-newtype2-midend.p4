@@ -228,9 +228,7 @@ control FabricIngress(inout parsed_headers_t hdr, inout fabric_metadata_t fabric
         if (hdr.packet_out.isValid()) {
             tbl_psaportidusingnewtype2l132.apply();
         }
-        if (hasExited) {
-            ;
-        } else {
+        if (!hasExited) {
             filtering_t.apply();
             forwarding_t.apply();
             tbl_psaportidusingnewtype2l213.apply();
