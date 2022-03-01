@@ -922,8 +922,6 @@ void EBPFTernaryTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
     std::vector<cstring> valueMasksNames;
     cstring uniquePrefix = name;
     cstring keyMaskName = "struct " + keyTypeName + "_mask";
-    cstring tuplesMap = name + "_tuples_map";
-    cstring prefixesMap = name + "_prefixes";
     uint32_t tuple_id = 0; // We have preallocated tuple maps with ids starting from 0
 
     cstring headName = program->refMap->newName("key_mask");
@@ -993,7 +991,7 @@ void EBPFTernaryTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
 
     builder->emitIndent();
     builder->appendFormat("%s(0, 0, &%s, &%s, &%s, &%s, NULL, NULL)",
-                          addPrefixFunctionName, tuplesMap, prefixesMap, headName, valueMask);
+                          addPrefixFunctionName, tuplesMapName, prefixesMapName, headName, valueMask);
     builder->endOfStatement(true);
     builder->newline();
 
@@ -1093,8 +1091,8 @@ void EBPFTernaryTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
                               addPrefixFunctionName,
                               cstring::to_cstring(samePrefixEntries.size()),
                               cstring::to_cstring(index),
-                              tuplesMap,
-                              prefixesMap,
+                              tuplesMapName,
+                              prefixesMapName,
                               keyMaskVarName,
                               valueMaskVarName,
                               keysArray,

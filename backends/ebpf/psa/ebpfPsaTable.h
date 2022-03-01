@@ -128,6 +128,8 @@ class EBPFTernaryTablePSA : public EBPFTablePSA {
     std::vector<std::vector<const IR::Entry*>> constEntriesGroupedByPrefix();
     bool hasEntries();
     const cstring addPrefixFunctionName = "add_prefix_and_entries";
+    const cstring tuplesMapName = name + "_tuples_map";
+    const cstring prefixesMapName = name + "_prefixes";
 
  public:
     EBPFTernaryTablePSA(const EBPFProgram* program, const IR::TableBlock* table,
