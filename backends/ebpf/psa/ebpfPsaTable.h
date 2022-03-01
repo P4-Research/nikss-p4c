@@ -148,6 +148,15 @@ class EBPFTernaryTablePSA : public EBPFTablePSA {
  protected:
     void emitConstEntriesInitializer(CodeBuilder *builder) override;
     void validateKeys() const override;
+    void emitValueMask(CodeBuilder *builder, cstring valueMask,
+                       cstring nextMask, int tupleId) const;
+    void emitKeyMasks(CodeBuilder *builder,
+                      std::vector<std::vector<const IR::Entry *>> &entriesList,
+                      std::vector<cstring> &keyMasksNames);
+    void emitKeysAndValues(CodeBuilder *builder,
+                           std::vector<const IR::Entry *> &samePrefixEntries,
+                           std::vector<cstring> &keyNames,
+                           std::vector<cstring> &valueNames);
 };
 
 }  // namespace EBPF

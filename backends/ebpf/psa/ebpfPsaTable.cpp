@@ -919,24 +919,145 @@ void EBPFTernaryTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
     cg.setBuilder(builder);
     std::vector<std::vector<const IR::Entry*>> entriesList = constEntriesGroupedByPrefix();
     std::vector<cstring> keyMasksNames;
-    std::vector<cstring> valueMasksNames;
     cstring uniquePrefix = name;
-    cstring keyMaskName = "struct " + keyTypeName + "_mask";
-    uint32_t tuple_id = 0; // We have preallocated tuple maps with ids starting from 0
+    int tuple_id = 0; // We have preallocated tuple maps with ids starting from 0
 
+    // emit key head mask
     cstring headName = program->refMap->newName("key_mask");
     builder->emitIndent();
-    builder->appendFormat("%s %s = {0}", keyMaskName, headName);
+    builder->appendFormat("struct %s_mask %s = {0}", keyTypeName, headName);
     builder->endOfStatement(true);
 
     // emit key masks
+    emitKeyMasks(builder, entriesList, keyMasksNames);
+
+    builder->newline();
+
+    // add head
+    cstring valueMask = program->refMap->newName("value_mask");
+    cstring nextMask = keyMasksNames[0];
+    int noTupleId = -1;
+    emitValueMask(builder, valueMask, nextMask, noTupleId);
+    builder->newline();
+
+    builder->emitIndent();
+    builder->appendFormat("%s(0, 0, &%s, &%s, &%s, &%s, NULL, NULL)",
+                          addPrefixFunctionName, tuplesMapName, prefixesMapName, headName, valueMask);
+    builder->endOfStatement(true);
+    builder->newline();
+
+    // emit values + updates
+    for (size_t i = 0; i < entriesList.size(); i++) {
+        auto samePrefixEntries = entriesList[i];
+        valueMask = program->refMap->newName("value_mask");
+        std::vector<cstring> keyNames;
+        std::vector<cstring> valueNames;
+        cstring keysArray = program->refMap->newName("keys");
+        cstring valuesArray = program->refMap->newName("values");
+        cstring keyMaskVarName = keyMasksNames[i];
+
+        nextMask = cstring::empty;
+        if (entriesList.size() > i + 1) {
+            nextMask = keyMasksNames[i + 1];
+        }
+        emitValueMask(builder, valueMask, nextMask, tuple_id);
+        builder->newline();
+        emitKeysAndValues(builder, samePrefixEntries, keyNames, valueNames);
+
+        // construct keys array
+        builder->newline();
+        builder->emitIndent();
+        builder->appendFormat("void *%s[] = {", keysArray);
+        for (auto keyName : keyNames)
+            builder->appendFormat("&%s,", keyName);
+        builder->append("}");
+        builder->endOfStatement(true);
+
+        // construct values array
+        builder->emitIndent();
+        builder->appendFormat("void *%s[] = {", valuesArray);
+        for (auto valueName : valueNames)
+            builder->appendFormat("&%s,", valueName);
+        builder->append("}");
+        builder->endOfStatement(true);
+
+        builder->newline();
+        builder->emitIndent();
+        builder->appendFormat("%s(%s, %s, &%s, &%s, &%s, &%s, %s, %s)",
+                              addPrefixFunctionName,
+                              cstring::to_cstring(samePrefixEntries.size()),
+                              cstring::to_cstring(tuple_id),
+                              tuplesMapName,
+                              prefixesMapName,
+                              keyMaskVarName,
+                              valueMask,
+                              keysArray,
+                              valuesArray);
+        builder->endOfStatement(true);
+
+        tuple_id++;
+    }
+}
+
+void EBPFTernaryTablePSA::emitKeysAndValues(CodeBuilder *builder,
+                                            std::vector<const IR::Entry *> &samePrefixEntries,
+                                            std::vector<cstring> &keyNames,
+                                            std::vector<cstring> &valueNames) {
+    CodeGenInspector cg(program->refMap, program->typeMap);
+    cg.setBuilder(builder);
+
+    for (auto entry : samePrefixEntries) {
+        cstring keyName = program->refMap->newName("key");
+        cstring valueName = program->refMap->newName("value");
+        keyNames.push_back(keyName);
+        valueNames.push_back(valueName);
+        // construct key
+        builder->emitIndent();
+        builder->appendFormat("struct %s %s = {}", keyTypeName.c_str(), keyName.c_str());
+        builder->endOfStatement(true);
+        for (size_t k = 0; k < keyGenerator->keyElements.size(); k++) {
+            auto keyElement = keyGenerator->keyElements[k];
+            cstring fieldName = get(keyFieldNames, keyElement);
+            CHECK_NULL(fieldName);
+            builder->emitIndent();
+            builder->appendFormat("%s.%s = ", keyName.c_str(), fieldName.c_str());
+            auto mtdecl = program->refMap->getDeclaration(keyElement->matchType->path, true);
+            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
+            auto expr = entry->keys->components[k];
+            if (expr->is<IR::Mask>()) {
+                auto km = expr->to<IR::Mask>();
+                auto ebpfType = get(keyTypes, keyElement);
+                unsigned width = 0;
+                if (ebpfType->is<EBPFScalarType>()) {
+                    auto scalar = ebpfType->to<EBPFScalarType>();
+                    width = scalar->implementationWidthInBits();
+                }
+                km->left->apply(cg);
+                builder->append(" & ");
+                km->right->apply(cg);
+                builder->endOfStatement(true);
+            }
+        }
+
+        // construct value
+        auto *mce = entry->action->to<IR::MethodCallExpression>();
+        emitTableValue(builder, mce, valueName.c_str());
+    }
+}
+
+void EBPFTernaryTablePSA::emitKeyMasks(CodeBuilder *builder,
+                                       std::vector<std::vector<const IR::Entry *>> &entriesList,
+                                       std::vector<cstring> &keyMasksNames) {
+    CodeGenInspector cg(program->refMap, program->typeMap);
+    cg.setBuilder(builder);
+
     for (auto samePrefixEntries : entriesList) {
         auto firstEntry = samePrefixEntries.front();
         cstring keyFieldName = program->refMap->newName("key_mask");
         keyMasksNames.push_back(keyFieldName);
 
         builder->emitIndent();
-        builder->appendFormat("%s %s = {0}", keyMaskName, keyFieldName);
+        builder->appendFormat("struct %s_mask %s = {0}", keyTypeName, keyFieldName);
         builder->endOfStatement(true);
 
         builder->emitIndent();
@@ -950,7 +1071,7 @@ void EBPFTernaryTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
             auto expr = firstEntry->keys->components[i];
             cstring fieldName = program->refMap->newName("field");
             if (auto mask = expr->to<IR::Mask>()) {
-                auto ebpfType = ::get(keyTypes, keyElement);
+                auto ebpfType = get(keyTypes, keyElement);
                 builder->emitIndent();
                 ebpfType->declare(builder, fieldName, false);
                 builder->append(" = ");
@@ -971,135 +1092,27 @@ void EBPFTernaryTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
             }
         }
     }
+}
 
-    builder->newline();
-
-    // add head
-    cstring valueMask = program->refMap->newName("value_mask");
+void EBPFTernaryTablePSA::emitValueMask(CodeBuilder *builder, const cstring valueMask,
+                                        const cstring nextMask, int tupleId) const {
     builder->emitIndent();
     builder->appendFormat("struct %s_mask %s = {0}", valueTypeName, valueMask);
     builder->endOfStatement(true);
 
     builder->emitIndent();
-    cstring nextMask = keyMasksNames[0];
-    builder->appendFormat("%s.next_tuple_mask = %s", valueMask, nextMask);
+    builder->appendFormat("%s.tuple_id = %s", valueMask, cstring::to_cstring(tupleId));
     builder->endOfStatement(true);
     builder->emitIndent();
-    builder->appendFormat("%s.has_next = 1", valueMask);
-    builder->endOfStatement(true);
-    builder->newline();
-
-    builder->emitIndent();
-    builder->appendFormat("%s(0, 0, &%s, &%s, &%s, &%s, NULL, NULL)",
-                          addPrefixFunctionName, tuplesMapName, prefixesMapName, headName, valueMask);
-    builder->endOfStatement(true);
-    builder->newline();
-
-    // emit values + updates
-    int index = 0;
-    for (size_t i = 0; i < entriesList.size(); i++) {
-        auto samePrefixEntries = entriesList[i];
-        valueMask = program->refMap->newName("value_mask");
-        valueMasksNames.push_back(valueMask);
-        builder->emitIndent();
-        builder->appendFormat("struct %s_mask %s = {0}", valueTypeName, valueMask);
+    if (nextMask.isNullOrEmpty()) {
+        builder->appendFormat("%s.has_next = 0", valueMask);
         builder->endOfStatement(true);
-
-        builder->emitIndent();
-        builder->appendFormat("%s.tuple_id = %s", valueMask, cstring::to_cstring(tuple_id++));
+    } else {
+        builder->appendFormat("%s.next_tuple_mask = %s", valueMask, nextMask);
         builder->endOfStatement(true);
         builder->emitIndent();
-        if (entriesList.size() == i + 1) {
-            builder->appendFormat("%s.has_next = 0", valueMask);
-            builder->endOfStatement(true);
-        } else {
-            nextMask = keyMasksNames[i + 1];// +1 because a head was emitted
-            builder->appendFormat("%s.next_tuple_mask = %s", valueMask, nextMask);
-            builder->endOfStatement(true);
-            builder->emitIndent();
-            builder->appendFormat("%s.has_next = 1", valueMask);
-            builder->endOfStatement(true);
-        }
-        builder->newline();
-        std::vector<cstring> keyNames;
-        std::vector<cstring> valueNames;
-        for (size_t j = 0; j < samePrefixEntries.size(); j++) {
-            cstring keyName = program->refMap->newName("key");
-            cstring valueName = program->refMap->newName("value");
-            keyNames.push_back(keyName);
-            valueNames.push_back(valueName);
-            auto entry = samePrefixEntries[j];
-
-            // construct key
-            builder->emitIndent();
-            builder->appendFormat("struct %s %s = {}", this->keyTypeName.c_str(), keyName.c_str());
-            builder->endOfStatement(true);
-            for (size_t k = 0; k < keyGenerator->keyElements.size(); k++) {
-                auto keyElement = keyGenerator->keyElements[k];
-                cstring fieldName = get(keyFieldNames, keyElement);
-                CHECK_NULL(fieldName);
-                builder->emitIndent();
-                builder->appendFormat("%s.%s = ", keyName.c_str(), fieldName.c_str());
-                auto mtdecl = program->refMap->getDeclaration(keyElement->matchType->path, true);
-                auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
-                auto expr = entry->keys->components[k];
-                if (expr->is<IR::Mask>()) {
-                    auto km = expr->to<IR::Mask>();
-                    auto ebpfType = ::get(keyTypes, keyElement);
-                    unsigned width = 0;
-                    if (ebpfType->is<EBPFScalarType>()) {
-                        auto scalar = ebpfType->to<EBPFScalarType>();
-                        width = scalar->implementationWidthInBits();
-                    }
-                    km->left->apply(cg);
-                    builder->append(" & ");
-                    km->right->apply(cg);
-                    builder->endOfStatement(true);
-                }
-            }
-
-            // construct value
-            auto *mce = entry->action->to<IR::MethodCallExpression>();
-            emitTableValue(builder, mce, valueName.c_str());
-
-        }
-        cstring keysArray = program->refMap->newName("keys");
-        cstring valuesArray = program->refMap->newName("values");
-
-        // construct keys array
-        builder->newline();
-        builder->emitIndent();
-        builder->appendFormat("void *%s[] = {", keysArray);
-        for (auto keyName : keyNames)
-            builder->appendFormat("&%s,", keyName);
-        builder->append("}");
+        builder->appendFormat("%s.has_next = 1", valueMask);
         builder->endOfStatement(true);
-
-        // construct values array
-        builder->emitIndent();
-        builder->appendFormat("void *%s[] = {", valuesArray);
-        for (auto valueName : valueNames)
-            builder->appendFormat("&%s,", valueName);
-        builder->append("}");
-        builder->endOfStatement(true);
-
-        cstring valueMaskVarName = valueMasksNames[index];
-        cstring keyMaskVarName = keyMasksNames[index];
-        builder->newline();
-        builder->emitIndent();
-        builder->appendFormat("%s(%s, %s, &%s, &%s, &%s, &%s, %s, %s)",
-                              addPrefixFunctionName,
-                              cstring::to_cstring(samePrefixEntries.size()),
-                              cstring::to_cstring(index),
-                              tuplesMapName,
-                              prefixesMapName,
-                              keyMaskVarName,
-                              valueMaskVarName,
-                              keysArray,
-                              valuesArray);
-        builder->endOfStatement(true);
-
-        index++;
     }
 }
 
