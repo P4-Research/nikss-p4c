@@ -31,6 +31,7 @@ class ControlBodyTranslator : public virtual CodeGenInspector {
     std::set<const IR::Parameter*> toDereference;
     std::vector<cstring> saveAction;
     P4::P4CoreLibrary& p4lib;
+    int commentDescriptionDepth;
 
  public:
     explicit ControlBodyTranslator(const EBPFControl* control);
@@ -51,6 +52,7 @@ class ControlBodyTranslator : public virtual CodeGenInspector {
     bool preorder(const IR::ReturnStatement*) override;
     bool preorder(const IR::IfStatement* statement) override;
     bool preorder(const IR::SwitchStatement* statement) override;
+    bool preorder(const IR::StructExpression *expr) override;
 };
 
 class EBPFControl : public EBPFObject {
