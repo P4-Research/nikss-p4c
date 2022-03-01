@@ -56,7 +56,7 @@ class EBPFTablePSA : public EBPFTable {
     void emitTableValue(CodeBuilder* builder, const IR::MethodCallExpression* actionMce,
                         cstring valueName);
     void emitDefaultActionInitializer(CodeBuilder *builder);
-    void emitConstEntriesInitializer(CodeBuilder *builder);
+    virtual void emitConstEntriesInitializer(CodeBuilder *builder);
     void emitMapUpdateTraceMsg(CodeBuilder *builder, cstring mapName,
                                cstring returnCode) const;
 
@@ -124,6 +124,11 @@ class EBPFTablePSA : public EBPFTable {
 };
 
 class EBPFTernaryTablePSA : public EBPFTablePSA {
+ private:
+    std::vector<std::vector<const IR::Entry*>> constEntriesGroupedByPrefix();
+    bool hasEntries();
+    const cstring addPrefixFunctionName = "add_prefix_and_entries";
+
  public:
     EBPFTernaryTablePSA(const EBPFProgram* program, const IR::TableBlock* table,
                  CodeGenInspector* codeGen, cstring name, size_t size) :
@@ -137,8 +142,9 @@ class EBPFTernaryTablePSA : public EBPFTablePSA {
         return EBPFTablePSA::isMatchTypeSupported(matchType) ||
                matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name;
     }
-
+    static cstring addPrefixFunc(bool trace);
  protected:
+    void emitConstEntriesInitializer(CodeBuilder *builder) override;
     void validateKeys() const override;
 };
 

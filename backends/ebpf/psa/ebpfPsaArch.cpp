@@ -264,6 +264,10 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
         builder->appendLine(meterExecuteFunc);
         builder->newline();
     }
+
+    cstring addPrefixFunc = EBPFTernaryTablePSA::addPrefixFunc(options.emitTraceMessages);
+    builder->appendLine(addPrefixFunc);
+    builder->newline();
 }
 
 // =====================PSAArchTC=============================
@@ -310,20 +314,20 @@ void PSAArchTC::emit(CodeBuilder *builder) const {
     emitInstances(builder);
 
     /*
-     * 6. BPF map initialization
+     * 6. Helper functions for ingress and egress program.
+     */
+    emitHelperFunctions(builder);
+
+    /*
+     * 7. BPF map initialization
      */
     emitInitializer(builder);
     builder->newline();
 
     /*
-     * 7. XDP helper program.
+     * 8. XDP helper program.
      */
     xdp->emit(builder);
-
-    /*
-     * 8. Helper functions for ingress and egress program.
-     */
-    emitHelperFunctions(builder);
 
     /*
      * 9. TC Ingress program.

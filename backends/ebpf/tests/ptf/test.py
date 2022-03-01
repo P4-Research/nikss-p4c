@@ -450,6 +450,23 @@ class ConstEntryAndActionPSATest(P4EbpfTest):
         super(P4EbpfTest, self).tearDown()
 
 
+class ConstEntryTernaryPSATest(P4EbpfTest):
+
+    p4_file_path = "p4testdata/const-entry-ternary.p4"
+
+    def runTest(self):
+        pkt = testutils.simple_ip_packet()
+        pkt[IP].src = 0x33333333
+
+        # via ternary const entry
+        pkt[IP].dst = 0x11229900  # mask is 0xFFFF00FF
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT2)
+        pkt[IP].dst = 0x11993355  # mask is 0xFF00FFFF
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT1)
+
+
 class VerifyPSATest(P4EbpfTest):
     p4_file_path = "p4testdata/verify.p4"
 

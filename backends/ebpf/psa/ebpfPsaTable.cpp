@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <boost/range/irange.hpp>
 
 #include "backends/ebpf/ebpfType.h"
 #include "ebpfPsaTable.h"
@@ -451,6 +452,8 @@ void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
     }
 }
 
+
+
 void EBPFTablePSA::emitDefaultActionInitializer(CodeBuilder *builder) {
     const IR::P4Table* t = table->container;
     const IR::Expression* defaultAction = t->getDefaultAction();
@@ -676,6 +679,16 @@ void EBPFTernaryTablePSA::emitInstance(CodeBuilder *builder) {
         builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
                                        program->arrayIndexType,
                                        cstring("struct ") + valueTypeName, 1);
+        if (hasEntries()) {
+            auto entries = constEntriesGroupedByPrefix();
+            // A number of tuples is equal to number of unique prefixes
+            int nrOfTuples = entries.size();
+            for (int i = 0; i < nrOfTuples; i++) {
+                builder->target->emitTableDecl(builder, name + "_tuple_" + std::to_string(i), TableHash,
+                                               "struct " + keyTypeName,
+                                               "struct " + valueTypeName, size);
+            }
+        }
     }
 
     emitCacheInstance(builder);
@@ -899,6 +912,332 @@ void EBPFTernaryTablePSA::validateKeys() const {
         }
         last_key_size = width;
     }
+}
+
+void EBPFTernaryTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
+    CodeGenInspector cg(program->refMap, program->typeMap);
+    cg.setBuilder(builder);
+    std::vector<std::vector<const IR::Entry*>> entriesList = constEntriesGroupedByPrefix();
+    std::vector<cstring> keyMaskVarsNames;
+    std::vector<cstring> valueMaskVarsNames;
+    cstring uniquePrefix = name;
+    cstring keyMaskName = "struct " + keyTypeName + "_mask";
+    uint32_t tuple_id = 0; // We have preallocated tuple maps with ids starting from 0
+
+    cstring headName = uniquePrefix + "_head";
+    builder->emitIndent();
+    builder->append(keyMaskName + " " + headName);
+    builder->append(" = {0}");
+    builder->endOfStatement(true);
+
+    // emit key masks
+    int index = 0;
+    for (auto samePrefixEntries : entriesList) {
+        auto firstEntry = samePrefixEntries.front();
+        cstring keyFieldName = program->refMap->newName("key_mask");//uniquePrefix + "_key_mask_" + cstring::to_cstring(index);
+        keyMaskVarsNames.push_back(keyFieldName);
+        builder->emitIndent();
+        builder->append(keyMaskName + " " + keyFieldName);
+        builder->append(" = {0}");
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        cstring keyFieldNamePtr = program->refMap->newName(keyFieldName + "_ptr");//uniquePrefix + "_" + keyFieldName + "_ptr";
+        builder->append("char *" + keyFieldNamePtr + " = &" + keyFieldName + ".mask");
+        builder->endOfStatement(true);
+        builder->newline();
+
+        cstring prevField;
+        for (size_t i = 0; i < keyGenerator->keyElements.size(); i++) {
+            auto keyElement = keyGenerator->keyElements[i];
+            auto expr = firstEntry->keys->components[i];
+            cstring fieldName = program->refMap->newName("field");//uniquePrefix + "_field_" + cstring::to_cstring(i);
+            if (auto mask = expr->to<IR::Mask>()) {
+                auto ebpfType = ::get(keyTypes, keyElement);
+                builder->emitIndent();
+                ebpfType->declare(builder, fieldName, false);
+                builder->append(" = ");
+                mask->right->apply(cg);
+                builder->endOfStatement(true);
+                builder->emitIndent();
+                if (i == 0) {
+                    builder->appendFormat("__builtin_memcpy(%s, &%s, sizeof(%s))",
+                                          keyFieldNamePtr, fieldName, fieldName);
+                } else {
+                    builder->appendFormat("__builtin_memcpy(%s + sizeof(%s), &%s, sizeof(%s))",
+                                          keyFieldNamePtr, prevField, fieldName, fieldName);
+                }
+                builder->endOfStatement(true);
+                builder->newline();
+                prevField = cstring(fieldName);
+            }
+        }
+
+        index++;
+    }
+
+    // add head
+
+    cstring valueMask = program->refMap->newName("value_mask");//uniquePrefix + "_value_mask";
+//    valueMaskVarsNames.push_back(valueMask);
+    builder->emitIndent();
+    builder->appendFormat("struct %s_mask %s = {0}", valueTypeName, valueMask);
+    builder->endOfStatement(true);
+
+    builder->emitIndent();
+    cstring nextMask = keyMaskVarsNames[0];
+//    keyMaskVarsNames.erase(keyMaskVarsNames.begin());
+    builder->appendFormat("%s.next_tuple_mask = %s", valueMask, nextMask);
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->appendFormat("%s.has_next = 1", valueMask);
+    builder->endOfStatement(true);
+    builder->newline();
+
+    builder->emitIndent();
+    cstring tuplesMap = name + "_tuples_map";
+    cstring prefixesMap = name + "_prefixes";
+    builder->appendFormat("%s(0, 0, &%s, &%s, &%s, &%s, NULL, NULL)",
+                          addPrefixFunctionName, tuplesMap, prefixesMap, headName, valueMask);
+    builder->endOfStatement(true);
+    builder->newline();
+
+    // emit values + updates
+    index = 0;
+    for (size_t i = 0; i < entriesList.size(); i++) {
+        auto samePrefixEntries = entriesList[i];
+        valueMask = program->refMap->newName("value_mask");//uniquePrefix + "_value_mask_" + cstring::to_cstring(index);
+        valueMaskVarsNames.push_back(valueMask);
+        builder->emitIndent();
+        builder->appendFormat("struct %s_mask %s = {0}", valueTypeName, valueMask);
+        builder->endOfStatement(true);
+
+        builder->emitIndent();
+        builder->appendFormat("%s.tuple_id = %s", valueMask, cstring::to_cstring(tuple_id++));
+        builder->endOfStatement(true);
+        builder->emitIndent();
+        if (entriesList.size() == i + 1) {
+            builder->appendFormat("%s.has_next = 0", valueMask);
+            builder->endOfStatement(true);
+        } else {
+            nextMask = keyMaskVarsNames[i + 1];// +1 because a head was emitted
+//            keyMaskVarsNames.erase(keyMaskVarsNames.begin());
+
+            builder->appendFormat("%s.next_tuple_mask = %s", valueMask, nextMask);
+            builder->endOfStatement(true);
+            builder->emitIndent();
+            builder->appendFormat("%s.has_next = 1", valueMask);
+            builder->endOfStatement(true);
+        }
+        builder->newline();
+        std::vector<cstring> keyNames;
+        std::vector<cstring> valueNames;
+        for (size_t j = 0; j < samePrefixEntries.size(); j++) {
+            cstring keyName = program->refMap->newName("key");//uniquePrefix + "_key_" + cstring::to_cstring(j);
+            cstring valueName = program->refMap->newName("value");//uniquePrefix + "_value_" + cstring::to_cstring(j);
+            keyNames.push_back(keyName);
+            valueNames.push_back(valueName);
+            auto entry = samePrefixEntries[j];
+
+            // construct key
+            builder->emitIndent();
+            builder->appendFormat("struct %s %s = {}", this->keyTypeName.c_str(), keyName.c_str());
+            builder->endOfStatement(true);
+            for (size_t k = 0; k < keyGenerator->keyElements.size(); k++) {
+                auto keyElement = keyGenerator->keyElements[k];
+                cstring fieldName = get(keyFieldNames, keyElement);
+                CHECK_NULL(fieldName);
+                builder->emitIndent();
+                builder->appendFormat("%s.%s = ", keyName.c_str(), fieldName.c_str());
+                auto mtdecl = program->refMap->getDeclaration(keyElement->matchType->path, true);
+                auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
+                auto expr = entry->keys->components[k];
+                if (expr->is<IR::Mask>()) {
+                    auto km = expr->to<IR::Mask>();
+                    auto ebpfType = ::get(keyTypes, keyElement);
+                    unsigned width = 0;
+                    if (ebpfType->is<EBPFScalarType>()) {
+                        auto scalar = ebpfType->to<EBPFScalarType>();
+                        width = scalar->implementationWidthInBits();
+                    }
+//                    builder->appendFormat("%s(", getByteSwapMethod(width));
+                    km->left->apply(cg);
+                    builder->append(" & ");
+                    km->right->apply(cg);
+//                    builder->append(")");
+                    builder->endOfStatement(true);
+                }
+            }
+
+            // construct value
+            auto *mce = entry->action->to<IR::MethodCallExpression>();
+            emitTableValue(builder, mce, valueName.c_str());
+
+        }
+        cstring keysArray = program->refMap->newName("keys");//uniquePrefix + "_keys";
+        cstring valuesArray = program->refMap->newName("values");//uniquePrefix + "_values";
+
+        // construct keys array
+        builder->newline();
+        builder->emitIndent();
+        builder->appendFormat("void *%s[] = {", keysArray);
+        for (auto keyName : keyNames)
+            builder->appendFormat("&%s,", keyName);
+        builder->append("}");
+        builder->endOfStatement(true);
+
+        // construct values array
+        builder->emitIndent();
+        builder->appendFormat("void *%s[] = {", valuesArray);
+        for (auto valueName : valueNames)
+            builder->appendFormat("&%s,", valueName);
+        builder->append("}");
+        builder->endOfStatement(true);
+
+        cstring valueMaskVarName = valueMaskVarsNames[index];
+        cstring keyMaskVarName = keyMaskVarsNames[index];
+        builder->newline();
+        builder->emitIndent();
+        builder->appendFormat("%s(%s, %s, &%s, &%s, &%s, &%s, %s, %s)",
+                              addPrefixFunctionName,
+                              cstring::to_cstring(samePrefixEntries.size()),
+                              cstring::to_cstring(index),
+                              tuplesMap,
+                              prefixesMap,
+                              keyMaskVarName,
+                              valueMaskVarName,
+                              keysArray,
+                              valuesArray);
+        builder->endOfStatement(true);
+
+        index++;
+    }
+}
+
+std::vector<std::vector<const IR::Entry*>> EBPFTernaryTablePSA::constEntriesGroupedByPrefix() {
+    std::vector<std::vector<const IR::Entry*>> entriesGroupedByPrefix;
+    std::vector<std::vector<int>> list;
+    const IR::EntriesList* entries = table->container->getEntries();
+    if (entries != nullptr) {
+        for (int i = 0; i < (int)entries->entries.size(); i++) {
+            if (!list.empty()) {
+                auto last = list.back();
+                auto it = std::find(last.begin(), last.end(), i);
+                if (it != last.end()) {
+                    // If this entry was added in a previous iteration
+                    continue;
+                }
+            }
+            auto main_entr = entries->entries[i];
+            std::vector<int> indexes;
+            indexes.push_back(i);
+            for (int j = i; j < (int)entries->entries.size(); j++) {
+                auto ref_entr = entries->entries[j];
+                if (i != j) {
+                    bool isTheSamePrefix = true;
+                    for (size_t k = 0; k < main_entr->keys->components.size(); k++) {
+                        auto k1 = main_entr->keys->components[k];
+                        auto k2 = ref_entr->keys->components[k];
+                        if (auto k1Mask = k1->to<IR::Mask>()) {
+                            if (auto k2Mask = k2->to<IR::Mask>()) {
+                                auto val1 = k1Mask->right->to<IR::Constant>();
+                                auto val2 = k2Mask->right->to<IR::Constant>();
+                                if (val1->value != val2->value) {
+                                    isTheSamePrefix = false;
+                                }
+                            }
+                        }
+                    }
+                    if (isTheSamePrefix) {
+                        indexes.push_back(j);
+                    }
+                }
+            }
+            list.push_back(indexes);
+        }
+
+        for (auto samePrefixEntries : list) {
+            std::vector<const IR::Entry*> samePrefEntries;
+            for (int i : samePrefixEntries) {
+                samePrefEntries.push_back(entries->entries[i]);
+            }
+            entriesGroupedByPrefix.push_back(samePrefEntries);
+        }
+    }
+
+    return entriesGroupedByPrefix;
+}
+
+bool EBPFTernaryTablePSA::hasEntries() {
+    const IR::EntriesList* entries = table->container->getEntries();
+    return entries && entries->size() > 0;
+}
+
+cstring EBPFTernaryTablePSA::addPrefixFunc(bool trace) {
+    cstring addPrefixFunc =
+            "static __always_inline\n"
+            "void add_prefix_and_entries(__u32 nr_entries,\n"
+            "            __u32 tuple_id,\n"
+            "            void *tuples_map,\n"
+            "            void *prefixes_map,\n"
+            "            void *key_mask,\n"
+            "            void *value_mask,\n"
+            "            void *keysPtrs[],\n"
+            "            void *valuesPtrs[]) {\n"
+            "    int ret = bpf_map_update_elem(prefixes_map, key_mask, value_mask, BPF_ANY);\n"
+            "    if (ret) {\n"
+            "%trace_msg_prefix_map_fail%"
+            "        return;\n"
+            "    }\n"
+            "    if (nr_entries == 0) {\n"
+            "        return;\n"
+            "    }\n"
+            "    struct bpf_elf_map *tuple = bpf_map_lookup_elem(tuples_map, &tuple_id);\n"
+            "    if (tuple) {\n"
+            "        for (__u32 i = 0; i < nr_entries; i++) {\n"
+            "            int ret = bpf_map_update_elem(tuple, keysPtrs[i], valuesPtrs[i], "
+            "BPF_ANY);\n"
+            "            if (ret) {\n"
+            "%trace_msg_tuple_update_fail%"
+            "                return;\n"
+            "            } else {\n"
+            "%trace_msg_tuple_update_success%"
+            "            }\n"
+            "        }\n"
+            "    } else {\n"
+            "%trace_msg_tuple_not_found%"
+            "        return;\n"
+            "    }\n"
+            "}";
+
+    if (trace) {
+        addPrefixFunc = addPrefixFunc.replace(
+                "%trace_msg_prefix_map_fail%",
+                "        bpf_trace_message(\"Prefixes map update failed\\n\");\n");
+        addPrefixFunc = addPrefixFunc.replace(
+                "%trace_msg_tuple_update_fail%",
+                "                bpf_trace_message(\"Tuple map update failed\\n\");\n");
+        addPrefixFunc = addPrefixFunc.replace(
+                "%trace_msg_tuple_update_success%",
+                "                bpf_trace_message(\"Tuple map update succeed\\n\");\n");
+        addPrefixFunc = addPrefixFunc.replace(
+                "%trace_msg_tuple_not_found%",
+                "        bpf_trace_message(\"Tuple not found\\n\");\n");
+    } else {
+        addPrefixFunc = addPrefixFunc.replace(
+                "%trace_msg_prefix_map_fail%",
+                "");
+        addPrefixFunc = addPrefixFunc.replace(
+                "%trace_msg_tuple_update_fail%",
+                "");
+        addPrefixFunc = addPrefixFunc.replace(
+                "%trace_msg_tuple_update_success%",
+                "");
+        addPrefixFunc = addPrefixFunc.replace(
+                "%trace_msg_tuple_not_found%",
+                "");
+    }
+
+    return addPrefixFunc;
 }
 
 }  // namespace EBPF
