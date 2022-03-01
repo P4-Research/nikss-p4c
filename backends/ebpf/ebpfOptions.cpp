@@ -25,7 +25,7 @@ EbpfOptions::EbpfOptions() {
                 "[ebpf back-end] Allow for user-provided implementation of extern functions.");
         registerOption("--trace", nullptr,
                 [this](const char*) { emitTraceMessages = true; return true; },
-                "Enable tracing of packet flow");
+                "Generate tracing messages of packet processing");
         registerOption("--xdp", nullptr,
                 [this](const char*) { generateToXDP = true; return true; },
                 "[psa only] Compile and generate the P4 prog to XDP layer");

@@ -204,6 +204,8 @@ void EBPFProgram::emitPreamble(CodeBuilder* builder) {
     builder->newline();
     builder->appendLine("void* memcpy(void* dest, const void* src, size_t num);");
     builder->newline();
+
+    builder->target->emitPreamble(builder);
 }
 
 void EBPFProgram::emitLocalVariables(CodeBuilder* builder) {
@@ -256,7 +258,8 @@ void EBPFProgram::emitPipeline(CodeBuilder* builder) {
     builder->target->emitTraceMessage(builder, "Control: packet processing started");
     control->emit(builder);
     builder->blockEnd(true);
-    builder->target->emitTraceMessage(builder, "Control: packet processing finished");
+    builder->target->emitTraceMessage(builder, "Control: packet processing finished, pass=%d",
+                                      1, control->accept->name.name.c_str());
 }
 
 }  // namespace EBPF

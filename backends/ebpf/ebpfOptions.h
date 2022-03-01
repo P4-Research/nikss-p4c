@@ -45,6 +45,7 @@ class EbpfOptions : public CompilerOptions {
     bool generateToXDP = false;
     bool pipelineOptimization = false;
     enum XDP2TC xdp2tcMode = XDP2TC_NONE;
+
     EbpfOptions();
 
     void calculateXDP2TCMode() {

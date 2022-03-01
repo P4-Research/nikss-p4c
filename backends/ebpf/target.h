@@ -90,15 +90,6 @@ class Target {
     virtual void emitMain(Util::SourceCodeBuilder* builder,
                           cstring functionName,
                           cstring argName) const = 0;
-    virtual void emitPreamble(Util::SourceCodeBuilder* builder) const {
-        (void) builder;
-    }
-    virtual void emitTraceMessage(Util::SourceCodeBuilder* builder, const char* format,
-                                  int argc = 0, ...) const {
-        (void) builder;
-        (void) format;
-        (void) argc;
-    }
     virtual cstring dataOffset(cstring base) const = 0;
     virtual cstring dataEnd(cstring base) const = 0;
     virtual cstring forwardReturnCode() const = 0;
@@ -107,6 +98,22 @@ class Target {
     // Path on /sys filesystem where maps are stored
     virtual cstring sysMapPath() const = 0;
     virtual cstring packetDescriptorType() const = 0;
+
+    virtual void emitPreamble(Util::SourceCodeBuilder* builder) const;
+    /// Emit trace message which will be printed during packet processing (if enabled).
+    /// @param builder Actual source code builder.
+    /// @param format Format string, interpreted by `printk`-like function. For more
+    ///        information see documentation for `bpf_trace_printk`.
+    /// @param argc Number of variadic arguments. Up to 3 arguments can be passed
+    ///        due to limitation of eBPF.
+    /// @param ... Arguments to the format string, they must be C string and valid code in C.
+    ///
+    /// To print variable value: `emitTraceMessage(builder, "var=%u", 1, "var_name")`
+    /// To print expression value: `emitTraceMessage(builder, "diff=%d", 1, "var1 - var2")`
+    /// To print just message: `emitTraceMessage(builder, "Here")`
+    virtual void emitTraceMessage(Util::SourceCodeBuilder* builder,
+                                  const char* format, int argc, ...) const;
+    virtual void emitTraceMessage(Util::SourceCodeBuilder* builder, const char* format) const;
 };
 
 // Represents a target that is compiled within the kernel
@@ -139,10 +146,8 @@ class KernelSamplesTarget : public Target {
 
  public:
     explicit KernelSamplesTarget(bool emitTrace = false, cstring name = "Linux kernel")
-        : Target(name) {
-        emitTraceMessages = emitTrace;
-        innerMapIndex = 0;
-    }
+        : Target(name), innerMapIndex(0), emitTraceMessages(emitTrace) {}
+
     void emitLicense(Util::SourceCodeBuilder* builder, cstring license) const override;
     void emitCodeSection(Util::SourceCodeBuilder* builder, cstring sectionName) const override;
     void emitIncludes(Util::SourceCodeBuilder* builder) const override;
@@ -179,6 +184,7 @@ class KernelSamplesTarget : public Target {
     cstring dropReturnCode() const override { return "TC_ACT_SHOT"; }
     cstring abortReturnCode() const override { return "TC_ACT_SHOT"; }
     cstring sysMapPath() const override { return "/sys/fs/bpf/tc/globals"; }
+
     cstring packetDescriptorType() const override { return "struct __sk_buff"; }
 
     void annotateTableWithBTF(Util::SourceCodeBuilder* builder, cstring name,
@@ -244,6 +250,7 @@ class BccTarget : public Target {
 class TestTarget : public EBPF::KernelSamplesTarget {
  public:
     TestTarget() : KernelSamplesTarget(false, "Userspace Test") {}
+
     void emitResizeBuffer(Util::SourceCodeBuilder*, cstring, cstring) const override {};
     void emitIncludes(Util::SourceCodeBuilder* builder) const override;
     void emitTableDecl(Util::SourceCodeBuilder* builder,

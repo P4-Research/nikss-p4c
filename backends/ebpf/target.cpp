@@ -20,6 +20,21 @@ limitations under the License.
 namespace EBPF {
 
 
+void Target::emitPreamble(Util::SourceCodeBuilder* builder) const {
+    (void) builder;
+}
+
+void Target::emitTraceMessage(Util::SourceCodeBuilder* builder, const char* format,
+                              int argc, ...) const {
+    (void) builder; (void) format; (void) argc;
+}
+
+void Target::emitTraceMessage(Util::SourceCodeBuilder* builder, const char* format) const {
+    emitTraceMessage(builder, format, 0);
+}
+
+//////////////////////////////////////////////////////////////
+
 void KernelSamplesTarget::emitIncludes(Util::SourceCodeBuilder* builder) const {
     builder->append("#include \"ebpf_kernel.h\"\n");
     builder->newline();
@@ -157,9 +172,12 @@ void KernelSamplesTarget::emitPreamble(Util::SourceCodeBuilder* builder) const {
                 "        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \\\n"
                 "    } while(0)";
     } else {
+        // With disabled tracing also add this (empty) macro
+        // to avoid errors when somewhere it is hardcoded.
         macro = "#define bpf_trace_message(fmt, ...)";
     }
     builder->appendLine(macro);
+    builder->newline();
 }
 
 void KernelSamplesTarget::emitTraceMessage(Util::SourceCodeBuilder* builder, const char* format,
@@ -170,9 +188,12 @@ void KernelSamplesTarget::emitTraceMessage(Util::SourceCodeBuilder* builder, con
     cstring msg = format;
     va_list ap;
 
-    // ensure that printed message ends with '\n'
+    // Older kernels do not append new line when printing message but newer do that,
+    // so ensure that printed message ends with '\n'. Empty lines in logs
+    // will look better than everything in a single line.
     if (!msg.endsWith("\\n"))
         msg = msg + "\\n";
+
     msg = cstring("\"") + msg + "\"";
 
     va_start(ap, argc);

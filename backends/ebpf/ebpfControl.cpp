@@ -385,8 +385,8 @@ void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
         builder->target->emitTraceMessage(builder,
             "Control: Entry not found, executing implicit NoAction");
     }
+    builder->endOfStatement(true);
     builder->blockEnd(true);
-
     builder->blockEnd(true);
 
     msgStr = Util::printf_format("Control: %s applied", method->object->getName().name);

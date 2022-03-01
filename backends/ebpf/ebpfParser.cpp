@@ -159,6 +159,9 @@ StateTranslationVisitor::compileExtractField(
     auto program = state->parser->program;
     cstring msgStr;
 
+    msgStr = Util::printf_format("Parser: extracting field %s", field);
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
+
     if (widthToExtract <= 64) {
         unsigned lastBitIndex = widthToExtract + alignment - 1;
         unsigned lastWordIndex = lastBitIndex / 8;
@@ -255,6 +258,7 @@ StateTranslationVisitor::compileExtractField(
             exprStr = exprStr.replace(".", "->");
         }
         cstring tmp = Util::printf_format("(unsigned long long) %s.%s", exprStr, field);
+
         msgStr = Util::printf_format("Parser: extracted %s=0x%%llx (%u bits)",
                                      field, widthToExtract);
         builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, tmp.c_str());
@@ -282,6 +286,7 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
 
     cstring offsetStr = Util::printf_format("BYTES(%s + %s)",
                                             program->offsetVar, cstring::to_cstring(width));
+
     // FIXME: program->lengthVariable should be used instead of difference of end and start
     builder->target->emitTraceMessage(builder, "Parser: check pkt_len=%%d < last_read_byte=%%d", 2,
                               (program->packetEndVar + " - " + program->packetStartVar).c_str(),
@@ -348,6 +353,9 @@ StateTranslationVisitor::compileExtract(const IR::Expression* destination) {
         visit(destination);
         builder->appendLine(".ebpf_valid = 1;");
     }
+
+    msgStr = Util::printf_format("Parser: extracted %s", destination->toString());
+    builder->target->emitTraceMessage(builder, msgStr.c_str());
 
     builder->newline();
 }
