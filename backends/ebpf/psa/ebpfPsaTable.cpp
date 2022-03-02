@@ -1024,19 +1024,25 @@ void EBPFTernaryTablePSA::emitKeysAndValues(CodeBuilder *builder,
             auto mtdecl = program->refMap->getDeclaration(keyElement->matchType->path, true);
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
             auto expr = entry->keys->components[k];
-            if (expr->is<IR::Mask>()) {
-                auto km = expr->to<IR::Mask>();
-                auto ebpfType = get(keyTypes, keyElement);
-                unsigned width = 0;
-                if (ebpfType->is<EBPFScalarType>()) {
-                    auto scalar = ebpfType->to<EBPFScalarType>();
-                    width = scalar->implementationWidthInBits();
-                }
+            auto ebpfType = get(keyTypes, keyElement);
+            if (auto km = expr->to<IR::Mask>()) {
                 km->left->apply(cg);
                 builder->append(" & ");
                 km->right->apply(cg);
-                builder->endOfStatement(true);
+            } else {
+                expr->apply(cg);
+                builder->append(" & ");
+                unsigned width = 0;
+                if (auto hasWidth = ebpfType->to<IHasWidth>()) {
+                    width = hasWidth->widthInBits();
+                } else {
+                    BUG("Cannot assess field bit width");
+                }
+                builder->append("0x");
+                for (int j = 0; j < width / 8; j++)
+                    builder->append("ff");
             }
+            builder->endOfStatement(true);
         }
 
         // construct value
@@ -1070,26 +1076,38 @@ void EBPFTernaryTablePSA::emitKeyMasks(CodeBuilder *builder,
             auto keyElement = keyGenerator->keyElements[i];
             auto expr = firstEntry->keys->components[i];
             cstring fieldName = program->refMap->newName("field");
+            auto ebpfType = get(keyTypes, keyElement);
+            builder->emitIndent();
+            ebpfType->declare(builder, fieldName, false);
+            builder->append(" = ");
             if (auto mask = expr->to<IR::Mask>()) {
-                auto ebpfType = get(keyTypes, keyElement);
-                builder->emitIndent();
-                ebpfType->declare(builder, fieldName, false);
-                builder->append(" = ");
                 mask->right->apply(cg);
                 builder->endOfStatement(true);
-                builder->emitIndent();
-                if (i == 0) {
-                    builder->appendFormat("__builtin_memcpy(%s, &%s, sizeof(%s))",
-                                          keyFieldNamePtr, fieldName, fieldName);
-                } else {
-                    builder->appendFormat("__builtin_memcpy(%s + sizeof(%s), &%s, sizeof(%s))",
-                                          keyFieldNamePtr, prevField, fieldName, fieldName);
-                }
-                builder->endOfStatement(true);
-                prevField = cstring(fieldName);
             } else {
-                // TODO: support for exact, range matching fields
+                // MidEnd transforms 0xffff... masks into exact match
+                // So we receive there a Constant same as exact match
+                // So we have to create 0xffff... mask on our own
+                unsigned width = 0;
+                if (auto hasWidth = ebpfType->to<IHasWidth>()) {
+                    width = hasWidth->widthInBits();
+                } else {
+                    BUG("Cannot assess field bit width");
+                }
+                builder->append("0x");
+                for (int j = 0; j < width / 8; j++)
+                    builder->append("ff");
+                builder->endOfStatement(true);
             }
+            builder->emitIndent();
+            if (i == 0) {
+                builder->appendFormat("__builtin_memcpy(%s, &%s, sizeof(%s))",
+                                      keyFieldNamePtr, fieldName, fieldName);
+            } else {
+                builder->appendFormat("__builtin_memcpy(%s + sizeof(%s), &%s, sizeof(%s))",
+                                      keyFieldNamePtr, prevField, fieldName, fieldName);
+            }
+            builder->endOfStatement(true);
+            prevField = cstring(fieldName);
         }
     }
 }
