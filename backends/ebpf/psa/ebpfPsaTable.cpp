@@ -915,9 +915,12 @@ void EBPFTernaryTablePSA::validateKeys() const {
 }
 
 void EBPFTernaryTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
+    std::vector<std::vector<const IR::Entry*>> entriesList = constEntriesGroupedByPrefix();
+    if (entriesList.empty())
+        return;
+
     CodeGenInspector cg(program->refMap, program->typeMap);
     cg.setBuilder(builder);
-    std::vector<std::vector<const IR::Entry*>> entriesList = constEntriesGroupedByPrefix();
     std::vector<cstring> keyMasksNames;
     cstring uniquePrefix = name;
     int tuple_id = 0; // We have preallocated tuple maps with ids starting from 0
