@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <boost/range/irange.hpp>
 
 #include "backends/ebpf/ebpfType.h"
 #include "ebpfPsaTable.h"
@@ -451,8 +450,6 @@ void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
         }
     }
 }
-
-
 
 void EBPFTablePSA::emitDefaultActionInitializer(CodeBuilder *builder) {
     const IR::P4Table* t = table->container;
