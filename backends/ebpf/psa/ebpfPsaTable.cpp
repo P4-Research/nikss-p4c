@@ -681,8 +681,8 @@ void EBPFTernaryTablePSA::emitInstance(CodeBuilder *builder) {
             // A number of tuples is equal to number of unique prefixes
             int nrOfTuples = entries.size();
             for (int i = 0; i < nrOfTuples; i++) {
-                builder->target->emitTableDecl(builder, name + "_tuple_" + std::to_string(i), TableHash,
-                                               "struct " + keyTypeName,
+                builder->target->emitTableDecl(builder, name + "_tuple_" + std::to_string(i),
+                                               TableHash,"struct " + keyTypeName,
                                                "struct " + valueTypeName, size);
             }
         }
@@ -920,7 +920,7 @@ void EBPFTernaryTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
     cg.setBuilder(builder);
     std::vector<cstring> keyMasksNames;
     cstring uniquePrefix = name;
-    int tuple_id = 0; // We have preallocated tuple maps with ids starting from 0
+    int tuple_id = 0;  // We have preallocated tuple maps with ids starting from 0
 
     // emit key head mask
     cstring headName = program->refMap->newName("key_mask");
@@ -942,7 +942,8 @@ void EBPFTernaryTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
 
     builder->emitIndent();
     builder->appendFormat("%s(0, 0, &%s, &%s, &%s, &%s, NULL, NULL)",
-                          addPrefixFunctionName, tuplesMapName, prefixesMapName, headName, valueMask);
+                          addPrefixFunctionName, tuplesMapName,
+                          prefixesMapName, headName, valueMask);
     builder->endOfStatement(true);
     builder->newline();
 

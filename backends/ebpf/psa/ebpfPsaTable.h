@@ -145,6 +145,7 @@ class EBPFTernaryTablePSA : public EBPFTablePSA {
                matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name;
     }
     static cstring addPrefixFunc(bool trace);
+
  protected:
     void emitConstEntriesInitializer(CodeBuilder *builder) override;
     void validateKeys() const override;
