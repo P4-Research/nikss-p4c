@@ -676,8 +676,8 @@ void EBPFTernaryTablePSA::emitInstance(CodeBuilder *builder) {
         builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
                                        program->arrayIndexType,
                                        cstring("struct ") + valueTypeName, 1);
-        if (hasEntries()) {
-            auto entries = constEntriesGroupedByPrefix();
+        if (hasConstEntries()) {
+            auto entries = getConstEntriesGroupedByPrefix();
             // A number of tuples is equal to number of unique prefixes
             int nrOfTuples = entries.size();
             for (int i = 0; i < nrOfTuples; i++) {
@@ -912,7 +912,7 @@ void EBPFTernaryTablePSA::validateKeys() const {
 }
 
 void EBPFTernaryTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
-    std::vector<std::vector<const IR::Entry*>> entriesList = constEntriesGroupedByPrefix();
+    std::vector<std::vector<const IR::Entry*>> entriesList = getConstEntriesGroupedByPrefix();
     if (entriesList.empty())
         return;
 
@@ -1135,7 +1135,7 @@ void EBPFTernaryTablePSA::emitValueMask(CodeBuilder *builder, const cstring valu
     }
 }
 
-std::vector<std::vector<const IR::Entry*>> EBPFTernaryTablePSA::constEntriesGroupedByPrefix() {
+std::vector<std::vector<const IR::Entry*>> EBPFTernaryTablePSA::getConstEntriesGroupedByPrefix() {
     std::vector<std::vector<const IR::Entry*>> entriesGroupedByPrefix;
     std::vector<std::vector<int>> list;
     const IR::EntriesList* entries = table->container->getEntries();
@@ -1189,7 +1189,7 @@ std::vector<std::vector<const IR::Entry*>> EBPFTernaryTablePSA::constEntriesGrou
     return entriesGroupedByPrefix;
 }
 
-bool EBPFTernaryTablePSA::hasEntries() {
+bool EBPFTernaryTablePSA::hasConstEntries() {
     const IR::EntriesList* entries = table->container->getEntries();
     return entries && entries->size() > 0;
 }

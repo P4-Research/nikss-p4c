@@ -125,8 +125,8 @@ class EBPFTablePSA : public EBPFTable {
 
 class EBPFTernaryTablePSA : public EBPFTablePSA {
  private:
-    std::vector<std::vector<const IR::Entry*>> constEntriesGroupedByPrefix();
-    bool hasEntries();
+    std::vector<std::vector<const IR::Entry*>> getConstEntriesGroupedByPrefix();
+    bool hasConstEntries();
     const cstring addPrefixFunctionName = "add_prefix_and_entries";
     const cstring tuplesMapName = name + "_tuples_map";
     const cstring prefixesMapName = name + "_prefixes";
