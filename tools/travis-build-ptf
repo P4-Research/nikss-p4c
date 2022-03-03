@@ -90,7 +90,7 @@ function install_psabpf_ctl() {
   git clone --recursive --branch const_entries https://github.com/P4-Research/psabpf.git /tmp/psabpf
   cd /tmp/psabpf
   # some sort of git tag, but later use git tags when psabpf ready to use
-  git reset --hard 27e2e40e
+  git reset --hard d9f865f1
   ./build_libbpf.sh
   mkdir build
   cd build
