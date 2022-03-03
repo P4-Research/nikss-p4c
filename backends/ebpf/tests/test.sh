@@ -10,8 +10,6 @@ function print_help() {
   echo "OPTIONS:"
   echo "--bpf-hook       A BPF hook that should be used as a main attach point <tc|xdp>"
   echo "--xdp2tc         A mode to pass metadata from XDP to TC programs <meta|head|cpumap>."
-  echo "--table-caching  Use table cache for tables with LPM and/or ternary key <on|off>."
-  echo "--pipeline-opt   Apply pipeline-aware optimization <on|off>."
   echo "--trace          Build P4 programs with tracing logs (disabled by default) <on|off>."
   echo "--help           Print this message."
   echo
@@ -51,14 +49,6 @@ for i in "$@"; do
       ;;
     --xdp2tc=*)
       XDP2TC_ARG="${i#*=}"
-      shift # past argument=value
-      ;;
-    --table-caching=*)
-      TABLE_CACHING_ARG="${i#*=}"
-      shift # past argument=value
-      ;;
-    --pipeline-opt=*)
-      PIPELINE_OPT_ARG="${i#*=}"
       shift # past argument=value
       ;;
     --trace=*)
@@ -131,15 +121,11 @@ ulimit -l 65536
 # ;xdp=<True|False>;xdp2tc=<meta|head|cpumap>
 declare -a XDP=("False" "True")
 declare -a XDP2TC_MODE=("head" "cpumap" "meta")
-declare -a TABLE_CACHING=("False" "True")
-declare -a PIPELINE_OPT=("False" "True")
 TRACE_LOGS="False"
 
 if [ ! -z "$BPF_HOOK" ]; then
   if [ "$BPF_HOOK" == "tc" ]; then
     XDP=( "False" )
-  elif [ "$BPF_HOOK" == "xdp" ]; then
-    XDP=( "True" )
   else
     echo "Wrong --bpf-hook value provided; running script for both hooks."
   fi
@@ -150,26 +136,6 @@ if [ ! -z "$XDP2TC_ARG" ]; then
     XDP2TC_MODE=( "$XDP2TC_ARG" )
   else
     echo "Wrong --xdp2tc value provided; running script for all XDP2TC modes."
-  fi
-fi
-
-if [ ! -z "$TABLE_CACHING_ARG" ]; then
-  if [ "$TABLE_CACHING_ARG" == "on" ]; then
-    TABLE_CACHING=( "True" )
-  elif [ "$TABLE_CACHING_ARG" == "off" ]; then
-    TABLE_CACHING=( "False" )
-  else
-    echo "Wrong --table-caching value provided; running script for both enabled/disabled."
-  fi
-fi
-
-if [ ! -z "$PIPELINE_OPT_ARG" ]; then
-  if [ "$PIPELINE_OPT_ARG" == "on" ]; then
-    PIPELINE_OPT=( "True" )
-  elif [ "$PIPELINE_OPT_ARG" == "off" ]; then
-    PIPELINE_OPT=( "False" )
-  else
-    echo "Wrong --pipeline-opt value provided; running script for both enabled/disabled."
   fi
 fi
 
@@ -184,27 +150,16 @@ if [ ! -z "$TRACE_LOGS_ARGS" ]; then
 fi
 
 TEST_CASE=$@
-for xdp_enabled in "${XDP[@]}" ; do
-  for xdp2tc_mode in "${XDP2TC_MODE[@]}" ; do
-      for table_caching_enabled in "${TABLE_CACHING[@]}" ; do
-        for pipeline_opt_enabled in "${PIPELINE_OPT[@]}" ; do
-          if [ "$xdp_enabled" == "False" ] && [ "$pipeline_opt_enabled" == "True" ]; then
-            echo "Test skipped because pipeline-aware optimization doesn't work in TC yet"
-            continue
-          fi
-          TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch";trace="'"$TRACE_LOGS"'"'
-          TEST_PARAMS+=";xdp='$xdp_enabled';xdp2tc='$xdp2tc_mode'"
-          TEST_PARAMS+=";table_caching='$table_caching_enabled'"
-          TEST_PARAMS+=";pipeline_optimization='$pipeline_opt_enabled'"
-          # Start tests
-          ptf \
-            --test-dir ptf/ \
-            --test-params="$TEST_PARAMS" \
-            --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
-            --interface 4@s1-eth4 --interface 5@s1-eth5 $TEST_CASE
-          exit_on_error
-          rm -rf ptf_out
-        done
-      done
-  done
+xdp_enabled="False"
+for xdp2tc_mode in "${XDP2TC_MODE[@]}" ; do
+  TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch";trace="'"$TRACE_LOGS"'"'
+  TEST_PARAMS+=";xdp='$xdp_enabled';xdp2tc='$xdp2tc_mode'"
+  # Start tests
+  ptf \
+    --test-dir ptf/ \
+    --test-params="$TEST_PARAMS" \
+    --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
+    --interface 4@s1-eth4 --interface 5@s1-eth5 $TEST_CASE
+  exit_on_error
+  rm -rf ptf_out
 done

@@ -100,7 +100,6 @@ class EgressTrafficManagerDropPSATest(P4EbpfTest):
         testutils.verify_no_other_packets(self)
 
 
-@tc_only
 class EgressTrafficManagerClonePSATest(P4EbpfTest):
     """
     1. Send packet to interface PORT1 (bpf ifindex = 5) with destination MAC address equals to aa:bb:cc:dd:ee:ff.
@@ -130,7 +129,6 @@ class EgressTrafficManagerClonePSATest(P4EbpfTest):
         super(EgressTrafficManagerClonePSATest, self).tearDown()
 
 
-@tc_only
 @xdp2tc_head_not_supported
 class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
     """
@@ -156,9 +154,6 @@ class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
         testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
 
-# FIXME: MulticastPSATest fails if egress optimization is enabled.
-#  We skip it for now, as it is not used for benchmarking.
-@skip_if_pipeline_optimization_enabled
 class MulticastPSATest(P4EbpfTest):
     p4_file_path = "p4testdata/psa-multicast.p4"
 
@@ -228,137 +223,6 @@ class SimpleLpmP4TwoKeysPSATest(P4EbpfTest):
         self.remove_map("ingress_tbl_fwd_exact_lpm")
         self.remove_map("ingress_tbl_fwd_exact_lpm_defaultAction")
         super(SimpleLpmP4TwoKeysPSATest, self).tearDown()
-
-
-class CountersPSATest(P4EbpfTest):
-    p4_file_path = "p4testdata/counters.p4"
-
-    def runTest(self):
-        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55',
-                                         eth_src='00:AA:00:00:00:01',
-                                         pktlen=100)
-        testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
-
-        self.counter_verify(name="ingress_test1_cnt", keys=[1], bytes=100)
-        self.counter_verify(name="ingress_test2_cnt", keys=[1], packets=1)
-        self.counter_verify(name="ingress_test3_cnt", keys=[1], bytes=100, packets=1)
-
-        pkt = testutils.simple_ip_packet(eth_dst='00:11:22:33:44:55',
-                                         eth_src='00:AA:00:00:01:FE',
-                                         pktlen=199)
-        testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
-
-        self.counter_verify(name="ingress_test1_cnt", keys=[0x1fe], bytes=199)
-        self.counter_verify(name="ingress_test2_cnt", keys=[0x1fe], packets=1)
-        self.counter_verify(name="ingress_test3_cnt", keys=[0x1fe], bytes=199, packets=1)
-
-
-class DirectCountersPSATest(P4EbpfTest):
-    p4_file_path = "p4testdata/direct-counters.p4"
-
-    def runTest(self):
-        self.table_add(table="ingress_tbl1", keys=["10.0.0.0"], action=1)
-        self.table_add(table="ingress_tbl2", keys=["10.0.0.1"], action=2)
-        self.table_add(table="ingress_tbl2", keys=["10.0.0.2"], action=3)
-
-        for i in range(3):
-            pkt = testutils.simple_ip_packet(pktlen=100, ip_src='10.0.0.{}'.format(i))
-            testutils.send_packet(self, PORT0, pkt)
-            testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
-
-        self.verify_map_entry("ingress_tbl1", "0 0 0 10", "01 00 00 00 64 00 00 00 01 00 00 00")
-        self.verify_map_entry("ingress_tbl2", "1 0 0 10", "02 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00")
-        self.verify_map_entry("ingress_tbl2", "2 0 0 10", "03 00 00 00 64 00 00 00 01 00 00 00 01 00 00 00")
-
-    def tearDown(self):
-        self.remove_maps(["ingress_tbl1", "ingress_tbl1_defaultAction",
-                          "ingress_tbl2", "ingress_tbl2_defaultAction"])
-        super(DirectCountersPSATest, self).tearDown()
-
-
-class DigestPSATest(P4EbpfTest):
-
-    p4_file_path = "p4testdata/digest.p4"
-
-    def runTest(self):
-        pkt = testutils.simple_ip_packet(eth_src="fa:fb:fc:fd:fe:f0")
-        testutils.send_packet(self, PORT0, pkt)
-        testutils.send_packet(self, PORT0, pkt)
-        testutils.send_packet(self, PORT0, pkt)
-
-        digests = self.digest_get("mac_learn_digest_0")
-        if len(digests) != 3:
-            self.fail("Expected 3 digest messages, got {}".format(len(digests)))
-        for d in digests:
-            if d["srcAddr"] != "0xfafbfcfdfef0" or d["ingress_port"] != "0x4":
-                self.fail("Digest map stored wrong values: mac->{}, port->{}".format(d["srcAddr"], d["ingress_port"]))
-
-
-class PSATernaryTest(P4EbpfTest):
-
-    p4_file_path = "p4testdata/psa-ternary.p4"
-
-    def runTest(self):
-        # flow rules for 'tbl_ternary_0'
-        # 1. ipv4.srcAddr=1.2.3.4/0xffffff00 => action 0 priority 1
-        # 2. ipv4.srcAddr=1.2.3.4/0xffff00ff => action 1 priority 10
-        self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4^0xffffff00"], action=0, priority=1)
-        self.table_add(table="ingress_tbl_ternary_0", keys=["1.2.3.4^0xffff00ff"], action=1, priority=10)
-
-        # flow rules for 'tbl_ternary_1'
-        # 1. ipv4.diffserv=0x00/0x00, ipv4.dstAddr=192.168.2.1/24 => action 0 priority 1
-        # 2. ipv4.diffserv=0x00/0xff, ipv4.dstAddr=192.168.2.1/24 => action 1 priority 10
-        self.table_add(table="ingress_tbl_ternary_1", keys=["192.168.2.1/24", "0^0"], action=0, priority=1)
-        self.table_add(table="ingress_tbl_ternary_1", keys=["192.168.2.1/24", "0^0xFF"], action=1, priority=10)
-
-        # flow rules 'tbl_ternary_2':
-        # 1. ipv4.protocol=0x11, ipv4.diffserv=0x00/0x00, ipv4.dstAddr=192.168.2.1/16 => action 0 priority 1
-        # 2. ipv4.protocol=0x11, ipv4.diffserv=0x00/0xff, ipv4.dstAddr=192.168.2.1/16 => action 1 priority 10
-        self.table_add(table="ingress_tbl_ternary_2", keys=["192.168.2.1/16", "0x11", "0^0"], action=0, priority=1)
-        self.table_add(table="ingress_tbl_ternary_2", keys=["192.168.2.1/16", "0x11", "0^0xFF"], action=1, priority=10)
-
-        pkt = testutils.simple_udp_packet(ip_src='1.2.3.4', ip_dst='192.168.2.1')
-        testutils.send_packet(self, PORT0, pkt)
-        pkt[IP].proto = 0x7
-        pkt[IP].chksum = 0xb3e7
-        pkt[IP].src = '17.17.17.17'
-        pkt[IP].dst = '255.255.255.255'
-        pkt[UDP].chksum = 0x044D
-        testutils.verify_packet(self, pkt, PORT1)
-
-
-class ParserValueSetPSATest(P4EbpfTest):
-    """
-    Test value_set implementation. P4 application will pass packet, which IP destination
-    address contains value_set and destination port 80.
-    1. Send UDP packet. Should be dropped.
-    2. Configure value_set with other IP address.
-    3. Send UDP packet. Should be dropped.
-    4. Change IP destination address to the same as in value_set.
-    5. Send UDP packet. Should be passed.
-    """
-    p4_file_path = "p4testdata/pvs.p4"
-
-    def runTest(self):
-        pkt = testutils.simple_udp_packet(ip_dst='8.8.8.8', udp_dport=80)
-
-        testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_no_other_packets(self)
-
-        self.update_map("IngressParserImpl_pvs", '1 0 0 10', '0 0 0 0')
-
-        testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_no_other_packets(self)
-
-        pkt[IP].dst = '10.0.0.1'
-        testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
-
-    def tearDown(self):
-        self.remove_map("IngressParserImpl_pvs")
-        super(ParserValueSetPSATest, self).tearDown()
 
 
 class ConstDefaultActionPSATest(P4EbpfTest):
@@ -467,57 +331,6 @@ class BridgedMetadataPSATest(P4EbpfTest):
         testutils.verify_no_other_packets(self)
 
 
-@xdp2tc_head_not_supported
-class RandomPSATest(P4EbpfTest):
-    """
-    Read random data generated by data plane.
-    Verify that random values from received packet are in the right range.
-    """
-    p4_file_path = "p4testdata/random.p4"
-
-    class RandomHeader(Packet):
-        name = "random"
-        fields_desc = [
-            IntField("f1", 0),
-            ShortField("f2", 0),
-            ShortField("f3", 0)
-        ]
-
-    def setUp(self):
-        super(RandomPSATest, self).setUp()
-        bind_layers(Ether, self.RandomHeader, type=0x801)
-
-    def tearDown(self):
-        split_layers(Ether, self.RandomHeader, type=0x801)
-        super(RandomPSATest, self).tearDown()
-
-    def verify_range(self, value, min_value, max_value):
-        if value < min_value or value > max_value:
-            self.fail("Value {} out of range [{}, {}]".format(value, min_value, max_value))
-
-    def runTest(self):
-        pkt = Ether() / self.RandomHeader()
-        mask = Mask(pkt)
-        mask.set_do_not_care_scapy(self.RandomHeader, "f1")
-        mask.set_do_not_care_scapy(self.RandomHeader, "f2")
-        mask.set_do_not_care_scapy(self.RandomHeader, "f3")
-        sequence = [[], [], []]
-        for _ in range(10):
-            testutils.send_packet(self, PORT0, pkt)
-            (_, recv_pkt) = testutils.verify_packet_any_port(self, mask, ALL_PORTS)
-            recv_pkt = Ether(recv_pkt)
-            self.verify_range(value=recv_pkt[self.RandomHeader].f1, min_value=0x80_00_00_01, max_value=0x80_00_00_05)
-            sequence[0].append(recv_pkt[self.RandomHeader].f1)
-            self.verify_range(value=recv_pkt[self.RandomHeader].f2, min_value=0, max_value=127)
-            sequence[1].append(recv_pkt[self.RandomHeader].f2)
-            self.verify_range(value=recv_pkt[self.RandomHeader].f3, min_value=256, max_value=259)
-            sequence[2].append(recv_pkt[self.RandomHeader].f3)
-        logger.info("f1 sequence: {}".format(sequence[0]))
-        logger.info("f2 sequence: {}".format(sequence[1]))
-        logger.info("f3 sequence: {}".format(sequence[2]))
-
-
-@tc_only
 class QoSPSATest(P4EbpfTest):
 
     p4_file_path = "p4testdata/cos-psa.p4"
@@ -535,58 +348,6 @@ class QoSPSATest(P4EbpfTest):
 
         testutils.send_packet(self, PORT0, arp_pkt)
         testutils.verify_packet(self, exp_arp_pkt, PORT1)
-
-
-@table_caching_only
-class LPMTableCachePSATest(P4EbpfTest):
-    p4_file_path = "p4testdata/table-cache-lpm.p4"
-
-    def runTest(self):
-        self.table_add(table="ingress_tbl_lpm", keys=["00:11:22:33:44:55"], action=1, data=["11:22:33:44:55:66"])
-        pkt = testutils.simple_ip_packet(eth_dst="00:11:22:33:44:55")
-        exp_pkt = testutils.simple_ip_packet(eth_dst="11:22:33:44:55:66")
-        exp_pkt[Ether].type = 0x8601
-
-        testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_packet(self, exp_pkt, PORT1)
-
-        # modify cache directly - verify that it is used (modify to NoAction)
-        self.table_update(table="ingress_tbl_lpm_cache",
-                          keys=["64w0x60", "16w0", "48w0x554433221100"], action=0, data=["160w0"])
-        testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_packet(self, pkt, PORT1)
-
-        # update table - verify clearing cache
-        self.table_update(table="ingress_tbl_lpm", keys=["00:11:22:33:44:55"], action=1, data=["11:22:33:44:55:66"])
-        testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_packet(self, exp_pkt, PORT1)
-
-
-@table_caching_only
-class TernaryTableCachePSATest(P4EbpfTest):
-    p4_file_path = "p4testdata/table-cache-ternary.p4"
-
-    def runTest(self):
-        self.table_add(table="ingress_tbl_ternary", keys=["00:11:22:33:44:55"], action=1, data=["11:22:33:44:55:66"])
-        pkt = testutils.simple_ip_packet(eth_dst="00:11:22:33:44:55")
-        exp_pkt = testutils.simple_ip_packet(eth_dst="11:22:33:44:55:66")
-        exp_pkt[Ether].type = 0x8601
-
-        testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_packet(self, exp_pkt, PORT1)
-
-        # modify cache directly - verify that it is used (make action default)
-        self.table_update(table="ingress_tbl_ternary_cache",
-                          keys=["00:11:22:33:44:55"],
-                          action=1, data=["32w0", "11:22:33:44:55:66", "16w0", "64w0"])
-        testutils.send_packet(self, PORT0, pkt)
-        exp_pkt[Ether].type = 0x0800
-        testutils.verify_packet(self, exp_pkt, PORT1)
-
-        # delete table entry - verify clearing cache
-        self.table_delete(table="ingress_tbl_ternary", keys=["00:11:22:33:44:55"])
-        testutils.send_packet(self, PORT0, pkt)
-        testutils.verify_packet(self, pkt, PORT1)
 
 
 class PacketInLengthPSATest(P4EbpfTest):
@@ -632,4 +393,3 @@ class PacketInAdvancePSATest(P4EbpfTest):
 
     def tearDown(self):
         super(PacketInAdvancePSATest, self).tearDown()
-

@@ -113,15 +113,10 @@ class EBPFTable : public EBPFTableBase {
         return matchType->name.name == P4::P4CoreLibrary::instance.exactMatch.name ||
                matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name;
     }
-    virtual void emitDirectTypes(CodeBuilder* builder) { (void) builder; }
     cstring actionToActionIDName(const IR::P4Action * action) const;
     cstring getByteSwapMethod(unsigned int width) const;
     virtual bool dropOnNoMatchingEntryFound() const { return true; }
     virtual bool singleActionRun() const { return true; }
-    virtual bool cacheEnabled() { return false; }
-    virtual void emitCacheUpdate(CodeBuilder* builder, cstring key, cstring value) {
-        (void) builder; (void) key; (void) value;
-    }
 };
 
 class EBPFCounterTable : public EBPFTableBase {

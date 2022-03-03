@@ -4,12 +4,6 @@
 #include "ebpfPsaTable.h"
 #include "ebpfPsaControl.h"
 #include "xdpHelpProgram.h"
-#include "externs/ebpfPsaTableImplementation.h"
-#include "externs/ebpfPsaCounter.h"
-#include "externs/ebpfPsaHashAlgorithm.h"
-#include "externs/ebpfPsaRandom.h"
-#include "externs/ebpfPsaRegister.h"
-#include "externs/ebpfPsaMeter.h"
 
 namespace EBPF {
 
@@ -78,9 +72,6 @@ void PSAArch::emitTypes(CodeBuilder *builder) const {
         type->emit(builder);
     }
 
-    if (ingress->hasAnyMeter() || egress->hasAnyMeter())
-        EBPFMeterPSA::emitValueStruct(builder, ingress->refMap);
-
     ingress->parser->emitTypes(builder);
     ingress->control->emitTableTypes(builder);
     egress->parser->emitTypes(builder);
@@ -126,11 +117,9 @@ void PSAArch::emitPacketReplicationTables(CodeBuilder *builder) const {
 void PSAArch::emitPipelineInstances(CodeBuilder *builder) const {
     ingress->parser->emitValueSetInstances(builder);
     ingress->control->emitTableInstances(builder);
-    ingress->deparser->emitDigestInstances(builder);
 
     egress->parser->emitValueSetInstances(builder);
     egress->control->emitTableInstances(builder);
-    // no Digest in egress pipeline
 
     builder->target->emitTableDecl(builder, "hdr_md_cpumap",
                                    TablePerCPUArray, "u32",
@@ -155,8 +144,6 @@ void PSAArch::emitInitializer(CodeBuilder *builder) const {
 }
 
 void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
-    EBPFHashAlgorithmTypeFactoryPSA::instance()->emitGlobals(builder);
-
     cstring forEachFunc =
             "static __always_inline\n"
             "int do_for_each(SK_BUFF *skb, void *map, "
@@ -257,13 +244,6 @@ void PSAArch::emitHelperFunctions(CodeBuilder *builder) const {
 
     builder->appendLine(pktClonesFunc);
     builder->newline();
-
-    if (ingress->hasAnyMeter() || egress->hasAnyMeter()) {
-        cstring meterExecuteFunc =
-                EBPFMeterPSA::meterExecuteFunc(options.emitTraceMessages, ingress->refMap);
-        builder->appendLine(meterExecuteFunc);
-        builder->newline();
-    }
 }
 
 // =====================PSAArchTC=============================
@@ -333,10 +313,7 @@ void PSAArchTC::emit(CodeBuilder *builder) const {
     /*
      * 10. TC Egress program.
      */
-    if (!options.pipelineOptimization ||
-        (options.pipelineOptimization && !egress->isEmpty())) {
-        egress->emit(builder);
-    }
+    egress->emit(builder);
 
     builder->target->emitLicense(builder, ingress->license);
 }
@@ -359,108 +336,6 @@ void PSAArchTC::emitInstances(CodeBuilder *builder) const {
 
 void PSAArchTC::emitInitializerSection(CodeBuilder *builder) const {
     builder->appendLine("SEC(\"classifier/map-initializer\")");
-}
-
-// =====================PSAArchXDP=============================
-void PSAArchXDP::emit(CodeBuilder *builder) const {
-    builder->target->emitIncludes(builder);
-    emitPSAIncludes(builder);
-
-    emitPreamble(builder);
-
-    emitInternalStructures(builder);
-    emitTypes(builder);
-    emitGlobalHeadersMetadata(builder);
-
-    emitXDP2TCInternalStructures(builder);
-
-    emitInstances(builder);
-
-    emitHelperFunctions(builder);
-
-    emitInitializer(builder);
-
-    ingress->emit(builder);
-
-    if (!options.pipelineOptimization ||
-        (options.pipelineOptimization && !egress->isEmpty())) {
-        egress->emit(builder);
-    }
-
-    builder->newline();
-
-    emitDummyProgram(builder);
-    builder->newline();
-
-    tcIngressForXDP->emit(builder);
-    builder->newline();
-
-    tcEgressForXDP->emit(builder);
-
-    builder->target->emitLicense(builder, ingress->license);
-}
-
-void PSAArchXDP::emitPreamble(CodeBuilder* builder) const {
-    PSAArch::emitPreamble(builder);
-    builder->appendFormat("#define DEVMAP_SIZE %u", egressDevmapSize);
-    builder->newline();
-    builder->newline();
-}
-
-void PSAArchXDP::emitInstances(CodeBuilder *builder) const {
-    builder->newline();
-
-    builder->appendLine("REGISTER_START()");
-    emitPacketReplicationTables(builder);
-    emitPipelineInstances(builder);
-
-    tcEgressForXDP->control->tables.insert(egress->control->tables.begin(),
-                                           egress->control->tables.end());
-
-    builder->target->emitTableDecl(builder, "xdp2tc_shared_map", TablePerCPUArray,
-                                   "u32", "struct xdp2tc_metadata", 1);
-    if (options.pipelineOptimization) {
-        // bridged_headers is used to transfer Headers data from ingress to egress.
-        builder->target->emitTableDecl(builder, "bridged_headers", TablePerCPUArray,
-                       "u32",
-                       "struct " + ingress->parser->headerType->to<EBPFStructType>()->name, 1);
-        builder->target->emitTableDecl(builder, "egress_progs_table", TableProgArray,
-                                       "u32", "u32", 1);
-    }
-
-    builder->target->emitTableDecl(builder, "tx_port", TableDevmap,
-                                   "u32", "struct bpf_devmap_val", egressDevmapSize);
-
-    builder->appendLine("REGISTER_END()");
-    builder->newline();
-}
-
-void PSAArchXDP::emitInitializerSection(CodeBuilder *builder) const {
-    builder->appendLine("SEC(\"xdp/map-initializer\")");
-}
-
-void PSAArchXDP::emitXDP2TCInternalStructures(CodeBuilder *builder) const {
-    builder->appendFormat("struct xdp2tc_metadata {\n"
-                          "    struct %s headers;\n"
-                          "    struct psa_ingress_output_metadata_t ostd;\n"
-                          "    __u32 packetOffsetInBits;\n"
-                          "    __u16 pkt_ether_type;\n"
-                          "} __attribute__((aligned(4)));",
-                          tcIngressForXDP->parser->headerType->to<EBPFStructType>()->name);
-    builder->newline();
-}
-
-void PSAArchXDP::emitDummyProgram(CodeBuilder *builder) const {
-    // this is static program, so we can just paste a piece of code.
-    builder->appendLine("SEC(\"xdp_redirect_dummy_sec\")");
-    builder->append("int xdp_redirect_dummy(struct xdp_md *skb)");
-    builder->spc();
-    builder->blockStart();
-    builder->emitIndent();
-
-    builder->appendLine("return XDP_PASS;");
-
-    builder->blockEnd(true);  // end of function
 }
 
 // =====================ConvertToEbpfPSA=============================
@@ -517,172 +392,43 @@ const PSAArch * ConvertToEbpfPSA::build(const IR::ToplevelBlock *tlb) {
     auto egressDeparser = egress->getParameterValue("ed");
     BUG_CHECK(egressDeparser != nullptr, "No egress deparser block found");
 
-    if (!options.generateToXDP) {
-        auto xdp = new XDPHelpProgram(options);
+    auto xdp = new XDPHelpProgram(options);
 
-        auto ingress_pipeline_converter =
-            new ConvertToEbpfPipeline("tc-ingress", TC_INGRESS, options,
-                ingressParser->to<IR::ParserBlock>(),
-                ingressControl->to<IR::ControlBlock>(),
-                ingressDeparser->to<IR::ControlBlock>(),
-                refmap, typemap);
-        ingress->apply(*ingress_pipeline_converter);
-        tlb->getProgram()->apply(*ingress_pipeline_converter);
-        auto tcIngress = ingress_pipeline_converter->getEbpfPipeline();
+    auto ingress_pipeline_converter =
+        new ConvertToEbpfPipeline("tc-ingress", TC_INGRESS, options,
+            ingressParser->to<IR::ParserBlock>(),
+            ingressControl->to<IR::ControlBlock>(),
+            ingressDeparser->to<IR::ControlBlock>(),
+            refmap, typemap);
+    ingress->apply(*ingress_pipeline_converter);
+    tlb->getProgram()->apply(*ingress_pipeline_converter);
+    auto tcIngress = ingress_pipeline_converter->getEbpfPipeline();
 
-        auto egress_pipeline_converter =
-            new ConvertToEbpfPipeline("tc-egress", TC_EGRESS, options,
-                egressParser->to<IR::ParserBlock>(),
-                egressControl->to<IR::ControlBlock>(),
-                egressDeparser->to<IR::ControlBlock>(),
-                refmap, typemap);
-        egress->apply(*egress_pipeline_converter);
-        tlb->getProgram()->apply(*egress_pipeline_converter);
-        auto tcEgress = egress_pipeline_converter->getEbpfPipeline();
+    auto egress_pipeline_converter =
+        new ConvertToEbpfPipeline("tc-egress", TC_EGRESS, options,
+            egressParser->to<IR::ParserBlock>(),
+            egressControl->to<IR::ControlBlock>(),
+            egressDeparser->to<IR::ControlBlock>(),
+            refmap, typemap);
+    egress->apply(*egress_pipeline_converter);
+    tlb->getProgram()->apply(*egress_pipeline_converter);
+    auto tcEgress = egress_pipeline_converter->getEbpfPipeline();
 
-        return new PSAArchTC(options, ebpfTypes, xdp, tcIngress, tcEgress);
-    } else {
-        auto ingress_pipeline_converter =
-            new ConvertToEbpfPipeline("xdp-ingress", XDP_INGRESS, options,
-                ingressParser->to<IR::ParserBlock>(),
-                ingressControl->to<IR::ControlBlock>(),
-                ingressDeparser->to<IR::ControlBlock>(),
-                refmap, typemap);
-        ingress->apply(*ingress_pipeline_converter);
-        tlb->getProgram()->apply(*ingress_pipeline_converter);
-        auto xdpIngress = ingress_pipeline_converter->getEbpfPipeline();
-        BUG_CHECK(xdpIngress != nullptr, "Cannot create xdpIngress block.");
-
-        auto egress_pipeline_converter =
-            new ConvertToEbpfPipeline("xdp-egress", XDP_EGRESS, options,
-                egressParser->to<IR::ParserBlock>(),
-                egressControl->to<IR::ControlBlock>(),
-                egressDeparser->to<IR::ControlBlock>(),
-                refmap, typemap);
-        egress->apply(*egress_pipeline_converter);
-        tlb->getProgram()->apply(*egress_pipeline_converter);
-        auto xdpEgress = egress_pipeline_converter->getEbpfPipeline();
-        BUG_CHECK(xdpEgress != nullptr, "Cannot create xdpEgress block.");
-
-        auto tc_trafficmanager_converter =
-            new ConvertToEbpfPipeline("tc-ingress", TC_TRAFFIC_MANAGER, options,
-                                      ingressParser->to<IR::ParserBlock>(),
-                                      ingressControl->to<IR::ControlBlock>(),
-                                      ingressDeparser->to<IR::ControlBlock>(),
-                                      refmap, typemap);
-        ingress->apply(*tc_trafficmanager_converter);
-        auto tcTrafficManager = tc_trafficmanager_converter->getEbpfPipeline();
-        BUG_CHECK(tcTrafficManager != nullptr, "Cannot create tcTrafficManager block.");
-
-        auto tc_egress_pipeline_converter =
-            new ConvertToEbpfPipeline("tc-egress", TC_EGRESS, options,
-                                      egressParser->to<IR::ParserBlock>(),
-                                      egressControl->to<IR::ControlBlock>(),
-                                      egressDeparser->to<IR::ControlBlock>(),
-                                      refmap, typemap);
-        egress->apply(*tc_egress_pipeline_converter);
-        tlb->getProgram()->apply(*tc_egress_pipeline_converter);
-        auto tcEgress = tc_egress_pipeline_converter->getEbpfPipeline();
-        BUG_CHECK(tcEgress != nullptr, "Cannot create TC Egress for XDP block.");
-
-        return new PSAArchXDP(options, ebpfTypes,
-                              xdpIngress, xdpEgress, tcTrafficManager, tcEgress);
-    }
-}
-
-void ConvertToEbpfPSA::optimizePipeline() {
-    auto ig_deparser = ebpf_psa_arch->ingress->deparser->to<OptimizedXDPIngressDeparserPSA>();
-    auto eg_deparser = ebpf_psa_arch->egress->deparser;
-
-    auto eg_parser = ebpf_psa_arch->egress->parser->to<EBPFOptimizedEgressParserPSA>();
-
-    /* remove headers from ingress deparser that are deparsed at ingress,
-     * but are removed from packet by egress.
-     */
-    for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
-        cstring hdr = ig_deparser->headersExpressions[i];
-        if (ig_deparser->isHeaderEmitted(hdr) && eg_parser->isHeaderExtractedByParser(hdr) &&
-            !eg_deparser->isHeaderEmitted(hdr)) {
-            eg_parser->headersToSkipMovingOffset.emplace(ig_deparser->headersExpressions[i],
-                                                         ig_deparser->headersToEmit[i]);
-            ig_deparser->headersToEmit.erase(
-                    ig_deparser->headersToEmit.begin() + (unsigned int) i);
-            ig_deparser->headersExpressions.erase(
-                    ig_deparser->headersExpressions.begin() + (unsigned int) i);
-        }
-    }
-
-    if (ig_deparser->headersToEmit.empty() ||
-        eg_deparser->headersToEmit.empty()) {
-        return;
-    }
-
-    /*
-     * Iterate over ingress and egress deparsers.
-     * If:
-     * - both ingress and egress deparsers emit the same header at given position,
-     * - and the header is extracted by egress parser with no lookahead before extract().
-     * we can postpone ingress deparsing of the header to egress deparser.
-     * Iteration is stopped if ingress and egress deparsers are diverged at a given position.
-     * NOTE: if lookahead() is performed before extract() we must deparse the subsequent headers
-     * in the ingress to put actual packet field in the packet buffer. Otherwise, lookahead()
-     * operation may retrieve an old value from the packet buffer.
-     */
-    ig_deparser->optimizedHeadersExpressions =
-            std::vector<cstring>(ig_deparser->headersExpressions);
-    ig_deparser->optimizedHeadersToEmit =
-            std::vector<const IR::Type_Header *>(ig_deparser->headersToEmit);
-    for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
-        auto hdrToEmit = ig_deparser->headersToEmit[i];
-        cstring hdr = ig_deparser->headersExpressions[i];
-        if (hdr == eg_deparser->headersExpressions[i] &&
-            eg_parser->isHeaderExtractedByParserWithNoLookaheadBefore(hdr)) {
-            ig_deparser->removedHeadersToEmit.emplace(hdr, ig_deparser->headersToEmit[i]);
-            ig_deparser->optimizedHeadersToEmit.erase(std::find(
-                    ig_deparser->optimizedHeadersToEmit.begin(),
-                    ig_deparser->optimizedHeadersToEmit.end(),
-                    hdrToEmit));
-            ig_deparser->optimizedHeadersExpressions.erase(std::find(
-                    ig_deparser->optimizedHeadersExpressions.begin(),
-                    ig_deparser->optimizedHeadersExpressions.end(),
-                    hdr));
-        } else {
-            break;
-        }
-    }
+    return new PSAArchTC(options, ebpfTypes, xdp, tcIngress, tcEgress);
 }
 
 const IR::Node *ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
     ebpf_psa_arch = build(tlb);
-
-    if (options.generateToXDP && options.pipelineOptimization) {
-        if (ebpf_psa_arch->egress->isEmpty()) {
-            ebpf_psa_arch->ingress->deparser->to<OptimizedXDPIngressDeparserPSA>()
-                    ->skipEgress = true;
-        }
-        this->optimizePipeline();
-    }
-
     return tlb;
 }
 
 // =====================EbpfPipeline=============================
-// FIXME: probably we shouldn't have ConvertToEbpfPipeline inspector as "block" is not used here.
-// We can invoke parser/control/deparser->apply() inside the ConvertToEbpfPSA::build() method.
-// If so, EBPFPipeline construct should have the following arguments:
-// EBPFPipeline(name, EBPFParser, EBPFControl, EBPFDeparser).
 bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
     (void) block;
     if (type == TC_INGRESS) {
         pipeline = new TCIngressPipeline(name, options, refmap, typemap);
     } else if (type == TC_EGRESS) {
         pipeline = new TCEgressPipeline(name, options, refmap, typemap);
-    } else if (type == XDP_INGRESS) {
-        pipeline = new XDPIngressPipeline(name, options, refmap, typemap);
-    } else if (type == XDP_EGRESS) {
-        pipeline = new XDPEgressPipeline(name, options, refmap, typemap);
-    } else if (type == TC_TRAFFIC_MANAGER) {
-        pipeline = new TCTrafficManagerForXDP(name, options, refmap, typemap);
     } else {
         ::error(ErrorType::ERR_INVALID, "unknown type of pipeline");
         return false;
@@ -715,11 +461,7 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
 bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     auto pl = prsr->container->type->applyParams;
 
-    if (options.pipelineOptimization && type == XDP_EGRESS) {
-        parser = new EBPFOptimizedEgressParserPSA(program, prsr, typemap);
-    } else {
-        parser = new EBPFPsaParser(program, prsr, typemap);
-    }
+    parser = new EBPFPsaParser(program, prsr, typemap);
 
     auto it = pl->parameters.begin();
     parser->packet = *it; ++it;
@@ -741,20 +483,7 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     parser->visitor->asPointerVariables.insert(parser->user_metadata->name.name);
     parser->visitor->asPointerVariables.insert(parser->headers->name.name);
 
-    findValueSets(prsr);
-
     return true;
-}
-
-void ConvertToEBPFParserPSA::findValueSets(const IR::ParserBlock *prsr) {
-    for (auto decl : prsr->container->parserLocals) {
-        if (decl->is<IR::P4ValueSet>()) {
-            cstring extName = EBPFObject::externalName(decl);
-            auto pvs = new EBPFValueSetPSA(program, decl->to<IR::P4ValueSet>(),
-                                           extName, parser->visitor);
-            parser->valueSets.emplace(decl->name.name, pvs);
-        }
-    }
 }
 
 // =====================EBPFControl=============================
@@ -775,7 +504,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     auto codegen = new ControlBodyTranslatorPSA(control);
     codegen->substitute(control->headers, parserHeaders);
 
-    if (type != TC_EGRESS && type != XDP_EGRESS) {
+    if (type != TC_EGRESS) {
         codegen->asPointerVariables.insert(control->outputStandardMetadata->name.name);
     }
 
@@ -797,7 +526,6 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
     // use HASH_MAP as default type
     TableKind tableKind = TableHash;
 
-    bool isTernaryTable = false;
     // If any key field is LPM we will generate an LPM table
     auto keyGenerator = tblblk->container->getKey();
     if (keyGenerator != nullptr) {
@@ -810,9 +538,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
             auto mtdecl = refmap->getDeclaration(it->matchType->path, true);
             auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
             if (matchType->name.name != P4::P4CoreLibrary::instance.exactMatch.name &&
-                matchType->name.name != P4::P4CoreLibrary::instance.lpmMatch.name &&
-                matchType->name.name != P4::P4CoreLibrary::instance.ternaryMatch.name &&
-                matchType->name.name != "selector")
+                matchType->name.name != P4::P4CoreLibrary::instance.lpmMatch.name)
                 ::error(ErrorType::ERR_UNSUPPORTED,
                         "Match of type %1% not supported", it->matchType);
 
@@ -822,13 +548,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
                             "%1%: only one LPM field allowed", it->matchType);
                     return false;
                 }
-                if (isTernaryTable) {
-                    // if at least one field is ternary, the whole table should be ternary
-                    continue;
-                }
                 tableKind = TableLPMTrie;
-            } else if (matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name) {
-                isTernaryTable = true;
             }
         }
     }
@@ -844,12 +564,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::TableBlock *tblblk) {
 
     cstring name = EBPFObject::externalName(tblblk->container);
 
-    EBPFTablePSA *table;
-    if (isTernaryTable) {
-        table = new EBPFTernaryTablePSA(program, tblblk, control->codeGen, name, size);
-    } else {
-        table = new EBPFTablePSA(program, tblblk, control->codeGen, name, size);
-    }
+    EBPFTablePSA *table = new EBPFTablePSA(program, tblblk, control->codeGen, name, size);
 
     control->tables.emplace(tblblk->container->name, table);
     return true;
@@ -875,7 +590,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::IfStatement *ifState) {
 }
 
 bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Variable* decl) {
-    if (type == TC_INGRESS || type == XDP_INGRESS) {
+    if (type == TC_INGRESS) {
         if (decl->type->is<IR::Type_Name>() &&
             decl->type->to<IR::Type_Name>()->path->name.name == "psa_ingress_output_metadata_t") {
                 control->codeGen->asPointerVariables.insert(decl->name.name);
@@ -884,57 +599,12 @@ bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Variable* decl) {
     return true;
 }
 
-bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
-    auto di = instance->node->to<IR::Declaration_Instance>();
-    if (di == nullptr)
-        return false;
-    cstring name = EBPFObject::externalName(di);
-    cstring typeName = instance->type->getName().name;
-
-    if (typeName == "ActionProfile") {
-        auto ap = new EBPFActionProfilePSA(program, control->codeGen, di);
-        control->tables.emplace(di->name.name, ap);
-    } else if (typeName == "ActionSelector") {
-        auto ap = new EBPFActionSelectorPSA(program, control->codeGen, di);
-        control->tables.emplace(di->name.name, ap);
-    } else if (typeName == "Counter") {
-        auto ctr = new EBPFCounterPSA(program, di, name, control->codeGen);
-        control->counters.emplace(name, ctr);
-    } else if (typeName == "DirectCounter" || typeName == "DirectMeter") {
-        return false;
-    } else if (typeName == "Hash") {
-        auto hash = new EBPFHashPSA(program, di, name);
-        control->hashes.emplace(name, hash);
-    } else if (typeName == "Meter") {
-        auto met = new EBPFMeterPSA(program, name, di, control->codeGen);
-        control->meters.emplace(name, met);
-    } else if (typeName == "Random") {
-        auto rand = new EBPFRandomPSA(di);
-        control->randGenerators.emplace(name, rand);
-    } else if (typeName == "Register") {
-        auto reg = new EBPFRegisterPSA(program, name, di, control->codeGen);
-        control->registers.emplace(name, reg);
-    } else {
-        ::error(ErrorType::ERR_UNEXPECTED, "Unexpected block %s nested within control",
-                instance->toString());
-    }
-    return false;
-}
-
 // =====================EBPFDeparser=============================
 bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
     if (type == TC_INGRESS) {
         deparser = new TCIngressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == TC_EGRESS) {
         deparser = new TCEgressDeparserPSA(program, ctrl, parserHeaders, istd);
-    } else if (type == XDP_INGRESS && options.pipelineOptimization) {
-        deparser = new OptimizedXDPIngressDeparserPSA(program, ctrl, parserHeaders, istd);
-    } else if (type == XDP_INGRESS) {
-        deparser = new XDPIngressDeparserPSA(program, ctrl, parserHeaders, istd);
-    } else if (type == XDP_EGRESS) {
-        deparser = new XDPEgressDeparserPSA(program, ctrl, parserHeaders, istd);
-    } else if (type == TC_TRAFFIC_MANAGER) {
-        deparser = new TCIngressDeparserForTrafficManagerPSA(program, ctrl, parserHeaders, istd);
     } else {
         BUG("undefined pipeline type, cannot build deparser");
     }
@@ -950,33 +620,11 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
     deparser->headers = parserHeaders;
     if (ctrl->container->is<IR::P4Control>()) {
         auto p4Control = ctrl->container->to<IR::P4Control>();
-        findDigests(p4Control);
+        // TODO: placeholder for handling digests
         this->visit(p4Control->body);
     }
 
     return false;
-}
-
-void ConvertToEBPFDeparserPSA::findDigests(const IR::P4Control *p4Control) {
-    // Digests are only at ingress
-    if (type == TC_INGRESS || type == XDP_INGRESS) {
-        for (auto decl : p4Control->controlLocals) {
-            if (decl->is<IR::Declaration_Instance>()) {
-                auto di = decl->to<IR::Declaration_Instance>();
-                if (di->type->is<IR::Type_Specialized>()) {
-                    auto typeSpec = di->type->to<IR::Type_Specialized>();
-                    auto baseType = typeSpec->baseType;
-                    auto typeName = baseType->to<IR::Type_Name>();
-                    auto digest = typeName->path->name.name;
-                    if (digest == "Digest") {
-                        auto messageArg = typeSpec->arguments->front();
-                        auto messageType = typemap->getType(messageArg);
-                        deparser->digests.emplace(di->name.name, messageType);
-                    }
-                }
-            }
-        }
-    }
 }
 
 bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expression) {
@@ -1000,7 +648,7 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expressi
                 auto exprMemb = expr->to<IR::Member>();
                 auto headerName = exprMemb->member.name;
                 auto headersStructName = deparser->parserHeaders->name.name;
-                deparser->headersExpressions.push_back(headersStructName + "->" + headerName);
+                deparser->headersExpressions.emplace_back(headersStructName + "->" + headerName);
                 return false;
             }
         }

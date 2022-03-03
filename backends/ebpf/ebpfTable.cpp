@@ -81,9 +81,6 @@ void EBPFTable::initKey() {
     if (keyGenerator != nullptr) {
         unsigned fieldNumber = 0;
         for (auto c : keyGenerator->keyElements) {
-            if (c->matchType->path->name.name == "selector")
-                continue;  // this match type is intended for ActionSelector, not table itself
-
             auto type = program->typeMap->getType(c->expression);
             auto ebpfType = EBPFTypeFactory::instance->create(type);
             if (!ebpfType->is<IHasWidth>()) {
@@ -150,15 +147,6 @@ void EBPFTable::emitKeyType(CodeBuilder* builder) {
                         "Match of type %1% not supported", c->matchType);
             }
 
-            if (matchType->name.name == "selector") {
-                builder->emitIndent();
-                builder->append("/* ");
-                c->expression->apply(commentGen);
-                builder->append(" : selector */");
-                builder->newline();
-                continue;
-            }
-
             builder->emitIndent();
             ebpfType->declare(builder, fieldName, false);
             builder->append("; /* ");
@@ -209,7 +197,6 @@ void EBPFTable::emitValueType(CodeBuilder* builder) {
     builder->blockStart();
 
     emitValueStructStructure(builder);
-    emitDirectTypes(builder);
 
     builder->blockEnd(false);
     builder->endOfStatement(true);
@@ -238,12 +225,6 @@ void EBPFTable::emitValueStructStructure(CodeBuilder* builder) {
     builder->emitIndent();
     builder->append("unsigned int action;");
     builder->newline();
-
-    if (isTernaryTable()) {
-        builder->emitIndent();
-        builder->append("__u32 priority;");
-        builder->newline();
-    }
 
     builder->emitIndent();
     builder->append("union ");
@@ -695,21 +676,6 @@ bool EBPFTable::isLPMTable() {
     }
 
     return isLPM;
-}
-
-bool EBPFTable::isTernaryTable() {
-    if (keyGenerator != nullptr) {
-        // If any key field is ternary we will generate a ternary table
-        for (auto it : keyGenerator->keyElements) {
-            auto mtdecl = program->refMap->getDeclaration(it->matchType->path, true);
-            auto matchType = mtdecl->getNode()->to<IR::Declaration_ID>();
-            if (matchType->name.name == P4::P4CoreLibrary::instance.ternaryMatch.name) {
-                return true;
-            }
-        }
-    }
-
-    return false;
 }
 
 ////////////////////////////////////////////////////////////////

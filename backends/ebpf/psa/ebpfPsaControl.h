@@ -3,10 +3,6 @@
 
 #include "ebpfPsaTable.h"
 #include "backends/ebpf/ebpfControl.h"
-#include "backends/ebpf/psa/externs/ebpfPsaChecksum.h"
-#include "backends/ebpf/psa/externs/ebpfPsaRandom.h"
-#include "backends/ebpf/psa/externs/ebpfPsaRegister.h"
-#include "backends/ebpf/psa/externs/ebpfPsaMeter.h"
 
 namespace EBPF {
 
@@ -58,11 +54,6 @@ class EBPFControlPSA : public EBPFControl {
     const IR::Parameter* inputStandardMetadata;
     const IR::Parameter* outputStandardMetadata;
 
-    std::map<cstring, EBPFHashPSA*> hashes;
-    std::map<cstring, EBPFRandomPSA*> randGenerators;
-    std::map<cstring, EBPFRegisterPSA*>  registers;
-    std::map<cstring, EBPFMeterPSA*>  meters;
-
     EBPFControlPSA(const EBPFProgram* program, const IR::ControlBlock* control,
                    const IR::Parameter* parserHeaders) :
         EBPFControl(program, control, parserHeaders), p4Control(control->container) {}
@@ -72,28 +63,6 @@ class EBPFControlPSA : public EBPFControl {
     void emitTableTypes(CodeBuilder* builder) override;
     void emitTableInstances(CodeBuilder* builder) override;
     void emitTableInitializers(CodeBuilder* builder) override;
-
-    EBPFHashPSA* getHash(cstring name) const {
-        auto result = ::get(hashes, name);
-        BUG_CHECK(result != nullptr, "No hash named %1%", name);
-        return result; }
-
-    EBPFRegisterPSA* getRegister(cstring name) const {
-        auto result = ::get(registers, name);
-        BUG_CHECK(result != nullptr, "No register named %1%", name);
-        return result; }
-
-    EBPFRandomPSA* getRandGenerator(cstring name) const {
-        auto result = ::get(randGenerators, name);
-        BUG_CHECK(result != nullptr, "No random generator named %1%", name);
-        return result;
-    }
-
-    EBPFMeterPSA* getMeter(cstring name) const {
-        auto result = ::get(meters, name);
-        BUG_CHECK(result != nullptr, "No meter named %1%", name);
-        return result;
-    }
 };
 
 }  // namespace EBPF

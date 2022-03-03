@@ -54,13 +54,6 @@ set (P4C_EBPF_SRCS
   psa/ebpfPsaDeparser.cpp
   psa/ebpfPsaControl.cpp
   psa/ebpfPsaTable.cpp
-  psa/externs/ebpfPsaChecksum.cpp
-  psa/externs/ebpfPsaCounter.cpp
-  psa/externs/ebpfPsaHashAlgorithm.cpp
-  psa/externs/ebpfPsaRandom.cpp
-  psa/externs/ebpfPsaRegister.cpp
-  psa/externs/ebpfPsaTableImplementation.cpp
-  psa/externs/ebpfPsaMeter.cpp
   psa/backend.cpp)
 
 set (P4C_EBPF_HDRS
@@ -107,14 +100,7 @@ set (P4C_EBPF_HDRS
   psa/ebpfPsaDeparser.h
   psa/ebpfPsaControl.h
   psa/ebpfPsaTable.h
-  psa/externs/ebpfPsaChecksum.h
-  psa/externs/ebpfPsaCounter.h
-  psa/externs/ebpfPsaHashAlgorithm.h
-  psa/externs/ebpfPsaRandom.h
-  psa/externs/ebpfPsaRegister.h
-  psa/externs/ebpfPsaTableImplementation.h
-  psa/externs/ebpfPsaMeter.h
-  )
+)
 
 add_cpplint_files(${CMAKE_CURRENT_SOURCE_DIR} "${P4C_EBPF_SRCS};${P4C_EBPF_HDRS}")
 

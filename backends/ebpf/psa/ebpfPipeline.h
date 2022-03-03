@@ -101,17 +101,8 @@ class EBPFPipeline : public EBPFProgram {
     void emitHeadersFromCPUMAP(CodeBuilder* builder);
     void emitMetadataFromCPUMAP(CodeBuilder *builder);
 
-    bool hasAnyMeter() const {
-        auto directMeter = std::find_if(control->tables.begin(),
-                                        control->tables.end(),
-                                        [](std::pair<const cstring, EBPFTable*> elem) {
-                                            return !elem.second->to<EBPFTablePSA>()->meters.empty();
-                                        });
-        bool anyDirectMeter = directMeter != control->tables.end();
-        return anyDirectMeter || (!control->meters.empty());
-    }
     bool shouldEmitTimestamp() const {
-        return hasAnyMeter() || control->timestampIsUsed;
+        return control->timestampIsUsed;
     }
 };
 
@@ -184,59 +175,6 @@ class TCEgressPipeline : public EBPFEgressPipeline {
 
     void emitTrafficManager(CodeBuilder *builder) override;
 };
-
-class XDPIngressPipeline : public EBPFIngressPipeline {
- public:
-    XDPIngressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
-                    P4::TypeMap* typeMap) :
-            EBPFIngressPipeline(name, options, refMap, typeMap) {
-        target = new XdpTarget(options.emitTraceMessages);
-        sectionName = "xdp_ingress/" + name;
-        ifindexVar = cstring("skb->ingress_ifindex");
-        packetPathVar = cstring(compilerGlobalMetadata + "->packet_path");
-    }
-
-    void emitGlobalMetadataInitializer(CodeBuilder *builder) override;
-    void emitTrafficManager(CodeBuilder *builder) override;
-};
-
-class XDPEgressPipeline : public EBPFEgressPipeline {
- public:
-    XDPEgressPipeline(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
-                        P4::TypeMap* typeMap):
-            EBPFEgressPipeline(name, options, refMap, typeMap) {
-        target = new XdpTarget(options.emitTraceMessages);
-        if (options.pipelineOptimization) {
-            sectionName = "xdp/" + name;
-            ifindexVar = cstring("egress_ifindex");
-        } else {
-            sectionName = "xdp_devmap/" + name;
-            ifindexVar = cstring("skb->egress_ifindex");
-        }
-        // we do not support packet path, instance & priority in the XDP egress.
-        packetPathVar = cstring("0");
-        pktInstanceVar = cstring("0");
-        priorityVar = cstring("0");
-    }
-
-    void emitGlobalMetadataInitializer(CodeBuilder *builder) override;
-    void emitGetSharedHeaders(CodeBuilder *builder) override;
-    void emitTrafficManager(CodeBuilder *builder) override;
-};
-
-class TCTrafficManagerForXDP : public TCIngressPipeline {
-    void emitReadXDP2TCMetadataFromHead(CodeBuilder *builder);
-    void emitReadXDP2TCMetadataFromCPUMAP(CodeBuilder *builder);
-
- public:
-    TCTrafficManagerForXDP(cstring name, const EbpfOptions& options, P4::ReferenceMap* refMap,
-                           P4::TypeMap* typeMap) :
-            TCIngressPipeline(name, options, refMap, typeMap) {
-    }
-
-    void emit(CodeBuilder *builder) override;
-};
-
 }  // namespace EBPF
 
 #endif /* BACKENDS_EBPF_PSA_EBPFPIPELINE_H_ */

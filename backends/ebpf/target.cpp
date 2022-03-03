@@ -218,13 +218,6 @@ void KernelSamplesTarget::annotateTableWithBTF(Util::SourceCodeBuilder* builder,
 }
 
 //////////////////////////////////////////////////////////////
-void XdpTarget::emitResizeBuffer(Util::SourceCodeBuilder *builder,
-                                 cstring buffer, cstring offsetVar) const {
-    builder->appendFormat("bpf_xdp_adjust_head(%s, -%s)",
-                          buffer, offsetVar);
-}
-
-//////////////////////////////////////////////////////////////
 
 void TestTarget::emitIncludes(Util::SourceCodeBuilder* builder) const {
     builder->append("#include \"ebpf_test.h\"\n");

@@ -3,7 +3,6 @@
 #include "backends/ebpf/ebpfType.h"
 #include "ebpfPsaTable.h"
 #include "ebpfPipeline.h"
-#include "backends/ebpf/psa/externs/ebpfPsaTableImplementation.h"
 
 namespace EBPF {
 
@@ -40,54 +39,8 @@ cstring ActionTranslationVisitorPSA::getActionParamStr(const IR::Expression *exp
 }
 
 void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) {
-    auto declType = method->originalExternType;
-    auto decl = method->object;
-    BUG_CHECK(decl->is<IR::Declaration_Instance>(),
-            "Extern has not been declared");
-    auto di = decl->to<IR::Declaration_Instance>();
-    auto instanceName = EBPFObject::externalName(di);
-
-    if (declType->name.name == "DirectCounter") {
-        auto ctr = table->getCounter(instanceName);
-        if (ctr != nullptr)
-            ctr->emitDirectMethodInvocation(builder, method, valueName);
-        else
-            ::error(ErrorType::ERR_NOT_FOUND,
-                    "%1%: Table %2% do not own DirectCounter named %3%",
-                    method->expr, table->name, instanceName);
-    } else if (declType->name.name == "DirectMeter") {
-        auto met = table->getMeter(instanceName);
-        if (met != nullptr) {
-            met->emitDirectExecute(builder, method, valueName);
-        } else {
-            ::error(ErrorType::ERR_NOT_FOUND,
-                    "%1%: Table %2% do not own DirectMeter named %3%",
-                    method->expr, table->name, instanceName);
-        }
-    } else if (declType->name.name == "Counter") {
-        auto ctr = control->to<EBPFControlPSA>()->getCounter(instanceName);
-        // Counter count() always has one argument/index
-        if (ctr != nullptr) {
-            ctr->to<EBPFCounterPSA>()->emitMethodInvocation(builder, method, this);
-        } else {
-            ::error(ErrorType::ERR_NOT_FOUND,
-                    "%1%: Counter named %2% not found",
-                    method->expr, instanceName);
-        }
-        return;
-    } else if (declType->name.name == "Meter") {
-        auto met = control->to<EBPFControlPSA>()->getMeter(instanceName);
-        // Meter execute() always has one argument/index
-        if (met != nullptr) {
-            met->emitExecute(builder, method, this);
-        } else {
-            ::error(ErrorType::ERR_NOT_FOUND,
-                    "%1%: Meter named %2% not found",
-                    method->expr, instanceName);
-        }
-    } else {
-        ControlBodyTranslatorPSA::processMethod(method);
-    }
+    // TODO: placeholder for handling PSA externs
+    ControlBodyTranslatorPSA::processMethod(method);
 }
 
 cstring ActionTranslationVisitorPSA::getValueActionParam(const IR::PathExpression *valueExpr) {
@@ -113,12 +66,6 @@ void ActionTranslationVisitorPSA::processApply(const P4::ApplyMethod* method) {
 EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* table,
                            CodeGenInspector* codeGen, cstring name, size_t size) :
                            EBPFTable(program, table, codeGen), name(name), size(size) {
-    initDirectCounters();
-    initDirectMeters();
-
-    initImplementations();
-
-    tryEnableTableCache();
 
     auto sizeProperty = table->container->properties->getProperty("size");
     if (keyGenerator == nullptr && sizeProperty != nullptr) {
@@ -135,137 +82,9 @@ EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* tab
     }
 }
 
-EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name) :
-        EBPFTable(program, codeGen, name), name(name) {}
-
 ActionTranslationVisitor* EBPFTablePSA::createActionTranslationVisitor(
         cstring valueName, const EBPFProgram* program) const {
     return new ActionTranslationVisitorPSA(valueName, program->to<EBPFPipeline>(), this);
-}
-
-void EBPFTablePSA::initDirectCounters() {
-    auto counterAdder = [this](const IR::PathExpression * pe) {
-        CHECK_NULL(pe);
-        auto decl = program->refMap->getDeclaration(pe->path, true);
-        auto di = decl->to<IR::Declaration_Instance>();
-        CHECK_NULL(di);
-        auto counterName = EBPFObject::externalName(di);
-        auto ctr = new EBPFCounterPSA(program, di, counterName, codeGen);
-        this->counters.emplace_back(std::make_pair(counterName, ctr));
-    };
-
-    forEachPropertyEntry("psa_direct_counter", counterAdder);
-}
-
-void EBPFTablePSA::initDirectMeters() {
-    auto meterAdder = [this](const IR::PathExpression * pe) {
-        CHECK_NULL(pe);
-        auto decl = program->refMap->getDeclaration(pe->path, true);
-        auto di = decl->to<IR::Declaration_Instance>();
-        CHECK_NULL(di);
-        if (isLPMTable() || isTernaryTable()) {
-            ::error(ErrorType::ERR_UNSUPPORTED,
-                    "DirectMeter in table with ternary key or "
-                    "Longest Prefix Match key is not supported: %1%", di);
-            return;
-        }
-        auto meterName = EBPFObject::externalName(di);
-        auto met = new EBPFMeterPSA(program, meterName, di, codeGen);
-        this->meters.emplace_back(std::make_pair(meterName, met));
-    };
-
-    forEachPropertyEntry("psa_direct_meter", meterAdder);
-}
-
-void EBPFTablePSA::initImplementations() {
-    bool hasActionSelector = false;
-    auto impl = [this, &hasActionSelector](const IR::PathExpression * pe) {
-        CHECK_NULL(pe);
-        auto decl = program->refMap->getDeclaration(pe->path, true);
-        auto di = decl->to<IR::Declaration_Instance>();
-        CHECK_NULL(di);
-        EBPFTableImplementationPSA * implementation = nullptr;
-        cstring type = di->type->toString();
-        if (type == "ActionProfile" || type == "ActionSelector") {
-            auto ap = program->control->getTable(di->name.name);
-            implementation = ap->to<EBPFTableImplementationPSA>();
-            if (type == "ActionSelector")
-                hasActionSelector = true;
-        }
-
-        if (implementation != nullptr) {
-            implementation->registerTable(this);
-            implementations.emplace_back(implementation);
-        } else {
-            ::error(ErrorType::ERR_UNKNOWN,
-                    "%1%: unknown table implementation %2%", pe, decl);
-        }
-    };
-    forEachPropertyEntry("psa_implementation", impl);
-
-    // check if we have also selector key
-    const IR::KeyElement * selectorKey = nullptr;
-    if (keyGenerator != nullptr) {
-        for (auto k : keyGenerator->keyElements) {
-            auto mkdecl = program->refMap->getDeclaration(k->matchType->path, true);
-            auto matchType = mkdecl->getNode()->to<IR::Declaration_ID>();
-            if (matchType->name.name == "selector") {
-                selectorKey = k;
-                break;
-            }
-        }
-    }
-
-    if (hasActionSelector && selectorKey == nullptr) {
-        ::error(ErrorType::ERR_NOT_FOUND,
-                "%1%: ActionSelector provided but there is no selector key",
-                table->container);
-    }
-    if (!hasActionSelector && selectorKey != nullptr) {
-        ::error(ErrorType::ERR_NOT_FOUND,
-                "%1%: implementation not found, ActionSelector is required",
-                selectorKey->matchType);
-    }
-    auto emptyGroupAction = table->container->properties->getProperty("psa_empty_group_action");
-    if (!hasActionSelector && emptyGroupAction != nullptr) {
-        ::warning(ErrorType::WARN_UNUSED,
-                  "%1%: unused property (ActionSelector not provided)",
-                  emptyGroupAction);
-    }
-}
-
-bool EBPFTablePSA::hasImplementation() const {
-    return !implementations.empty();
-}
-
-void EBPFTablePSA::tryEnableTableCache() {
-    if (!program->options.enableTableCache)
-        return;
-    if (!isLPMTable() && !isTernaryTable())
-        return;
-    if (!counters.empty() || !meters.empty()) {
-        ::warning(ErrorType::WARN_UNSUPPORTED,
-                  "%1%: table cache can't be enabled due to direct extern(s)",
-                  table->container->name);
-        return;
-    }
-    createCacheTypeNames(false, true);
-}
-
-void EBPFTablePSA::createCacheTypeNames(bool isCacheKeyType, bool isCacheValueType) {
-    if (!program->options.enableTableCache)
-        return;
-
-    tableCacheEnabled = true;
-    cacheTableName = name + "_cache";
-
-    cacheKeyTypeName = keyTypeName;
-    if (isCacheKeyType)
-        cacheKeyTypeName = keyTypeName + "_cache";
-
-    cacheValueTypeName = valueTypeName;
-    if (isCacheValueType)
-        cacheValueTypeName = valueTypeName + "_cache";
 }
 
 void EBPFTablePSA::emitValueActionIDNames(CodeBuilder* builder) {
@@ -278,19 +97,8 @@ void EBPFTablePSA::emitValueActionIDNames(CodeBuilder* builder) {
 }
 
 void EBPFTablePSA::emitValueStructStructure(CodeBuilder* builder) {
-    if (hasImplementation()) {
-        if (isTernaryTable()) {
-            builder->emitIndent();
-            builder->append("__u32 priority;");
-            builder->newline();
-        }
-
-        for (auto impl : implementations) {
-            impl->emitReferenceEntry(builder);
-        }
-    } else {
-        EBPFTable::emitValueStructStructure(builder);
-    }
+    // TODO: placeholder for handling psa_implementation
+    EBPFTable::emitValueStructStructure(builder);
 }
 
 void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
@@ -301,14 +109,9 @@ void EBPFTablePSA::emitInstance(CodeBuilder *builder) {
                       cstring("struct ") + valueTypeName, size);
     }
 
-    if (!hasImplementation()) {
-        // Default action is up to implementation
-        emitTableDecl(builder, defaultActionMapName, TableArray,
-                      program->arrayIndexType,
-                      cstring("struct ") + valueTypeName, 1);
-    }
-
-    emitCacheInstance(builder);
+    emitTableDecl(builder, defaultActionMapName, TableArray,
+                  program->arrayIndexType,
+                  cstring("struct ") + valueTypeName, 1);
 }
 
 void EBPFTablePSA::emitTableDecl(CodeBuilder *builder,
@@ -317,58 +120,26 @@ void EBPFTablePSA::emitTableDecl(CodeBuilder *builder,
                                  cstring keyTypeName,
                                  cstring valueTypeName,
                                  size_t size) const {
-    if (meters.empty()) {
-        builder->target->emitTableDecl(builder,
-                                       tblName, kind,
-                                       keyTypeName,
-                                       valueTypeName,
-                                       size);
-    } else {
-        builder->target->emitTableDeclSpinlock(builder,
-                                               tblName, kind,
-                                               keyTypeName,
-                                               valueTypeName,
-                                               size);
-    }
+    builder->target->emitTableDecl(builder,
+                                   tblName, kind,
+                                   keyTypeName,
+                                   valueTypeName,
+                                   size);
 }
 
 void EBPFTablePSA::emitTypes(CodeBuilder* builder) {
     EBPFTable::emitTypes(builder);
-    emitCacheTypes(builder);
-}
-
-/**
- * Remember that order of emitting counters and meters affects future access to BPF maps.
- * Do not change this order!
- */
-void EBPFTablePSA::emitDirectTypes(CodeBuilder* builder) {
-    for (auto ctr : counters) {
-        ctr.second->emitValueType(builder);
-    }
-    for (auto met : meters) {
-        met.second->emitValueType(builder);
-    }
-    if (!meters.empty()) {
-        meters.begin()->second->emitSpinLockField(builder);
-    }
+    // TODO: placeholder for handling PSA-specific types
 }
 
 void EBPFTablePSA::emitAction(CodeBuilder* builder, cstring valueName, cstring actionRunVariable) {
-    if (hasImplementation()) {
-        for (auto impl : implementations) {
-            impl->applyImplementation(builder, valueName, actionRunVariable);
-        }
-    } else {
-        EBPFTable::emitAction(builder, valueName, actionRunVariable);
-    }
+    // TODO: placeholder for handling psa_implementation
+    EBPFTable::emitAction(builder, valueName, actionRunVariable);
 }
 
 void EBPFTablePSA::emitInitializer(CodeBuilder *builder) {
-    // Do not emit initializer when table implementation(s) is provided
-    if (!hasImplementation()) {
-        this->emitDefaultActionInitializer(builder);
-        this->emitConstEntriesInitializer(builder);
-    }
+    this->emitDefaultActionInitializer(builder);
+    this->emitConstEntriesInitializer(builder);
 }
 
 void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
@@ -534,371 +305,17 @@ void EBPFTablePSA::emitTableValue(CodeBuilder* builder, const IR::MethodCallExpr
 }
 
 void EBPFTablePSA::emitLookup(CodeBuilder* builder, cstring key, cstring value) {
-    if (tableCacheEnabled)
-        emitCacheLookup(builder, key, value);
-
+    // TODO: placeholder for handling ternary table caching
     EBPFTable::emitLookup(builder, key, value);
 }
 
 void EBPFTablePSA::emitLookupDefault(CodeBuilder* builder, cstring key, cstring value) {
-    if (hasImplementation()) {
-        builder->appendLine("/* table with implementation has no default action */");
-        builder->target->emitTraceMessage(builder,
-            "Control: skipping default action due to implementation");
-    } else {
-        EBPFTable::emitLookupDefault(builder, key, value);
-    }
+    // TODO: placeholder for handling psa_implementation
+    EBPFTable::emitLookupDefault(builder, key, value);
 }
 
 bool EBPFTablePSA::dropOnNoMatchingEntryFound() const {
-    if (hasImplementation())
-        return false;
+    // TODO: placeholder for handling psa_implementation
     return EBPFTable::dropOnNoMatchingEntryFound();
 }
-
-bool EBPFTablePSA::singleActionRun() const {
-    return implementations.size() <= 1;
-}
-
-void EBPFTablePSA::emitCacheTypes(CodeBuilder* builder) {
-    if (!tableCacheEnabled)
-        return;
-
-    builder->emitIndent();
-    builder->appendFormat("struct %s ", cacheValueTypeName.c_str());
-    builder->blockStart();
-
-    builder->emitIndent();
-    builder->appendFormat("struct %s value", valueTypeName.c_str());
-    builder->endOfStatement(true);
-
-    // additional metadata fields add at the end of this structure. This allows
-    // to simpler conversion cache value to value used by table
-
-    builder->emitIndent();
-    builder->append("u8 hit");
-    builder->endOfStatement(true);
-
-    builder->blockEnd(false);
-    builder->endOfStatement(true);
-}
-
-void EBPFTablePSA::emitCacheInstance(CodeBuilder* builder) {
-    if (!tableCacheEnabled)
-        return;
-
-    // TODO: make cache size calculation more smart
-    size_t cacheSize = std::max((size_t) 1, size / 2);
-    builder->target->emitTableDecl(builder, cacheTableName, TableHashLRU,
-                                   "struct " + cacheKeyTypeName, "struct " + cacheValueTypeName,
-                                   cacheSize);
-}
-
-void EBPFTablePSA::emitCacheLookup(CodeBuilder* builder, cstring key, cstring value) {
-    cstring cacheVal = "cached_value";
-
-    builder->appendFormat("struct %s* %s = NULL", cacheValueTypeName.c_str(), cacheVal.c_str());
-    builder->endOfStatement(true);
-
-    builder->target->emitTraceMessage(builder, "Control: trying table cache...");
-
-    builder->emitIndent();
-    builder->target->emitTableLookup(builder, cacheTableName, key, cacheVal);
-    builder->endOfStatement(true);
-
-    builder->emitIndent();
-    builder->appendFormat("if (%s != NULL) ", cacheVal.c_str());
-    builder->blockStart();
-
-    builder->target->emitTraceMessage(builder,
-                                      "Control: table cache hit, skipping later lookup(s)");
-    builder->emitIndent();
-    builder->appendFormat("%s = &(%s->value)", value.c_str(), cacheVal.c_str());
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->appendFormat("%s = %s->hit",
-                          program->control->hitVariable.c_str(), cacheVal.c_str());
-    builder->endOfStatement(true);
-
-    builder->blockEnd(false);
-    builder->append(" else ");
-    builder->blockStart();
-
-    builder->target->emitTraceMessage(builder, "Control: table cache miss, nevermind");
-    builder->emitIndent();
-
-    // Do not end block here because we need lookup for (default) value
-    // and set hit variable at this indent level which is done in the control block
-}
-
-void EBPFTablePSA::emitCacheUpdate(CodeBuilder* builder, cstring key, cstring value) {
-    cstring cacheUpdateVarName = "cache_update";
-
-    builder->emitIndent();
-    builder->appendFormat("if (%s != NULL) ", value.c_str());
-    builder->blockStart();
-
-    builder->emitIndent();
-    builder->appendFormat("struct %s %s = {0}",
-                          cacheValueTypeName.c_str(), cacheUpdateVarName.c_str());
-    builder->endOfStatement(true);
-
-    builder->emitIndent();
-    builder->appendFormat("%s.hit = %s",
-                          cacheUpdateVarName.c_str(), program->control->hitVariable.c_str());
-    builder->endOfStatement(true);
-
-    builder->emitIndent();
-    builder->appendFormat(
-        "__builtin_memcpy((void *) &(%s.value), (void *) %s, sizeof(struct %s))",
-        cacheUpdateVarName.c_str(), value.c_str(), valueTypeName.c_str());
-    builder->endOfStatement(true);
-
-    builder->emitIndent();
-    builder->target->emitTableUpdate(builder, cacheTableName, key, cacheUpdateVarName);
-    builder->newline();
-
-    builder->target->emitTraceMessage(builder, "Control: table cache updated");
-
-    builder->blockEnd(true);
-}
-
-// =====================EBPFTernaryTablePSA=============================
-void EBPFTernaryTablePSA::emitInstance(CodeBuilder *builder) {
-    builder->target->emitTableDecl(builder, name + "_prefixes", TableHash,
-                                   "struct " + keyTypeName + "_mask",
-                                   "struct " + valueTypeName + "_mask", size);
-    builder->target->emitMapInMapDecl(builder, name + "_tuple",
-                                      TableHash, "struct " + keyTypeName,
-                                      "struct " + valueTypeName, size,
-                                      name + "_tuples_map", TableArray, "__u32", size);
-    if (!hasImplementation()) {
-        builder->target->emitTableDecl(builder, defaultActionMapName, TableArray,
-                                       program->arrayIndexType,
-                                       cstring("struct ") + valueTypeName, 1);
-    }
-
-    emitCacheInstance(builder);
-}
-
-void EBPFTernaryTablePSA::emitKeyType(CodeBuilder *builder) {
-    builder->emitIndent();
-    builder->appendFormat("struct %s ", keyTypeName.c_str());
-    builder->blockStart();
-
-    CodeGenInspector commentGen(program->refMap, program->typeMap);
-    commentGen.setBuilder(builder);
-
-    unsigned int structAlignment = 4;  // 4 by default
-    if (keyGenerator != nullptr) {
-        for (auto c : keyGenerator->keyElements) {
-            if (c->matchType->path->name.name == "selector")
-                continue;  // this match type is intended for ActionSelector, not table itself
-
-            auto ebpfType = ::get(keyTypes, c);
-            cstring fieldName = ::get(keyFieldNames, c);
-
-            if (ebpfType->is<EBPFScalarType>() &&
-                ebpfType->to<EBPFScalarType>()->alignment() > structAlignment) {
-                structAlignment = 8;
-            }
-
-            builder->emitIndent();
-            ebpfType->declare(builder, fieldName, false);
-
-            builder->append("; /* ");
-            c->expression->apply(commentGen);
-            builder->append(" */");
-            builder->newline();
-        }
-    }
-
-    builder->blockEnd(false);
-    builder->appendFormat(" __attribute__((aligned(%d)))", structAlignment);
-    builder->endOfStatement(true);
-
-    // generate mask key
-    builder->emitIndent();
-    // TODO: find better solution to workaround BPF_COMPLEXITY_LIMIT_JMP_SEQ.
-    builder->appendFormat("#define MAX_%s_MASKS %u", keyTypeName.toUpper(),
-                          program->options.maxTernaryMasks);
-    builder->newline();
-
-    builder->emitIndent();
-    builder->appendFormat("struct %s_mask ", keyTypeName.c_str());
-    builder->blockStart();
-
-    builder->emitIndent();
-    builder->appendFormat("__u8 mask[sizeof(struct %s)];", keyTypeName.c_str());
-    builder->newline();
-
-    builder->blockEnd(false);
-    builder->appendFormat(" __attribute__((aligned(%d)))", structAlignment);
-    builder->endOfStatement(true);
-}
-
-void EBPFTernaryTablePSA::emitValueType(CodeBuilder* builder) {
-    EBPFTablePSA::emitValueType(builder);
-
-    if (isTernaryTable()) {
-        // emit ternary mask value
-        builder->emitIndent();
-        builder->appendFormat("struct %s_mask ", valueTypeName.c_str());
-        builder->blockStart();
-
-        builder->emitIndent();
-        builder->appendLine("__u32 tuple_id;");
-        builder->emitIndent();
-        builder->appendFormat("struct %s_mask next_tuple_mask;", keyTypeName.c_str());
-        builder->newline();
-        builder->emitIndent();
-        builder->appendLine("__u8 has_next;");
-        builder->blockEnd(false);
-        builder->endOfStatement(true);
-    }
-}
-
-void EBPFTernaryTablePSA::emitLookup(CodeBuilder *builder, cstring key, cstring value) {
-    if (tableCacheEnabled)
-        emitCacheLookup(builder, key, value);
-
-    builder->appendFormat("struct %s_mask head = {0};", keyTypeName);
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat("struct %s_mask *", valueTypeName);
-    builder->target->emitTableLookup(builder, name + "_prefixes", "head", "val");
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->append("if (val && val->has_next != 0) ");
-    builder->blockStart();
-    builder->emitIndent();
-    builder->appendFormat("struct %s_mask next = val->next_tuple_mask;", keyTypeName);
-    builder->newline();
-    builder->emitIndent();
-    builder->appendLine("#pragma clang loop unroll(disable)");
-    builder->emitIndent();
-    builder->appendFormat("for (int i = 0; i < MAX_%s_MASKS; i++) ", keyTypeName.toUpper());
-    builder->blockStart();
-    builder->emitIndent();
-    builder->appendFormat("struct %s_mask *", valueTypeName);
-    builder->target->emitTableLookup(builder, name + "_prefixes", "next", "v");
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->append("if (!v) ");
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder,
-                                      "Control: No next element found!");
-    builder->emitIndent();
-    builder->appendLine("break;");
-    builder->blockEnd(true);
-    builder->emitIndent();
-    cstring new_key = "k";
-    builder->appendFormat("struct %s %s = {};", keyTypeName, new_key);
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat("__u32 *chunk = ((__u32 *) &%s);", new_key);
-    builder->newline();
-    builder->emitIndent();
-    builder->appendLine("__u32 *mask = ((__u32 *) &next);");
-    builder->emitIndent();
-    builder->appendLine("#pragma clang loop unroll(disable)");
-    builder->emitIndent();
-    builder->appendFormat("for (int i = 0; i < sizeof(struct %s_mask) / 4; i++) ", keyTypeName);
-    builder->blockStart();
-    cstring str = Util::printf_format("*(((__u32 *) &%s) + i)", key);
-    builder->target->emitTraceMessage(builder,
-                                  "Control: [Ternary] Masking next 4 bytes of %llx with mask %llx",
-                                  2, str, "mask[i]");
-
-    builder->emitIndent();
-    builder->appendFormat("chunk[i] = ((__u32 *) &%s)[i] & mask[i];", key);
-    builder->newline();
-    builder->blockEnd(true);
-
-    builder->emitIndent();
-    builder->appendLine("__u32 tuple_id = v->tuple_id;");
-    builder->emitIndent();
-    builder->append("next = v->next_tuple_mask;");
-    builder->newline();
-    builder->emitIndent();
-    builder->append("struct bpf_elf_map *");
-    builder->target->emitTableLookup(builder, name + "_tuples_map",
-            "tuple_id", "tuple");
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->append("if (!tuple) ");
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder,
-      Util::printf_format("Control: Tuples map %s not found during ternary lookup. Bug?",
-              name));
-    builder->emitIndent();
-    builder->append("break;");
-    builder->newline();
-    builder->blockEnd(true);
-
-    builder->emitIndent();
-    builder->appendFormat("struct %s *tuple_entry = "
-                          "bpf_map_lookup_elem(%s, &%s)",
-                          valueTypeName, "tuple", new_key);
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->append("if (!tuple_entry) ");
-    builder->blockStart();
-    builder->emitIndent();
-    builder->append("if (v->has_next == 0) ");
-    builder->blockStart();
-    builder->emitIndent();
-    builder->appendLine("break;");
-    builder->blockEnd(true);
-    builder->emitIndent();
-    builder->append("continue;");
-    builder->newline();
-    builder->blockEnd(true);
-    builder->target->emitTraceMessage(builder,
-            "Control: Ternary match found, priority=%d.", 1, "tuple_entry->priority");
-
-    builder->emitIndent();
-    builder->appendFormat("if (%s == NULL || tuple_entry->priority > %s->priority) ",
-            value, value);
-    builder->blockStart();
-    builder->emitIndent();
-    builder->appendFormat("%s = tuple_entry;", value);
-    builder->newline();
-    builder->blockEnd(true);
-
-    builder->emitIndent();
-    builder->append("if (v->has_next == 0) ");
-    builder->blockStart();
-    builder->emitIndent();
-    builder->appendLine("break;");
-    builder->blockEnd(true);
-    builder->blockEnd(true);
-    builder->blockEnd(true);
-}
-
-void EBPFTernaryTablePSA::validateKeys() const {
-    if (keyGenerator == nullptr)
-        return;
-
-    unsigned last_key_size = std::numeric_limits<unsigned>::max();
-    for (auto it : keyGenerator->keyElements) {
-        if (it->matchType->path->name.name == "selector")
-            continue;
-
-        auto type = program->typeMap->getType(it->expression);
-        auto ebpfType = EBPFTypeFactory::instance->create(type);
-        if (!ebpfType->is<IHasWidth>())
-            continue;
-
-        unsigned width = ebpfType->to<IHasWidth>()->widthInBits();
-        if (width > last_key_size) {
-            ::error(ErrorType::WARN_ORDERING,
-                    "%1%: key field larger than previous key, move it before previous key "
-                    "to avoid padding between these keys", it->expression);
-            return;
-        }
-        last_key_size = width;
-    }
-}
-
 }  // namespace EBPF

@@ -16,34 +16,11 @@ TEST_PIPELINE_ID = 999
 TEST_PIPELINE_MOUNT_PATH = "/sys/fs/bpf/pipeline{}".format(TEST_PIPELINE_ID)
 PIPELINE_MAPS_MOUNT_PATH = "{}/maps".format(TEST_PIPELINE_MOUNT_PATH)
 
-
-def tc_only(cls):
-    if cls.is_xdp_test(cls):
-        cls.skip = True
-        cls.skip_reason = "not supported by XDP"
-    return cls
-
-
 def xdp2tc_head_not_supported(cls):
     if cls.xdp2tc_mode(cls) == 'head':
         cls.skip = True
         cls.skip_reason = "not supported for xdp2tc=head"
     return cls
-
-
-def table_caching_only(cls):
-    if not cls.is_table_caching_test(cls):
-        cls.skip = True
-        cls.skip_reason = "table caching test"
-    return cls
-
-
-def skip_if_pipeline_optimization_enabled(cls):
-    if cls.is_pipeline_opt_enabled(cls):
-        cls.skip = True
-        cls.skip_reason = "Skip if pipeline-aware optimization enabled"
-    return cls
-
 
 class EbpfTest(BaseTest):
     skip = False
@@ -77,8 +54,6 @@ class EbpfTest(BaseTest):
 
     def add_port(self, dev):
         self.exec_ns_cmd("psabpf-ctl add-port pipe {} dev {}".format(TEST_PIPELINE_ID, dev))
-        if dev.startswith("eth") and self.is_xdp_test():
-            self.exec_cmd("ip link set dev s1-{} xdp pinned {}/{}".format(dev, TEST_PIPELINE_MOUNT_PATH, "xdp_redirect_dummy_sec"))
 
     def del_port(self, dev):
         self.exec_ns_cmd("psabpf-ctl del-port pipe {} dev {}".format(TEST_PIPELINE_ID, dev))
@@ -126,15 +101,6 @@ class EbpfTest(BaseTest):
     def xdp2tc_mode(self):
         return testutils.test_param_get('xdp2tc')
 
-    def is_xdp_test(self):
-        return testutils.test_param_get('xdp') == 'True'
-
-    def is_table_caching_test(self):
-        return testutils.test_param_get('table_caching') == 'True'
-
-    def is_pipeline_opt_enabled(self):
-        return testutils.test_param_get('pipeline_optimization') == 'True'
-
     def is_trace_logs_enabled(self):
         return testutils.test_param_get('trace') == 'True'
 
@@ -150,8 +116,6 @@ class EbpfTest(BaseTest):
         self.exec_ns_cmd("psabpf-ctl pipeline load id {} {}".format(TEST_PIPELINE_ID, self.test_prog_image), "Can't load programs into eBPF subsystem")
 
         for intf in self.interfaces:
-            if intf == "psa_recirc" and self.is_xdp_test():
-                continue
             self.add_port(dev=intf)
 
     def tearDown(self):
@@ -182,15 +146,9 @@ class P4EbpfTest(EbpfTest):
         filename = tail.split(".")[0]
         self.test_prog_image = os.path.join("ptf_out", filename + ".o")
 
-        p4args = "--Wdisable=unused --max-ternary-masks 3"
+        p4args = "--Wdisable=unused"
         if "xdp2tc" in testutils.test_params_get():
             p4args += " --xdp2tc=" + testutils.test_param_get("xdp2tc")
-        if self.is_xdp_test():
-            p4args += " --xdp"
-        if self.is_pipeline_opt_enabled():
-            p4args += " --pipeline-opt"
-        if self.is_table_caching_test():
-            p4args += " --table-caching"
         if self.is_trace_logs_enabled():
             p4args += " --trace"
 
@@ -263,69 +221,3 @@ class P4EbpfTest(EbpfTest):
             for k in keys:
                 cmd = cmd + "{} ".format(k)
         self.exec_ns_cmd(cmd, "Table delete failed")
-
-    def meter_update(self, name, index, pir, pbs, cir, cbs):
-        cmd = "psabpf-ctl meter update pipe {} {} " \
-              "index {} {}:{} {}:{}".format(TEST_PIPELINE_ID, name,
-                                            index, pir, pbs, cir, cbs)
-        self.exec_ns_cmd(cmd, "Meter update failed")
-
-    def action_selector_add_action(self, selector, action, data=None):
-        cmd = "psabpf-ctl action-selector add_member pipe {} {} id {}".format(TEST_PIPELINE_ID, selector, action)
-        if data:
-            cmd = cmd + " data"
-            for d in data:
-                cmd = cmd + " {}".format(d)
-        _, stdout, _ = self.exec_ns_cmd(cmd, "ActionSelector add_member failed")
-        return int(stdout)
-
-    def action_selector_create_empty_group(self, selector):
-        cmd = "psabpf-ctl action-selector create_group pipe {} {}".format(TEST_PIPELINE_ID, selector)
-        _, stdout, _ = self.exec_ns_cmd(cmd, "ActionSelector create_group failed")
-        return int(stdout)
-
-    def action_selector_add_member_to_group(self, selector, group_ref, member_ref):
-        cmd = "psabpf-ctl action-selector add_to_group pipe {} {} {} to {}"\
-            .format(TEST_PIPELINE_ID, selector, member_ref, group_ref)
-        self.exec_ns_cmd(cmd, "ActionSelector add_to_group failed")
-
-    def digest_get(self, name):
-        cmd = "psabpf-ctl digest get pipe {} {}".format(TEST_PIPELINE_ID, name)
-        _, stdout, _ = self.exec_ns_cmd(cmd, "Digest get failed")
-        return json.loads(stdout)['Digest'][name]['digests']
-
-    def counter_get(self, name, keys=None):
-        key_str = ""
-        if keys:
-            key_str = key_str + "key"
-            for k in keys:
-                key_str = key_str + " {}".format(k)
-        cmd = "psabpf-ctl counter get pipe {} {} {}".format(TEST_PIPELINE_ID, name, key_str)
-        _, stdout, _ = self.exec_ns_cmd(cmd, "Counter get failed")
-        return json.loads(stdout)['Counter'][name]
-
-    def counter_verify(self, name, keys, bytes=None, packets=None):
-        counter = self.counter_get(name, keys=keys)
-        expected_type = ""
-        if packets:
-            expected_type = "PACKETS"
-        if bytes:
-            if packets:
-                expected_type = expected_type + "_AND_"
-            expected_type = expected_type + "BYTES"
-        counter_type = counter["type"]
-        if expected_type != counter_type:
-            self.fail("Invalid counter type, expected: \"{}\", got \"{}\"".format(expected_type, counter_type))
-
-        entries = counter["entries"]
-        if len(entries) != 1:
-            self.fail("expected one Counter entry")
-        entry = entries[0]
-        if bytes:
-            counter_bytes = int(entry["value"]["bytes"], 0)
-            if counter_bytes != bytes:
-                self.fail("Invalid counter bytes, expected {}, got {}".format(bytes, counter_bytes))
-        if packets:
-            counter_packets = int(entry["value"]["packets"], 0)
-            if counter_packets != packets:
-                self.fail("Invalid counter packets, expected {}, got {}".format(packets, counter_packets))

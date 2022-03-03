@@ -37,13 +37,7 @@ class EbpfOptions : public CompilerOptions {
     bool emitExterns = false;
     // Tracing eBPF code execution
     bool emitTraceMessages = false;
-    // Enable table cache for LPM and ternary tables
-    bool enableTableCache = false;
-    // maximum number of ternary masks
-    unsigned int maxTernaryMasks = 128;
 
-    bool generateToXDP = false;
-    bool pipelineOptimization = false;
     enum XDP2TC xdp2tcMode = XDP2TC_NONE;
 
     EbpfOptions();
@@ -53,14 +47,8 @@ class EbpfOptions : public CompilerOptions {
             return;
         }
 
-        if (generateToXDP && xdp2tcMode == XDP2TC_META) {
-            std::cerr << "XDP2TC 'meta' mode cannot be used if XDP is enabled. "
-                         "Falling back to 'head' mode." << std::endl;
-            xdp2tcMode = XDP2TC_HEAD;
-        } else if (generateToXDP && xdp2tcMode == XDP2TC_NONE) {
-            // use 'head' mode by default; it's the most safe option.
-            xdp2tcMode = XDP2TC_HEAD;
-        } else if (!generateToXDP && xdp2tcMode == XDP2TC_NONE) {
+        if (xdp2tcMode == XDP2TC_NONE) {
+            std::cout << "Setting XDP2TC 'meta' mode by default." << std::endl;
             // For TC, use 'meta' mode by default.
             xdp2tcMode = XDP2TC_META;
         }

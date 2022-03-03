@@ -14,10 +14,7 @@ namespace EBPF {
 
 enum pipeline_type {
     TC_INGRESS,
-    TC_EGRESS,
-    XDP_INGRESS,
-    XDP_EGRESS,
-    TC_TRAFFIC_MANAGER
+    TC_EGRESS
 };
 
 class PSAArch {
@@ -65,30 +62,6 @@ class PSAArchTC : public PSAArch {
     void emitInitializerSection(CodeBuilder *builder) const override;
 };
 
-class PSAArchXDP : public PSAArch {
- public:
-    // TC Ingress program used to support packet cloning in the XDP mode.
-    EBPFPipeline* tcIngressForXDP;
-    // If the XDP mode is used, we need to have TC Egress pipeline to handle cloned packets.
-    EBPFPipeline* tcEgressForXDP;
-    static const unsigned egressDevmapSize = 256;
-
-    PSAArchXDP(const EbpfOptions &options, std::vector<EBPFType*> &ebpfTypes,
-               EBPFPipeline* xdpIngress, EBPFPipeline* xdpEgress,
-               EBPFPipeline* tcTrafficManager, EBPFPipeline* tcEgress) :
-               PSAArch(options, ebpfTypes, xdpIngress, xdpEgress),
-               tcIngressForXDP(tcTrafficManager), tcEgressForXDP(tcEgress) { }
-
-    void emit(CodeBuilder* builder) const override;
-
-    void emitPreamble(CodeBuilder* builder) const override;
-    void emitInstances(CodeBuilder *builder) const override;
-    void emitInitializerSection(CodeBuilder *builder) const override;
-
-    void emitXDP2TCInternalStructures(CodeBuilder *builder) const;
-    void emitDummyProgram(CodeBuilder *builder) const;
-};
-
 class ConvertToEbpfPSA : public Transform {
     const EbpfOptions& options;
     BMV2::PsaProgramStructure& structure;
@@ -105,8 +78,6 @@ class ConvertToEbpfPSA : public Transform {
 
     const PSAArch *build(const IR::ToplevelBlock *prog);
     const IR::Node *preorder(IR::ToplevelBlock *p) override;
-
-    void optimizePipeline();
 
     const PSAArch *getPSAArchForEBPF() { return ebpf_psa_arch; }
 };
@@ -182,7 +153,6 @@ class ConvertToEBPFControlPSA : public Inspector {
     bool preorder(const IR::Declaration_Variable*) override;
     bool preorder(const IR::AssignmentStatement *a) override;
     bool preorder(const IR::IfStatement *a) override;
-    bool preorder(const IR::ExternBlock *) override;
 
     EBPF::EBPFControlPSA *getEBPFControl() { return control; }
 };
@@ -213,7 +183,6 @@ class ConvertToEBPFDeparserPSA : public Inspector {
     bool preorder(const IR::ControlBlock *) override;
     bool preorder(const IR::MethodCallExpression* expression) override;
     EBPF::EBPFDeparserPSA *getEBPFDeparser() { return deparser; }
-    void findDigests(const IR::P4Control *p4Control);
 };
 
 }  // namespace EBPF

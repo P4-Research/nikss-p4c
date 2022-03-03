@@ -17,32 +17,12 @@ void DeparserBodyTranslator::processFunction(const P4::ExternFunction *function)
 }
 
 void DeparserBodyTranslator::processMethod(const P4::ExternMethod *method) {
-    auto externName = method->originalExternType->name.name;
-    if (externName == "InternetChecksum" || externName == "Checksum") {
-        auto instance = method->object->getName().name;
-        auto methodName = method->method->getName().name;
-        deparser->getChecksum(instance)->processMethod(builder, methodName, method->expr, this);
-        return;
-    } else if (method->method->name.name == "emit") {
-        // do not use visitor to generate emit() methods
-        return;
-    } else if (method->method->name.name == "pack") {
-        // Emit digest pack method
-        auto obj = method->object;
-        auto di = obj->to<IR::Declaration_Instance>();
-        auto arg = method->expr->arguments->front();
-        builder->appendFormat("bpf_map_push_elem(&%s, &", di->name.name);
-        this->visit(arg);
-        builder->appendFormat(", BPF_EXIST)");
+    if (method->method->name.name == "emit") {
+        // do not use parent visitor to generate emit() methods
         return;
     }
+    // TODO: placeholder for handling PSA externs
     ControlBodyTranslator::processMethod(method);
-}
-
-bool EBPFDeparserPSA::isHeaderEmitted(cstring hdrName) const {
-    return std::find(headersExpressions.begin(),
-                     headersExpressions.end(),
-                     hdrName) != headersExpressions.end();
 }
 
 void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
@@ -225,14 +205,6 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
     unsigned shift = widthToEmit < 8 ?
                      (loadSize - alignment - widthToEmit) : (loadSize - widthToEmit);
     cstring hdrField = headerExpression + "." + field;
-    if (program->options.pipelineOptimization &&
-        this->is<OptimizedXDPIngressDeparserPSA>()) {
-        hdrField = field + "_val";
-        builder->emitIndent();
-        type->emit(builder);
-        builder->appendFormat(" %s = %s.%s", hdrField, headerExpression, field.c_str());
-        builder->endOfStatement(true);
-    }
 
     if (!swap.isNullOrEmpty()) {
         builder->emitIndent();
@@ -318,39 +290,8 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
     builder->newline();
 }
 
-void EBPFDeparserPSA::emitDigestInstances(CodeBuilder* builder) const {
-    for (auto digest : digests) {
-        builder->appendFormat("REGISTER_TABLE_NO_KEY_TYPE(%s, %s, 0, ",
-                              digest.first, "BPF_MAP_TYPE_QUEUE");
-        auto type = EBPFTypeFactory::instance->create(digest.second->to<IR::Type_Type>()->type);
-        type->declare(builder, "", false);
-        builder->appendFormat(", %d)", maxDigestQueueSize);
-        builder->newline();
-    }
-}
-
 void EBPFDeparserPSA::emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl) {
-    if (decl->is<IR::Declaration_Instance>()) {
-        auto di = decl->to<IR::Declaration_Instance>();
-        auto type = di->type->to<IR::Type_Name>();
-        auto typeSpec = di->type->to<IR::Type_Specialized>();
-        cstring name = di->name.name;
-
-        if (type != nullptr && type->path->name.name == "InternetChecksum") {
-            auto instance = new EBPFInternetChecksumPSA(program, di, name);
-            checksums.emplace(name, instance);
-            instance->emitVariables(builder);
-            return;
-        }
-
-        if (typeSpec != nullptr &&
-                typeSpec->baseType->to<IR::Type_Name>()->path->name.name == "Checksum") {
-            auto instance = new EBPFChecksumPSA(program, di, name);
-            checksums.emplace(name, instance);
-            instance->emitVariables(builder);
-            return;
-        }
-    }
+    // placeholder for handling checksums
 
     EBPFControlPSA::emitDeclaration(builder, decl);
 }
@@ -437,191 +378,5 @@ void TCIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->emitIndent();
     builder->appendLine("return TC_ACT_UNSPEC;");
     builder->blockEnd(true);
-}
-
-// =====================TCIngressDeparserForTrafficManagerPSA===========
-void TCIngressDeparserForTrafficManagerPSA::emitPreDeparser(CodeBuilder *builder) {
-    // clone support
-    builder->emitIndent();
-    builder->appendFormat("if (%s.clone) ", this->istd->name.name);
-    builder->blockStart();
-    builder->emitIndent();
-    builder->appendFormat("do_packet_clones(%s, &clone_session_tbl, %s.clone_session_id,"
-                          " CLONE_I2E, 1);",
-                          program->model.CPacketName.str(),
-                          this->istd->name.name);
-    builder->newline();
-    builder->blockEnd(true);
-}
-
-// =====================XDPIngressDeparserPSA=============================
-void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
-    builder->emitIndent();
-    // perform early multicast detection; if multicast is invoked, a packet will be
-    // passed up anyway, so we can do deparsing entirely in TC
-    builder->appendFormat("if (%s->clone || %s->multicast_group != 0) ",
-                          istd->name.name,
-                          istd->name.name);
-    builder->blockStart();
-    builder->emitIndent();
-    builder->appendLine("struct xdp2tc_metadata xdp2tc_md = {};");
-    builder->emitIndent();
-    builder->appendFormat("xdp2tc_md.headers = *%s", this->headers->name.name);
-
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->appendFormat("xdp2tc_md.ostd = *%s", this->istd->name.name);
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->appendFormat("xdp2tc_md.packetOffsetInBits = %s", this->program->offsetVar);
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->append("    void *data = (void *)(long)skb->data;\n"
-                    "    void *data_end = (void *)(long)skb->data_end;\n"
-                    "    struct ethhdr *eth = data;\n"
-                    "    if ((void *)((struct ethhdr *) eth + 1) > data_end) {\n"
-                    "        return XDP_ABORTED;\n"
-                    "    }\n"
-                    "    xdp2tc_md.pkt_ether_type = eth->h_proto;\n"
-                    "    eth->h_proto = bpf_htons(0x0800);\n");
-    if (program->options.xdp2tcMode == XDP2TC_HEAD) {
-        builder->emitIndent();
-        builder->appendFormat("int ret = bpf_xdp_adjust_head(%s, -(int)%s)",
-                              program->model.CPacketName.str(),
-                              "sizeof(struct xdp2tc_metadata)");
-        builder->endOfStatement(true);
-        builder->emitIndent();
-        builder->append("if (ret) ");
-        builder->blockStart();
-        builder->target->emitTraceMessage(builder, "Deparser: failed to push XDP2TC metadata");
-        builder->emitIndent();
-        builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
-        builder->newline();
-        builder->blockEnd(true);
-        builder->emitIndent();
-        builder->append("    data = (void *)(long)skb->data;\n"
-            "    data_end = (void *)(long)skb->data_end;\n"
-            "    if (((char *) data + 14 + sizeof(struct xdp2tc_metadata)) > (char *) data_end) {\n"
-            "        return XDP_ABORTED;\n"
-            "    }\n");
-        builder->appendLine("__builtin_memmove(data, data + sizeof(struct xdp2tc_metadata), 14);");
-        builder->appendLine("__builtin_memcpy(data + 14, "
-                            "&xdp2tc_md, sizeof(struct xdp2tc_metadata));");
-    } else if (program->options.xdp2tcMode == XDP2TC_CPUMAP) {
-        builder->emitIndent();
-        builder->target->emitTableUpdate(builder, "xdp2tc_shared_map",
-                                         this->program->zeroKey.c_str(), "xdp2tc_md");
-        builder->newline();
-    }
-    builder->target->emitTraceMessage(builder,
-                                      "Sending packet up to TC for cloning");
-    builder->emitIndent();
-    builder->appendFormat("return %s", builder->target->forwardReturnCode());
-    builder->endOfStatement(true);
-    builder->blockEnd(true);
-    builder->emitIndent();
-    builder->appendFormat("if (%s->drop) ",
-                           istd->name.name, istd->name.name);
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder, "PreDeparser: dropping packet..");
-    builder->emitIndent();
-    builder->appendFormat("return %s;\n", builder->target->abortReturnCode().c_str());
-    builder->blockEnd(true);
-
-    // if packet should be resubmitted, we skip deparser
-    builder->emitIndent();
-    builder->appendFormat("if (%s->resubmit) ", istd->name.name);
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder, "PreDeparser: resubmitting packet, "
-                                               "skipping deparser..");
-    builder->emitIndent();
-    builder->appendFormat("%s->packet_path = RESUBMIT;",
-                          program->to<EBPFPipeline>()->compilerGlobalMetadata);
-    builder->newline();
-    builder->emitIndent();
-    builder->appendLine("return -1;");
-    builder->blockEnd(true);
-}
-
-// =====================XDPEgressDeparserPSA=============================
-void XDPEgressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
-    builder->emitIndent();
-    builder->appendFormat("if (%s.drop) ",
-                          istd->name.name);
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder, "PreDeparser: dropping packet..");
-    builder->emitIndent();
-    builder->appendFormat("return %s;\n", builder->target->abortReturnCode().c_str());
-    builder->blockEnd(true);
-}
-
-// =====================OptimizedXDPIngressDeparserPSA=============================
-void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
-    if (this->skipEgress) {
-        EBPFDeparserPSA::emit(builder);
-        return;
-    }
-
-    builder->emitIndent();
-
-    codeGen->setBuilder(builder);
-
-    for (auto a : controlBlock->container->controlLocals)
-        emitDeclaration(builder, a);
-
-    this->emitDeparserExternCalls(builder);
-    builder->newline();
-
-    this->emitPreDeparser(builder);
-    this->emitPreparePacketBuffer(builder);
-
-    builder->emitIndent();
-    builder->appendFormat("%s = %s;",
-                          program->packetStartVar,
-                          builder->target->dataOffset(program->model.CPacketName.str()));
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat("%s = %s;",
-                          program->packetEndVar,
-                          builder->target->dataEnd(program->model.CPacketName.str()));
-    builder->newline();
-
-    builder->emitIndent();
-    builder->appendFormat("%s = 0", program->offsetVar.c_str());
-    builder->endOfStatement(true);
-
-    for (auto const& el : removedHeadersToEmit) {
-        builder->emitIndent();
-        builder->appendFormat("if (%s.ebpf_valid) ", el.first);
-        builder->blockStart();
-        builder->emitIndent();
-        builder->appendFormat("%s += %d", program->offsetVar.c_str(), el.second->width_bits());
-        builder->endOfStatement(true);
-        builder->blockEnd(true);
-    }
-
-    for (unsigned long i = 0; i < this->optimizedHeadersToEmit.size(); i++) {
-        auto headerToEmit = optimizedHeadersToEmit[i];
-        auto headerExpression = optimizedHeadersExpressions[i];
-        emitHeader(builder, headerToEmit, headerExpression);
-    }
-    builder->newline();
-
-    // put metadata into shared map
-    builder->emitIndent();
-    builder->appendFormat("%s->__helper_variable", this->headers->name.name);
-    cstring hdrValue = "(*" + this->headers->name.name + ")";
-    builder->appendFormat(" = %s->egress_port", this->istd->name.name);
-    builder->endOfStatement(true);
-
-    builder->emitIndent();
-    builder->target->emitTableUpdate(builder, "bridged_headers",
-                                     program->zeroKey.c_str(), hdrValue);
-    builder->newline();
-
-    builder->emitIndent();
-    builder->appendFormat("bpf_tail_call(%s, &egress_progs_table, 0)",
-                          this->program->model.CPacketName.str());
-    builder->endOfStatement(true);
 }
 }  // namespace EBPF
