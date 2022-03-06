@@ -76,7 +76,7 @@ class HashInActionPSATest(P4EbpfTest):
 
 @xdp2tc_head_not_supported
 class HashCRC32PSATest(P4EbpfTest):
-    p4_file_path ="p4testdata/hash-crc32.p4"
+    p4_file_path ="p4testdata/out.c"
 
     def runTest(self):
         pkt = Ether() / "1234567890000"

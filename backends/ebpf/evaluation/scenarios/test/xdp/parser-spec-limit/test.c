@@ -88,8 +88,8 @@ struct vxlan_t {
     u8 offset;
 } __attribute__((packed));
 struct headers_t {
-    struct ethernet_t ethernet; /* ethernet_t */
-    struct ipv4_t ipv4; /* ipv4_t */
+//    struct ethernet_t ethernet; /* ethernet_t */
+//    struct ipv4_t ipv4; /* ipv4_t */
     struct vxlan_t vxlan; /* vxlan_t */
     struct ethernet_t outer_ethernet; /* ethernet_t */
     struct ipv4_t outer_ipv4; /* ipv4_t */
@@ -101,6 +101,37 @@ struct tmp_headers_t {
 struct local_metadata_t {
 };
 
+struct parser_ethernet_t {
+    u64 dst_addr; /* ethernet_addr_t */
+    u16 ether_type; /* bit<16> */
+    u8 ebpf_valid;
+    u8 offset;
+} __attribute__((packed));
+struct parser_ipv4_t {
+    u16 total_len; /* bit<16> */
+    u8 protocol; /* bit<8> */
+    u8 ebpf_valid;
+    u8 offset;
+} __attribute__((packed));
+struct parser_udp_t {
+    u16 dst_port; /* bit<16> */
+    u8 ebpf_valid;
+    u8 offset;
+} __attribute__((packed));
+struct parser_vxlan_t {
+    u8 ebpf_valid;
+    u8 offset;
+} __attribute__((packed));
+
+struct parser_headers_t {
+    struct parser_ethernet_t ethernet; /* ethernet_t */
+    struct parser_ipv4_t ipv4; /* ipv4_t */
+    struct parser_vxlan_t vxlan; /* vxlan_t */
+    struct parser_ethernet_t outer_ethernet; /* ethernet_t */
+    struct parser_ipv4_t outer_ipv4; /* ipv4_t */
+    struct parser_udp_t outer_udp; /* udp_t */
+};
+
 struct ingress_vxlan_key {
     u64 field0; /* parsed_hdr->ethernet.dst_addr */
 } __attribute__((aligned(4)));
@@ -110,11 +141,11 @@ struct ingress_vxlan_value {
     unsigned int action;
     union {
         struct {
-            unsigned char ethernet_dst_addr[6];
-            unsigned char ethernet_src_addr[6];
+            u64 ethernet_dst_addr;
+            u64 ethernet_src_addr;
             u32 ipv4_src_addr;
             u32 ipv4_dst_addr;
-            unsigned char vxlan_vni[3];
+            u32 vxlan_vni;
             u32 port_out;
         } ingress_vxlan_encap;
         struct {
@@ -224,7 +255,7 @@ int do_packet_clones(SK_BUFF * skb, void * map, __u32 session_id, PSA_PacketPath
     return 0;
 }
 
-static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, struct psa_ingress_output_metadata_t *ostd, struct empty_metadata_t *resubmit_meta)
+static __always_inline int process(SK_BUFF *skb, struct parser_headers_t *parsed_hdr, struct psa_ingress_output_metadata_t *ostd, struct empty_metadata_t *resubmit_meta)
 {
 
     struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->cb;
@@ -242,6 +273,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
     struct local_metadata_t local_metadata1 = {
     };
     struct tmp_headers_t tmp_header;
+    struct headers_t headers;
 
     unsigned ebpf_packetOffsetInBits = 0;unsigned ebpf_packetOffsetInBits_save = 0;
     ParserError_t ebpf_errorCode = NoError;
@@ -385,6 +417,8 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
         void * ptr = (void *) &(tmp_header);
         bpf_skb_load_bytes(skb, 0, ptr, BYTES(ebpf_packetOffsetInBits));
 
+
+
         struct psa_ingress_input_metadata_t standard_metadata = {
                 .ingress_port = skb->ifindex,
                 .packet_path = meta->packet_path,
@@ -419,32 +453,32 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
                         case ACT_INGRESS_VXLAN_ENCAP:
                         {
 
-                            parsed_hdr->outer_ethernet.ebpf_valid = true;
-                            parsed_hdr->outer_ethernet.src_addr = value->u.ingress_vxlan_encap.ethernet_src_addr;
-                            parsed_hdr->outer_ethernet.dst_addr = value->u.ingress_vxlan_encap.ethernet_dst_addr;
-                            parsed_hdr->outer_ethernet.ether_type = 2048;
+                            headers.outer_ethernet.ebpf_valid = true;
+                            headers.outer_ethernet.src_addr = value->u.ingress_vxlan_encap.ethernet_src_addr;
+                            headers.outer_ethernet.dst_addr = value->u.ingress_vxlan_encap.ethernet_dst_addr;
+                            headers.outer_ethernet.ether_type = 2048;
 
-                            parsed_hdr->outer_ipv4.ebpf_valid = true;
-                            parsed_hdr->outer_ipv4.ver_ihl = 69;
-                            parsed_hdr->outer_ipv4.diffserv = 0;
-                            parsed_hdr->outer_ipv4.total_len = parsed_hdr->ipv4.total_len + 50;
-                            parsed_hdr->outer_ipv4.identification = 5395;
-                            parsed_hdr->outer_ipv4.flags_offset = 0;
-                            parsed_hdr->outer_ipv4.ttl = 64;
-                            parsed_hdr->outer_ipv4.protocol = 17;
-                            parsed_hdr->outer_ipv4.src_addr = value->u.ingress_vxlan_encap.ipv4_src_addr;
-                            parsed_hdr->outer_ipv4.dst_addr = value->u.ingress_vxlan_encap.ipv4_dst_addr;
+                            headers.outer_ipv4.ebpf_valid = true;
+                            headers.outer_ipv4.ver_ihl = 69;
+                            headers.outer_ipv4.diffserv = 0;
+                            headers.outer_ipv4.total_len = parsed_hdr->ipv4.total_len + 50;
+                            headers.outer_ipv4.identification = 5395;
+                            headers.outer_ipv4.flags_offset = 0;
+                            headers.outer_ipv4.ttl = 64;
+                            headers.outer_ipv4.protocol = 17;
+                            headers.outer_ipv4.src_addr = value->u.ingress_vxlan_encap.ipv4_src_addr;
+                            headers.outer_ipv4.dst_addr = value->u.ingress_vxlan_encap.ipv4_dst_addr;
 
-                            parsed_hdr->outer_udp.ebpf_valid = true;
-                            parsed_hdr->outer_udp.src_port = 15221;
-                            parsed_hdr->outer_udp.dst_port = 4789;
-                            parsed_hdr->outer_udp.length = parsed_hdr->ipv4.total_len + 30;
+                            headers.outer_udp.ebpf_valid = true;
+                            headers.outer_udp.src_port = 15221;
+                            headers.outer_udp.dst_port = 4789;
+                            headers.outer_udp.length = parsed_hdr->ipv4.total_len + 30;
 
-                            parsed_hdr->vxlan.ebpf_valid = true;
-                            parsed_hdr->vxlan.flags = 0;
-                            parsed_hdr->vxlan.reserved = 0;
-                            parsed_hdr->vxlan.vni = value->u.ingress_vxlan_encap.vxlan_vni;
-                            parsed_hdr->vxlan.reserved2 = 0;
+                            headers.vxlan.ebpf_valid = true;
+                            headers.vxlan.flags = 0;
+                            headers.vxlan.reserved = 0;
+                            headers.vxlan.vni = value->u.ingress_vxlan_encap.vxlan_vni;
+                            headers.vxlan.reserved2 = 0;
 
                             ostd->drop = false;
                             //bpf_trace_message("Port out: %d \n", value->u.ingress_vxlan_encap.port_out);
@@ -453,10 +487,10 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
                             break;
                         case ACT_INGRESS_VXLAN_DECAP:
                         {
-                            parsed_hdr->outer_ethernet.ebpf_valid = false;
-                            parsed_hdr->outer_ipv4.ebpf_valid = false;
-                            parsed_hdr->outer_udp.ebpf_valid = false;
-                            parsed_hdr->vxlan.ebpf_valid = false;
+                            headers.outer_ethernet.ebpf_valid = false;
+                            headers.outer_ipv4.ebpf_valid = false;
+                            headers.outer_udp.ebpf_valid = false;
+                            headers.vxlan.ebpf_valid = false;
                             ostd->drop = false;
                             //bpf_trace_message("Port out: %d \n", value->u.ingress_vxlan_decap.port_out);
                             ostd->egress_port = value->u.ingress_vxlan_decap.port_out;
@@ -492,16 +526,16 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
             return TC_ACT_UNSPEC;
         }
         int outHeaderLength = 0;
-        if (parsed_hdr->outer_ethernet.ebpf_valid) {
+        if (headers.outer_ethernet.ebpf_valid) {
             outHeaderLength += 112;
         }
-        if (parsed_hdr->outer_ipv4.ebpf_valid) {
+        if (headers.outer_ipv4.ebpf_valid) {
             outHeaderLength += 160;
         }
-        if (parsed_hdr->outer_udp.ebpf_valid) {
+        if (headers.outer_udp.ebpf_valid) {
             outHeaderLength += 64;
         }
-        if (parsed_hdr->vxlan.ebpf_valid) {
+        if (headers.vxlan.ebpf_valid) {
             outHeaderLength += 64;
         }
         if (parsed_hdr->ethernet.ebpf_valid) {
@@ -522,110 +556,110 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
         pkt = ((void*)(long)skb->data);
         ebpf_packetEnd = ((void*)(long)skb->data_end);
         ebpf_packetOffsetInBits = 0;
-        if (parsed_hdr->outer_ethernet.ebpf_valid) {
+        if (headers.outer_ethernet.ebpf_valid) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
                 return TC_ACT_SHOT;
             }
 
 //            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->outer_ethernet.offset), 14);
 
-            parsed_hdr->outer_ethernet.dst_addr = htonll(parsed_hdr->outer_ethernet.dst_addr << 16);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ethernet.dst_addr), 6);
+            headers.outer_ethernet.dst_addr = htonll(headers.outer_ethernet.dst_addr << 16);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ethernet.dst_addr), 6);
             ebpf_packetOffsetInBits += 48;
 
-            parsed_hdr->outer_ethernet.src_addr = htonll(parsed_hdr->outer_ethernet.src_addr << 16);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ethernet.src_addr), 6);
+            headers.outer_ethernet.src_addr = htonll(headers.outer_ethernet.src_addr << 16);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ethernet.src_addr), 6);
             ebpf_packetOffsetInBits += 48;
 
-            parsed_hdr->outer_ethernet.ether_type = bpf_htons(parsed_hdr->outer_ethernet.ether_type);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ethernet.ether_type), 2);
+            headers.outer_ethernet.ether_type = bpf_htons(headers.outer_ethernet.ether_type);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ethernet.ether_type), 2);
             ebpf_packetOffsetInBits += 16;
         }
-        if (parsed_hdr->outer_ipv4.ebpf_valid) {
+        if (headers.outer_ipv4.ebpf_valid) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
                 return TC_ACT_SHOT;
             }
 
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->outer_ipv4.offset), 20);//20
+//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.outer_ipv4.offset), 20);//20
 
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.ver_ihl), 1);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ipv4.ver_ihl), 1);
             ebpf_packetOffsetInBits += 8;
 
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.diffserv), 1);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ipv4.diffserv), 1);
             ebpf_packetOffsetInBits += 8;
 
-            parsed_hdr->outer_ipv4.total_len = bpf_htons(parsed_hdr->outer_ipv4.total_len);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.total_len), 2);
+            headers.outer_ipv4.total_len = bpf_htons(headers.outer_ipv4.total_len);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ipv4.total_len), 2);
             ebpf_packetOffsetInBits += 16;
 
-            parsed_hdr->outer_ipv4.identification = bpf_htons(parsed_hdr->outer_ipv4.identification);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.identification), 2);
+            headers.outer_ipv4.identification = bpf_htons(headers.outer_ipv4.identification);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ipv4.identification), 2);
             ebpf_packetOffsetInBits += 16;
 
-            parsed_hdr->outer_ipv4.flags_offset = bpf_htons(parsed_hdr->outer_ipv4.flags_offset);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.flags_offset), 2);
+            headers.outer_ipv4.flags_offset = bpf_htons(headers.outer_ipv4.flags_offset);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ipv4.flags_offset), 2);
             ebpf_packetOffsetInBits += 16;
 
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.ttl), 1);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ipv4.ttl), 1);
             ebpf_packetOffsetInBits += 8;
 
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.protocol), 1);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ipv4.protocol), 1);
             ebpf_packetOffsetInBits += 8;
 
-            parsed_hdr->outer_ipv4.hdr_checksum = bpf_htons(parsed_hdr->outer_ipv4.hdr_checksum);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.hdr_checksum), 2);
+            headers.outer_ipv4.hdr_checksum = bpf_htons(headers.outer_ipv4.hdr_checksum);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ipv4.hdr_checksum), 2);
             ebpf_packetOffsetInBits += 16;
 
-            parsed_hdr->outer_ipv4.src_addr = htonl(parsed_hdr->outer_ipv4.src_addr);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.src_addr), 4);
+            headers.outer_ipv4.src_addr = htonl(headers.outer_ipv4.src_addr);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ipv4.src_addr), 4);
             ebpf_packetOffsetInBits += 32;
 
-            parsed_hdr->outer_ipv4.dst_addr = htonl(parsed_hdr->outer_ipv4.dst_addr);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.dst_addr), 4);
+            headers.outer_ipv4.dst_addr = htonl(headers.outer_ipv4.dst_addr);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_ipv4.dst_addr), 4);
             ebpf_packetOffsetInBits += 32;
         }
-        if (parsed_hdr->outer_udp.ebpf_valid) {
+        if (headers.outer_udp.ebpf_valid) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 64)) {
                 return TC_ACT_SHOT;
             }
 
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->outer_udp.offset), 8);
+//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.outer_udp.offset), 8);
 
-            parsed_hdr->outer_udp.src_port = bpf_htons(parsed_hdr->outer_udp.src_port);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_udp.src_port), 2);
+            headers.outer_udp.src_port = bpf_htons(headers.outer_udp.src_port);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_udp.src_port), 2);
             ebpf_packetOffsetInBits += 16;
 
-            parsed_hdr->outer_udp.dst_port = bpf_htons(parsed_hdr->outer_udp.dst_port);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_udp.dst_port), 2);
+            headers.outer_udp.dst_port = bpf_htons(headers.outer_udp.dst_port);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_udp.dst_port), 2);
             ebpf_packetOffsetInBits += 16;
 
-            parsed_hdr->outer_udp.length = bpf_htons(parsed_hdr->outer_udp.length);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_udp.length), 2);
+            headers.outer_udp.length = bpf_htons(headers.outer_udp.length);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_udp.length), 2);
             ebpf_packetOffsetInBits += 16;
 
-            parsed_hdr->outer_udp.checksum = bpf_htons(parsed_hdr->outer_udp.checksum);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_udp.checksum), 2);
+            headers.outer_udp.checksum = bpf_htons(headers.outer_udp.checksum);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.outer_udp.checksum), 2);
             ebpf_packetOffsetInBits += 16;
         }
-        if (parsed_hdr->vxlan.ebpf_valid) {
+        if (headers.vxlan.ebpf_valid) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 64)) {
                 return TC_ACT_SHOT;
             }
 
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->vxlan.offset), 8);
+//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + headers.vxlan.offset), 8);
 
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->vxlan.flags), 1);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.vxlan.flags), 1);
             ebpf_packetOffsetInBits += 8;
 
-            parsed_hdr->vxlan.reserved = htonl(parsed_hdr->vxlan.reserved << 8);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->vxlan.reserved), 3);
+            headers.vxlan.reserved = htonl(headers.vxlan.reserved << 8);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.vxlan.reserved), 3);
             ebpf_packetOffsetInBits += 24;
 
-            parsed_hdr->vxlan.vni = htonl(parsed_hdr->vxlan.vni << 8);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->vxlan.vni), 3);
+            headers.vxlan.vni = htonl(headers.vxlan.vni << 8);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.vxlan.vni), 3);
             ebpf_packetOffsetInBits += 24;
 
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->vxlan.reserved2), 1);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(headers.vxlan.reserved2), 1);
             ebpf_packetOffsetInBits += 8;
         }
         if (parsed_hdr->ethernet.ebpf_valid) {
@@ -672,7 +706,7 @@ int tc_ingress_func(SK_BUFF *skb) {
     };
 
     struct empty_metadata_t resubmit_meta;
-    struct headers_t headers = {
+    struct parser_headers_t headers = {
             .ethernet = {
                     .ebpf_valid = 0
             },
@@ -715,7 +749,7 @@ SEC("classifier/tc-egress")
 int tc_egress_func(SK_BUFF *skb) {
     //bpf_trace_message("TC egress\n");
     struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->cb;
-    volatile struct headers_t headers = {
+    volatile struct parser_headers_t headers = {
             .ethernet = {
                     .ebpf_valid = 0
             },

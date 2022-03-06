@@ -1,0 +1,49 @@
+13:47:07.486  root      : INFO    : ++++++++ Thu Mar  3 13:47:07 2022 ++++++++
+13:47:07.833  root      : INFO    : ROCEv2 support found in Scapy
+13:47:07.834  root      : WARNING : VXLAN support not found in Scapy
+13:47:07.835  root      : WARNING : ERSPAN support not found in Scapy
+13:47:07.835  root      : INFO    : GENEVE support found in Scapy
+13:47:07.836  root      : INFO    : MPLS support found in Scapy
+13:47:07.837  root      : WARNING : NVGRE support not found in Scapy
+13:47:07.837  root      : INFO    : IGMP support found in Scapy
+13:47:07.849  root      : DEBUG   : Parsed test parameters:
+13:47:07.849  root      : DEBUG   : 	*interfaces=psa_recirc,eth0,eth1,eth2,eth3,eth4,eth5
+13:47:07.849  root      : DEBUG   : 	*namespace=switch
+13:47:07.849  root      : DEBUG   : 	*xdp=False
+13:47:07.849  root      : DEBUG   : 	*xdp2tc=cpumap
+13:47:07.850  root      : DEBUG   : 	*hdr2Map=False
+13:47:07.850  root      : DEBUG   : 	*table_caching=False
+13:47:07.850  root      : DEBUG   : 	*pipeline_optimization=False
+13:47:07.850  root      : DEBUG   : If something is missing, make sure you used the correct syntax: --test-params="[k=v;]*k=v"
+13:47:07.930  root      : INFO    : Importing platform: eth
+13:47:07.930  root      : DEBUG   : Configuration: {'list': False, 'list_test_names': False, 'allow_user': False, 'test_spec': '', 'test_file': None, 'test_dir': 'ptf/', 'test_order': 'default', 'test_order_seed': 2746, 'platform': 'eth', 'platform_args': None, 'platform_dir': '/usr/local/lib/python3.9/dist-packages/ptf-0.9.1-py3.9.egg/ptf/platforms', 'interfaces': [(0, 0, 's1-eth0'), (0, 1, 's1-eth1'), (0, 2, 's1-eth2'), (0, 3, 's1-eth3'), (0, 4, 's1-eth4'), (0, 5, 's1-eth5')], 'device_sockets': [], 'log_file': 'ptf.log', 'log_dir': None, 'debug': 'verbose', 'profile': False, 'profile_file': 'profile.out', 'xunit': False, 'xunit_dir': 'xunit', 'relax': False, 'test_params': 'interfaces="psa_recirc,eth0,eth1,eth2,eth3,eth4,eth5";namespace="switch";xdp=\'False\';xdp2tc=\'cpumap\';hdr2Map=\'False\';table_caching=\'False\';pipeline_optimization=\'False\'', 'failfast': False, 'fail_skipped': False, 'default_timeout': 2.0, 'default_negative_timeout': 0.1, 'minsize': 0, 'random_seed': None, 'disable_ipv6': False, 'disable_vxlan': False, 'disable_erspan': False, 'disable_geneve': False, 'disable_mpls': False, 'disable_nvgre': False, 'disable_igmp': False, 'disable_rocev2': False, 'qlen': 100, 'test_case_timeout': None, 'socket_recv_size': 4096, 'port_map': {(0, 0): 's1-eth0', (0, 1): 's1-eth1', (0, 2): 's1-eth2', (0, 3): 's1-eth3', (0, 4): 's1-eth4', (0, 5): 's1-eth5'}}
+13:47:07.931  root      : INFO    : port map: {(0, 0): 's1-eth0', (0, 1): 's1-eth1', (0, 2): 's1-eth2', (0, 3): 's1-eth3', (0, 4): 's1-eth4', (0, 5): 's1-eth5'}
+13:47:07.931  root      : INFO    : Autogen random seed: 93351320
+13:47:07.935  root      : INFO    : *** TEST RUN START: Thu Mar  3 13:47:07 2022
+13:47:07.938  eBPFTest  : INFO    : P4ARGS=--trace --max-ternary-masks 3 --xdp2tc=cpumap
+13:47:08.323  root      : INFO    : ** START TEST CASE checksum.HashCRC32PSATest
+13:47:08.323  eBPFTest  : INFO    : 
+Using test params: {'interfaces': 'psa_recirc,eth0,eth1,eth2,eth3,eth4,eth5', 'namespace': 'switch', 'xdp': 'False', 'xdp2tc': 'cpumap', 'hdr2Map': 'False', 'table_caching': 'False', 'pipeline_optimization': 'False'}
+13:47:09.653  scapy.runtime: WARNING : Mac address to reach destination not found. Using broadcast.
+13:47:09.663  dataplane : DEBUG   : Sending 27 bytes to device 0, port 0
+13:47:09.664  dataplane : DEBUG   : Pkt len 27 in on device 0, port 1
+13:47:09.664  root      : DEBUG   : Checking for pkt on device 0, port [0, 1, 2]
+13:47:09.664  dataplane : WARNING : Dataplane poll with exp_pkt but no port number
+13:47:09.664  dataplane : DEBUG   : Grabbing packet
+13:47:09.665  dataplane : DEBUG   : Checking packet from device 0, port 1
+13:47:09.665  scapy.runtime: WARNING : Mac address to reach destination not found. Using broadcast.
+13:47:09.669  dataplane : DEBUG   : Out of packets on all ports
+13:47:09.669  dataplane : DEBUG   : Did not find packet
+13:47:10.666  dataplane : DEBUG   : Grabbing packet
+13:47:10.667  dataplane : DEBUG   : Out of packets on all ports
+13:47:10.668  dataplane : DEBUG   : Did not find packet
+13:47:11.665  dataplane : DEBUG   : Poll timeout, no packet from device 0, port None
+13:47:11.666  root      : DEBUG   : Checking for unexpected packets on all ports of device 0
+13:47:11.668  dataplane : DEBUG   : Grabbing packet
+13:47:11.668  dataplane : DEBUG   : Out of packets on all ports
+13:47:11.669  dataplane : DEBUG   : Did not find packet
+13:47:11.768  dataplane : DEBUG   : Poll timeout, no packet from device 0, port None
+13:47:11.770  scapy.runtime: WARNING : more Mac address to reach destination not found. Using broadcast.
+13:47:12.441  root      : INFO    : ** END TEST CASE checksum.HashCRC32PSATest
+13:47:12.444  root      : INFO    : *** TEST RUN END  : Thu Mar  3 13:47:12 2022
+13:47:12.445  dataplane : INFO    : Thread exit

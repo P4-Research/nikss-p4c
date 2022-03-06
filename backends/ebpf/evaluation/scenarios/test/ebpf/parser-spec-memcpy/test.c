@@ -110,11 +110,11 @@ struct ingress_vxlan_value {
     unsigned int action;
     union {
         struct {
-            unsigned char ethernet_dst_addr[6];
-            unsigned char ethernet_src_addr[6];
+            u64 ethernet_dst_addr;
+            u64 ethernet_src_addr;
             u32 ipv4_src_addr;
             u32 ipv4_dst_addr;
-            unsigned char vxlan_vni[3];
+            u32 vxlan_vni;
             u32 port_out;
         } ingress_vxlan_encap;
         struct {
@@ -262,7 +262,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
     ebpf_packetOffsetInBits += 48;
     parsed_hdr->ethernet.ether_type = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 16;
-
+    //__builtin_memcpy(parsed_hdr->ethernet.dst_addr, current_data, sizeof(struct ethhdr_t));
     parsed_hdr->ethernet.ebpf_valid = 1;
 
 /* extract(parsed_hdr->ipv4)*/
@@ -527,18 +527,18 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
                 return TC_ACT_SHOT;
             }
 
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->outer_ethernet.offset), 14);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->outer_ethernet.offset), 14);
 
-            parsed_hdr->outer_ethernet.dst_addr = htonll(parsed_hdr->outer_ethernet.dst_addr << 16);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ethernet.dst_addr), 6);
+            /*parsed_hdr->outer_ethernet.dst_addr = htonll(parsed_hdr->outer_ethernet.dst_addr << 16);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ethernet.dst_addr), 6);*/
             ebpf_packetOffsetInBits += 48;
 
-            parsed_hdr->outer_ethernet.src_addr = htonll(parsed_hdr->outer_ethernet.src_addr << 16);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ethernet.src_addr), 6);
+            /*parsed_hdr->outer_ethernet.src_addr = htonll(parsed_hdr->outer_ethernet.src_addr << 16);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ethernet.src_addr), 6);*/
             ebpf_packetOffsetInBits += 48;
 
-            parsed_hdr->outer_ethernet.ether_type = bpf_htons(parsed_hdr->outer_ethernet.ether_type);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ethernet.ether_type), 2);
+            /*parsed_hdr->outer_ethernet.ether_type = bpf_htons(parsed_hdr->outer_ethernet.ether_type);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ethernet.ether_type), 2);*/
             ebpf_packetOffsetInBits += 16;
         }
         if (parsed_hdr->outer_ipv4.ebpf_valid) {
@@ -546,42 +546,42 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
                 return TC_ACT_SHOT;
             }
 
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->outer_ipv4.offset), 20);//20
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->outer_ipv4.offset), 20);//20
 
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.ver_ihl), 1);
+            //__builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.ver_ihl), 1);
             ebpf_packetOffsetInBits += 8;
 
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.diffserv), 1);
+            //__builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.diffserv), 1);
             ebpf_packetOffsetInBits += 8;
 
-            parsed_hdr->outer_ipv4.total_len = bpf_htons(parsed_hdr->outer_ipv4.total_len);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.total_len), 2);
+            //parsed_hdr->outer_ipv4.total_len = bpf_htons(parsed_hdr->outer_ipv4.total_len);
+            //__builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.total_len), 2);
             ebpf_packetOffsetInBits += 16;
 
-            parsed_hdr->outer_ipv4.identification = bpf_htons(parsed_hdr->outer_ipv4.identification);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.identification), 2);
+            //parsed_hdr->outer_ipv4.identification = bpf_htons(parsed_hdr->outer_ipv4.identification);
+            //__builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.identification), 2);
             ebpf_packetOffsetInBits += 16;
 
-            parsed_hdr->outer_ipv4.flags_offset = bpf_htons(parsed_hdr->outer_ipv4.flags_offset);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.flags_offset), 2);
+            //parsed_hdr->outer_ipv4.flags_offset = bpf_htons(parsed_hdr->outer_ipv4.flags_offset);
+            //__builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.flags_offset), 2);
             ebpf_packetOffsetInBits += 16;
 
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.ttl), 1);
+            //__builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.ttl), 1);
             ebpf_packetOffsetInBits += 8;
 
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.protocol), 1);
+            //__builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.protocol), 1);
             ebpf_packetOffsetInBits += 8;
 
-            parsed_hdr->outer_ipv4.hdr_checksum = bpf_htons(parsed_hdr->outer_ipv4.hdr_checksum);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.hdr_checksum), 2);
+            //parsed_hdr->outer_ipv4.hdr_checksum = bpf_htons(parsed_hdr->outer_ipv4.hdr_checksum);
+            //__builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.hdr_checksum), 2);
             ebpf_packetOffsetInBits += 16;
 
-            parsed_hdr->outer_ipv4.src_addr = htonl(parsed_hdr->outer_ipv4.src_addr);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.src_addr), 4);
+            //parsed_hdr->outer_ipv4.src_addr = htonl(parsed_hdr->outer_ipv4.src_addr);
+            //__builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.src_addr), 4);
             ebpf_packetOffsetInBits += 32;
 
-            parsed_hdr->outer_ipv4.dst_addr = htonl(parsed_hdr->outer_ipv4.dst_addr);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.dst_addr), 4);
+            //parsed_hdr->outer_ipv4.dst_addr = htonl(parsed_hdr->outer_ipv4.dst_addr);
+            //__builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_ipv4.dst_addr), 4);
             ebpf_packetOffsetInBits += 32;
         }
         if (parsed_hdr->outer_udp.ebpf_valid) {
@@ -589,22 +589,22 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
                 return TC_ACT_SHOT;
             }
 
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->outer_udp.offset), 8);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->outer_udp.offset), 8);
 
-            parsed_hdr->outer_udp.src_port = bpf_htons(parsed_hdr->outer_udp.src_port);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_udp.src_port), 2);
+            //parsed_hdr->outer_udp.src_port = bpf_htons(parsed_hdr->outer_udp.src_port);
+            //__builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_udp.src_port), 2);
             ebpf_packetOffsetInBits += 16;
 
-            parsed_hdr->outer_udp.dst_port = bpf_htons(parsed_hdr->outer_udp.dst_port);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_udp.dst_port), 2);
+            //parsed_hdr->outer_udp.dst_port = bpf_htons(parsed_hdr->outer_udp.dst_port);
+            //__builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_udp.dst_port), 2);
             ebpf_packetOffsetInBits += 16;
 
-            parsed_hdr->outer_udp.length = bpf_htons(parsed_hdr->outer_udp.length);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_udp.length), 2);
+            //parsed_hdr->outer_udp.length = bpf_htons(parsed_hdr->outer_udp.length);
+            //__builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_udp.length), 2);
             ebpf_packetOffsetInBits += 16;
 
-            parsed_hdr->outer_udp.checksum = bpf_htons(parsed_hdr->outer_udp.checksum);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_udp.checksum), 2);
+            //parsed_hdr->outer_udp.checksum = bpf_htons(parsed_hdr->outer_udp.checksum);
+            //__builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->outer_udp.checksum), 2);
             ebpf_packetOffsetInBits += 16;
         }
         if (parsed_hdr->vxlan.ebpf_valid) {
@@ -612,20 +612,20 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
                 return TC_ACT_SHOT;
             }
 
-//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->vxlan.offset), 8);
+            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->vxlan.offset), 8);
 
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->vxlan.flags), 1);
+//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->vxlan.flags), 1);
             ebpf_packetOffsetInBits += 8;
 
-            parsed_hdr->vxlan.reserved = htonl(parsed_hdr->vxlan.reserved << 8);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->vxlan.reserved), 3);
+//            parsed_hdr->vxlan.reserved = htonl(parsed_hdr->vxlan.reserved << 8);
+//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->vxlan.reserved), 3);
             ebpf_packetOffsetInBits += 24;
 
-            parsed_hdr->vxlan.vni = htonl(parsed_hdr->vxlan.vni << 8);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->vxlan.vni), 3);
+//            parsed_hdr->vxlan.vni = htonl(parsed_hdr->vxlan.vni << 8);
+//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->vxlan.vni), 3);
             ebpf_packetOffsetInBits += 24;
 
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->vxlan.reserved2), 1);
+//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->vxlan.reserved2), 1);
             ebpf_packetOffsetInBits += 8;
         }
         if (parsed_hdr->ethernet.ebpf_valid) {
@@ -635,8 +635,8 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
 
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->ethernet.offset), 14);
 
-            parsed_hdr->ethernet.dst_addr = htonll(parsed_hdr->ethernet.dst_addr << 16);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->ethernet.dst_addr), 6);
+//            parsed_hdr->ethernet.dst_addr = htonll(parsed_hdr->ethernet.dst_addr << 16);
+//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->ethernet.dst_addr), 6);
             ebpf_packetOffsetInBits += 48;
             ebpf_packetOffsetInBits += 48;
             ebpf_packetOffsetInBits += 16;
@@ -650,8 +650,8 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
 
             ebpf_packetOffsetInBits += 8;
             ebpf_packetOffsetInBits += 8;
-            parsed_hdr->ipv4.total_len = bpf_htons(parsed_hdr->ipv4.total_len);
-            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->ipv4.total_len), 2);
+//            parsed_hdr->ipv4.total_len = bpf_htons(parsed_hdr->ipv4.total_len);
+//            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), (void *) &(parsed_hdr->ipv4.total_len), 2);
             ebpf_packetOffsetInBits += 16;
             ebpf_packetOffsetInBits += 16;
             ebpf_packetOffsetInBits += 16;
@@ -742,7 +742,7 @@ int tc_egress_func(SK_BUFF *skb) {
     u32 ebpf_zero = 0;
     unsigned char ebpf_byte;
     struct psa_egress_input_metadata_t istd = {
-            .class_of_service = meta->class_of_service,
+            //.class_of_service = meta->class_of_service,
             .egress_port = skb->ifindex,
             .packet_path = meta->packet_path,
             .instance = meta->instance,

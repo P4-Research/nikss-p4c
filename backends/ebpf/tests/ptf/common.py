@@ -222,12 +222,11 @@ class P4EbpfTest(EbpfTest):
             p4args += " --table-caching"
 
         logger.info("P4ARGS=" + p4args)
-        self.exec_cmd("make -f ../runtime/kernel.mk BPFOBJ={output} P4FILE={p4file} "
-                      "ARGS=\"{cargs}\" P4C=p4c-ebpf P4ARGS=\"{p4args}\" psa".format(
+        self.exec_cmd("make -f ../runtime/kernel.mk ARGS=\"-DBTF -DPSA_PORT_RECIRCULATE=2\" BPFOBJ={output} ebpf CFILE={cfile}"
+                     .format(
                             output=self.test_prog_image,
-                            p4file=self.p4_file_path,
-                            cargs="-DPSA_PORT_RECIRCULATE=2",
-                            p4args=p4args),
+                            cfile=self.p4_file_path,
+                            ),
                       "Compilation error")
         super(P4EbpfTest, self).setUp()
 

@@ -110,11 +110,11 @@ struct ingress_vxlan_value {
     unsigned int action;
     union {
         struct {
-            unsigned char ethernet_dst_addr[6];
-            unsigned char ethernet_src_addr[6];
+            u64 ethernet_dst_addr;
+            u64 ethernet_src_addr;
             u32 ipv4_src_addr;
             u32 ipv4_dst_addr;
-            unsigned char vxlan_vni[3];
+            u32 vxlan_vni;
             u32 port_out;
         } ingress_vxlan_encap;
         struct {
@@ -137,7 +137,7 @@ SEC("classifier/map-initializer")
 int map_initialize() {
     return 0;
 }
-SEC("xdp/xdp-ingress")
+/*SEC("xdp/xdp-ingress")
 int xdp_func(struct xdp_md *skb) {
     void *data = (void *)(long)skb->data;
     void *data_end = (void *)(long)skb->data_end;
@@ -161,7 +161,7 @@ int xdp_func(struct xdp_md *skb) {
     eth->h_proto = bpf_htons(0x0800);
 
     return XDP_PASS;
-}
+}*/
 inline u16 csum16_add(u16 csum, u16 addend) {
     u16 res = csum;
     res += addend;
@@ -174,7 +174,7 @@ inline u16 csum_replace2(u16 csum, u16 old, u16 new) {
     return (~csum16_add(csum16_sub(~csum, old), new));
 }
 static __always_inline
-int do_for_each(SK_BUFF *skb, void *map, unsigned int max_iter, void (*a)(SK_BUFF *, void *))
+int do_for_each(struct xdp_md *skb, void *map, unsigned int max_iter, void (*a)(struct xdp_md *, void *))
 {
     elem_t head_idx = {0, 0};
     struct element *elem = bpf_map_lookup_elem(map, &head_idx);
@@ -200,16 +200,16 @@ int do_for_each(SK_BUFF *skb, void *map, unsigned int max_iter, void (*a)(SK_BUF
 }
 
 static __always_inline
-void do_clone(SK_BUFF *skb, void *data)
+void do_clone(struct xdp_md *skb, void *data)
 {
     struct clone_session_entry *entry = (struct clone_session_entry *) data;
-    bpf_clone_redirect(skb, entry->egress_port, 0);
+//    bpf_clone_redirect(skb, entry->egress_port, 0); // w xdp nie działają helpery bpf
 }
 
 static __always_inline
-int do_packet_clones(SK_BUFF * skb, void * map, __u32 session_id, PSA_PacketPath_t new_pkt_path, __u8 caller_id)
+int do_packet_clones(struct xdp_md * skb, void * map, __u32 session_id, PSA_PacketPath_t new_pkt_path, __u8 caller_id)
 {
-    struct psa_global_metadata * meta = (struct psa_global_metadata *) skb->cb;
+    struct psa_global_metadata * meta = (struct psa_global_metadata *) (struct internal_metadata *)(unsigned long)skb->data_meta;
     void * inner_map;
     inner_map = bpf_map_lookup_elem(map, &session_id);
     if (inner_map != NULL) {
@@ -224,21 +224,28 @@ int do_packet_clones(SK_BUFF * skb, void * map, __u32 session_id, PSA_PacketPath
     return 0;
 }
 
-static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, struct psa_ingress_output_metadata_t *ostd, struct empty_metadata_t *resubmit_meta)
+static __always_inline int process(struct xdp_md *skb, struct headers_t *parsed_hdr, struct psa_ingress_output_metadata_t *ostd, struct empty_metadata_t *resubmit_meta)
 {
-
-    struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->cb;
-    if (meta->packet_path == NORMAL) {
-        struct internal_metadata *md = (struct internal_metadata *)(unsigned long)skb->data_meta;
-        if ((void *) ((struct internal_metadata *) md + 1) > (void *)(long)skb->data) {
-            return TC_ACT_SHOT;
-        }
-        __u16 *ether_type = (__u16 *) ((void *) (long)skb->data + 12);
-        if ((void *) ((__u16 *) ether_type + 1) >     (void *) (long) skb->data_end) {
-            return TC_ACT_SHOT;
-        }
-        *ether_type = md->pkt_ether_type;
+    struct internal_metadata *md;
+    int returnCode = bpf_xdp_adjust_meta(skb, -(int)sizeof(*md));
+    if (returnCode < 0) {
+        return XDP_ABORTED;
     }
+    md = (struct internal_metadata *)(unsigned long)skb->data_meta;
+    if ((void *) ((struct internal_metadata *) md + 1) > (void *)(long)skb->data) {
+        return XDP_DROP;
+    }
+    __u16 *ether_type = (__u16 *) ((void *) (long)skb->data + 12);
+    if ((void *) ((__u16 *) ether_type + 1) >     (void *) (long) skb->data_end) {
+        return XDP_DROP;
+    }
+    *ether_type = md->pkt_ether_type;
+
+    struct psa_global_metadata *meta = (struct psa_global_metadata *) (struct internal_metadata *)(unsigned long)skb->data_meta; // zmiana cb na data_meta
+    //if (meta->packet_path == NORMAL) { // błąd w libbpf
+
+
+    //}
     struct local_metadata_t local_metadata1 = {
     };
     struct tmp_headers_t tmp_header;
@@ -376,19 +383,22 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
 }
 
     reject: {
-    return TC_ACT_SHOT;
+    return XDP_DROP;
 }
 
     accept:
     {
 
-        void * ptr = (void *) &(tmp_header);
-        bpf_skb_load_bytes(skb, 0, ptr, BYTES(ebpf_packetOffsetInBits));
-
+        //void * ptr = (void *) &(tmp_header);
+        //bpf_skb_load_bytes(skb, 0, ptr, BYTES(ebpf_packetOffsetInBits));   // unsupported in xdp
+        if ((void *) ((char *) skb->data + 92) > (void *)(long)skb->data_end) {
+            return XDP_DROP;
+        }
+        __builtin_memcpy(&(tmp_header), (char *)skb->data, 92);
         struct psa_ingress_input_metadata_t standard_metadata = {
-                .ingress_port = skb->ifindex,
+                .ingress_port = skb->ingress_ifindex, // w strukturze xdp jest ingress_ifindex
                 .packet_path = meta->packet_path,
-                .ingress_timestamp = skb->tstamp,
+                .ingress_timestamp = bpf_ktime_get_ns(), // zmiana bo poprzednio wywalało error
                 .parser_error = ebpf_errorCode,
         };
         u8 hit_1;
@@ -470,11 +480,11 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
                         default:
                         {
                             //bpf_trace_message("Default \n");
-                            return TC_ACT_SHOT;
+                            return XDP_DROP;
                         }
                     }
                 } else {
-                    return TC_ACT_SHOT;
+                    return XDP_DROP;
                 }
             }
             ;
@@ -485,11 +495,11 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
             do_packet_clones(skb, &clone_session_tbl, ostd->clone_session_id, CLONE_I2E, 1);
         }
         if (ostd->drop) {
-            return TC_ACT_SHOT;
+            return XDP_DROP;
         }
         if (ostd->resubmit) {
             meta->packet_path = RESUBMIT;
-            return TC_ACT_UNSPEC;
+            return XDP_ABORTED;
         }
         int outHeaderLength = 0;
         if (parsed_hdr->outer_ethernet.ebpf_valid) {
@@ -514,9 +524,11 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
         int outHeaderOffset = BYTES(outHeaderLength) - BYTES(ebpf_packetOffsetInBits);
         if (outHeaderOffset != 0) {
             int returnCode = 0;
-            returnCode = bpf_skb_adjust_room(skb, outHeaderOffset, 1, 0);
+            __u32 new_hdrsz = sizeof(struct ethernet_t) + sizeof( struct ipv4_t) +
+                              sizeof(struct udp_t) + sizeof(struct vxlan_t);
+            returnCode = bpf_xdp_adjust_head(skb, -new_hdrsz);
             if (returnCode) {
-                return TC_ACT_SHOT;
+                return XDP_DROP;
             }
         }
         pkt = ((void*)(long)skb->data);
@@ -524,7 +536,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
         ebpf_packetOffsetInBits = 0;
         if (parsed_hdr->outer_ethernet.ebpf_valid) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
-                return TC_ACT_SHOT;
+                return XDP_DROP;
             }
 
 //            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->outer_ethernet.offset), 14);
@@ -543,7 +555,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
         }
         if (parsed_hdr->outer_ipv4.ebpf_valid) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
-                return TC_ACT_SHOT;
+                return XDP_DROP;
             }
 
 //            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->outer_ipv4.offset), 20);//20
@@ -586,7 +598,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
         }
         if (parsed_hdr->outer_udp.ebpf_valid) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 64)) {
-                return TC_ACT_SHOT;
+                return XDP_DROP;
             }
 
 //            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->outer_udp.offset), 8);
@@ -609,7 +621,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
         }
         if (parsed_hdr->vxlan.ebpf_valid) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 64)) {
-                return TC_ACT_SHOT;
+                return XDP_DROP;
             }
 
 //            __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->vxlan.offset), 8);
@@ -630,7 +642,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
         }
         if (parsed_hdr->ethernet.ebpf_valid) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
-                return TC_ACT_SHOT;
+                return XDP_DROP;
             }
 
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->ethernet.offset), 14);
@@ -643,7 +655,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
         }
         if (parsed_hdr->ipv4.ebpf_valid) {
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
-                return TC_ACT_SHOT;
+                return XDP_DROP;
             }
 
             __builtin_memcpy(pkt + BYTES(ebpf_packetOffsetInBits), ((void *) &(tmp_header) + parsed_hdr->ipv4.offset), 20);
@@ -663,10 +675,10 @@ static __always_inline int process(SK_BUFF *skb, struct headers_t *parsed_hdr, s
         }
 
     }
-    return TC_ACT_UNSPEC;
+    return XDP_ABORTED;
 }
-SEC("classifier/tc-ingress")
-int tc_ingress_func(SK_BUFF *skb) {
+SEC("xdp/xdp-ingress")
+int tc_ingress_func(struct xdp_md *skb) {
     struct psa_ingress_output_metadata_t ostd = {
             .drop = true,
     };
@@ -692,7 +704,7 @@ int tc_ingress_func(SK_BUFF *skb) {
                     .ebpf_valid = 0
             },
     };
-    int ret = TC_ACT_UNSPEC;
+    int ret = XDP_ABORTED;
 #pragma clang loop unroll(disable)
     for (int i = 0; i < 4; i++) {
         ostd.resubmit = 0;
@@ -702,19 +714,19 @@ int tc_ingress_func(SK_BUFF *skb) {
         }
         __builtin_memset((void *) &headers, 0, sizeof(struct headers_t));
     }
-    if (ret != TC_ACT_UNSPEC) {
+    if (ret != XDP_ABORTED) {
         return ret;
     }
     if (ostd.multicast_group != 0) {
         do_packet_clones(skb, &multicast_grp_tbl, ostd.multicast_group, NORMAL_MULTICAST, 2);
-        return TC_ACT_SHOT;
+        return XDP_DROP;
     }
     return bpf_redirect(ostd.egress_port, 0);
 }
-SEC("classifier/tc-egress")
-int tc_egress_func(SK_BUFF *skb) {
+SEC("xdp/xdp-egress")
+int tc_egress_func(struct xdp_md *skb) {
     //bpf_trace_message("TC egress\n");
-    struct psa_global_metadata *meta = (struct psa_global_metadata *) skb->cb;
+    struct psa_global_metadata *meta = (struct psa_global_metadata *) (struct internal_metadata *)(unsigned long)skb->data_meta;
     volatile struct headers_t headers = {
             .ethernet = {
                     .ebpf_valid = 0
@@ -742,11 +754,10 @@ int tc_egress_func(SK_BUFF *skb) {
     u32 ebpf_zero = 0;
     unsigned char ebpf_byte;
     struct psa_egress_input_metadata_t istd = {
-            .class_of_service = meta->class_of_service,
-            .egress_port = skb->ifindex,
+            .egress_port = skb->ingress_ifindex,
             .packet_path = meta->packet_path,
             .instance = meta->instance,
-            .egress_timestamp = skb->tstamp,
+            .egress_timestamp = bpf_ktime_get_ns(),
             .parser_error = ebpf_errorCode,
     };
     if (istd.egress_port == PSA_PORT_RECIRCULATE) {
@@ -762,7 +773,7 @@ int tc_egress_func(SK_BUFF *skb) {
 }
 
     reject: {
-    return TC_ACT_SHOT;
+    return XDP_DROP;
 }
 
     accept:
@@ -779,9 +790,11 @@ int tc_egress_func(SK_BUFF *skb) {
         int outHeaderOffset = BYTES(outHeaderLength) - BYTES(ebpf_packetOffsetInBits);
         if (outHeaderOffset != 0) {
             int returnCode = 0;
-            returnCode = bpf_skb_adjust_room(skb, outHeaderOffset, 1, 0);
+            __u32 new_hdrsz = sizeof(struct ethernet_t) + sizeof( struct ipv4_t) +
+                              sizeof(struct udp_t) + sizeof(struct vxlan_t);
+            returnCode = bpf_xdp_adjust_head(skb, -new_hdrsz);
             if (returnCode) {
-                return TC_ACT_SHOT;
+                return XDP_DROP;
             }
         }
         pkt = ((void*)(long)skb->data);
@@ -794,14 +807,14 @@ int tc_egress_func(SK_BUFF *skb) {
     }
 
     if (ostd.drop) {
-        return TC_ACT_SHOT;
+        return XDP_DROP;
     }
 
-    if (istd.egress_port == P4C_PSA_PORT_RECIRCULATE) {
-        meta->packet_path = RECIRCULATE;
+    /*if (istd.egress_port == P4C_PSA_PORT_RECIRCULATE) {
+        //meta->packet_path = RECIRCULATE;
         return bpf_redirect(PSA_PORT_RECIRCULATE, BPF_F_INGRESS);
-    }
+    }*/
 
-    return TC_ACT_OK;
+    return XDP_PASS;
 }
 char _license[] SEC("license") = "GPL";

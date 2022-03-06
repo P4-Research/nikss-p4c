@@ -27,7 +27,7 @@ function exit_on_error() {
 function cleanup() {
       echo "Cleaning...."
       for intf in "${INTERFACES[@]}" ; do
-        ip link del "s1-$intf"
+        ip link show "s1-$intf"
       done
       ip netns exec switch ip link del psa_recirc
       ip netns exec switch ip link del psa_cpu

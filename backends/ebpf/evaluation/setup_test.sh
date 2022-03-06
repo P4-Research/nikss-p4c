@@ -56,14 +56,17 @@ declare -a RECIRC_PORT_ID=$(ip -o link | awk '$2 == "psa_recirc:" {print $1}' | 
 
 echo "Compiling data plane program.."
 declare -a P4PROGRAM=$(find "$2" -maxdepth 1 -type f -name "*.p4")
-declare -a ARGS="-DPSA_PORT_RECIRCULATE=$RECIRC_PORT_ID"
+declare -a ARGS="-DBTF -DPSA_PORT_RECIRCULATE=$RECIRC_PORT_ID"
 
 if [ -n "$P4PROGRAM" ]; then
   echo "Found P4 program: $P4PROGRAM"
   make -f ../runtime/kernel.mk BPFOBJ=out.o \
       P4FILE=$P4PROGRAM ARGS="$ARGS" P4ARGS="$P4ARGS" psa
+#<<<<<<< HEAD
   exit_on_error
   psabpf-ctl pipeline load id 99 out.o
+#=======
+#>>>>>>> efeb94fc81aebe380a110af48a3516a30e22bb15
   exit_on_error
 else
   declare -a CFILE=$(find "$2" -maxdepth 1 -type f -name "*.c")
@@ -84,6 +87,7 @@ for intf in ${INTERFACES//,/ } ; do
   sysctl -w net.ipv6.conf."$intf".accept_ra=0
   
   ifconfig "$intf" promisc
+#<<<<<<< HEAD
   ethtool -L "$intf" combined 1
   ethtool -G "$intf" tx 4096
   ethtool -G "$intf" rx 4096
@@ -98,6 +102,14 @@ for intf in ${INTERFACES//,/ } ; do
   #tc filter add dev "$intf" egress bpf da fd /sys/fs/bpf/prog/classifier_tc-egress
 
   psabpf-ctl pipeline add-port id 99 "$intf"
+#=======
+
+  # TODO: move this to psabpf-ctl
+  bpftool net attach xdp pinned /sys/fs/bpf/prog/xdp_ingress_xdp-ingress dev "$intf" #overwrite
+  tc qdisc add dev "$intf" clsact
+  tc filter add dev "$intf" ingress bpf da fd /sys/fs/bpf/prog/classifier_tc-ingress
+  tc filter add dev "$intf" egress bpf da fd /sys/fs/bpf/prog/classifier_tc-egress
+#>>>>>>> efeb94fc81aebe380a110af48a3516a30e22bb15
 
   # by default, pin IRQ to 3rd CPU core
   bash scripts/set_irq_affinity.sh 2 "$intf"
@@ -118,6 +130,35 @@ for intf in ${INTERFACES//,/ } ; do
   ip link show "$intf"
 done
 
+echo -e "Populating crc lookup table"
+
+  #crc=$i
+  #for ((j = 0; j <= 7; j++)); do
+  #  crc=$(((crc >> 1) ^ (-(crc & 1) & 0x4c11db7)))
+  #done
+  #calc=$(printf "%08x" $crc)
+  #echo "LE crc $calc"
+  #BECALC="${calc:6:2} ${calc:4:2} ${calc:2:2} ${calc:0:2}"
+  #echo "BE crc $BECALC"
+  #bpftool map update name crc_lookup_tbl key  hex $(printf "%x" $i) 00 00 00 value  hex $BECALC
+    #LSB_CRC32_POLY=0x04c11db7 # The CRC32 polynomal LSB order
+__generate_crc_lookup_table() {
+  local -i -r LSB_CRC32_POLY=0xEDB88320 # The CRC32 polynomal LSB order
+  local -i index byte lsb
+
+    for index in {0..255}; do
+      ((byte = 255 - index))
+      for _ in {0..7}; do # 8-bit lsb shift
+        ((lsb = byte & 0x01, byte = ((byte >> 1) & 0x7FFFFFFF) ^ (lsb == 0 ? LSB_CRC32_POLY : 0)))
+      done
+      calc=$(printf "%0x" $byte)
+      BECALC="${calc:6:2} ${calc:4:2} ${calc:2:2} ${calc:0:2}"
+      printf "%0x" $byte
+      echo "BE crc $BECALC"
+      bpftool map update name crc_lookup_tbl key  hex $(printf "%x" $index) 00 00 00 value  hex $BECALC
+    done
+}
+__generate_crc_lookup_table
 echo -e "Dumping BPF setup:"
 bpftool net show 
 
