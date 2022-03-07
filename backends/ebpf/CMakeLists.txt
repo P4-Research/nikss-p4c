@@ -148,7 +148,6 @@ add_dependencies(p4c_driver linkp4cebpf)
 set(EBPF_DRIVER_KERNEL "${CMAKE_CURRENT_SOURCE_DIR}/run-ebpf-test.py -t kernel -c \"${P4C_BINARY_DIR}/p4c-ebpf\"")
 set(EBPF_DRIVER_BCC "${CMAKE_CURRENT_SOURCE_DIR}/run-ebpf-test.py -t bcc -c \"${P4C_BINARY_DIR}/p4c-ebpf\"")
 set(EBPF_DRIVER_TEST "${CMAKE_CURRENT_SOURCE_DIR}/run-ebpf-test.py -t test -c \"${P4C_BINARY_DIR}/p4c-ebpf\"")
-set(EBPF_PTF_DRIVER_TEST "${CMAKE_CURRENT_SOURCE_DIR}/run-ptf-tests.sh")
 
 set (XFAIL_TESTS_KERNEL
   # Rejected by kernel verifier, likely reasons:
@@ -167,10 +166,6 @@ set (EBPF_TEST_SUITES
   "${P4C_SOURCE_DIR}/testdata/p4_16_samples/*_ebpf.p4"
   )
 
-set (EBPF_PSA_PTF_TEST_SUITES
-  "${CMAKE_CURRENT_SOURCE_DIR}/tests/test.sh"
-  )
-
 # determine the kernel version
 execute_process(COMMAND uname -r
   OUTPUT_VARIABLE P4C_EBPF_KERNEL_VER
@@ -185,16 +180,6 @@ if (${KERNEL_VER} VERSION_LESS ${MIN_KERNEL} )
   set (SUPPORTS_KERNEL False)
 else()
   set (SUPPORTS_KERNEL True)
-endif()
-
-# Check if the kernel version is new enough to support some features required for PSA
-set (MIN_KERNEL 5.8.0)
-string (REGEX MATCH "[0-9]+[^-]*" KERNEL_VER ${CMAKE_SYSTEM})
-if (${KERNEL_VER} VERSION_LESS ${MIN_KERNEL} )
-  MESSAGE(WARNING "Kernel version ${KERNEL_VER} too small for PSA, expected ${MIN_KERNEL}. Ignoring ebpf kernel PSA PTF tests...")
-  set (SUPPORTS_KERNEL_PSA False)
-else()
-  set (SUPPORTS_KERNEL_PSA True)
 endif()
 
 # Check if we have the right llvm version
@@ -221,33 +206,6 @@ else()
   set (SUPPORTS_KERNEL False)
 endif()
 
-# check for the psabpf-ctl program
-find_program(PSABPF_CTL_PROG "psabpf-ctl")
-if (PSABPF_CTL_PROG)
-  message(STATUS "Found psabpf-ctl program")
-else()
-  MESSAGE(WARNING "psabpf-ctl not found, ignoring ebpf kernel PSA PTF tests...")
-  set (SUPPORTS_KERNEL_PSA False)
-endif()
-
-# check if bpftool is available
-find_program(BPFTOOL_PROG "bpftool")
-if (BPFTOOL_PROG)
-  message(STATUS "Found bpftool program")
-else()
-  MESSAGE(WARNING "bpftool not found, ignoring ebpf kernel PSA PTF tests...")
-  set (SUPPORTS_KERNEL_PSA False)
-endif()
-
-# check if PTF is available
-find_program(PTF_PROG "ptf")
-if (PTF_PROG)
-  message(STATUS "Found ptf program")
-else()
-  MESSAGE(WARNING "PTF not found, ignoring ebpf kernel PSA PTF tests...")
-  set (SUPPORTS_KERNEL_PSA False)
-endif()
-
 # Only add the kernel tests if the two requirements are met
 if (SUPPORTS_KERNEL)
   p4c_add_tests("ebpf-kernel" ${EBPF_DRIVER_KERNEL} ${EBPF_TEST_SUITES} "${XFAIL_TESTS_KERNEL}")
@@ -266,11 +224,5 @@ p4c_add_test_with_args("ebpf" ${EBPF_DRIVER_TEST} FALSE "testdata/p4_16_samples/
 # FIXME:This does not work yet
 # We do not have support for dynamic addition of tables in the test framework
 p4c_add_test_with_args("ebpf" ${EBPF_DRIVER_TEST} TRUE "testdata/p4_16_samples/ebpf_conntrack_extern.p4" "testdata/p4_16_samples/ebpf_conntrack_extern.p4" "--extern-file ${P4C_SOURCE_DIR}/testdata/extern_modules/extern-conntrack-ebpf.c" "")
-
-# Execute PSA PTF test only when: (1) kernel is supported, (2) psabpf-ctl, (3) bpftool and (4) PTF are available
-if (SUPPORTS_KERNEL_PSA)
-  set (ebpf-psa-ptf_timeout 7200)
-  p4c_add_tests("ebpf-psa-ptf" ${EBPF_PTF_DRIVER_TEST} ${EBPF_PSA_PTF_TEST_SUITES} "")
-endif()
 
 message(STATUS "Done with configuring BPF back end")
