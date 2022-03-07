@@ -227,7 +227,8 @@ class P4EbpfTest(EbpfTest):
     def multicast_group_delete(self, group):
         self.exec_ns_cmd("psabpf-ctl multicast-group delete pipe {} id {}".format(TEST_PIPELINE_ID, group))
 
-    def table_write(self, method, table, keys, action=0, data=None, priority=None, references=None):
+    def table_write(self, method, table, keys, action=0, data=None, priority=None, references=None,
+                    counters=None, meters=None):
         """
         Use table_add or table_update instead of this method
         """
@@ -240,21 +241,30 @@ class P4EbpfTest(EbpfTest):
         cmd = cmd + "key "
         for k in keys:
             cmd = cmd + "{} ".format(k)
-        if data:
+        if data or counters or meters:
             cmd = cmd + "data "
-            for d in data:
-                cmd = cmd + "{} ".format(d)
+            if data:
+                for d in data:
+                    cmd = cmd + "{} ".format(d)
+            if counters:
+                for k, v in counters.items():
+                    cmd = cmd + "counter {} {} ".format(k, v)
+            if meters:
+                for k, v in meters.items():
+                    cmd = cmd + "meter {} {} ".format(k, v)
         if priority:
             cmd = cmd + "priority {}".format(priority)
         self.exec_ns_cmd(cmd, "Table {} failed".format(method))
 
-    def table_add(self, table, keys, action=0, data=None, priority=None, references=None):
+    def table_add(self, table, keys, action=0, data=None, priority=None, references=None,
+                  counters=None, meters=None):
         self.table_write(method="add", table=table, keys=keys, action=action, data=data,
-                         priority=priority, references=references)
+                         priority=priority, references=references, counters=counters, meters=meters)
 
-    def table_update(self, table, keys, action=0, data=None, priority=None, references=None):
+    def table_update(self, table, keys, action=0, data=None, priority=None, references=None,
+                     counters=None, meters=None):
         self.table_write(method="update", table=table, keys=keys, action=action, data=data,
-                         priority=priority, references=references)
+                         priority=priority, references=references, counters=counters, meters=meters)
 
     def table_delete(self, table, keys=None):
         cmd = "psabpf-ctl table delete pipe {} {} ".format(TEST_PIPELINE_ID, table)
