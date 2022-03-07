@@ -20,8 +20,8 @@ jobs:
     - name: Build (Linux)
       run: |
         tools/start_ccache
-        docker build --network host -t p4c-ptf -f Dockerfile.ptf --build-arg MAKEFLAGS=-j8 --build-arg IMAGE_TYPE=test --build-arg ENABLE_UNIFIED_COMPILATION=$UNIFIED --build-arg ENABLE_GMP=$ENABLE_GMP .
+        docker build --network host -t p4c --build-arg MAKEFLAGS=-j8 --build-arg IMAGE_TYPE=test --build-arg ENABLE_UNIFIED_COMPILATION=$UNIFIED --build-arg ENABLE_GMP=$ENABLE_GMP .
 
     - name: Run PTF tests (Linux)
       run: |
-        sudo docker run --privileged -v /sys/fs/bpf:/sys/fs/bpf -w /p4c/build p4c-ptf bash -c 'make check-ebpf-psa-ptf; EXIT_CODE=$?; cat Testing/Temporary/LastTest.log; exit $EXIT_CODE'
+        sudo docker run --privileged -v /sys/fs/bpf:/sys/fs/bpf -w /p4c/backends/ebpf/tests p4c ./test.sh

@@ -111,6 +111,31 @@ build ${CMAKE_FLAGS}
 make install
 /usr/local/bin/ccache -p -s
 
+function install_ptf_test_deps() {
+  export P4C_PTF_PACKAGES="gcc-multilib \
+                           python3-six \
+                           libjansson-dev \
+                           linux-tools-`uname -r`"
+  # Package "linux-tools-generic-hwe-20.04" is not required because
+  # we test under current kernel, not the newest one
+  apt-get install -y --no-install-recommends ${P4C_PTF_PACKAGES}
+
+  git clone --recursive https://github.com/P4-Research/psabpf.git /tmp/psabpf
+  cd /tmp/psabpf
+  # some sort of git tag, but later use git tags when psabpf ready to use
+  git reset --hard 8fc9687
+  ./build_libbpf.sh
+  mkdir build
+  cd build
+  cmake ..
+  make "-j$(nproc)"
+  make install
+}
+
+if [[ "${IMAGE_TYPE}" == "test" ]] ; then
+  install_ptf_test_deps
+fi
+
 if [[ "${IMAGE_TYPE}" == "build" ]] ; then
   apt-get purge -y ${P4C_DEPS} git
   apt-get autoremove --purge -y
