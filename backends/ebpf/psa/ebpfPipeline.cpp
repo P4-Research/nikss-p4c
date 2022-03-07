@@ -324,11 +324,7 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
                         "    }", actUnspecCode);
     builder->newline();
 
-    if (!options.pipelineOptimization ||
-        (deparser->is<OptimizedXDPIngressDeparserPSA>() &&
-         deparser->to<OptimizedXDPIngressDeparserPSA>()->skipEgress)) {
-        this->emitTrafficManager(builder);
-    }
+    this->emitTrafficManager(builder);
     builder->blockEnd(true);
 }
 

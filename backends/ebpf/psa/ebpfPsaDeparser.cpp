@@ -24,7 +24,7 @@ void DeparserBodyTranslator::processMethod(const P4::ExternMethod *method) {
         deparser->getChecksum(instance)->processMethod(builder, methodName, method->expr, this);
         return;
     } else if (method->method->name.name == "emit") {
-        // do not use visitor to generate emit() methods
+        // do not use this visitor to generate emit() methods
         return;
     } else if (method->method->name.name == "pack") {
         // Emit digest pack method
@@ -39,69 +39,239 @@ void DeparserBodyTranslator::processMethod(const P4::ExternMethod *method) {
     ControlBodyTranslator::processMethod(method);
 }
 
-bool EBPFDeparserPSA::isHeaderEmitted(cstring hdrName) const {
-    return std::find(headersExpressions.begin(),
-                     headersExpressions.end(),
-                     hdrName) != headersExpressions.end();
+DeparserHdrEmitTranslator::DeparserHdrEmitTranslator(const EBPFDeparserPSA *deparser) :
+        CodeGenInspector(deparser->program->refMap, deparser->program->typeMap),
+        ControlBodyTranslator(deparser), deparser(deparser) {
+    setName("DeparserHdrEmitTranslator");
 }
 
-void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
-    auto pipeline = program->to<EBPFPipeline>();
+void DeparserHdrEmitTranslator::processMethod(const P4::ExternMethod *method) {
+    if (method->method->name.name == "emit") {
+        auto decl = method->object;
+        if (decl == deparser->packet_out) {
+            if (method->method->name.name == p4lib.packetOut.emit.name) {
+                auto expr = method->expr->arguments->at(0)->expression;
+                auto exprType = deparser->program->typeMap->getType(expr);
+                auto headerToEmit = exprType->to<IR::Type_Header>();
+                if (headerToEmit == nullptr) {
+                    ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                            "Cannot emit a non-header type %1%", expr);
+                }
 
-    builder->emitIndent();
-    builder->appendFormat("int %s = 0", this->outerHdrLengthVar.c_str());
-    builder->endOfStatement(true);
+                auto exprMemb = expr->to<IR::Member>();
+                auto headerName = exprMemb->member.name;
+                auto headersStructName = deparser->parserHeaders->name.name;
+                auto headerExpression = headersStructName + "->" + headerName;
 
-    for (unsigned long i = 0; i < this->headersToEmit.size(); i++) {
-        auto headerToEmit = headersToEmit[i];
-        auto headerExpression = headersExpressions[i];
-        unsigned width = headerToEmit->width_bits();
-        builder->emitIndent();
-        builder->append("if (");
-        builder->append(headerExpression);
-        builder->append(".ebpf_valid) ");
-        builder->blockStart();
-        builder->emitIndent();
-        builder->appendFormat("%s += %d;", this->outerHdrLengthVar.c_str(), width);
-        builder->newline();
-        builder->blockEnd(true);
+                cstring msgStr;
+                builder->emitIndent();
+                builder->append("if (");
+                builder->append(headerExpression);
+                builder->append(".ebpf_valid) ");
+                builder->blockStart();
+                auto program = deparser->program;
+                unsigned width = headerToEmit->width_bits();
+                msgStr = Util::printf_format("Deparser: emitting header %s", headerExpression.c_str());
+                builder->target->emitTraceMessage(builder, msgStr.c_str());
+
+                builder->emitIndent();
+                builder->appendFormat("if (%s < %s + BYTES(%s + %d)) ",
+                                      program->packetEndVar.c_str(),
+                                      program->packetStartVar.c_str(),
+                                      program->offsetVar.c_str(), width);
+                builder->blockStart();
+                builder->target->emitTraceMessage(builder, "Deparser: invalid packet (packet too short)");
+                builder->emitIndent();
+                // We immediately return instead of jumping to reject state.
+                // It avoids reaching BPF_COMPLEXITY_LIMIT_JMP_SEQ.
+                builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
+                builder->newline();
+                builder->blockEnd(true);
+                builder->emitIndent();
+                builder->newline();
+                unsigned alignment = 0;
+                for (auto f : headerToEmit->fields) {
+                    auto ftype = deparser->program->typeMap->getType(f);
+                    auto etype = EBPFTypeFactory::instance->create(ftype);
+                    auto et = dynamic_cast<EBPF::IHasWidth *>(etype);
+                    if (et == nullptr) {
+                        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                                "Only headers with fixed widths supported %1%", f);
+                        return;
+                    }
+                    emitField(builder, headerExpression, f->name, alignment, etype);
+                    alignment += et->widthInBits();
+                    alignment %= 8;
+                }
+                builder->blockEnd(true);
+            }
+        }
+    }
+}
+
+void DeparserHdrEmitTranslator::emitField(CodeBuilder* builder, cstring headerExpression,
+                                cstring field, unsigned int alignment,
+                                EBPF::EBPFType* type) const {
+    auto program = deparser->program;
+
+    auto et = dynamic_cast<EBPF::IHasWidth *>(type);
+    if (et == nullptr) {
+        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                "Only headers with fixed widths supported %1%", headerExpression);
+        return;
+    }
+    unsigned widthToEmit = et->widthInBits();
+    unsigned loadSize = 0;
+    cstring swap = "", msgStr;
+
+    if (widthToEmit <= 64) {
+        cstring tmp = Util::printf_format("(unsigned long long) %s.%s",
+                                          headerExpression, field);
+        msgStr = Util::printf_format("Deparser: emitting field %s=0x%%llx (%u bits)",
+                                     field, widthToEmit);
+        builder->target->emitTraceMessage(builder, msgStr.c_str(), 1, tmp.c_str());
+    } else {
+        msgStr = Util::printf_format("Deparser: emitting field %s (%u bits)", field, widthToEmit);
+        builder->target->emitTraceMessage(builder, msgStr.c_str());
     }
 
-    builder->newline();
-    builder->emitIndent();
+    if (widthToEmit <= 8) {
+        loadSize = 8;
+    } else if (widthToEmit <= 16) {
+        swap = "bpf_htons";
+        loadSize = 16;
+    } else if (widthToEmit <= 32) {
+        swap = "htonl";
+        loadSize = 32;
+    } else if (widthToEmit <= 64) {
+        swap = "htonll";
+        loadSize = 64;
+    }
+    unsigned bytes = ROUNDUP(widthToEmit, 8);
+    unsigned shift = widthToEmit < 8 ?
+                     (loadSize - alignment - widthToEmit) : (loadSize - widthToEmit);
+    cstring hdrField = headerExpression + "." + field;
 
-    cstring offsetVar = program->offsetVar;
-    builder->appendFormat("int %s = BYTES(%s) - BYTES(%s)",
-                          this->outerHdrOffsetVar.c_str(),
-                          this->outerHdrLengthVar.c_str(),
-                          offsetVar.c_str());
+    if (!swap.isNullOrEmpty()) {
+        builder->emitIndent();
+        builder->append(hdrField);
+        builder->appendFormat(" = %s(", swap);
+        builder->append(hdrField);
+        if (shift != 0)
+            builder->appendFormat(" << %d", shift);
+        builder->append(")");
+        builder->endOfStatement(true);
+    }
+    unsigned bitsInFirstByte = widthToEmit % 8;
+    if (bitsInFirstByte == 0) bitsInFirstByte = 8;
+    unsigned bitsInCurrentByte = bitsInFirstByte;
+    unsigned left = widthToEmit;
+    for (unsigned i = 0; i < (widthToEmit + 7) / 8; i++) {
+        builder->emitIndent();
+        builder->appendFormat("%s = ((char*)(&", program->byteVar.c_str());
+        builder->append(hdrField);
+        builder->appendFormat("))[%d]", i);
+        builder->endOfStatement(true);
+        unsigned freeBits = alignment != 0 ? (8 - alignment) : 8;
+        bitsInCurrentByte = left >= 8 ? 8 : left;
+        unsigned bitsToWrite =
+                bitsInCurrentByte > freeBits ? freeBits : bitsInCurrentByte;
+        BUG_CHECK((bitsToWrite > 0) && (bitsToWrite <= 8),
+                  "invalid bitsToWrite %d", bitsToWrite);
+        builder->emitIndent();
+        if (alignment == 0 && bitsToWrite == 8) {  // write whole byte
+            builder->appendFormat(
+                    "write_byte(%s, BYTES(%s) + %d, (%s))",
+                    program->packetStartVar.c_str(),
+                    program->offsetVar.c_str(),
+                    widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
+                    program->byteVar.c_str());
+        } else {  // write partial
+            shift = (8 - alignment - bitsToWrite);
+            builder->appendFormat(
+                    "write_partial(%s + BYTES(%s) + %d, %d, %d, (%s >> %d))",
+                    program->packetStartVar.c_str(),
+                    program->offsetVar.c_str(),
+                    widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
+                    bitsToWrite,
+                    shift,
+                    program->byteVar.c_str(),
+                    widthToEmit > freeBits ? alignment == 0 ? shift : alignment : 0);
+        }
+        builder->endOfStatement(true);
+        left -= bitsToWrite;
+        bitsInCurrentByte -= bitsToWrite;
+        alignment = (alignment + bitsToWrite) % 8;
+        bitsToWrite = (8 - bitsToWrite);
+        if (bitsInCurrentByte > 0) {
+            builder->emitIndent();
+            if (bitsToWrite == 8) {
+                builder->appendFormat(
+                        "write_byte(%s, BYTES(%s) + %d + 1, (%s << %d))",
+                        program->packetStartVar.c_str(),
+                        program->offsetVar.c_str(),
+                        widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
+                        program->byteVar.c_str(),
+                        8 - alignment % 8);
+            } else {
+                builder->appendFormat(
+                        "write_partial(%s + BYTES(%s) + %d + 1, %d, %d, (%s))",
+                        program->packetStartVar.c_str(),
+                        program->offsetVar.c_str(),
+                        widthToEmit > 64 ? bytes - i - 1 : i,  // reversed order for wider fields
+                        bitsToWrite,
+                        8 + alignment - bitsToWrite,
+                        program->byteVar.c_str());
+            }
+            builder->endOfStatement(true);
+            left -= bitsToWrite;
+        }
+        alignment = (alignment + bitsToWrite) % 8;
+    }
+    builder->emitIndent();
+    builder->appendFormat("%s += %d", program->offsetVar.c_str(),
+                          widthToEmit);
     builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->appendFormat("if (%s != 0) ", this->outerHdrOffsetVar.c_str());
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusting by %d B",
-                                      1, this->outerHdrOffsetVar.c_str());
-    builder->emitIndent();
-    builder->appendFormat("int %s = 0", this->returnCode.c_str());
-    builder->endOfStatement(true);
-    builder->emitIndent();
-    builder->appendFormat("%s = ", this->returnCode.c_str());
-    pipeline->target->emitResizeBuffer(builder, program->model.CPacketName.str(),
-                                       this->outerHdrOffsetVar);
-    builder->endOfStatement(true);
-
-    builder->emitIndent();
-    builder->appendFormat("if (%s) ", this->returnCode.c_str());
-    builder->blockStart();
-    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjust failed");
-    builder->emitIndent();
-    // We immediately return instead of jumping to reject state.
-    // It avoids reaching BPF_COMPLEXITY_LIMIT_JMP_SEQ.
-    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
     builder->newline();
-    builder->blockEnd(true);
-    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusted");
-    builder->blockEnd(true);
+}
+
+DeparserPrepareBufferTranslator::DeparserPrepareBufferTranslator(const EBPFDeparserPSA *deparser) :
+        CodeGenInspector(deparser->program->refMap, deparser->program->typeMap),
+        ControlBodyTranslator(deparser), deparser(deparser) {
+    setName("DeparserPrepareBufferTranslator");
+}
+
+void DeparserPrepareBufferTranslator::processMethod(const P4::ExternMethod *method) {
+    if (method->method->name.name == "emit") {
+        auto decl = method->object;
+        if (decl == deparser->packet_out) {
+            if (method->method->name.name == p4lib.packetOut.emit.name) {
+                auto expr = method->expr->arguments->at(0)->expression;
+                auto exprType = deparser->program->typeMap->getType(expr);
+                auto headerToEmit = exprType->to<IR::Type_Header>();
+                if (headerToEmit == nullptr) {
+                    ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                            "Cannot emit a non-header type %1%", expr);
+                }
+
+                auto exprMemb = expr->to<IR::Member>();
+                auto headerName = exprMemb->member.name;
+                auto headersStructName = deparser->parserHeaders->name.name;
+                auto headerExpression = headersStructName + "->" + headerName;
+
+                unsigned width = headerToEmit->width_bits();
+                builder->emitIndent();
+                builder->append("if (");
+                builder->append(headerExpression);
+                builder->append(".ebpf_valid) ");
+                builder->blockStart();
+                builder->emitIndent();
+                builder->appendFormat("%s += %d;", this->deparser->outerHdrLengthVar.c_str(), width);
+                builder->newline();
+                builder->blockEnd(true);
+            }
+        }
+    }
 }
 
 void EBPFDeparserPSA::emit(CodeBuilder* builder) {
@@ -115,7 +285,17 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     builder->newline();
 
     emitPreDeparser(builder);
-    emitPreparePacketBuffer(builder);
+
+    builder->emitIndent();
+    builder->appendFormat("int %s = 0", this->outerHdrLengthVar.c_str());
+    builder->endOfStatement(true);
+
+    auto prepareBufferTranslator = new DeparserPrepareBufferTranslator(this);
+    prepareBufferTranslator->setBuilder(builder);
+    prepareBufferTranslator->asPointerVariables.insert(this->headers->name.name);
+    controlBlock->container->body->apply(*prepareBufferTranslator);
+
+    emitBufferAdjusts(builder);
 
     builder->emitIndent();
     builder->appendFormat("%s = %s;",
@@ -132,12 +312,53 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     builder->appendFormat("%s = 0", program->offsetVar.c_str());
     builder->endOfStatement(true);
 
-    for (unsigned long i = 0; i < this->headersToEmit.size(); i++) {
-        auto headerToEmit = headersToEmit[i];
-        auto headerExpression = headersExpressions[i];
-        emitHeader(builder, headerToEmit, headerExpression);
-    }
+    // emit headers
+    auto hdrEmitTranslator = new DeparserHdrEmitTranslator(this);
+    hdrEmitTranslator->setBuilder(builder);
+    hdrEmitTranslator->asPointerVariables.insert(this->headers->name.name);
+    controlBlock->container->body->apply(*hdrEmitTranslator);
+
     builder->newline();
+}
+
+void EBPFDeparserPSA::emitBufferAdjusts(CodeBuilder *builder) const {
+    auto pipeline = program->to<EBPFPipeline>();
+
+    builder->newline();
+    builder->emitIndent();
+
+    cstring offsetVar = program->offsetVar;
+    builder->appendFormat("int %s = BYTES(%s) - BYTES(%s)",
+                          outerHdrOffsetVar.c_str(),
+                          outerHdrLengthVar.c_str(),
+                          offsetVar.c_str());
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->appendFormat("if (%s != 0) ", outerHdrOffsetVar.c_str());
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusting by %d B",
+                                      1, outerHdrOffsetVar.c_str());
+    builder->emitIndent();
+    builder->appendFormat("int %s = 0", returnCode.c_str());
+    builder->endOfStatement(true);
+    builder->emitIndent();
+    builder->appendFormat("%s = ", returnCode.c_str());
+    pipeline->target->emitResizeBuffer(builder, program->model.CPacketName.str(),
+                                       outerHdrOffsetVar);
+    builder->endOfStatement(true);
+
+    builder->emitIndent();
+    builder->appendFormat("if (%s) ", returnCode.c_str());
+    builder->blockStart();
+    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjust failed");
+    builder->emitIndent();
+    // We immediately return instead of jumping to reject state.
+    // It avoids reaching BPF_COMPLEXITY_LIMIT_JMP_SEQ.
+    builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
+    builder->newline();
+    builder->blockEnd(true);
+    builder->target->emitTraceMessage(builder, "Deparser: pkt_len adjusted");
+    builder->blockEnd(true);
 }
 
 void EBPFDeparserPSA::emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
@@ -225,14 +446,6 @@ void EBPFDeparserPSA::emitField(CodeBuilder* builder, cstring headerExpression,
     unsigned shift = widthToEmit < 8 ?
                      (loadSize - alignment - widthToEmit) : (loadSize - widthToEmit);
     cstring hdrField = headerExpression + "." + field;
-    if (program->options.pipelineOptimization &&
-        this->is<OptimizedXDPIngressDeparserPSA>()) {
-        hdrField = field + "_val";
-        builder->emitIndent();
-        type->emit(builder);
-        builder->appendFormat(" %s = %s.%s", hdrField, headerExpression, field.c_str());
-        builder->endOfStatement(true);
-    }
 
     if (!swap.isNullOrEmpty()) {
         builder->emitIndent();
@@ -555,73 +768,4 @@ void XDPEgressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->blockEnd(true);
 }
 
-// =====================OptimizedXDPIngressDeparserPSA=============================
-void OptimizedXDPIngressDeparserPSA::emit(CodeBuilder *builder) {
-    if (this->skipEgress) {
-        EBPFDeparserPSA::emit(builder);
-        return;
-    }
-
-    builder->emitIndent();
-
-    codeGen->setBuilder(builder);
-
-    for (auto a : controlBlock->container->controlLocals)
-        emitDeclaration(builder, a);
-
-    this->emitDeparserExternCalls(builder);
-    builder->newline();
-
-    this->emitPreDeparser(builder);
-    this->emitPreparePacketBuffer(builder);
-
-    builder->emitIndent();
-    builder->appendFormat("%s = %s;",
-                          program->packetStartVar,
-                          builder->target->dataOffset(program->model.CPacketName.str()));
-    builder->newline();
-    builder->emitIndent();
-    builder->appendFormat("%s = %s;",
-                          program->packetEndVar,
-                          builder->target->dataEnd(program->model.CPacketName.str()));
-    builder->newline();
-
-    builder->emitIndent();
-    builder->appendFormat("%s = 0", program->offsetVar.c_str());
-    builder->endOfStatement(true);
-
-    for (auto const& el : removedHeadersToEmit) {
-        builder->emitIndent();
-        builder->appendFormat("if (%s.ebpf_valid) ", el.first);
-        builder->blockStart();
-        builder->emitIndent();
-        builder->appendFormat("%s += %d", program->offsetVar.c_str(), el.second->width_bits());
-        builder->endOfStatement(true);
-        builder->blockEnd(true);
-    }
-
-    for (unsigned long i = 0; i < this->optimizedHeadersToEmit.size(); i++) {
-        auto headerToEmit = optimizedHeadersToEmit[i];
-        auto headerExpression = optimizedHeadersExpressions[i];
-        emitHeader(builder, headerToEmit, headerExpression);
-    }
-    builder->newline();
-
-    // put metadata into shared map
-    builder->emitIndent();
-    builder->appendFormat("%s->__helper_variable", this->headers->name.name);
-    cstring hdrValue = "(*" + this->headers->name.name + ")";
-    builder->appendFormat(" = %s->egress_port", this->istd->name.name);
-    builder->endOfStatement(true);
-
-    builder->emitIndent();
-    builder->target->emitTableUpdate(builder, "bridged_headers",
-                                     program->zeroKey.c_str(), hdrValue);
-    builder->newline();
-
-    builder->emitIndent();
-    builder->appendFormat("bpf_tail_call(%s, &egress_progs_table, 0)",
-                          this->program->model.CPacketName.str());
-    builder->endOfStatement(true);
-}
 }  // namespace EBPF
