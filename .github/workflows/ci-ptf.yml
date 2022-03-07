@@ -1,4 +1,4 @@
-name: "ptf-p4c"
+name: "ptf-ebpf"
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
     - name: Build (Linux)
       run: |
         tools/start_ccache
-        docker build --network host -t p4c --build-arg MAKEFLAGS=-j8 --build-arg IMAGE_TYPE=test --build-arg ENABLE_UNIFIED_COMPILATION=$UNIFIED --build-arg ENABLE_GMP=$ENABLE_GMP .
+        docker build --network host -t p4c --build-arg MAKEFLAGS=-j8 --build-arg IMAGE_TYPE=test --build-arg ENABLE_UNIFIED_COMPILATION=$UNIFIED --build-arg ENABLE_GMP=$ENABLE_GMP --build-arg INSTALL_PTF_EBPF_DEPENDENCIES=ON .
 
     - name: Run PTF tests (Linux)
       run: |
