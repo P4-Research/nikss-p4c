@@ -79,7 +79,7 @@ function install_ptf_ebpf_test_deps() (
   git clone --recursive https://github.com/P4-Research/psabpf.git /tmp/psabpf
   cd /tmp/psabpf
   # psabpf is under heavy development, later use git tags when it will be ready to use
-  git reset --hard e418f91
+  git reset --hard bcd381b
   ./build_libbpf.sh
   mkdir build
   cd build
