@@ -10,43 +10,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="377f10a9-9f38-49c5-b01d-0746d8fa4c47" name="Default Changelist" comment="Add CRC lookup table opt">
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf/no-copy-parser/commands.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf/no-copy-parser/no-copy-parser.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf/parser-spec-memcpy/commands.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf/parser-spec-memcpy/test.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf/parser-spec/commands.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf/tmp/test.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf/vxlan-no-action/commands.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf/vxlan-no-action/test.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/array-map/10-entries.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/array-map/100-entries.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/array-map/1000-entries.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/array-map/10000-entries.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/array-map/commands.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/array-map/test.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/hash-map/10-entries.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/hash-map/100-entries.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/hash-map/1000-entries.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/hash-map/10000-entries.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/hash-map/commands.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/hash-map/test.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/lpm-map/10-entries.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/lpm-map/100-entries.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/lpm-map/1000-entries.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/lpm-map/10000-entries.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/lpm-map/commands.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/benchmark-maps/lpm-map/test.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/parser-memcpy/commands.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/parser-memcpy/test.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/parser-spec-limit/test.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/parser-spec/test.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/vxlan/out.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/xdp/vxlan/out.c.save" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf/parser-spec/test.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf/parser-spec/test.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/setup_test.sh" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/setup_test.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backends/ebpf/tests/ptf/checksum.py" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/tests/ptf/checksum.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backends/ebpf/tests/ptf/common.py" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/tests/ptf/common.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backends/ebpf/tests/test.sh" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/tests/test.sh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-test-no-opt/out.c" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-test-p4/out.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/out.bc" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/out.o" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/out.o" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -78,11 +46,12 @@
     <property name="cf.first.check.clang-format" value="false" />
     <property name="cidr.known.project.marker" value="true" />
     <property name="cmake.loaded.for.project" value="true" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf/no-copy-parser" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/backends/ebpf/evaluation" />
     <property name="nodejs_package_manager_path" value="npm" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/backends/ebpf/evaluation" />
       <recent name="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf/no-copy-parser" />
       <recent name="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf" />
       <recent name="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf/parser-spec-memcpy" />
@@ -116,7 +85,8 @@
       <workItem from="1634627614956" duration="12988000" />
       <workItem from="1634846886545" duration="7986000" />
       <workItem from="1635192874731" duration="4699000" />
-      <workItem from="1645440088861" duration="32565000" />
+      <workItem from="1645440088861" duration="33195000" />
+      <workItem from="1646774472676" duration="513000" />
     </task>
     <task id="LOCAL-00001" summary="Add parser-memcpy xdp file">
       <created>1627145554985</created>
