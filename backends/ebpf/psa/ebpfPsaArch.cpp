@@ -321,12 +321,6 @@ void PSAArchTC::emit(CodeBuilder *builder) const {
 void PSAArchTC::emitInstances(CodeBuilder *builder) const {
     builder->appendLine("REGISTER_START()");
 
-    if (options.xdp2tcMode == XDP2TC_CPUMAP) {
-        builder->target->emitTableDecl(builder, "workaround_cpumap",
-                                       TablePerCPUArray, "u32",
-                                       "u16", 1);
-    }
-
     emitPacketReplicationTables(builder);
     emitPipelineInstances(builder);
 

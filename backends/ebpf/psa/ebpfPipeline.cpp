@@ -434,15 +434,7 @@ void TCIngressPipeline::emitGlobalMetadataInitializer(CodeBuilder *builder) {
                           compilerGlobalMetadata);
     builder->blockStart();
     builder->emitIndent();
-    if (options.xdp2tcMode == XDP2TC_META) {
-        emitTCWorkaroundUsingMeta(builder);
-    } else if (options.xdp2tcMode == XDP2TC_HEAD) {
-        emitTCWorkaroundUsingHead(builder);
-    } else if (options.xdp2tcMode == XDP2TC_CPUMAP) {
-        emitTCWorkaroundUsingCPUMAP(builder);
-    } else {
-        BUG("no xdp2tc mode specified?");
-    }
+    emitTCWorkaroundUsingMeta(builder);
     builder->blockEnd(true);
 }
 

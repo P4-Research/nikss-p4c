@@ -20,12 +20,6 @@ limitations under the License.
 #include <getopt.h>
 #include "frontends/common/options.h"
 
-enum XDP2TC {
-    XDP2TC_NONE,
-    XDP2TC_META,
-    XDP2TC_HEAD,
-    XDP2TC_CPUMAP
-};
 
 class EbpfOptions : public CompilerOptions {
  public:
@@ -35,25 +29,9 @@ class EbpfOptions : public CompilerOptions {
     bool loadIRFromJson = false;
     // Externs generation
     bool emitExterns = false;
-    // Tracing eBPF code execution
+    // tracing eBPF code execution
     bool emitTraceMessages = false;
-
-    enum XDP2TC xdp2tcMode = XDP2TC_NONE;
-
     EbpfOptions();
-
-    void calculateXDP2TCMode() {
-        if (arch != "psa") {
-            return;
-        }
-
-        if (xdp2tcMode == XDP2TC_NONE) {
-            std::cout << "Setting XDP2TC 'meta' mode by default." << std::endl;
-            // For TC, use 'meta' mode by default.
-            xdp2tcMode = XDP2TC_META;
-        }
-        BUG_CHECK(xdp2tcMode != XDP2TC_NONE, "xdp2tc mode should not be set to NONE, bug?");
-    }
 };
 
 using EbpfContext = P4CContextWithOptions<EbpfOptions>;
