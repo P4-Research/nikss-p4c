@@ -36,7 +36,7 @@ class EBPFPipeline : public EBPFProgram {
         target = new KernelSamplesTarget(options.emitTraceMessages);
         sectionName = "classifier/" + name;
         functionName = name.replace("-", "_") + "_func";
-        errorType = "ParserError_t";
+        errorEnum = "ParserError_t";
         packetStartVar = cstring("pkt");
         contextVar = cstring("skb");
         lengthVar = cstring("pkt_len");

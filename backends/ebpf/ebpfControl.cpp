@@ -572,19 +572,6 @@ void EBPFControl::emitDeclaration(CodeBuilder* builder, const IR::Declaration* d
         etype->declare(builder, vd->name, isPointer);
         builder->endOfStatement(true);
 
-        if (!isPointer) {
-            if (auto type = etype->to<EBPFTypeName>()) {
-                if (type->canonicalTypeIs<EBPFStructType>()) {
-                    builder->emitIndent();
-                    builder->appendFormat("__builtin_memset((void *) &%s, 0, sizeof(",
-                                          vd->name.name);
-                    etype->declare(builder, cstring::empty, false);
-                    builder->append("))");
-                    builder->endOfStatement(true);
-                }
-            }
-        }
-
         BUG_CHECK(vd->initializer == nullptr,
                   "%1%: declarations with initializers not supported", decl);
         return;

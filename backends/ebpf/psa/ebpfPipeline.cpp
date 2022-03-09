@@ -11,7 +11,7 @@ void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     builder->appendFormat("unsigned %s_save = 0;", offsetVar.c_str());
     builder->newline();
     builder->emitIndent();
-    builder->appendFormat("%s %s = %s;", errorType.c_str(), errorVar.c_str(),
+    builder->appendFormat("%s %s = %s;", errorEnum.c_str(), errorVar.c_str(),
                           P4::P4CoreLibrary::instance.noError.str());
     builder->newline();
     builder->emitIndent();

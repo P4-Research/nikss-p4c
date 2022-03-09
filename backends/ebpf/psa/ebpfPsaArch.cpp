@@ -356,12 +356,6 @@ const PSAArch * ConvertToEbpfPSA::build(const IR::ToplevelBlock *tlb) {
                 continue;
             ebpfTypes.push_back(type);
         }
-
-        // Use special version of error type
-        if (d->is<IR::Type_Error>()) {
-            auto type = new EBPFErrorTypePSA(d->to<IR::Type_Error>());
-            ebpfTypes.push_back(type);
-        }
     }
 
     /*

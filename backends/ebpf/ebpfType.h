@@ -126,11 +126,6 @@ class EBPFTypeName : public EBPFType, public IHasWidth {
     unsigned widthInBits() override;
     unsigned implementationWidthInBits() override;
     void declareArray(CodeBuilder* builder, cstring id, unsigned size) override;
-    EBPFType* getCanonicalType() {
-        return canonical;
-    }
-    template<typename T> bool canonicalTypeIs() const
-    { return dynamic_cast<const T*>(this->canonical) != nullptr; }
 };
 
 // Also represents headers and unions
@@ -173,19 +168,6 @@ class EBPFEnumType : public EBPFType, public EBPF::IHasWidth {
     unsigned widthInBits() override { return 32; }
     unsigned implementationWidthInBits() override { return 32; }
     const IR::Type_Enum* getType() const { return type->to<IR::Type_Enum>(); }
-};
-
-// represents an error type for PSA
-class EBPFErrorTypePSA : public EBPFType {
- public:
-    explicit EBPFErrorTypePSA(const IR::Type_Error * type) : EBPFType(type) {}
-
-    void emit(CodeBuilder* builder) override;
-    void declare(CodeBuilder* builder, cstring id, bool asPointer) override;
-    void declareInit(CodeBuilder* builder, cstring id, bool asPointer) override;
-    void emitInitializer(CodeBuilder* builder) override;
-
-    const IR::Type_Error* getType() const { return type->to<IR::Type_Error>(); }
 };
 
 }  // namespace EBPF

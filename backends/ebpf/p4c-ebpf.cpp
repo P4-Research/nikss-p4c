@@ -74,7 +74,6 @@ void compile(EbpfOptions& options) {
         if (::errorCount() > 0)
             return;
     }
-
     EBPF::MidEnd midend;
     midend.addDebugHook(hook);
     auto toplevel = midend.run(options, program);

@@ -49,7 +49,7 @@ class EBPFProgram : public EBPFObject {
     cstring endLabel, offsetVar, lengthVar;
     cstring zeroKey, functionName, errorVar;
     cstring packetStartVar, packetEndVar, byteVar;
-    cstring errorType;
+    cstring errorEnum;
     cstring license = "GPL";  // TODO: this should be a compiler option probably
     cstring arrayIndexType = "u32";
 
@@ -68,7 +68,7 @@ class EBPFProgram : public EBPFObject {
         packetEndVar = EBPFModel::reserved("packetEnd");
         byteVar = EBPFModel::reserved("byte");
         endLabel = EBPFModel::reserved("end");
-        errorType = EBPFModel::reserved("errorCodes");
+        errorEnum = EBPFModel::reserved("errorCodes");
     }
 
  protected:

@@ -46,9 +46,6 @@ EBPFType* EBPFTypeFactory::create(const IR::Type* type) {
         if (et == nullptr)
             return nullptr;
         result = new EBPFStackType(ts, et);
-    } else if (type->is<IR::Type_Error>()) {
-        // EBPF target implements error type as scalar of witdh 8 bits
-        result = new EBPFScalarType(new IR::Type_Bits(8, false));
     } else {
         ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
                 "Type %1% not supported", type);
@@ -195,10 +192,9 @@ EBPFStructType::EBPFStructType(const IR::Type_StructLike* strct) :
 void
 EBPFStructType::declare(CodeBuilder* builder, cstring id, bool asPointer) {
     builder->append(kind);
-    builder->appendFormat(" %s ", name.c_str());
     if (asPointer)
         builder->append("*");
-    builder->appendFormat("%s", id.c_str());
+    builder->appendFormat(" %s %s", name.c_str(), id.c_str());
 }
 
 void EBPFStructType::declareInit(CodeBuilder* builder, cstring id, bool asPointer) {
@@ -232,15 +228,9 @@ void EBPFStructType::emit(CodeBuilder* builder) {
     builder->spc();
     builder->blockStart();
 
-    bool emitHelperVariableForHeaders = false;
     for (auto f : fields) {
         auto type = f->type;
         builder->emitIndent();
-
-        if (type->is<EBPFTypeName>() &&
-            type->to<EBPFTypeName>()->getCanonicalType()->type->is<IR::Type_Header>()) {
-            emitHelperVariableForHeaders = true;
-        }
 
         type->declare(builder, f->field->name, false);
         builder->append("; ");
@@ -252,16 +242,6 @@ void EBPFStructType::emit(CodeBuilder* builder) {
         }
         builder->append(" */");
         builder->newline();
-    }
-
-    if (emitHelperVariableForHeaders) {
-        // this is a struct storing headers
-        // append helper variable that will be used by
-        // pipeline-aware optimization to transfer egress_port from
-        // ingress eBPF program to tail-called egress eBPF program.
-        // This variable has intentionally generic name as it might be
-        // used for another purpose in future.
-        builder->appendLine("__u32 __helper_variable;");
     }
 
     if (type->is<IR::Type_Header>()) {
@@ -343,58 +323,12 @@ void EBPFEnumType::emit(EBPF::CodeBuilder* builder) {
     builder->append("enum ");
     auto et = getType();
     builder->append(et->name);
-    builder->spc();
     builder->blockStart();
     for (auto m : et->members) {
         builder->append(m->name);
         builder->appendLine(",");
     }
-    builder->blockEnd(false);
-    builder->endOfStatement(true);
-}
-
-////////////////////////////////////////////////////////////////
-
-void EBPFErrorTypePSA::emit(CodeBuilder* builder) {
-    auto terr = this->getType();
-    int id = -1;
-    for (auto decl : terr->members) {
-        ++id;
-        auto sourceFile = decl->srcInfo.getSourceFile();
-        // all the error codes are located in core.p4 file, they are defined in psa.h
-        if (sourceFile.endsWith("core.p4"))
-            continue;
-        // for future, also exclude definitions in psa.p4 file
-        if (sourceFile.endsWith("/psa.p4"))
-            continue;
-
-        builder->emitIndent();
-        builder->append("static const ParserError_t ");
-        builder->appendFormat("%s = %d", decl->name.name, id);
-        builder->endOfStatement(true);
-
-        // type u8 can have values from 0 to 255
-        if (id > 255) {
-            ::warning(ErrorType::ERR_OVERLIMIT,
-                      "%1%: Reached maximum number of possible errors", decl);
-        }
-    }
-
-    builder->newline();
-}
-
-void EBPFErrorTypePSA::declareInit(CodeBuilder* builder, cstring id, bool asPointer) {
-    declare(builder, id, asPointer);
-}
-
-void EBPFErrorTypePSA::declare(CodeBuilder* builder, cstring id, bool asPointer) {
-    (void) builder; (void) id; (void) asPointer;
-    BUG("Error type is not declarable");
-}
-
-void EBPFErrorTypePSA::emitInitializer(CodeBuilder* builder) {
-    (void) builder;
-    BUG("Error type cannot be initialized");
+    builder->blockEnd(true);
 }
 
 }  // namespace EBPF
