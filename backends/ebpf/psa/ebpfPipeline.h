@@ -50,10 +50,6 @@ class EBPFPipeline : public EBPFProgram {
         oneKey = EBPFModel::reserved("one");
     }
 
-    /* Check if pipeline does any processing.
-     * Return false if not. */
-    bool isEmpty() const;
-
     virtual cstring dropReturnCode() {
         if (sectionName.startsWith("xdp")) {
             return "XDP_DROP";
