@@ -6,6 +6,16 @@ PORT2 = 2
 ALL_PORTS = [PORT0, PORT1, PORT2]
 
 
+class Issue22(P4EbpfTest):
+    """
+    If common parser is used, p4c-ebpf fails due to unexpected method call in parser (setInvalid())
+    """
+    p4_file_path = "p4testdata/issue22.p4"
+
+    def runTest(self):
+        pass
+
+
 class Issue102(P4EbpfTest):
     """
     If multiple tables use the same action the compiler returns 'Macro redefined' error
