@@ -1,8 +1,6 @@
 
 
 
-
-
 struct ethernet_t {
 	bit<48> dstAddr
 	bit<48> srcAddr
@@ -75,7 +73,7 @@ action NoAction args none {
 	return
 }
 
-action execute args none {
+action execute_1 args none {
 	mov m.local_metadata_data m.Ingress_tmpMask
 	return
 }
@@ -86,7 +84,7 @@ table tbl {
 	}
 	actions {
 		NoAction
-		execute
+		execute_1
 	}
 	default_action NoAction args none 
 	size 0x10000
@@ -111,20 +109,6 @@ apply {
 	table tbl
 	jmpneq LABEL_DROP m.psa_ingress_output_metadata_drop 0x0
 	emit h.ethernet
-	emit h.ipv4
-	emit h.tcp
-	extract h.ethernet
-	mov m.tmpMask_1 h.ethernet.etherType
-	and m.tmpMask_1 0xc0
-	jmpeq EGRESSPARSERIMPL_PARSE_IPV4 m.tmpMask_1 0x80
-	jmp EGRESSPARSERIMPL_ACCEPT
-	EGRESSPARSERIMPL_PARSE_IPV4 :	extract h.ipv4
-	mov m.tmpMask_2 h.ipv4.protocol
-	and m.tmpMask_2 0xf8
-	jmpeq EGRESSPARSERIMPL_PARSE_TCP m.tmpMask_2 0x10
-	jmp EGRESSPARSERIMPL_ACCEPT
-	EGRESSPARSERIMPL_PARSE_TCP :	extract h.tcp
-	EGRESSPARSERIMPL_ACCEPT :	emit h.ethernet
 	emit h.ipv4
 	emit h.tcp
 	tx m.psa_ingress_output_metadata_egress_port

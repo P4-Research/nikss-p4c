@@ -71,7 +71,7 @@ action NoAction args none {
 	return
 }
 
-action execute args none {
+action execute_1 args none {
 	mov m.local_metadata_data 0x1
 	return
 }
@@ -82,7 +82,7 @@ table tbl {
 	}
 	actions {
 		NoAction
-		execute
+		execute_1
 	}
 	default_action NoAction args none 
 	size 0x10000
@@ -108,9 +108,6 @@ apply {
 	INGRESSPARSERIMPL_PARSE_TCP :	extract h.tcp
 	INGRESSPARSERIMPL_ACCEPT :	table tbl
 	jmpneq LABEL_DROP m.psa_ingress_output_metadata_drop 0x0
-	emit h.ethernet
-	emit h.ipv4
-	emit h.tcp
 	emit h.ethernet
 	emit h.ipv4
 	emit h.tcp
