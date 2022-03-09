@@ -61,7 +61,7 @@ struct metadata {
 struct headers {
     struct ethernet_t ethernet; /* ethernet_t */
     struct crc_t crc; /* crc_t */
-__u32 __helper_variable;
+    __u32 __helper_variable;
 };
 struct tuple_0 {
     u8 f0; /* bit<4> */
@@ -79,10 +79,10 @@ struct xdp2tc_metadata {
 
 
 struct bpf_map_def SEC("maps") tx_port = {
-    .type          = BPF_MAP_TYPE_DEVMAP,
-    .key_size      = sizeof(int),
-    .value_size    = sizeof(struct bpf_devmap_val),
-    .max_entries   = DEVMAP_SIZE,
+        .type          = BPF_MAP_TYPE_DEVMAP,
+        .key_size      = sizeof(int),
+        .value_size    = sizeof(struct bpf_devmap_val),
+        .max_entries   = DEVMAP_SIZE,
 };
 
 REGISTER_START()
@@ -98,8 +98,8 @@ REGISTER_TABLE(xdp2tc_shared_map, BPF_MAP_TYPE_PERCPU_ARRAY, u32, struct xdp2tc_
 BPF_ANNOTATE_KV_PAIR(xdp2tc_shared_map, u32, struct xdp2tc_metadata)
 REGISTER_END()
 
-static __always_inline
-void crc16_update(u16 * reg, const u8 * data, u16 data_size, const u16 poly) {
+        static __always_inline
+        void crc16_update(u16 * reg, const u8 * data, u16 data_size, const u16 poly) {
     data += data_size - 1;
     for (u16 i = 0; i < data_size; i++) {
         bpf_trace_message("CRC16: data byte: %x\n", *data);
@@ -111,30 +111,38 @@ void crc16_update(u16 * reg, const u8 * data, u16 data_size, const u16 poly) {
     }
 }
 static __always_inline u16 crc16_finalize(u16 reg, const u16 poly) {
-    return reg;
+return reg;
 }
 static __always_inline
 void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
-    data += data_size - 1;
-    for (u16 i = 0; i < data_size; i++) {
-        //bpf_trace_message("CRC32: data byte: %x\n", *data);
-        *reg ^= *data;
-        for (u8 bit = 0; bit < 8; bit++) {
-            *reg = (*reg) & 1 ? ((*reg) >> 1) ^ poly : (*reg) >> 1;
+
+    data += data_size -1;
+    unsigned char* current = (unsigned char*) data;
+    u32* lookup_value = NULL;
+
+    for (u16 i = 0; i < data_size; i++){
+
+        u32 lookup_key = (((*reg) & 0xFF) ^ *current--);
+
+        lookup_value =  BPF_MAP_LOOKUP_ELEM(crc_lookup_tbl, &lookup_key);
+        if (lookup_value != NULL) {
+
+            *reg =   ((*reg) >> 8) ^ *lookup_value;
+            /
+
         }
-        data--;
     }
 }
 static __always_inline u32 crc32_finalize(u32 reg, const u32 poly) {
-    return reg ^ 0xFFFFFFFF;
+return reg ^ 0xFFFFFFFF;
 }
 inline u16 csum16_add(u16 csum, u16 addend) {
-    u16 res = csum;
-    res += addend;
-    return (res + (res < addend));
+u16 res = csum;
+res += addend;
+return (res + (res < addend));
 }
 inline u16 csum16_sub(u16 csum, u16 addend) {
-    return csum16_add(csum, ~addend);
+return csum16_add(csum, ~addend);
 }
 static __always_inline
 int do_for_each(SK_BUFF *skb, void *map, unsigned int max_iter, void (*a)(SK_BUFF *, void *))
@@ -145,7 +153,7 @@ int do_for_each(SK_BUFF *skb, void *map, unsigned int max_iter, void (*a)(SK_BUF
         return -1;
     }
     if (elem->next_id.port == 0 && elem->next_id.instance == 0) {
-               return 0;
+        return 0;
     }
     elem_t next_id = elem->next_id;
     for (unsigned int i = 0; i < max_iter; i++) {
@@ -185,7 +193,7 @@ int do_packet_clones(SK_BUFF * skb, void * map, __u32 session_id, PSA_PacketPath
     } else {
     }
     return 0;
- }
+}
 
 SEC("xdp/map-initializer")
 int map_initialize() {
@@ -199,12 +207,12 @@ int xdp_ingress_func(struct xdp_md *skb) {
     struct empty_metadata_t resubmit_meta;
 
     volatile struct headers parsed_hdr = {
-        .ethernet = {
-            .ebpf_valid = 0
-        },
-        .crc = {
-            .ebpf_valid = 0
-        },
+            .ethernet = {
+                    .ebpf_valid = 0
+            },
+            .crc = {
+                    .ebpf_valid = 0
+            },
     };
 
     struct metadata user_meta = {
@@ -225,90 +233,90 @@ int xdp_ingress_func(struct xdp_md *skb) {
 
     start: {
 /* extract(parsed_hdr.ethernet) */
-        if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112 + 0)) {
-            ebpf_errorCode = PacketTooShort;
-            goto reject;
-        }
+    if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112 + 0)) {
+        ebpf_errorCode = PacketTooShort;
+        goto reject;
+    }
 
-        parsed_hdr.ethernet.dstAddr = (u64)((load_dword(pkt, BYTES(ebpf_packetOffsetInBits)) >> 16) & EBPF_MASK(u64, 48));
-        ebpf_packetOffsetInBits += 48;
+    parsed_hdr.ethernet.dstAddr = (u64)((load_dword(pkt, BYTES(ebpf_packetOffsetInBits)) >> 16) & EBPF_MASK(u64, 48));
+    ebpf_packetOffsetInBits += 48;
 
-        parsed_hdr.ethernet.srcAddr = (u64)((load_dword(pkt, BYTES(ebpf_packetOffsetInBits)) >> 16) & EBPF_MASK(u64, 48));
-        ebpf_packetOffsetInBits += 48;
+    parsed_hdr.ethernet.srcAddr = (u64)((load_dword(pkt, BYTES(ebpf_packetOffsetInBits)) >> 16) & EBPF_MASK(u64, 48));
+    ebpf_packetOffsetInBits += 48;
 
-        parsed_hdr.ethernet.etherType = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
-        ebpf_packetOffsetInBits += 16;
+    parsed_hdr.ethernet.etherType = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
+    ebpf_packetOffsetInBits += 16;
 
-        parsed_hdr.ethernet.ebpf_valid = 1;
+    parsed_hdr.ethernet.ebpf_valid = 1;
 
 /* extract(parsed_hdr.crc) */
-        if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 104 + 0)) {
-            ebpf_errorCode = PacketTooShort;
-            goto reject;
-        }
-
-        parsed_hdr.crc.f1 = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) >> 4) & EBPF_MASK(u8, 4));
-        ebpf_packetOffsetInBits += 4;
-
-        parsed_hdr.crc.f2 = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))) & EBPF_MASK(u8, 4));
-        ebpf_packetOffsetInBits += 4;
-
-        parsed_hdr.crc.f3 = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
-        ebpf_packetOffsetInBits += 32;
-
-        parsed_hdr.crc.f4 = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
-        ebpf_packetOffsetInBits += 32;
-
-        parsed_hdr.crc.crc = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
-        ebpf_packetOffsetInBits += 32;
-
-        parsed_hdr.crc.ebpf_valid = 1;
-
-        goto accept;
+    if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 104 + 0)) {
+        ebpf_errorCode = PacketTooShort;
+        goto reject;
     }
+
+    parsed_hdr.crc.f1 = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) >> 4) & EBPF_MASK(u8, 4));
+    ebpf_packetOffsetInBits += 4;
+
+    parsed_hdr.crc.f2 = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))) & EBPF_MASK(u8, 4));
+    ebpf_packetOffsetInBits += 4;
+
+    parsed_hdr.crc.f3 = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
+    ebpf_packetOffsetInBits += 32;
+
+    parsed_hdr.crc.f4 = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
+    ebpf_packetOffsetInBits += 32;
+
+    parsed_hdr.crc.crc = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
+    ebpf_packetOffsetInBits += 32;
+
+    parsed_hdr.crc.ebpf_valid = 1;
+
+    goto accept;
+}
 
     reject: {
-        if (ebpf_errorCode == 0) {
-            return XDP_ABORTED;
-        }
-        goto accept;
+    if (ebpf_errorCode == 0) {
+        return XDP_ABORTED;
     }
+    goto accept;
+}
 
 
     accept: {
-        struct psa_ingress_input_metadata_t istd = {
+    struct psa_ingress_input_metadata_t istd = {
             .ingress_port = skb->ingress_ifindex,
             .packet_path = 0,
             .parser_error = ebpf_errorCode,
     };
-        u8 hit_3;
-        struct psa_ingress_output_metadata_t meta_1;
-        __builtin_memset((void *) &meta_1, 0, sizeof(struct psa_ingress_output_metadata_t ));
-        u32 egress_port_1;
-        u32 ingress_h_reg = 0xffffffff;
-        {
-{
-meta_1 = ostd;
-                egress_port_1 = 5;
-                meta_1.drop = false;
-                meta_1.multicast_group = 0;
-                meta_1.egress_port = egress_port_1;
-                ostd = meta_1;
-            };
-                        ingress_h_reg = 0xffffffff;
-            {
-                u8 ingress_h_tmp = 0;
-                ingress_h_tmp = (parsed_hdr.crc.f1 << 4) | (parsed_hdr.crc.f2 << 0);
-                crc32_update(&ingress_h_reg, &ingress_h_tmp, 1, 3988292384);
-                crc32_update(&ingress_h_reg, (u8 *) &(parsed_hdr.crc.f3), 4, 3988292384);
-                crc32_update(&ingress_h_reg, (u8 *) &(parsed_hdr.crc.f4), 4, 3988292384);
-            }
-            parsed_hdr.crc.crc = crc32_finalize(ingress_h_reg, 3988292384);
-        }
-    }
+    u8 hit_3;
+    struct psa_ingress_output_metadata_t meta_1;
+    __builtin_memset((void *) &meta_1, 0, sizeof(struct psa_ingress_output_metadata_t ));
+    u32 egress_port_1;
+    u32 ingress_h_reg = 0xffffffff;
     {
-{
-;
+        {
+            meta_1 = ostd;
+            egress_port_1 = 5;
+            meta_1.drop = false;
+            meta_1.multicast_group = 0;
+            meta_1.egress_port = egress_port_1;
+            ostd = meta_1;
+        };
+        ingress_h_reg = 0xffffffff;
+        {
+            u8 ingress_h_tmp = 0;
+            ingress_h_tmp = (parsed_hdr.crc.f1 << 4) | (parsed_hdr.crc.f2 << 0);
+            crc32_update(&ingress_h_reg, &ingress_h_tmp, 1, 3988292384);
+            crc32_update(&ingress_h_reg, (u8 *) &(parsed_hdr.crc.f3), 4, 3988292384);
+            crc32_update(&ingress_h_reg, (u8 *) &(parsed_hdr.crc.f4), 4, 3988292384);
+        }
+        parsed_hdr.crc.crc = crc32_finalize(ingress_h_reg, 3988292384);
+    }
+}
+    {
+        {
+            ;
             ;
         }
 
@@ -317,25 +325,25 @@ meta_1 = ostd;
             xdp2tc_md.headers = parsed_hdr;
             xdp2tc_md.ostd = ostd;
             xdp2tc_md.packetOffsetInBits = ebpf_packetOffsetInBits;
-                void *data = (void *)(long)skb->data;
-    void *data_end = (void *)(long)skb->data_end;
-    struct ethhdr *eth = data;
-    if ((void *)((struct ethhdr *) eth + 1) > data_end) {
-        return XDP_ABORTED;
-    }
-    xdp2tc_md.pkt_ether_type = eth->h_proto;
-    eth->h_proto = bpf_htons(0x0800);
+            void *data = (void *)(long)skb->data;
+            void *data_end = (void *)(long)skb->data_end;
+            struct ethhdr *eth = data;
+            if ((void *)((struct ethhdr *) eth + 1) > data_end) {
+                return XDP_ABORTED;
+            }
+            xdp2tc_md.pkt_ether_type = eth->h_proto;
+            eth->h_proto = bpf_htons(0x0800);
             int ret = bpf_xdp_adjust_head(skb, -(int)sizeof(struct xdp2tc_metadata));
             if (ret) {
                 return XDP_ABORTED;
             }
-                data = (void *)(long)skb->data;
-    data_end = (void *)(long)skb->data_end;
-    if (((char *) data + 14 + sizeof(struct xdp2tc_metadata)) > (char *) data_end) {
-        return XDP_ABORTED;
-    }
-__builtin_memmove(data, data + sizeof(struct xdp2tc_metadata), 14);
-__builtin_memcpy(data + 14, &xdp2tc_md, sizeof(struct xdp2tc_metadata));
+            data = (void *)(long)skb->data;
+            data_end = (void *)(long)skb->data_end;
+            if (((char *) data + 14 + sizeof(struct xdp2tc_metadata)) > (char *) data_end) {
+                return XDP_ABORTED;
+            }
+            __builtin_memmove(data, data + sizeof(struct xdp2tc_metadata), 14);
+            __builtin_memcpy(data + 14, &xdp2tc_md, sizeof(struct xdp2tc_metadata));
             return XDP_PASS;
         }
         if (ostd.drop || ostd.resubmit) {
@@ -364,7 +372,7 @@ __builtin_memcpy(data + 14, &xdp2tc_md, sizeof(struct xdp2tc_metadata));
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
                 return XDP_ABORTED;
             }
-            
+
             parsed_hdr.ethernet.dstAddr = htonll(parsed_hdr.ethernet.dstAddr << 16);
             ebpf_byte = ((char*)(&parsed_hdr.ethernet.dstAddr))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
@@ -407,7 +415,7 @@ __builtin_memcpy(data + 14, &xdp2tc_md, sizeof(struct xdp2tc_metadata));
             if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 104)) {
                 return XDP_ABORTED;
             }
-            
+
             ebpf_byte = ((char*)(&parsed_hdr.crc.f1))[0];
             write_partial(pkt + BYTES(ebpf_packetOffsetInBits) + 0, 4, 4, (ebpf_byte >> 0));
             ebpf_packetOffsetInBits += 4;
@@ -471,18 +479,18 @@ int xdp_egress_func(struct xdp_md *skb) {
     u32 pkt_len = skb->data_end - skb->data;
 
     volatile struct headers parsed_hdr = {
-        .ethernet = {
-            .ebpf_valid = 0
-        },
-        .crc = {
-            .ebpf_valid = 0
-        },
+            .ethernet = {
+                    .ebpf_valid = 0
+            },
+            .crc = {
+                    .ebpf_valid = 0
+            },
     };
 
     struct psa_egress_output_metadata_t ostd = {
-       .clone = false,
+            .clone = false,
             .drop = false,
-        };
+    };
 
     struct psa_egress_input_metadata_t istd = {
             .class_of_service = 0,
@@ -490,20 +498,20 @@ int xdp_egress_func(struct xdp_md *skb) {
             .packet_path = 0,
             .instance = 0,
             .parser_error = ebpf_errorCode,
-        };
+    };
     if (istd.egress_port == PSA_PORT_RECIRCULATE) {
         istd.egress_port = P4C_PSA_PORT_RECIRCULATE;
     }
     start: {
-        goto accept;
-    }
+    goto accept;
+}
 
     reject: {
-        if (ebpf_errorCode == 0) {
-            return XDP_ABORTED;
-        }
-        goto accept;
+    if (ebpf_errorCode == 0) {
+        return XDP_ABORTED;
     }
+    goto accept;
+}
 
     accept:
     istd.parser_error = ebpf_errorCode;
@@ -515,7 +523,7 @@ int xdp_egress_func(struct xdp_md *skb) {
         }
     }
     {
-{
+        {
         }
 
         if (ostd.drop) {
@@ -551,7 +559,7 @@ int xdp_redirect_dummy(struct xdp_md *skb) {
 
 SEC("classifier/tc-ingress")
 int tc_ingress_func(SK_BUFF *skb) {
-        unsigned ebpf_packetOffsetInBits = 0;
+    unsigned ebpf_packetOffsetInBits = 0;
     unsigned ebpf_packetOffsetInBits_save = 0;
     ParserError_t ebpf_errorCode = NoError;
     void* pkt = ((void*)(long)skb->data);
@@ -560,14 +568,14 @@ int tc_ingress_func(SK_BUFF *skb) {
     u32 ebpf_one = 1;
     unsigned char ebpf_byte;
     u32 pkt_len = skb->len;
-        void *data = (void *)(long)skb->data;
+    void *data = (void *)(long)skb->data;
     void *data_end = (void *)(long)skb->data_end;
     if (((char *) data + 14 + sizeof(struct xdp2tc_metadata)) > (char *) data_end) {
         return TC_ACT_SHOT;
     }
     struct xdp2tc_metadata xdp2tc_md = {};
     bpf_skb_load_bytes(skb, 14, &xdp2tc_md, sizeof(struct xdp2tc_metadata));
-        __u16 *ether_type = (__u16 *) ((void *) (long)skb->data + 12);
+    __u16 *ether_type = (__u16 *) ((void *) (long)skb->data + 12);
     if ((void *) ((__u16 *) ether_type + 1) >     (void *) (long) skb->data_end) {
         return TC_ACT_SHOT;
     }
@@ -579,8 +587,8 @@ int tc_ingress_func(SK_BUFF *skb) {
     if (ret) {
         return XDP_ABORTED;
     }
-    
-if (ostd.clone) {
+
+    if (ostd.clone) {
         do_packet_clones(skb, &clone_session_tbl, ostd.clone_session_id, CLONE_I2E, 1);
     }
     int outHeaderLength = 0;
@@ -606,7 +614,7 @@ if (ostd.clone) {
         if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 112)) {
             return XDP_ABORTED;
         }
-        
+
         parsed_hdr.ethernet.dstAddr = htonll(parsed_hdr.ethernet.dstAddr << 16);
         ebpf_byte = ((char*)(&parsed_hdr.ethernet.dstAddr))[0];
         write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
@@ -649,7 +657,7 @@ if (ostd.clone) {
         if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 104)) {
             return XDP_ABORTED;
         }
-        
+
         ebpf_byte = ((char*)(&parsed_hdr.crc.f1))[0];
         write_partial(pkt + BYTES(ebpf_packetOffsetInBits) + 0, 4, 4, (ebpf_byte >> 0));
         ebpf_packetOffsetInBits += 4;
@@ -715,18 +723,18 @@ int tc_egress_func(SK_BUFF *skb) {
     struct metadata user_meta = {
     };
     volatile struct headers parsed_hdr = {
-        .ethernet = {
-            .ebpf_valid = 0
-        },
-        .crc = {
-            .ebpf_valid = 0
-        },
+            .ethernet = {
+                    .ebpf_valid = 0
+            },
+            .crc = {
+                    .ebpf_valid = 0
+            },
     };
 
     struct psa_egress_output_metadata_t ostd = {
-       .clone = false,
+            .clone = false,
             .drop = false,
-        };
+    };
 
     struct psa_egress_input_metadata_t istd = {
             .class_of_service = skb->priority,
@@ -734,20 +742,20 @@ int tc_egress_func(SK_BUFF *skb) {
             .packet_path = compiler_meta__->packet_path,
             .instance = compiler_meta__->instance,
             .parser_error = ebpf_errorCode,
-        };
+    };
     if (istd.egress_port == PSA_PORT_RECIRCULATE) {
         istd.egress_port = P4C_PSA_PORT_RECIRCULATE;
     }
     start: {
-        goto accept;
-    }
+    goto accept;
+}
 
     reject: {
-        if (ebpf_errorCode == 0) {
-            return XDP_ABORTED;
-        }
-        goto accept;
+    if (ebpf_errorCode == 0) {
+        return XDP_ABORTED;
     }
+    goto accept;
+}
 
     accept:
     istd.parser_error = ebpf_errorCode;
@@ -757,7 +765,7 @@ int tc_egress_func(SK_BUFF *skb) {
         }
     }
     {
-{
+        {
         }
 
         int outHeaderLength = 0;
@@ -788,7 +796,7 @@ int tc_egress_func(SK_BUFF *skb) {
         return bpf_redirect(PSA_PORT_RECIRCULATE, BPF_F_INGRESS);
     }
 
-    
+
     return TC_ACT_OK;
 }
 char _license[] SEC("license") = "GPL";

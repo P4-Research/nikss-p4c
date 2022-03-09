@@ -143,8 +143,9 @@ echo -e "Populating crc lookup table"
   #bpftool map update name crc_lookup_tbl key  hex $(printf "%x" $i) 00 00 00 value  hex $BECALC
     #LSB_CRC32_POLY=0x04c11db7 # The CRC32 polynomal LSB order
 __generate_crc_lookup_table() {
+
   local -i -r LSB_CRC32_POLY=0xEDB88320 # The CRC32 polynomal LSB order
-  local -i index byte lsb
+  local -i index, index2 byte lsb, lkp1a, lkp1b,lkp1c, lkp2a, lkp2b,lkp2c, lkp3a, lkp3b,lkp3c,ins,ins2,ins3
 
     for index in {0..255}; do
       ((byte = 255 - index))
@@ -153,12 +154,62 @@ __generate_crc_lookup_table() {
       done
       calc=$(printf "%0x" $byte)
       BECALC="${calc:6:2} ${calc:4:2} ${calc:2:2} ${calc:0:2}"
-      printf "%0x" $byte
-      echo "BE crc $BECALC"
-      bpftool map update name crc_lookup_tbl key  hex $(printf "%x" $index) 00 00 00 value  hex $BECALC
+      #printf "%0x" $byte
+      #echo "BE crc $BECALC"
+      bpftool map update name crc_lookup_tbl1 key hex $(printf "%x" $index) 00 00 00  value  hex $BECALC
     done
+
+    for index2 in {0..255}; do
+
+      lkp1a=$( bpftool map lookup name crc_lookup_tbl1 key hex $(printf "%x" $index2) 00 00 00 | awk 'FNR == 3 {print $2}' )
+      ((lkp1b=lkp1a & 0xFF))
+      calc=$(printf "%0x" $lkp1b)
+      #BECALC1="${calc:6:2} ${calc:4:2} ${calc:2:2} ${calc:0:2}"
+      lkp1c=$( bpftool map lookup name crc_lookup_tbl1 key hex $calc 00 00 00 | awk 'FNR == 3 {print $2}' )
+      ((ins=(lkp1a >> 8) ^ lkp1c))
+      #printf "lkp1b = %0x\n" $lkp1b
+      #echo "index2= $(printf "%x" $index2)"
+      calc2=$(printf "%08x" $ins)
+      BECALC2="${calc2:6:2} ${calc2:4:2} ${calc2:2:2} ${calc2:0:2}"
+      #printf "%0x" $calc2
+      #echo "ins=$calc2"
+      bpftool map update name crc_lookup_tbl2 key hex $(printf "%x" $index2) 00 00 00  value  hex $BECALC2
+
+      lkp2a=$( bpftool map lookup name crc_lookup_tbl2 key hex $(printf "%x" $index2) 00 00 00 | awk 'FNR == 3 {print $2}' )
+            ((lkp2b=lkp2a & 0xFF))
+            calc=$(printf "%0x" $lkp2b)
+            BECALC1="${calc:6:2} ${calc:4:2} ${calc:2:2} ${calc:0:2}"
+            lkp2c=$( bpftool map lookup name crc_lookup_tbl1 key hex $calc 00 00 00 | awk 'FNR == 3 {print $2}' )
+            ((ins2=(lkp2a >> 8) ^ lkp2c))
+            #printf "lkp1b = %0x\n" $lkp1b
+            #echo "index2= $(printf "%x" $index2)"
+            calc3=$(printf "%08x" $ins2)
+            BECALC3="${calc3:6:2} ${calc3:4:2} ${calc3:2:2} ${calc3:0:2}"
+            #printf "%0x" $calc2
+            #echo "ins3=$calc3"
+            bpftool map update name crc_lookup_tbl3 key hex $(printf "%x" $index2) 00 00 00  value  hex $BECALC3
+
+      lkp3a=$( bpftool map lookup name crc_lookup_tbl3 key hex $(printf "%x" $index2) 00 00 00 | awk 'FNR == 3 {print $2}' )
+                  ((lkp3b=lkp3a & 0xFF))
+                  calc=$(printf "%0x" $lkp3b)
+                  BECALC1="${calc:6:2} ${calc:4:2} ${calc:2:2} ${calc:0:2}"
+                  lkp3c=$( bpftool map lookup name crc_lookup_tbl1 key hex $calc 00 00 00 | awk 'FNR == 3 {print $2}' )
+                  ((ins3=(lkp3a >> 8) ^ lkp3c))
+                  #printf "lkp1b = %0x\n" $lkp1b
+                  #echo "index2= $(printf "%x" $index2)"
+                  calc4=$(printf "%08x" $ins3)
+                  BECALC4="${calc3:6:2} ${calc3:4:2} ${calc3:2:2} ${calc3:0:2}"
+                  #printf "%0x" $calc2
+                  echo "ins4=$calc4"
+                  bpftool map update name crc_lookup_tbl4 key hex $(printf "%x" $index2) 00 00 00  value  hex $BECALC4
+
+
+    done
+
 }
+
 __generate_crc_lookup_table
+
 echo -e "Dumping BPF setup:"
 bpftool net show 
 

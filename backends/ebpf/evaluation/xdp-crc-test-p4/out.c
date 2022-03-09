@@ -96,6 +96,8 @@ REGISTER_TABLE_OUTER(multicast_grp_tbl, BPF_MAP_TYPE_ARRAY_OF_MAPS, __u32, __u32
 BPF_ANNOTATE_KV_PAIR(multicast_grp_tbl, __u32, __u32)
 REGISTER_TABLE(xdp2tc_shared_map, BPF_MAP_TYPE_PERCPU_ARRAY, u32, struct xdp2tc_metadata, 1)
 BPF_ANNOTATE_KV_PAIR(xdp2tc_shared_map, u32, struct xdp2tc_metadata)
+REGISTER_TABLE(crc_lookup_tbl, BPF_MAP_TYPE_ARRAY, u32, u32, 256)
+BPF_ANNOTATE_KV_PAIR(crc_lookup_tbl, u32, u32)
 REGISTER_END()
 
         static __always_inline

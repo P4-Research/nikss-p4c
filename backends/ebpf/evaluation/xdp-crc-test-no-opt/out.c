@@ -116,6 +116,7 @@ return reg;
 static __always_inline
 void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
     data += data_size - 1;
+#pragma unroll
     for (u16 i = 0; i < data_size; i++) {
         //bpf_trace_message("CRC32: data byte: %x\n", *data);
         *reg ^= *data;
