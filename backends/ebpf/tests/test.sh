@@ -57,10 +57,6 @@ for i in "$@"; do
       TABLE_CACHING_ARG="${i#*=}"
       shift # past argument=value
       ;;
-    --pipeline-opt=*)
-      PIPELINE_OPT_ARG="${i#*=}"
-      shift # past argument=value
-      ;;
     --trace=*)
       TRACE_LOGS_ARGS="${i#*=}"
       shift # past argument=value
@@ -132,7 +128,6 @@ ulimit -l 65536
 declare -a XDP=("False" "True")
 declare -a XDP2TC_MODE=("head" "cpumap" "meta")
 declare -a TABLE_CACHING=("False" "True")
-declare -a PIPELINE_OPT=("False" "True")
 TRACE_LOGS="False"
 
 if [ ! -z "$BPF_HOOK" ]; then
@@ -163,16 +158,6 @@ if [ ! -z "$TABLE_CACHING_ARG" ]; then
   fi
 fi
 
-if [ ! -z "$PIPELINE_OPT_ARG" ]; then
-  if [ "$PIPELINE_OPT_ARG" == "on" ]; then
-    PIPELINE_OPT=( "True" )
-  elif [ "$PIPELINE_OPT_ARG" == "off" ]; then
-    PIPELINE_OPT=( "False" )
-  else
-    echo "Wrong --pipeline-opt value provided; running script for both enabled/disabled."
-  fi
-fi
-
 if [ ! -z "$TRACE_LOGS_ARGS" ]; then
   if [ "$TRACE_LOGS_ARGS" == "on" ]; then
     TRACE_LOGS="True"
@@ -187,24 +172,17 @@ TEST_CASE=$@
 for xdp_enabled in "${XDP[@]}" ; do
   for xdp2tc_mode in "${XDP2TC_MODE[@]}" ; do
       for table_caching_enabled in "${TABLE_CACHING[@]}" ; do
-        for pipeline_opt_enabled in "${PIPELINE_OPT[@]}" ; do
-          if [ "$xdp_enabled" == "False" ] && [ "$pipeline_opt_enabled" == "True" ]; then
-            echo "Test skipped because pipeline-aware optimization doesn't work in TC yet"
-            continue
-          fi
-          TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch";trace="'"$TRACE_LOGS"'"'
-          TEST_PARAMS+=";xdp='$xdp_enabled';xdp2tc='$xdp2tc_mode'"
-          TEST_PARAMS+=";table_caching='$table_caching_enabled'"
-          TEST_PARAMS+=";pipeline_optimization='$pipeline_opt_enabled'"
-          # Start tests
-          ptf \
-            --test-dir ptf/ \
-            --test-params="$TEST_PARAMS" \
-            --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
-            --interface 4@s1-eth4 --interface 5@s1-eth5 $TEST_CASE
-          exit_on_error
-          rm -rf ptf_out
-        done
+        TEST_PARAMS='interfaces="'"$interface_list"'";namespace="switch";trace="'"$TRACE_LOGS"'"'
+        TEST_PARAMS+=";xdp='$xdp_enabled';xdp2tc='$xdp2tc_mode'"
+        TEST_PARAMS+=";table_caching='$table_caching_enabled'"
+        # Start tests
+        ptf \
+          --test-dir ptf/ \
+          --test-params="$TEST_PARAMS" \
+          --interface 0@s1-eth0 --interface 1@s1-eth1 --interface 2@s1-eth2 --interface 3@s1-eth3 \
+          --interface 4@s1-eth4 --interface 5@s1-eth5 $TEST_CASE
+        exit_on_error
+        rm -rf ptf_out
       done
   done
 done

@@ -156,9 +156,6 @@ class EgressTrafficManagerRecirculatePSATest(P4EbpfTest):
         testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
 
 
-# FIXME: MulticastPSATest fails if egress optimization is enabled.
-#  We skip it for now, as it is not used for benchmarking.
-@skip_if_pipeline_optimization_enabled
 class MulticastPSATest(P4EbpfTest):
     p4_file_path = "p4testdata/psa-multicast.p4"
 
