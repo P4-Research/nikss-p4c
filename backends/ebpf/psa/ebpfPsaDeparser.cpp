@@ -71,7 +71,8 @@ void DeparserHdrEmitTranslator::processMethod(const P4::ExternMethod *method) {
                 builder->blockStart();
                 auto program = deparser->program;
                 unsigned width = headerToEmit->width_bits();
-                msgStr = Util::printf_format("Deparser: emitting header %s", headerExpression.c_str());
+                msgStr = Util::printf_format("Deparser: emitting header %s",
+                                             headerExpression.c_str());
                 builder->target->emitTraceMessage(builder, msgStr.c_str());
 
                 builder->emitIndent();
@@ -80,7 +81,8 @@ void DeparserHdrEmitTranslator::processMethod(const P4::ExternMethod *method) {
                                       program->packetStartVar.c_str(),
                                       program->offsetVar.c_str(), width);
                 builder->blockStart();
-                builder->target->emitTraceMessage(builder, "Deparser: invalid packet (packet too short)");
+                builder->target->emitTraceMessage(builder,
+                                                  "Deparser: invalid packet (packet too short)");
                 builder->emitIndent();
                 // We immediately return instead of jumping to reject state.
                 // It avoids reaching BPF_COMPLEXITY_LIMIT_JMP_SEQ.
@@ -266,7 +268,8 @@ void DeparserPrepareBufferTranslator::processMethod(const P4::ExternMethod *meth
                 builder->append(".ebpf_valid) ");
                 builder->blockStart();
                 builder->emitIndent();
-                builder->appendFormat("%s += %d;", this->deparser->outerHdrLengthVar.c_str(), width);
+                builder->appendFormat("%s += %d;",
+                                      this->deparser->outerHdrLengthVar.c_str(), width);
                 builder->newline();
                 builder->blockEnd(true);
             }

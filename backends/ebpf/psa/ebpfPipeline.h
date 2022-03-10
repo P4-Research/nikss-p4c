@@ -50,10 +50,6 @@ class EBPFPipeline : public EBPFProgram {
         oneKey = EBPFModel::reserved("one");
     }
 
-    /* Check if pipeline does any processing.
-     * Return false if not. */
-    bool isEmpty() const;
-
     virtual cstring dropReturnCode() {
         if (sectionName.startsWith("xdp")) {
             return "XDP_DROP";
@@ -206,13 +202,8 @@ class XDPEgressPipeline : public EBPFEgressPipeline {
                         P4::TypeMap* typeMap):
             EBPFEgressPipeline(name, options, refMap, typeMap) {
         target = new XdpTarget(options.emitTraceMessages);
-        if (options.pipelineOptimization) {
-            sectionName = "xdp/" + name;
-            ifindexVar = cstring("egress_ifindex");
-        } else {
-            sectionName = "xdp_devmap/" + name;
-            ifindexVar = cstring("skb->egress_ifindex");
-        }
+        sectionName = "xdp_devmap/" + name;
+        ifindexVar = cstring("skb->egress_ifindex");
         // we do not support packet path, instance & priority in the XDP egress.
         packetPathVar = cstring("0");
         pktInstanceVar = cstring("0");

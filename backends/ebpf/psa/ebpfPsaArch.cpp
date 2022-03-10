@@ -333,10 +333,7 @@ void PSAArchTC::emit(CodeBuilder *builder) const {
     /*
      * 10. TC Egress program.
      */
-    if (!options.pipelineOptimization ||
-        (options.pipelineOptimization && !egress->isEmpty())) {
-        egress->emit(builder);
-    }
+    egress->emit(builder);
 
     builder->target->emitLicense(builder, ingress->license);
 }
@@ -382,10 +379,7 @@ void PSAArchXDP::emit(CodeBuilder *builder) const {
 
     ingress->emit(builder);
 
-    if (!options.pipelineOptimization ||
-        (options.pipelineOptimization && !egress->isEmpty())) {
-        egress->emit(builder);
-    }
+    egress->emit(builder);
 
     builder->newline();
 
@@ -419,14 +413,6 @@ void PSAArchXDP::emitInstances(CodeBuilder *builder) const {
 
     builder->target->emitTableDecl(builder, "xdp2tc_shared_map", TablePerCPUArray,
                                    "u32", "struct xdp2tc_metadata", 1);
-    if (options.pipelineOptimization) {
-        // bridged_headers is used to transfer Headers data from ingress to egress.
-        builder->target->emitTableDecl(builder, "bridged_headers", TablePerCPUArray,
-                       "u32",
-                       "struct " + ingress->parser->headerType->to<EBPFStructType>()->name, 1);
-        builder->target->emitTableDecl(builder, "egress_progs_table", TableProgArray,
-                                       "u32", "u32", 1);
-    }
 
     builder->target->emitTableDecl(builder, "tx_port", TableDevmap,
                                    "u32", "struct bpf_devmap_val", egressDevmapSize);
@@ -644,11 +630,7 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
 bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     auto pl = prsr->container->type->applyParams;
 
-    if (options.pipelineOptimization && type == XDP_EGRESS) {
-        parser = new EBPFOptimizedEgressParserPSA(program, prsr, typemap);
-    } else {
-        parser = new EBPFPsaParser(program, prsr, typemap);
-    }
+    parser = new EBPFPsaParser(program, prsr, typemap);
 
     auto it = pl->parameters.begin();
     parser->packet = *it; ++it;
