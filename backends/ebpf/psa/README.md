@@ -117,7 +117,7 @@ invoking `bpf_redirect()` to the `PSA_PORT_RECIRCULATE` port with `BPF_F_INGRESS
 ## Metadata
 
 There are some global metadata defined for the PSA architecture. For example, `packet_path` must be shared among different pipelines.
-To share a global metadata between pipelines we will use `skb->cb` (control buffer), which gives us 20B that are free to use.
+To share a global metadata between pipelines we use `skb->cb` (control buffer), which gives us 20B that are free to use.
 
 # Getting started
 
@@ -232,4 +232,4 @@ Project maintainers:
 
 - Tomasz Osiński (tomasz@opennetworking.org / osinstom@gmail.com)
 - Mateusz Kossakowski (mateusz.kossakowski@orange.com / mateusz.kossakowski.10@gmail.com)
-- Tomasz Osiński (jan.palimaka@orange.com / jan.palimaka95@gmail.com)
+- Jan Palimąka (jan.palimaka@orange.com / jan.palimaka95@gmail.com)
