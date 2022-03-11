@@ -69,6 +69,8 @@ bool DeparserPrepareBufferTranslator::preorder(const IR::BlockStatement* s) {
             }
         }
     }
+
+    return false;
 }
 
 bool DeparserPrepareBufferTranslator::preorder(const IR::MethodCallExpression* expression) {
@@ -80,6 +82,8 @@ bool DeparserPrepareBufferTranslator::preorder(const IR::MethodCallExpression* e
         processMethod(ext);
         return false;
     }
+
+    return false;
 }
 
 void DeparserPrepareBufferTranslator::processMethod(const P4::ExternMethod *method) {
