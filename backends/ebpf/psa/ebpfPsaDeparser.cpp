@@ -9,6 +9,20 @@ DeparserBodyTranslator::DeparserBodyTranslator(const EBPFDeparserPSA *deparser) 
     setName("DeparserBodyTranslator");
 }
 
+bool DeparserBodyTranslator::preorder(const IR::MethodCallExpression* expression) {
+    auto mi = P4::MethodInstance::resolve(expression,
+                                          control->program->refMap,
+                                          control->program->typeMap);
+    auto ext = mi->to<P4::ExternMethod>();
+    if (ext != nullptr) {
+        // We skip headers emit processing which is handled by DeparserHdrEmitTranslator
+        if (ext->method->name.name == p4lib.packetOut.emit.name)
+            return false;
+    }
+
+    return ControlBodyTranslator::preorder(expression);
+}
+
 void DeparserBodyTranslator::processFunction(const P4::ExternFunction *function) {
     if (function->method->name.name == "psa_resubmit") {
         builder->appendFormat("!%s->drop && %s->resubmit",
@@ -23,7 +37,7 @@ void DeparserBodyTranslator::processMethod(const P4::ExternMethod *method) {
         auto methodName = method->method->getName().name;
         deparser->getChecksum(instance)->processMethod(builder, methodName, method->expr, this);
         return;
-    } else if (method->method->name.name == "emit") {
+    } else if (method->method->name.name == p4lib.packetOut.emit.name) {
         // do not use this visitor to generate emit() methods
         return;
     } else if (method->method->name.name == "pack") {
@@ -39,81 +53,140 @@ void DeparserBodyTranslator::processMethod(const P4::ExternMethod *method) {
     ControlBodyTranslator::processMethod(method);
 }
 
-DeparserHdrEmitTranslator::DeparserHdrEmitTranslator(const EBPFDeparserPSA *deparser) :
+DeparserPrepareBufferTranslator::DeparserPrepareBufferTranslator(const EBPFDeparserPSA *deparser) :
         CodeGenInspector(deparser->program->refMap, deparser->program->typeMap),
         ControlBodyTranslator(deparser), deparser(deparser) {
-    setName("DeparserHdrEmitTranslator");
+    setName("DeparserPrepareBufferTranslator");
 }
 
-void DeparserHdrEmitTranslator::processMethod(const P4::ExternMethod *method) {
-    if (method->method->name.name == "emit") {
-        auto decl = method->object;
-        if (decl == deparser->packet_out) {
-            if (method->method->name.name == p4lib.packetOut.emit.name) {
-                auto expr = method->expr->arguments->at(0)->expression;
-                auto exprType = deparser->program->typeMap->getType(expr);
-                auto headerToEmit = exprType->to<IR::Type_Header>();
-                if (headerToEmit == nullptr) {
-                    ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
-                            "Cannot emit a non-header type %1%", expr);
+bool DeparserPrepareBufferTranslator::preorder(const IR::BlockStatement* s) {
+    for (auto a : s->components) {
+        if (auto method = a->to<IR::MethodCallStatement>()) {
+            if (auto expr = method->methodCall->method->to<IR::Member>()) {
+                if (expr->member.name == p4lib.packetOut.emit.name) {
+                    visit(a);
                 }
-
-                auto exprMemb = expr->to<IR::Member>();
-                auto headerName = exprMemb->member.name;
-                auto headersStructName = deparser->parserHeaders->name.name;
-                auto headerExpression = headersStructName + "->" + headerName;
-
-                cstring msgStr;
-                builder->emitIndent();
-                builder->append("if (");
-                builder->append(headerExpression);
-                builder->append(".ebpf_valid) ");
-                builder->blockStart();
-                auto program = deparser->program;
-                unsigned width = headerToEmit->width_bits();
-                msgStr = Util::printf_format("Deparser: emitting header %s",
-                                             headerExpression.c_str());
-                builder->target->emitTraceMessage(builder, msgStr.c_str());
-
-                builder->emitIndent();
-                builder->appendFormat("if (%s < %s + BYTES(%s + %d)) ",
-                                      program->packetEndVar.c_str(),
-                                      program->packetStartVar.c_str(),
-                                      program->offsetVar.c_str(), width);
-                builder->blockStart();
-                builder->target->emitTraceMessage(builder,
-                                                  "Deparser: invalid packet (packet too short)");
-                builder->emitIndent();
-                // We immediately return instead of jumping to reject state.
-                // It avoids reaching BPF_COMPLEXITY_LIMIT_JMP_SEQ.
-                builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
-                builder->newline();
-                builder->blockEnd(true);
-                builder->emitIndent();
-                builder->newline();
-                unsigned alignment = 0;
-                for (auto f : headerToEmit->fields) {
-                    auto ftype = deparser->program->typeMap->getType(f);
-                    auto etype = EBPFTypeFactory::instance->create(ftype);
-                    auto et = dynamic_cast<EBPF::IHasWidth *>(etype);
-                    if (et == nullptr) {
-                        ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
-                                "Only headers with fixed widths supported %1%", f);
-                        return;
-                    }
-                    emitField(builder, headerExpression, f->name, alignment, etype);
-                    alignment += et->widthInBits();
-                    alignment %= 8;
-                }
-                builder->blockEnd(true);
             }
         }
     }
 }
 
+bool DeparserPrepareBufferTranslator::preorder(const IR::MethodCallExpression* expression) {
+    auto mi = P4::MethodInstance::resolve(expression,
+                                          control->program->refMap,
+                                          control->program->typeMap);
+    auto ext = mi->to<P4::ExternMethod>();
+    if (ext != nullptr) {
+        processMethod(ext);
+        return false;
+    }
+}
+
+void DeparserPrepareBufferTranslator::processMethod(const P4::ExternMethod *method) {
+    if (method->method->name.name == p4lib.packetOut.emit.name) {
+        auto decl = method->object;
+        if (decl == deparser->packet_out) {
+            auto expr = method->expr->arguments->at(0)->expression;
+            auto exprType = deparser->program->typeMap->getType(expr);
+            auto headerToEmit = exprType->to<IR::Type_Header>();
+            if (headerToEmit == nullptr) {
+                ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                        "Cannot emit a non-header type %1%", expr);
+            }
+
+            auto exprMemb = expr->to<IR::Member>();
+            auto headerName = exprMemb->member.name;
+            auto headersStructName = deparser->parserHeaders->name.name;
+            auto headerExpression = headersStructName + "->" + headerName;
+
+            unsigned width = headerToEmit->width_bits();
+            builder->emitIndent();
+            builder->append("if (");
+            builder->append(headerExpression);
+            builder->append(".ebpf_valid) ");
+            builder->blockStart();
+            builder->emitIndent();
+            builder->appendFormat("%s += %d;",
+                                  this->deparser->outerHdrLengthVar.c_str(), width);
+            builder->newline();
+            builder->blockEnd(true);
+        }
+    }
+}
+
+DeparserHdrEmitTranslator::DeparserHdrEmitTranslator(const EBPFDeparserPSA *deparser) :
+        CodeGenInspector(deparser->program->refMap, deparser->program->typeMap),
+        DeparserPrepareBufferTranslator(deparser), deparser(deparser) {
+    setName("DeparserHdrEmitTranslator");
+}
+
+void DeparserHdrEmitTranslator::processMethod(const P4::ExternMethod *method) {
+    if (method->method->name.name == p4lib.packetOut.emit.name) {
+        auto decl = method->object;
+        if (decl == deparser->packet_out) {
+            auto expr = method->expr->arguments->at(0)->expression;
+            auto exprType = deparser->program->typeMap->getType(expr);
+            auto headerToEmit = exprType->to<IR::Type_Header>();
+            if (headerToEmit == nullptr) {
+                ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                        "Cannot emit a non-header type %1%", expr);
+            }
+
+            auto exprMemb = expr->to<IR::Member>();
+            auto headerName = exprMemb->member.name;
+            auto headersStructName = deparser->parserHeaders->name.name;
+            auto headerExpression = headersStructName + "->" + headerName;
+
+            cstring msgStr;
+            builder->emitIndent();
+            builder->append("if (");
+            builder->append(headerExpression);
+            builder->append(".ebpf_valid) ");
+            builder->blockStart();
+            auto program = deparser->program;
+            unsigned width = headerToEmit->width_bits();
+            msgStr = Util::printf_format("Deparser: emitting header %s",
+                                         headerExpression.c_str());
+            builder->target->emitTraceMessage(builder, msgStr.c_str());
+
+            builder->emitIndent();
+            builder->appendFormat("if (%s < %s + BYTES(%s + %d)) ",
+                                  program->packetEndVar.c_str(),
+                                  program->packetStartVar.c_str(),
+                                  program->offsetVar.c_str(), width);
+            builder->blockStart();
+            builder->target->emitTraceMessage(builder,
+                                              "Deparser: invalid packet (packet too short)");
+            builder->emitIndent();
+            // We immediately return instead of jumping to reject state.
+            // It avoids reaching BPF_COMPLEXITY_LIMIT_JMP_SEQ.
+            builder->appendFormat("return %s;", builder->target->abortReturnCode().c_str());
+            builder->newline();
+            builder->blockEnd(true);
+            builder->emitIndent();
+            builder->newline();
+            unsigned alignment = 0;
+            for (auto f : headerToEmit->fields) {
+                auto ftype = deparser->program->typeMap->getType(f);
+                auto etype = EBPFTypeFactory::instance->create(ftype);
+                auto et = dynamic_cast<EBPF::IHasWidth *>(etype);
+                if (et == nullptr) {
+                    ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
+                            "Only headers with fixed widths supported %1%", f);
+                    return;
+                }
+                emitField(builder, headerExpression, f->name, alignment, etype);
+                alignment += et->widthInBits();
+                alignment %= 8;
+            }
+            builder->blockEnd(true);
+        }
+    }
+}
+
 void DeparserHdrEmitTranslator::emitField(CodeBuilder* builder, cstring headerExpression,
-                                cstring field, unsigned int alignment,
-                                EBPF::EBPFType* type) const {
+                                          cstring field, unsigned int alignment,
+                                          EBPF::EBPFType* type) const {
     auto program = deparser->program;
 
     auto et = dynamic_cast<EBPF::IHasWidth *>(type);
@@ -235,46 +308,6 @@ void DeparserHdrEmitTranslator::emitField(CodeBuilder* builder, cstring headerEx
                           widthToEmit);
     builder->endOfStatement(true);
     builder->newline();
-}
-
-DeparserPrepareBufferTranslator::DeparserPrepareBufferTranslator(const EBPFDeparserPSA *deparser) :
-        CodeGenInspector(deparser->program->refMap, deparser->program->typeMap),
-        ControlBodyTranslator(deparser), deparser(deparser) {
-    setName("DeparserPrepareBufferTranslator");
-}
-
-void DeparserPrepareBufferTranslator::processMethod(const P4::ExternMethod *method) {
-    if (method->method->name.name == "emit") {
-        auto decl = method->object;
-        if (decl == deparser->packet_out) {
-            if (method->method->name.name == p4lib.packetOut.emit.name) {
-                auto expr = method->expr->arguments->at(0)->expression;
-                auto exprType = deparser->program->typeMap->getType(expr);
-                auto headerToEmit = exprType->to<IR::Type_Header>();
-                if (headerToEmit == nullptr) {
-                    ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
-                            "Cannot emit a non-header type %1%", expr);
-                }
-
-                auto exprMemb = expr->to<IR::Member>();
-                auto headerName = exprMemb->member.name;
-                auto headersStructName = deparser->parserHeaders->name.name;
-                auto headerExpression = headersStructName + "->" + headerName;
-
-                unsigned width = headerToEmit->width_bits();
-                builder->emitIndent();
-                builder->append("if (");
-                builder->append(headerExpression);
-                builder->append(".ebpf_valid) ");
-                builder->blockStart();
-                builder->emitIndent();
-                builder->appendFormat("%s += %d;",
-                                      this->deparser->outerHdrLengthVar.c_str(), width);
-                builder->newline();
-                builder->blockEnd(true);
-            }
-        }
-    }
 }
 
 void EBPFDeparserPSA::emit(CodeBuilder* builder) {

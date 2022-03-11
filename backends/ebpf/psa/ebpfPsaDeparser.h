@@ -19,6 +19,7 @@ class DeparserBodyTranslator : public ControlBodyTranslator {
 
     void processFunction(const P4::ExternFunction* function) override;
     void processMethod(const P4::ExternMethod* method) override;
+    bool preorder(const IR::MethodCallExpression* expression) override;
 };
 
 // this translator emits buffer preparation (eg. which headers will be emitted)
@@ -28,17 +29,19 @@ class DeparserPrepareBufferTranslator : public ControlBodyTranslator {
  public:
     explicit DeparserPrepareBufferTranslator(const EBPFDeparserPSA* deparser);
 
-    void processMethod(const P4::ExternMethod* method) override;
+    void processMethod(const P4::ExternMethod* method);
+    bool preorder(const IR::BlockStatement* s) override;
+    bool preorder(const IR::MethodCallExpression* expression) override;
 };
 
 // this translator emits headers
-class DeparserHdrEmitTranslator : public ControlBodyTranslator {
+class DeparserHdrEmitTranslator : public DeparserPrepareBufferTranslator {
     const EBPFDeparserPSA* deparser;
 
  public:
     explicit DeparserHdrEmitTranslator(const EBPFDeparserPSA* deparser);
 
-    void processMethod(const P4::ExternMethod* method) override;
+    void processMethod(const P4::ExternMethod* method);
     void emitField(CodeBuilder* builder, cstring headerExpression,
                    cstring field, unsigned alignment, EBPF::EBPFType* type) const;
 };
