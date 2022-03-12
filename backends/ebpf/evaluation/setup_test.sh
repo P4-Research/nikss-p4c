@@ -132,16 +132,24 @@ done
 
 echo -e "Populating crc lookup table"
 
-  #crc=$i
-  #for ((j = 0; j <= 7; j++)); do
-  #  crc=$(((crc >> 1) ^ (-(crc & 1) & 0x4c11db7)))
-  #done
-  #calc=$(printf "%08x" $crc)
-  #echo "LE crc $calc"
-  #BECALC="${calc:6:2} ${calc:4:2} ${calc:2:2} ${calc:0:2}"
-  #echo "BE crc $BECALC"
-  #bpftool map update name crc_lookup_tbl key  hex $(printf "%x" $i) 00 00 00 value  hex $BECALC
-    #LSB_CRC32_POLY=0x04c11db7 # The CRC32 polynomal LSB order
+__generate_crc_lookup_table_standard() {
+
+  local -i -r LSB_CRC32_POLY=0xEDB88320 # The CRC32 polynomal LSB order
+  local -i index, index2 byte lsb, lkp1a, lkp1b,lkp1c, lkp2a, lkp2b,lkp2c, lkp3a, lkp3b,lkp3c,ins,ins2,ins3
+
+    for index in {0..255}; do
+      ((byte = 255 - index))
+      for _ in {0..7}; do # 8-bit lsb shift
+        ((lsb = byte & 0x01, byte = ((byte >> 1) & 0x7FFFFFFF) ^ (lsb == 0 ? LSB_CRC32_POLY : 0)))
+      done
+      calc=$(printf "%0x" $byte)
+      BECALC="${calc:6:2} ${calc:4:2} ${calc:2:2} ${calc:0:2}"
+      #printf "%0x" $byte
+      #echo "BE crc $BECALC"
+      bpftool map update name crc_lookup_tbl key hex $(printf "%x" $index) 00 00 00  value  hex $BECALC
+    done
+    }
+
 __generate_crc_lookup_table() {
 
   local -i -r LSB_CRC32_POLY=0xEDB88320 # The CRC32 polynomal LSB order
@@ -200,7 +208,7 @@ __generate_crc_lookup_table() {
                   calc4=$(printf "%08x" $ins3)
                   BECALC4="${calc3:6:2} ${calc3:4:2} ${calc3:2:2} ${calc3:0:2}"
                   #printf "%0x" $calc2
-                  echo "ins4=$calc4"
+                  #echo "ins4=$calc4"
                   bpftool map update name crc_lookup_tbl4 key hex $(printf "%x" $index2) 00 00 00  value  hex $BECALC4
 
 
@@ -208,7 +216,26 @@ __generate_crc_lookup_table() {
 
 }
 
-__generate_crc_lookup_table
+__generate_crc_lookup_table2() {
+    local -i -r LSB_CRC32_POLY=0xEDB88320 # The CRC32 polynomal LSB order
+    local -i index, index2 byte lsb, lkp1a, lkp1b,lkp1c, lkp2a, lkp2b,lkp2c, lkp3a, lkp3b,lkp3c,ins,ins2,ins3
+    TABLE=""
+      for index in {0..255}; do
+        ((byte = 255 - index))
+        for _ in {0..7}; do # 8-bit lsb shift
+          ((lsb = byte & 0x01, byte = ((byte >> 1) & 0x7FFFFFFF) ^ (lsb == 0 ? LSB_CRC32_POLY : 0)))
+        done
+        calc=$(printf "%08x" $byte)
+        TABLE+="${calc:6:2} ${calc:4:2} ${calc:2:2} ${calc:0:2} "
+        #printf "%0x" $byte
+        #echo "BE crc $BECALC"
+      done
+      bpftool map update name crc_lookup_tbl key hex  00 00 00 00  value  hex $TABLE
+    echo "$TABLE"
+}
+
+__generate_crc_lookup_table2
+#__generate_crc_lookup_table_standard
 
 echo -e "Dumping BPF setup:"
 bpftool net show 

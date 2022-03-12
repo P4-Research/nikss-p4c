@@ -10,11 +10,11 @@
 #define BYTES(w) ((w) / 8)
 #define write_partial(a, w, s, v) do { *((u8*)a) = ((*((u8*)a)) & ~(EBPF_MASK(u8, w) << s)) | (v << s) ; } while (0)
 #define write_byte(base, offset, v) do { *(u8*)((base) + (offset)) = (v); } while (0)
-#define bpf_trace_message(fmt, ...)                                \
-    do {                                                           \
-        char ____fmt[] = fmt;                                      \
-        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
-    } while(0)
+#define bpf_trace_message(fmt, ...)     //                           \
+//    do {                                                           \
+//        char ____fmt[] = fmt;                                      \
+//        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
+//    } while(0)
 
 #define CLONE_MAX_PORTS 64
 #define CLONE_MAX_INSTANCES 1

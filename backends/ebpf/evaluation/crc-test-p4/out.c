@@ -10,7 +10,11 @@
 #define BYTES(w) ((w) / 8)
 #define write_partial(a, w, s, v) do { *((u8*)a) = ((*((u8*)a)) & ~(EBPF_MASK(u8, w) << s)) | (v << s) ; } while (0)
 #define write_byte(base, offset, v) do { *(u8*)((base) + (offset)) = (v); } while (0)
-#define bpf_trace_message(fmt, ...)
+#define bpf_trace_message(fmt, ...) //\
+   // do {                                                          \
+   //    char ____fmt[] = fmt;                                      \
+   //    bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
+   // } while(0)
 
 #define CLONE_MAX_PORTS 64
 #define CLONE_MAX_INSTANCES 1
@@ -160,7 +164,7 @@ void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
     u32* lookup_value = NULL;
 
     for (u16 i = 0; i < data_size; i++){
-        //bpf_trace_message("CRC32: data byte: %x\n", *current);
+        bpf_trace_message("CRC32: data byte: %x\n", *current);
         u32 lookup_key = (((*reg) & 0xFF) ^ *current--);
 
         lookup_value =  BPF_MAP_LOOKUP_ELEM(crc_lookup_tbl, &lookup_key);
@@ -168,7 +172,7 @@ void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
             //bpf_trace_message("CRC32: lookup value: %x\n", *lookup_value);
            // bpf_trace_message("CRC32: current crc value: %x\n", *reg);
             *reg =   ((*reg) >> 8) ^ *lookup_value;
-            //bpf_trace_message("CRC32: next crc value: %x\n", *reg);
+            bpf_trace_message("CRC32: next crc value: %x\n", *reg);
 
         }
     }

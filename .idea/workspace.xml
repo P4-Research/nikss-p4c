@@ -9,15 +9,15 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="377f10a9-9f38-49c5-b01d-0746d8fa4c47" name="Default Changelist" comment="Add XDP CRC lookup table opt">
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-slice-by-4-tc/out.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-slice-by-4/out.c" afterDir="false" />
+    <list default="true" id="377f10a9-9f38-49c5-b01d-0746d8fa4c47" name="Default Changelist" comment="Add slicing by 4 tables generation">
+      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-lookup-tbl-2/out.c" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-lookup-tbl-2/out.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/out.c" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-no-opt/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-no-opt/out.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-slice-by-4-tc/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-slice-by-4-tc/out.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-test-p4/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-test-p4/out.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/out.o" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/out.o" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/setup_test.sh" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/setup_test.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-test-no-opt/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-test-no-opt/out.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-test-p4/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-test-p4/out.c" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -49,16 +49,16 @@
     <property name="cf.first.check.clang-format" value="false" />
     <property name="cidr.known.project.marker" value="true" />
     <property name="cmake.loaded.for.project" value="true" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-slice-by-4" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-lookup-tbl-2" />
     <property name="nodejs_package_manager_path" value="npm" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-lookup-tbl-2" />
+      <recent name="$PROJECT_DIR$/backends/ebpf/evaluation" />
+      <recent name="$PROJECT_DIR$/backends/ebpf/evaluation/crc-lookup-tbl-2" />
       <recent name="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-slice-by-4" />
       <recent name="$PROJECT_DIR$/backends/ebpf/evaluation/crc-slice-by-4-tc" />
-      <recent name="$PROJECT_DIR$/backends/ebpf/evaluation" />
-      <recent name="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf/no-copy-parser" />
-      <recent name="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/backends/ebpf/evaluation/scenarios/test/ebpf/tmp" />
@@ -90,7 +90,7 @@
       <workItem from="1635192874731" duration="4699000" />
       <workItem from="1645440088861" duration="33195000" />
       <workItem from="1646774472676" duration="559000" />
-      <workItem from="1646852127840" duration="8553000" />
+      <workItem from="1646852127840" duration="26495000" />
     </task>
     <task id="LOCAL-00001" summary="Add parser-memcpy xdp file">
       <created>1627145554985</created>
@@ -225,7 +225,14 @@
       <option name="project" value="LOCAL" />
       <updated>1646775008740</updated>
     </task>
-    <option name="localTasksCounter" value="20" />
+    <task id="LOCAL-00020" summary="Add slicing by 4 tables generation">
+      <created>1646860746937</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1646860746937</updated>
+    </task>
+    <option name="localTasksCounter" value="21" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -264,6 +271,7 @@
     <MESSAGE value="modified parser-spec-memcpy" />
     <MESSAGE value="Add CRC lookup table opt" />
     <MESSAGE value="Add XDP CRC lookup table opt" />
-    <option name="LAST_COMMIT_MESSAGE" value="Add XDP CRC lookup table opt" />
+    <MESSAGE value="Add slicing by 4 tables generation" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add slicing by 4 tables generation" />
   </component>
 </project>
