@@ -29,7 +29,7 @@ class DeparserPrepareBufferTranslator : public ControlBodyTranslator {
  public:
     explicit DeparserPrepareBufferTranslator(const EBPFDeparserPSA* deparser);
 
-    void processMethod(const P4::ExternMethod* method);
+    void processMethod(const P4::ExternMethod* method) override;
     bool preorder(const IR::BlockStatement* s) override;
     bool preorder(const IR::MethodCallExpression* expression) override;
 };
@@ -41,9 +41,10 @@ class DeparserHdrEmitTranslator : public DeparserPrepareBufferTranslator {
  public:
     explicit DeparserHdrEmitTranslator(const EBPFDeparserPSA* deparser);
 
-    void processMethod(const P4::ExternMethod* method);
-    void emitField(CodeBuilder* builder, cstring headerExpression,
-                   cstring field, unsigned alignment, EBPF::EBPFType* type) const;
+    void processMethod(const P4::ExternMethod* method) override;
+    void emitField(CodeBuilder* builder, cstring field, const IR::Expression* hdrExpr,
+                   unsigned alignment, EBPF::EBPFType* type);
+    void cos(const IR::Expression *expr);
 };
 
 class EBPFDeparserPSA : public EBPFControlPSA {
@@ -84,10 +85,10 @@ class EBPFDeparserPSA : public EBPFControlPSA {
         builder->newline();
     }
 
-    virtual void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
-                    cstring &headerExpression) const;
-    void emitField(CodeBuilder* builder, cstring headerExpression,
-                   cstring field, unsigned alignment, EBPF::EBPFType* type) const;
+//    virtual void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
+//                    cstring &headerExpression) const;
+//    void emitField(CodeBuilder* builder, cstring field,
+//                   unsigned alignment, EBPF::EBPFType* type) const;
     void emitDigestInstances(CodeBuilder* builder) const;
     void emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl) override;
 

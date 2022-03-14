@@ -856,7 +856,7 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
         BUG("failed to build deparser");
     }
 
-    deparser->headers = parserHeaders;
+//    deparser->headers = parserHeaders;
     if (ctrl->container->is<IR::P4Control>()) {
         auto p4Control = ctrl->container->to<IR::P4Control>();
         findDigests(p4Control);
