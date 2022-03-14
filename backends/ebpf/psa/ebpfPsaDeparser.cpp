@@ -219,13 +219,13 @@ void DeparserHdrEmitTranslator::emitField(CodeBuilder* builder, cstring field,
     unsigned bytes = ROUNDUP(widthToEmit, 8);
     unsigned shift = widthToEmit < 8 ?
                      (loadSize - alignment - widthToEmit) : (loadSize - widthToEmit);
-//    cstring hdrField = "parsed_hdr." + field; // headerExpression
 
     if (!swap.isNullOrEmpty()) {
         builder->emitIndent();
         visit(hdrExpr);
-        builder->appendFormat(" = %s(", swap);
+        builder->appendFormat(".%s = %s(", field, swap);
         visit(hdrExpr);
+        builder->appendFormat(".%s", field);
         if (shift != 0)
             builder->appendFormat(" << %d", shift);
         builder->append(")");
@@ -239,7 +239,7 @@ void DeparserHdrEmitTranslator::emitField(CodeBuilder* builder, cstring field,
         builder->emitIndent();
         builder->appendFormat("%s = ((char*)(&", program->byteVar.c_str());
         visit(hdrExpr);
-        builder->appendFormat("))[%d]", i);
+        builder->appendFormat(".%s))[%d]", field, i);
         builder->endOfStatement(true);
         unsigned freeBits = alignment != 0 ? (8 - alignment) : 8;
         bitsInCurrentByte = left >= 8 ? 8 : left;
