@@ -71,6 +71,7 @@ class EBPFDeparser : public EBPFControl {
     EBPFDeparser(const EBPFProgram* program, const IR::ControlBlock* control,
                  const IR::Parameter* parserHeaders) :
             EBPFControl(program, control, parserHeaders) {
+        codeGen = new DeparserBodyTranslator(this);
         outerHdrOffsetVar = cstring("outHeaderOffset");
         outerHdrLengthVar = cstring("outHeaderLength");
         returnCode = cstring("returnCode");

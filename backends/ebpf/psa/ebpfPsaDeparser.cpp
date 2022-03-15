@@ -37,9 +37,6 @@ bool IngressDeparserPSA::build() {
     }
     headerType = EBPFTypeFactory::instance->create(ht);
 
-    codeGen->useAsPointerVariable(resubmit_meta->name.name);
-    codeGen->useAsPointerVariable(user_metadata->name.name);
-    codeGen->substitute(this->headers, parserHeaders);
     return true;
 }
 

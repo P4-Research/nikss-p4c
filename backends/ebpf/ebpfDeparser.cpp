@@ -330,7 +330,6 @@ void EBPFDeparser::emitBufferAdjusts(CodeBuilder *builder) const {
 
 void EBPFDeparser::emit(CodeBuilder* builder) {
     codeGen->setBuilder(builder);
-    codeGen->useAsPointerVariable(this->headers->name.name);
 
     for (auto a : controlBlock->container->controlLocals)
         emitDeclaration(builder, a);
@@ -346,7 +345,7 @@ void EBPFDeparser::emit(CodeBuilder* builder) {
 
     auto prepareBufferTranslator = new DeparserPrepareBufferTranslator(this);
     prepareBufferTranslator->setBuilder(builder);
-    prepareBufferTranslator->useAsPointerVariable(this->headers->name.name);
+    prepareBufferTranslator->copyPointerVariables(codeGen);
     prepareBufferTranslator->substitute(this->headers, this->parserHeaders);
     controlBlock->container->body->apply(*prepareBufferTranslator);
 
@@ -370,7 +369,7 @@ void EBPFDeparser::emit(CodeBuilder* builder) {
     // emit headers
     auto hdrEmitTranslator = new DeparserHdrEmitTranslator(this);
     hdrEmitTranslator->setBuilder(builder);
-    hdrEmitTranslator->useAsPointerVariable(this->headers->name.name);
+    hdrEmitTranslator->copyPointerVariables(codeGen);
     hdrEmitTranslator->substitute(this->headers, this->parserHeaders);
     controlBlock->container->body->apply(*hdrEmitTranslator);
 

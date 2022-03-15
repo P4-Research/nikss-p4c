@@ -24,7 +24,9 @@ class EBPFDeparserPSA : public EBPFDeparser {
 
     EBPFDeparserPSA(const EBPFProgram* program, const IR::ControlBlock* control,
                     const IR::Parameter* parserHeaders, const IR::Parameter *istd) :
-            EBPFDeparser(program, control, parserHeaders), istd(istd) { }
+            EBPFDeparser(program, control, parserHeaders), istd(istd) {
+        codeGen = new DeparserBodyTranslatorPSA(this);
+    }
 
     void emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl) override;
 };
