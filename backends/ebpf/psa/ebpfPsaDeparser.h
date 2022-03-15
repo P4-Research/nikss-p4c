@@ -44,7 +44,6 @@ class DeparserHdrEmitTranslator : public DeparserPrepareBufferTranslator {
     void processMethod(const P4::ExternMethod* method) override;
     void emitField(CodeBuilder* builder, cstring field, const IR::Expression* hdrExpr,
                    unsigned alignment, EBPF::EBPFType* type);
-    void cos(const IR::Expression *expr);
 };
 
 class EBPFDeparserPSA : public EBPFControlPSA {

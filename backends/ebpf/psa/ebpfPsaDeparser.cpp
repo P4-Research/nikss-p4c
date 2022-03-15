@@ -186,7 +186,7 @@ void DeparserHdrEmitTranslator::emitField(CodeBuilder* builder, cstring field,
     auto et = dynamic_cast<EBPF::IHasWidth *>(type);
     if (et == nullptr) {
         ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
-                "Only headers with fixed widths supported %1%", "headerExpression");
+                "Only headers with fixed widths supported %1%", hdrExpr);
         return;
     }
     unsigned widthToEmit = et->widthInBits();
@@ -445,7 +445,7 @@ bool IngressDeparserPSA::build() {
 
     codeGen->asPointerVariables.insert(resubmit_meta->name.name);
     codeGen->asPointerVariables.insert(user_metadata->name.name);
-//    codeGen->substitute(this->headers, parserHeaders);
+    codeGen->substitute(this->headers, parserHeaders);
     return true;
 }
 
