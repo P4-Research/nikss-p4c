@@ -22,6 +22,7 @@ def xdp2tc_head_not_supported(cls):
         cls.skip_reason = "not supported for xdp2tc=head"
     return cls
 
+
 class EbpfTest(BaseTest):
     skip = False
     skip_reason = ''

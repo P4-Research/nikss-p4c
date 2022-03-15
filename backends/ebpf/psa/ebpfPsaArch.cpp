@@ -605,7 +605,6 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
         BUG("failed to build deparser");
     }
 
-    deparser->headers = parserHeaders;
     if (ctrl->container->is<IR::P4Control>()) {
         auto p4Control = ctrl->container->to<IR::P4Control>();
         // TODO: placeholder for handling digests
@@ -615,32 +614,4 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
     return false;
 }
 
-bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expression) {
-    auto mi = P4::MethodInstance::resolve(expression,
-                                          deparser->program->refMap,
-                                          deparser->program->typeMap);
-    auto extMethod = mi->to<P4::ExternMethod>();
-    if (extMethod != nullptr) {
-        auto decl = extMethod->object;
-        if (decl == deparser->packet_out) {
-            if (extMethod->method->name.name == p4lib.packetOut.emit.name) {
-                auto expr = extMethod->expr->arguments->at(0)->expression;
-                auto exprType = deparser->program->typeMap->getType(expr);
-                auto ht = exprType->to<IR::Type_Header>();
-                if (ht == nullptr) {
-                    ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
-                            "Cannot emit a non-header type %1%", expr);
-                    return false;
-                }
-                deparser->headersToEmit.push_back(ht);
-                auto exprMemb = expr->to<IR::Member>();
-                auto headerName = exprMemb->member.name;
-                auto headersStructName = deparser->parserHeaders->name.name;
-                deparser->headersExpressions.emplace_back(headersStructName + "->" + headerName);
-                return false;
-            }
-        }
-    }
-    return false;
-}
 }  // namespace EBPF

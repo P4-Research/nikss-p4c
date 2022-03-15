@@ -181,7 +181,6 @@ class ConvertToEBPFDeparserPSA : public Inspector {
                              deparser(nullptr), options(options) {}
 
     bool preorder(const IR::ControlBlock *) override;
-    bool preorder(const IR::MethodCallExpression* expression) override;
     EBPF::EBPFDeparserPSA *getEBPFDeparser() { return deparser; }
 };
 

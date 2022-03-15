@@ -588,5 +588,4 @@ void TCEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
     builder->appendFormat("return %s", forwardReturnCode());
     builder->endOfStatement(true);
 }
-
 }  // namespace EBPF
