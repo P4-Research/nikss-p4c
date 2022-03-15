@@ -597,7 +597,7 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
         BUG("undefined pipeline type, cannot build deparser");
     }
 
-    auto codegen = new DeparserBodyTranslator(deparser);
+    auto codegen = new DeparserBodyTranslatorPSA(deparser);
     codegen->useAsPointerVariable(parserHeaders->name.name);
 
     deparser->codeGen = codegen;
