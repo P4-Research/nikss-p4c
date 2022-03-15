@@ -37,6 +37,7 @@ class EBPFType;
 
 class EBPFProgram : public EBPFObject {
  public:
+    const Target* target;
     const EbpfOptions& options;
     const IR::P4Program* program;
     const IR::ToplevelBlock*  toplevel;

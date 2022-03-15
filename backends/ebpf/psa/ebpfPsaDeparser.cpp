@@ -354,8 +354,6 @@ void EBPFDeparserPSA::emit(CodeBuilder* builder) {
 }
 
 void EBPFDeparserPSA::emitBufferAdjusts(CodeBuilder *builder) const {
-    auto pipeline = program->to<EBPFPipeline>();
-
     builder->newline();
     builder->emitIndent();
 
@@ -375,7 +373,7 @@ void EBPFDeparserPSA::emitBufferAdjusts(CodeBuilder *builder) const {
     builder->endOfStatement(true);
     builder->emitIndent();
     builder->appendFormat("%s = ", returnCode.c_str());
-    pipeline->target->emitResizeBuffer(builder, program->model.CPacketName.str(),
+    program->target->emitResizeBuffer(builder, program->model.CPacketName.str(),
                                        outerHdrOffsetVar);
     builder->endOfStatement(true);
 
@@ -471,7 +469,7 @@ bool EgressDeparserPSA::build() {
 /*
  * PreDeparser for Ingress pipeline implements:
  * - packet cloning (using clone sessions)
- * - early packet drop
+ * - early packet dropEBPFProgram
  * - resubmission
  */
 void TCIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {

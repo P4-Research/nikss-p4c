@@ -13,11 +13,6 @@ namespace EBPF {
  */
 class EBPFPipeline : public EBPFProgram {
  public:
-    // The builder->target defines ether TC or XDP target,
-    // while for PSA-eBPF we may use both of them interchangeably.
-    // This field stores the Target object that is unique per eBPF program (pipeline).
-    const Target* target;
-
     const cstring name;
     cstring sectionName;
     cstring contextVar;
