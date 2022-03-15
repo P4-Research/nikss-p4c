@@ -86,7 +86,7 @@ void EBPFDeparserPSA::emitPreparePacketBuffer(CodeBuilder *builder) {
 
 void EBPFDeparserPSA::emit(CodeBuilder* builder) {
     codeGen->setBuilder(builder);
-    codeGen->asPointerVariables.insert(this->headers->name.name);
+    codeGen->useAsPointerVariable(this->headers->name.name);
 
     for (auto a : controlBlock->container->controlLocals)
         emitDeclaration(builder, a);
@@ -311,8 +311,8 @@ bool IngressDeparserPSA::build() {
     }
     headerType = EBPFTypeFactory::instance->create(ht);
 
-    codeGen->asPointerVariables.insert(resubmit_meta->name.name);
-    codeGen->asPointerVariables.insert(user_metadata->name.name);
+    codeGen->useAsPointerVariable(resubmit_meta->name.name);
+    codeGen->useAsPointerVariable(user_metadata->name.name);
     codeGen->substitute(this->headers, parserHeaders);
     return true;
 }

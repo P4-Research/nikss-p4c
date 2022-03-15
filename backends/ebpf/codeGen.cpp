@@ -201,7 +201,7 @@ bool CodeGenInspector::preorder(const IR::Member* expression) {
     if (ei == nullptr) {
         visit(expression->expr);
         auto pe = expression->expr->to<IR::PathExpression>();
-        if (pe != nullptr && asPointerVariables.count(pe->path->name.name) > 0) {
+        if (pe != nullptr && isPointerVariable(pe->path->name.name)) {
             builder->append("->");
         } else {
             builder->append(".");
