@@ -74,8 +74,7 @@ EBPFTable::EBPFTable(const EBPFProgram* program, const IR::TableBlock* table,
 
 EBPFTable::EBPFTable(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name) :
         EBPFTableBase(program, name, codeGen),
-        keyGenerator(nullptr), actionList(nullptr), table(nullptr) {
-}
+        keyGenerator(nullptr), actionList(nullptr), table(nullptr) {}
 
 void EBPFTable::initKey() {
     if (keyGenerator != nullptr) {
@@ -97,6 +96,8 @@ void EBPFTable::initKey() {
     }
 }
 
+// Performs the following validations:
+// 1. Validates if LPM key is the last one from match keys (ignores selector fields).
 void EBPFTable::validateKeys() const {
     if (keyGenerator == nullptr)
         return;
@@ -209,12 +210,13 @@ void EBPFTable::emitValueActionIDNames(CodeBuilder* builder) {
     for (auto a : actionList->actionList) {
         auto adecl = program->refMap->getDeclaration(a->getPath(), true);
         auto action = adecl->getNode()->to<IR::P4Action>();
-        // NoAction is from standard library
+        // no need to define a constant for NoAction,
+        // "case 0" will be explicitly generated in the action handling switch
         if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
             continue;
         }
         builder->emitIndent();
-        builder->appendFormat("#define %s %d", actionToActionIDName(action), action_idx);
+        builder->appendFormat("#define %s %d", p4ActionToActionIDName(action), action_idx);
         builder->newline();
         action_idx++;
     }
@@ -362,14 +364,26 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
             continue;
         bool memcpy = false;
         EBPFScalarType* scalar = nullptr;
-        unsigned width = 0;
         cstring swap;
         if (ebpfType->is<EBPFScalarType>()) {
             scalar = ebpfType->to<EBPFScalarType>();
-            width = scalar->implementationWidthInBits();
+            unsigned width = scalar->implementationWidthInBits();
             memcpy = !EBPFScalarType::generatesScalar(width);
 
-            swap = getByteSwapMethod(width);
+            if (width <= 8) {
+                swap = "";  // single byte, nothing to swap
+            } else if (width <= 16) {
+                swap = "bpf_htons";
+            } else if (width <= 32) {
+                swap = "bpf_htonl";
+            } else if (width <= 64) {
+                swap = "bpf_htonll";
+            } else {
+                // TODO: handle width > 64 bits
+                ::error(ErrorType::ERR_UNSUPPORTED,
+                        "%1%: fields wider than 64 bits are not supported yet",
+                        fieldName);
+            }
         }
 
         bool isLPMKeyBigEndian = false;
@@ -421,20 +435,6 @@ void EBPFTable::emitKey(CodeBuilder* builder, cstring keyName) {
     }
 }
 
-cstring EBPFTable::getByteSwapMethod(unsigned int width) const {
-    cstring swap;
-    if (width <= 8) {
-        swap = "";  // single byte, nothing to swap
-    } else if (width <= 16) {
-        swap = "bpf_htons";
-    } else if (width <= 32) {
-        swap = "bpf_htonl";
-    } else if (width <= 64) {
-        swap = "bpf_htonll";
-    }
-    return swap;
-}
-
 void EBPFTable::emitAction(CodeBuilder* builder, cstring valueName, cstring actionRunVariable) {
     builder->emitIndent();
     builder->appendFormat("switch (%s->action) ", valueName.c_str());
@@ -445,12 +445,8 @@ void EBPFTable::emitAction(CodeBuilder* builder, cstring valueName, cstring acti
         auto action = adecl->getNode()->to<IR::P4Action>();
         cstring name = EBPFObject::externalName(action), msgStr, convStr;
         builder->emitIndent();
-        if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
-            builder->append("case 0: ");
-        } else {
-            cstring actionName = actionToActionIDName(action);
-            builder->appendFormat("case %s: ", actionName);
-        }
+        cstring actionName = p4ActionToActionIDName(action);
+        builder->appendFormat("case %s: ", actionName);
         builder->newline();
         builder->increaseIndent();
 
@@ -540,12 +536,8 @@ void EBPFTable::emitInitializer(CodeBuilder* builder) {
     builder->appendFormat("struct %s %s = ", valueTypeName.c_str(), value.c_str());
     builder->blockStart();
     builder->emitIndent();
-    if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
-        builder->append(".action = 0,");
-    } else {
-        cstring actionName = actionToActionIDName(action);
-        builder->appendFormat(".action = %s,", actionName);
-    }
+    cstring actionName = p4ActionToActionIDName(action);
+    builder->appendFormat(".action = %s,", actionName);
     builder->newline();
 
     CodeGenInspector cg(program->refMap, program->typeMap);
@@ -617,7 +609,7 @@ void EBPFTable::emitInitializer(CodeBuilder* builder) {
                               valueTypeName.c_str(), value.c_str());
         builder->blockStart();
         builder->emitIndent();
-        cstring actionName = actionToActionIDName(action);
+        cstring actionName = p4ActionToActionIDName(action);
         builder->appendFormat(".action = %s,", actionName);
         builder->newline();
 
@@ -651,7 +643,12 @@ void EBPFTable::emitInitializer(CodeBuilder* builder) {
     builder->blockEnd(true);
 }
 
-cstring EBPFTable::actionToActionIDName(const IR::P4Action * action) const {
+cstring EBPFTable::p4ActionToActionIDName(const IR::P4Action * action) const {
+    if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
+        // NoAction always gets ID=0.
+        return "0";
+    }
+
     cstring actionName = EBPFObject::externalName(action);
     cstring tableInstance = dataMapName;
     return Util::printf_format("%s_ACT_%s", tableInstance.toUpper(), actionName.toUpper());

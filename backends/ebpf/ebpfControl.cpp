@@ -387,7 +387,7 @@ void ControlBodyTranslator::processApply(const P4::ApplyMethod* method) {
         builder->endOfStatement(true);
     } else {
         builder->target->emitTraceMessage(builder,
-            "Control: Entry not found, executing implicit NoAction");
+                                          "Control: Entry not found, executing implicit NoAction");
     }
     builder->endOfStatement(true);
     builder->blockEnd(true);
@@ -474,10 +474,8 @@ bool ControlBodyTranslator::preorder(const IR::SwitchStatement* statement) {
             auto decl = control->program->refMap->getDeclaration(pe->path, true);
             BUG_CHECK(decl->is<IR::P4Action>(), "%1%: expected an action", pe);
             auto act = decl->to<IR::P4Action>();
-            cstring fullActionName = table->actionToActionIDName(act);
-            act->name.originalName == P4::P4CoreLibrary::instance.noAction.name ?
-                builder->append("0") :
-                builder->append(fullActionName);
+            cstring fullActionName = table->p4ActionToActionIDName(act);
+            builder->append(fullActionName);
         }
         builder->append(":");
         builder->newline();

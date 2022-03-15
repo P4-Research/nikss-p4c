@@ -73,7 +73,6 @@ class EBPFTable : public EBPFTableBase {
     const cstring prefixFieldName = "prefixlen";
 
     bool isLPMTable();
-    bool isTernaryTable();
     virtual void validateKeys() const;
     virtual ActionTranslationVisitor*
     createActionTranslationVisitor(cstring valueName, const EBPFProgram* program) const {
@@ -83,7 +82,7 @@ class EBPFTable : public EBPFTableBase {
  public:
     const IR::Key*            keyGenerator;
     const IR::ActionList*     actionList;
-    const IR::TableBlock*    table;
+    const IR::TableBlock*     table;
     cstring               defaultActionMapName;
     cstring               actionEnumName;
     std::map<const IR::KeyElement*, cstring> keyFieldNames;
@@ -91,14 +90,17 @@ class EBPFTable : public EBPFTableBase {
 
     EBPFTable(const EBPFProgram* program, const IR::TableBlock* table, CodeGenInspector* codeGen);
     EBPFTable(const EBPFProgram* program, CodeGenInspector* codeGen, cstring name);
+
+    cstring p4ActionToActionIDName(const IR::P4Action * action) const;
+    void emitActionArguments(CodeBuilder* builder, const IR::P4Action* action, cstring name);
+    void emitKey(CodeBuilder* builder, cstring keyName);
+
     virtual void emitTypes(CodeBuilder* builder);
     virtual void emitInstance(CodeBuilder* builder);
-    void emitActionArguments(CodeBuilder* builder, const IR::P4Action* action, cstring name);
     virtual void emitKeyType(CodeBuilder* builder);
     virtual void emitValueType(CodeBuilder* builder);
     virtual void emitValueActionIDNames(CodeBuilder* builder);
     virtual void emitValueStructStructure(CodeBuilder* builder);
-    void emitKey(CodeBuilder* builder, cstring keyName);
     virtual void emitAction(CodeBuilder* builder, cstring valueName, cstring actionRunVariable);
     virtual void emitInitializer(CodeBuilder* builder);
     virtual void emitLookup(CodeBuilder* builder, cstring key, cstring value) {
@@ -113,8 +115,8 @@ class EBPFTable : public EBPFTableBase {
         return matchType->name.name == P4::P4CoreLibrary::instance.exactMatch.name ||
                matchType->name.name == P4::P4CoreLibrary::instance.lpmMatch.name;
     }
-    cstring actionToActionIDName(const IR::P4Action * action) const;
-    cstring getByteSwapMethod(unsigned int width) const;
+    // Whether to drop packet if no match entry found.
+    // Some table implementations may want to continue processing.
     virtual bool dropOnNoMatchingEntryFound() const { return true; }
     virtual bool singleActionRun() const { return true; }
 };

@@ -167,11 +167,27 @@ void EBPFTablePSA::emitConstEntriesInitializer(CodeBuilder *builder) {
 
                     auto ebpfType = ::get(keyTypes, keyElement);
                     unsigned width = 0;
+                    cstring swap;
                     if (ebpfType->is<EBPFScalarType>()) {
                         auto scalar = ebpfType->to<EBPFScalarType>();
                         width = scalar->implementationWidthInBits();
+
+                        if (width <= 8) {
+                            swap = "";  // single byte, nothing to swap
+                        } else if (width <= 16) {
+                            swap = "bpf_htons";
+                        } else if (width <= 32) {
+                            swap = "bpf_htonl";
+                        } else if (width <= 64) {
+                            swap = "bpf_htonll";
+                        } else {
+                            // TODO: handle width > 64 bits
+                            ::error(ErrorType::ERR_UNSUPPORTED,
+                                    "%1%: fields wider than 64 bits are not supported yet",
+                                    fieldName);
+                        }
                     }
-                    builder->appendFormat("%s(", getByteSwapMethod(width));
+                    builder->appendFormat("%s(", swap);
                     if (auto km = expr->to<IR::Mask>()) {
                         km->left->apply(cg);
                     } else {
@@ -284,12 +300,8 @@ void EBPFTablePSA::emitTableValue(CodeBuilder* builder, const IR::MethodCallExpr
     builder->appendFormat("struct %s %s = ", valueTypeName.c_str(), valueName.c_str());
     builder->blockStart();
     builder->emitIndent();
-    if (action->name.originalName == P4::P4CoreLibrary::instance.noAction.name) {
-        builder->append(".action = 0,");
-    } else {
-        cstring fullActionName = actionToActionIDName(action);
-        builder->appendFormat(".action = %s,", fullActionName);
-    }
+    cstring fullActionName = p4ActionToActionIDName(action);
+    builder->appendFormat(".action = %s,", fullActionName);
     builder->newline();
 
     builder->emitIndent();
