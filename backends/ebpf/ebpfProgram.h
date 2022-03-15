@@ -56,6 +56,7 @@ class EBPFProgram : public EBPFObject {
     cstring errorType;
     cstring license = "GPL";  // TODO: this should be a compiler option probably
     cstring arrayIndexType = "u32";
+    cstring compilerGlobalMetadata;
 
     virtual bool build();  // return 'true' on success
 

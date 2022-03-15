@@ -18,7 +18,6 @@ class EBPFPipeline : public EBPFProgram {
     cstring contextVar;
     cstring timestampVar, ifindexVar;
     cstring priorityVar, packetPathVar, pktInstanceVar;
-    cstring compilerGlobalMetadata;
     cstring oneKey;
 
     EBPFControlPSA* control;

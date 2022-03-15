@@ -1,5 +1,4 @@
 #include "ebpfPsaDeparser.h"
-#include "ebpfPipeline.h"
 
 namespace EBPF {
 
@@ -503,9 +502,8 @@ void TCIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
     builder->target->emitTraceMessage(builder, "PreDeparser: resubmitting packet, "
                                                "skipping deparser..");
     builder->emitIndent();
-    const EBPFPipeline* pipelineProgram = dynamic_cast<const EBPFPipeline*>(program);
     builder->appendFormat("%s->packet_path = RESUBMIT;",
-                    pipelineProgram->compilerGlobalMetadata);
+                    program->compilerGlobalMetadata);
     builder->newline();
     builder->emitIndent();
     builder->appendLine("return TC_ACT_UNSPEC;");
@@ -609,7 +607,7 @@ void XDPIngressDeparserPSA::emitPreDeparser(CodeBuilder *builder) {
                                                "skipping deparser..");
     builder->emitIndent();
     builder->appendFormat("%s->packet_path = RESUBMIT;",
-                          program->to<EBPFPipeline>()->compilerGlobalMetadata);
+                          program->compilerGlobalMetadata);
     builder->newline();
     builder->emitIndent();
     builder->appendLine("return -1;");
