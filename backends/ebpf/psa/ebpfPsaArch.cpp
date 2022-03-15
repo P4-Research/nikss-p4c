@@ -467,9 +467,9 @@ bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
         return false;
     parser->headerType = EBPFTypeFactory::instance->create(ht);
 
-    parser->visitor->asPointerVariables.insert(resubmit_meta->name.name);
-    parser->visitor->asPointerVariables.insert(parser->user_metadata->name.name);
-    parser->visitor->asPointerVariables.insert(parser->headers->name.name);
+    parser->visitor->useAsPointerVariable(resubmit_meta->name.name);
+    parser->visitor->useAsPointerVariable(parser->user_metadata->name.name);
+    parser->visitor->useAsPointerVariable(parser->headers->name.name);
 
     return true;
 }
@@ -493,11 +493,11 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     codegen->substitute(control->headers, parserHeaders);
 
     if (type != TC_EGRESS) {
-        codegen->asPointerVariables.insert(control->outputStandardMetadata->name.name);
+        codegen->useAsPointerVariable(control->outputStandardMetadata->name.name);
     }
 
-    codegen->asPointerVariables.insert(control->headers->name.name);
-    codegen->asPointerVariables.insert(control->user_metadata->name.name);
+    codegen->useAsPointerVariable(control->headers->name.name);
+    codegen->useAsPointerVariable(control->user_metadata->name.name);
 
     control->codeGen = codegen;
 
@@ -581,7 +581,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Variable* decl) {
     if (type == TC_INGRESS) {
         if (decl->type->is<IR::Type_Name>() &&
             decl->type->to<IR::Type_Name>()->path->name.name == "psa_ingress_output_metadata_t") {
-                control->codeGen->asPointerVariables.insert(decl->name.name);
+                control->codeGen->useAsPointerVariable(decl->name.name);
         }
     }
     return true;
@@ -598,7 +598,7 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
     }
 
     auto codegen = new DeparserBodyTranslator(deparser);
-    codegen->asPointerVariables.insert(parserHeaders->name.name);
+    codegen->useAsPointerVariable(parserHeaders->name.name);
 
     deparser->codeGen = codegen;
     if (!deparser->build()) {
