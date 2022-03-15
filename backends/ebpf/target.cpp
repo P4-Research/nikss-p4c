@@ -202,7 +202,6 @@ void KernelSamplesTarget::emitTraceMessage(Util::SourceCodeBuilder* builder, con
         msg = msg + "\\n";
 
     msg = cstring("\"") + msg + "\"";
-
     va_start(ap, argc);
     for (int i = 0; i < argc; ++i) {
         auto arg = va_arg(ap, const char *);
