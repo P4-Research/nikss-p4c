@@ -3,32 +3,6 @@
 
 namespace EBPF {
 
-bool EBPFPipeline::isEmpty() const {
-    // check if parser doesn't have any state
-    // Why 3? Parser will always have at least start, accept and reject states.
-    if (parser->parserBlock->container->states.size() > 3) {
-        return false;
-    }
-
-    auto startState = parser->parserBlock->container->states.at(0);
-    auto pathExpr = startState->selectExpression->to<IR::PathExpression>()->path;
-    if (!startState->components.empty() || pathExpr->name.name != IR::ParserState::accept) {
-        return false;
-    }
-
-    // check if control is empty
-    if (!control->p4Control->body->components.empty()) {
-        return false;
-    }
-
-    // check if deparser doesn't emit anything
-    if (!deparser->headersToEmit.empty()) {
-        return false;
-    }
-
-    return true;
-}
-
 void EBPFPipeline::emitLocalVariables(CodeBuilder* builder) {
     builder->emitIndent();
     builder->appendFormat("unsigned %s = 0;", offsetVar.c_str());
@@ -324,11 +298,7 @@ void EBPFIngressPipeline::emit(CodeBuilder *builder) {
                         "    }", actUnspecCode);
     builder->newline();
 
-    if (!options.pipelineOptimization ||
-        (deparser->is<OptimizedXDPIngressDeparserPSA>() &&
-         deparser->to<OptimizedXDPIngressDeparserPSA>()->skipEgress)) {
-        this->emitTrafficManager(builder);
-    }
+    this->emitTrafficManager(builder);
     builder->blockEnd(true);
 }
 
@@ -397,65 +367,15 @@ void EBPFEgressPipeline::emit(CodeBuilder *builder) {
     emitUserMetadataInstance(builder);
     builder->newline();
 
-    // FIXME: pipeline optimization supported for XDP only.
-    if (options.pipelineOptimization && this->is<XDPEgressPipeline>()) {
-        /*
-         * If we remove appended headers (e.g. bridged metadata) we should fix pkt_len
-         * and add missing bytes, because pkt_len is used to update byte Counters.
-         */
-        unsigned append_bits = 0;
-        for (auto el : parser->to<EBPFOptimizedEgressParserPSA>()->headersToSkipMovingOffset) {
-            auto hdr = el.second;
-            append_bits += hdr->width_bits();
-        }
+    emitHeaderInstances(builder);
+    builder->newline();
 
-        if (append_bits != 0) {
-            builder->emitIndent();
-            builder->appendFormat("%s += %d", this->lengthVar, append_bits / 8);
-            builder->endOfStatement(true);
-        }
-
-        emitLocalHeaderInstancesAsPointers(builder);
-        builder->emitIndent();
-
-        emitGetSharedHeaders(builder);
-
-        emitCPUMAPHeadersInitializers(builder);
-        builder->newline();
-        emitCPUMAPInitializers(builder);
-        builder->newline();
-        emitMetadataFromCPUMAP(builder);
-        builder->newline();
-
-        auto eg_parser = parser->to<EBPFOptimizedEgressParserPSA>();
-        auto fields = eg_parser->headerType->to<EBPFStructType>()->fields;
-
-        for (auto f : fields) {
-            builder->emitIndent();
-            builder->appendFormat("u8 %s_%s_ingress_ebpf_valid = %s->%s.ebpf_valid",
-                                  parser->headers->name.name, f->field->name.name,
-                                  parser->headers->name.name, f->field->name.name);
-            builder->endOfStatement(true);
-        }
-
-        for (auto f : fields) {
-            builder->emitIndent();
-            builder->appendFormat("%s->%s.ebpf_valid = 0",
-                                  parser->headers->name.name, f->field->name.name);
-            builder->endOfStatement(true);
-            eg_parser->headersToInvalidate.insert(f->field->name.name);
-        }
-    } else {
-        emitHeaderInstances(builder);
-        builder->newline();
-
-        emitCPUMAPInitializers(builder);
-        builder->newline();
-        emitHeadersFromCPUMAP(builder);
-        builder->newline();
-        emitMetadataFromCPUMAP(builder);
-        builder->newline();
-    }
+    emitCPUMAPInitializers(builder);
+    builder->newline();
+    emitHeadersFromCPUMAP(builder);
+    builder->newline();
+    emitMetadataFromCPUMAP(builder);
+    builder->newline();
 
     emitPSAControlOutputMetadata(builder);
     emitPSAControlInputMetadata(builder);
@@ -762,12 +682,7 @@ void XDPEgressPipeline::emitTrafficManager(CodeBuilder *builder) {
                                         "EgressTM: output packet to port %d",
                                       1, varStr);
     builder->emitIndent();
-    if (options.pipelineOptimization) {
-        builder->appendFormat("return bpf_redirect_map(&tx_port, %s.egress_port%s, 0);",
-                              control->inputStandardMetadata->name.name, "%DEVMAP_SIZE");
-    } else {
-        builder->appendFormat("return %s;", this->forwardReturnCode());
-    }
+    builder->appendFormat("return %s;", this->forwardReturnCode());
     builder->newline();
 }
 

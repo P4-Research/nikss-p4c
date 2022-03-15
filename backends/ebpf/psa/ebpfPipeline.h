@@ -13,11 +13,6 @@ namespace EBPF {
  */
 class EBPFPipeline : public EBPFProgram {
  public:
-    // The builder->target defines ether TC or XDP target,
-    // while for PSA-eBPF we may use both of them interchangeably.
-    // This field stores the Target object that is unique per eBPF program (pipeline).
-    const Target* target;
-
     const cstring name;
     cstring sectionName;
     cstring contextVar;
@@ -49,10 +44,6 @@ class EBPFPipeline : public EBPFProgram {
         priorityVar = cstring("skb->priority");
         oneKey = EBPFModel::reserved("one");
     }
-
-    /* Check if pipeline does any processing.
-     * Return false if not. */
-    bool isEmpty() const;
 
     virtual cstring dropReturnCode() {
         if (sectionName.startsWith("xdp")) {
@@ -206,13 +197,8 @@ class XDPEgressPipeline : public EBPFEgressPipeline {
                         P4::TypeMap* typeMap):
             EBPFEgressPipeline(name, options, refMap, typeMap) {
         target = new XdpTarget(options.emitTraceMessages);
-        if (options.pipelineOptimization) {
-            sectionName = "xdp/" + name;
-            ifindexVar = cstring("egress_ifindex");
-        } else {
-            sectionName = "xdp_devmap/" + name;
-            ifindexVar = cstring("skb->egress_ifindex");
-        }
+        sectionName = "xdp_devmap/" + name;
+        ifindexVar = cstring("skb->egress_ifindex");
         // we do not support packet path, instance & priority in the XDP egress.
         packetPathVar = cstring("0");
         pktInstanceVar = cstring("0");

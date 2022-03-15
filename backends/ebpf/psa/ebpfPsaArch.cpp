@@ -333,10 +333,7 @@ void PSAArchTC::emit(CodeBuilder *builder) const {
     /*
      * 10. TC Egress program.
      */
-    if (!options.pipelineOptimization ||
-        (options.pipelineOptimization && !egress->isEmpty())) {
-        egress->emit(builder);
-    }
+    egress->emit(builder);
 
     builder->target->emitLicense(builder, ingress->license);
 }
@@ -382,10 +379,7 @@ void PSAArchXDP::emit(CodeBuilder *builder) const {
 
     ingress->emit(builder);
 
-    if (!options.pipelineOptimization ||
-        (options.pipelineOptimization && !egress->isEmpty())) {
-        egress->emit(builder);
-    }
+    egress->emit(builder);
 
     builder->newline();
 
@@ -419,14 +413,6 @@ void PSAArchXDP::emitInstances(CodeBuilder *builder) const {
 
     builder->target->emitTableDecl(builder, "xdp2tc_shared_map", TablePerCPUArray,
                                    "u32", "struct xdp2tc_metadata", 1);
-    if (options.pipelineOptimization) {
-        // bridged_headers is used to transfer Headers data from ingress to egress.
-        builder->target->emitTableDecl(builder, "bridged_headers", TablePerCPUArray,
-                       "u32",
-                       "struct " + ingress->parser->headerType->to<EBPFStructType>()->name, 1);
-        builder->target->emitTableDecl(builder, "egress_progs_table", TableProgArray,
-                                       "u32", "u32", 1);
-    }
 
     builder->target->emitTableDecl(builder, "tx_port", TableDevmap,
                                    "u32", "struct bpf_devmap_val", egressDevmapSize);
@@ -590,79 +576,8 @@ const PSAArch * ConvertToEbpfPSA::build(const IR::ToplevelBlock *tlb) {
     }
 }
 
-void ConvertToEbpfPSA::optimizePipeline() {
-    auto ig_deparser = ebpf_psa_arch->ingress->deparser->to<OptimizedXDPIngressDeparserPSA>();
-    auto eg_deparser = ebpf_psa_arch->egress->deparser;
-
-    auto eg_parser = ebpf_psa_arch->egress->parser->to<EBPFOptimizedEgressParserPSA>();
-
-    /* remove headers from ingress deparser that are deparsed at ingress,
-     * but are removed from packet by egress.
-     */
-    for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
-        cstring hdr = ig_deparser->headersExpressions[i];
-        if (ig_deparser->isHeaderEmitted(hdr) && eg_parser->isHeaderExtractedByParser(hdr) &&
-            !eg_deparser->isHeaderEmitted(hdr)) {
-            eg_parser->headersToSkipMovingOffset.emplace(ig_deparser->headersExpressions[i],
-                                                         ig_deparser->headersToEmit[i]);
-            ig_deparser->headersToEmit.erase(
-                    ig_deparser->headersToEmit.begin() + (unsigned int) i);
-            ig_deparser->headersExpressions.erase(
-                    ig_deparser->headersExpressions.begin() + (unsigned int) i);
-        }
-    }
-
-    if (ig_deparser->headersToEmit.empty() ||
-        eg_deparser->headersToEmit.empty()) {
-        return;
-    }
-
-    /*
-     * Iterate over ingress and egress deparsers.
-     * If:
-     * - both ingress and egress deparsers emit the same header at given position,
-     * - and the header is extracted by egress parser with no lookahead before extract().
-     * we can postpone ingress deparsing of the header to egress deparser.
-     * Iteration is stopped if ingress and egress deparsers are diverged at a given position.
-     * NOTE: if lookahead() is performed before extract() we must deparse the subsequent headers
-     * in the ingress to put actual packet field in the packet buffer. Otherwise, lookahead()
-     * operation may retrieve an old value from the packet buffer.
-     */
-    ig_deparser->optimizedHeadersExpressions =
-            std::vector<cstring>(ig_deparser->headersExpressions);
-    ig_deparser->optimizedHeadersToEmit =
-            std::vector<const IR::Type_Header *>(ig_deparser->headersToEmit);
-    for (unsigned long i = 0; i < ig_deparser->headersToEmit.size(); i++) {
-        auto hdrToEmit = ig_deparser->headersToEmit[i];
-        cstring hdr = ig_deparser->headersExpressions[i];
-        if (hdr == eg_deparser->headersExpressions[i] &&
-            eg_parser->isHeaderExtractedByParserWithNoLookaheadBefore(hdr)) {
-            ig_deparser->removedHeadersToEmit.emplace(hdr, ig_deparser->headersToEmit[i]);
-            ig_deparser->optimizedHeadersToEmit.erase(std::find(
-                    ig_deparser->optimizedHeadersToEmit.begin(),
-                    ig_deparser->optimizedHeadersToEmit.end(),
-                    hdrToEmit));
-            ig_deparser->optimizedHeadersExpressions.erase(std::find(
-                    ig_deparser->optimizedHeadersExpressions.begin(),
-                    ig_deparser->optimizedHeadersExpressions.end(),
-                    hdr));
-        } else {
-            break;
-        }
-    }
-}
-
 const IR::Node *ConvertToEbpfPSA::preorder(IR::ToplevelBlock *tlb) {
     ebpf_psa_arch = build(tlb);
-
-    if (options.generateToXDP && options.pipelineOptimization) {
-        if (ebpf_psa_arch->egress->isEmpty()) {
-            ebpf_psa_arch->ingress->deparser->to<OptimizedXDPIngressDeparserPSA>()
-                    ->skipEgress = true;
-        }
-        this->optimizePipeline();
-    }
-
     return tlb;
 }
 
@@ -715,11 +630,7 @@ bool ConvertToEbpfPipeline::preorder(const IR::PackageBlock *block) {
 bool ConvertToEBPFParserPSA::preorder(const IR::ParserBlock *prsr) {
     auto pl = prsr->container->type->applyParams;
 
-    if (options.pipelineOptimization && type == XDP_EGRESS) {
-        parser = new EBPFOptimizedEgressParserPSA(program, prsr, typemap);
-    } else {
-        parser = new EBPFPsaParser(program, prsr, typemap);
-    }
+    parser = new EBPFPsaParser(program, prsr, typemap);
 
     auto it = pl->parameters.begin();
     parser->packet = *it; ++it;
@@ -927,8 +838,6 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
         deparser = new TCIngressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == TC_EGRESS) {
         deparser = new TCEgressDeparserPSA(program, ctrl, parserHeaders, istd);
-    } else if (type == XDP_INGRESS && options.pipelineOptimization) {
-        deparser = new OptimizedXDPIngressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == XDP_INGRESS) {
         deparser = new XDPIngressDeparserPSA(program, ctrl, parserHeaders, istd);
     } else if (type == XDP_EGRESS) {
@@ -947,7 +856,6 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
         BUG("failed to build deparser");
     }
 
-    deparser->headers = parserHeaders;
     if (ctrl->container->is<IR::P4Control>()) {
         auto p4Control = ctrl->container->to<IR::P4Control>();
         findDigests(p4Control);
@@ -979,32 +887,4 @@ void ConvertToEBPFDeparserPSA::findDigests(const IR::P4Control *p4Control) {
     }
 }
 
-bool ConvertToEBPFDeparserPSA::preorder(const IR::MethodCallExpression *expression) {
-    auto mi = P4::MethodInstance::resolve(expression,
-                                          deparser->program->refMap,
-                                          deparser->program->typeMap);
-    auto extMethod = mi->to<P4::ExternMethod>();
-    if (extMethod != nullptr) {
-        auto decl = extMethod->object;
-        if (decl == deparser->packet_out) {
-            if (extMethod->method->name.name == p4lib.packetOut.emit.name) {
-                auto expr = extMethod->expr->arguments->at(0)->expression;
-                auto exprType = deparser->program->typeMap->getType(expr);
-                auto ht = exprType->to<IR::Type_Header>();
-                if (ht == nullptr) {
-                    ::error(ErrorType::ERR_UNSUPPORTED_ON_TARGET,
-                            "Cannot emit a non-header type %1%", expr);
-                    return false;
-                }
-                deparser->headersToEmit.push_back(ht);
-                auto exprMemb = expr->to<IR::Member>();
-                auto headerName = exprMemb->member.name;
-                auto headersStructName = deparser->parserHeaders->name.name;
-                deparser->headersExpressions.push_back(headersStructName + "->" + headerName);
-                return false;
-            }
-        }
-    }
-    return false;
-}
 }  // namespace EBPF

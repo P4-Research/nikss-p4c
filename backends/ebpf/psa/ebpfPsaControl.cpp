@@ -89,6 +89,7 @@ void ControlBodyTranslatorPSA::processMethod(const P4::ExternMethod* method) {
 cstring ControlBodyTranslatorPSA::getValueActionParam(const IR::PathExpression *valueExpr) {
     return valueExpr->path->name.name;
 }
+
 cstring ControlBodyTranslatorPSA::getIndexActionParam(const IR::PathExpression *indexExpr) {
     return indexExpr->path->name.name;
 }
