@@ -87,9 +87,6 @@ class EBPFControl : public EBPFObject {
         auto result = ::get(counters, name);
         BUG_CHECK(result != nullptr, "No counter named %1%", name);
         return result; }
-    bool shouldDeclareAsPointer(const IR::Declaration *decl) {
-        return codeGen->asPointerVariables.count(decl->name.name) > 0;
-    }
 
  protected:
     void scanConstants();
