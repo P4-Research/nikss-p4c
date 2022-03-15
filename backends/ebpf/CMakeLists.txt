@@ -52,7 +52,6 @@ set (P4C_EBPF_SRCS
   psa/ebpfPipeline.cpp
   psa/ebpfPsaParser.cpp
   psa/ebpfPsaDeparser.cpp
-  psa/ebpfPsaControl.cpp
   psa/ebpfPsaTable.cpp
   psa/backend.cpp)
 

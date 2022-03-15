@@ -489,7 +489,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     control->inputStandardMetadata = *it; ++it;
     control->outputStandardMetadata = *it;
 
-    auto codegen = new ControlBodyTranslatorPSA(control);
+    auto codegen = new ControlBodyTranslator(control);
     codegen->substitute(control->headers, parserHeaders);
 
     if (type != TC_EGRESS) {

@@ -3,6 +3,7 @@
 
 #include "frontends/p4/methodInstance.h"
 #include "backends/ebpf/ebpfTable.h"
+#include "ebpfPsaControl.h"
 
 namespace EBPF {
 
@@ -16,12 +17,6 @@ class EBPFTablePSA : public EBPFTable {
                        size_t size) const;
 
  protected:
-    ActionTranslationVisitor*
-        createActionTranslationVisitor(cstring valueName,
-                                       const EBPFProgram* program) const override;
-
-    bool hasImplementation() const;
-
     void emitTableValue(CodeBuilder* builder, const IR::MethodCallExpression* actionMce,
                         cstring valueName);
     void emitDefaultActionInitializer(CodeBuilder *builder);

@@ -6,62 +6,6 @@
 
 namespace EBPF {
 
-// =====================ActionTranslationVisitorPSA=============================
-ActionTranslationVisitorPSA::ActionTranslationVisitorPSA(cstring valueName,
-                                                         const EBPFProgram *program,
-                                                         const EBPFTablePSA *table) :
-        CodeGenInspector(program->refMap, program->typeMap),
-        ActionTranslationVisitor(valueName, program),
-        ControlBodyTranslatorPSA(program->to<EBPFPipeline>()->control),
-        table(table) {}
-
-bool ActionTranslationVisitorPSA::preorder(const IR::PathExpression* pe) {
-    if (isActionParameter(pe)) {
-        return ActionTranslationVisitor::preorder(pe);
-    }
-    return ControlBodyTranslator::preorder(pe);
-}
-
-bool ActionTranslationVisitorPSA::isActionParameter(const IR::Expression *expression) const {
-    if (auto path = expression->to<IR::PathExpression>())
-        return ActionTranslationVisitor::isActionParameter(path);
-    else if (auto cast = expression->to<IR::Cast>())
-        return isActionParameter(cast->expr);
-    else
-        return false;
-}
-
-cstring ActionTranslationVisitorPSA::getActionParamStr(const IR::Expression *expression) const {
-    if (auto cast = expression->to<IR::Cast>())
-        return ActionTranslationVisitor::getActionParamStr(cast->expr);
-    else
-        return ActionTranslationVisitor::getActionParamStr(expression);
-}
-
-void ActionTranslationVisitorPSA::processMethod(const P4::ExternMethod* method) {
-    // TODO: placeholder for handling PSA externs
-    ControlBodyTranslatorPSA::processMethod(method);
-}
-
-cstring ActionTranslationVisitorPSA::getValueActionParam(const IR::PathExpression *valueExpr) {
-    if (isActionParameter(valueExpr)) {
-        return getActionParamStr(valueExpr);
-    }
-
-    return ControlBodyTranslatorPSA::getValueActionParam(valueExpr);
-}
-cstring ActionTranslationVisitorPSA::getIndexActionParam(const IR::PathExpression *indexExpr) {
-    if (isActionParameter(indexExpr)) {
-        return getActionParamStr(indexExpr);
-    }
-
-    return ControlBodyTranslatorPSA::getIndexActionParam(indexExpr);
-}
-
-void ActionTranslationVisitorPSA::processApply(const P4::ApplyMethod* method) {
-    ::error(ErrorType::ERR_UNSUPPORTED, "%1%: not supported in action", method->expr);
-}
-
 // =====================EBPFTablePSA=============================
 EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* table,
                            CodeGenInspector* codeGen, cstring name, size_t size) :
@@ -82,10 +26,6 @@ EBPFTablePSA::EBPFTablePSA(const EBPFProgram* program, const IR::TableBlock* tab
     }
 }
 
-ActionTranslationVisitor* EBPFTablePSA::createActionTranslationVisitor(
-        cstring valueName, const EBPFProgram* program) const {
-    return new ActionTranslationVisitorPSA(valueName, program->to<EBPFPipeline>(), this);
-}
 
 void EBPFTablePSA::emitValueActionIDNames(CodeBuilder* builder) {
     // For action_run method we preserve these ID names for actions.

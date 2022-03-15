@@ -77,11 +77,6 @@ $(BPFNAME).bc: %.bc : %.c
 $(BPFNAME).o: %.o : %.bc
 	$(LLC) -march=bpf -mcpu=probe -filetype=obj $< -o $@
 
-.PHONY: ebpf
-ebpf:
-	$(CLANG) $(ARGS) $(CFLAGS) $(INCLUDES) -emit-llvm -c -o  $(BPFNAME).bc $(CFILE)
-	$(LLC) -march=bpf -mcpu=probe -filetype=obj -o $(BPFNAME).o $(BPFNAME).bc
-
 .PHONY: psa
 psa: P4ARGS_TARGET= --arch psa
 psa: $(BPFNAME).c
