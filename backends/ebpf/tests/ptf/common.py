@@ -147,8 +147,6 @@ class P4EbpfTest(EbpfTest):
         self.test_prog_image = os.path.join("ptf_out", filename + ".o")
 
         p4args = "--Wdisable=unused"
-        if "xdp2tc" in testutils.test_params_get():
-            p4args += " --xdp2tc=" + testutils.test_param_get("xdp2tc")
         if self.is_trace_logs_enabled():
             p4args += " --trace"
 
