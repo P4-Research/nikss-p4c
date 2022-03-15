@@ -84,10 +84,6 @@ class EBPFDeparserPSA : public EBPFControlPSA {
         builder->newline();
     }
 
-//    virtual void emitHeader(CodeBuilder* builder, const IR::Type_Header* headerToEmit,
-//                    cstring &headerExpression) const;
-//    void emitField(CodeBuilder* builder, cstring field,
-//                   unsigned alignment, EBPF::EBPFType* type) const;
     void emitDigestInstances(CodeBuilder* builder) const;
     void emitDeclaration(CodeBuilder* builder, const IR::Declaration* decl) override;
 
