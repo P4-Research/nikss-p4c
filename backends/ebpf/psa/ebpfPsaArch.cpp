@@ -597,12 +597,16 @@ bool ConvertToEBPFDeparserPSA::preorder(const IR::ControlBlock *ctrl) {
         BUG("undefined pipeline type, cannot build deparser");
     }
 
-    auto codegen = new DeparserBodyTranslator(deparser);
-    codegen->useAsPointerVariable(parserHeaders->name.name);
-
-    deparser->codeGen = codegen;
     if (!deparser->build()) {
         BUG("failed to build deparser");
+    }
+
+    deparser->codeGen->substitute(deparser->headers, parserHeaders);
+    deparser->codeGen->useAsPointerVariable(deparser->headers->name.name);
+
+    if (type == TC_INGRESS) {
+        deparser->codeGen->useAsPointerVariable(deparser->resubmit_meta->name.name);
+        deparser->codeGen->useAsPointerVariable(deparser->user_metadata->name.name);
     }
 
     if (ctrl->container->is<IR::P4Control>()) {
