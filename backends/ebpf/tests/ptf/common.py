@@ -257,6 +257,15 @@ class P4EbpfTest(EbpfTest):
                 cmd = cmd + "{} ".format(k)
         self.exec_ns_cmd(cmd, "Table delete failed")
 
+    def table_set_default(self, table, action=0, data=None):
+        cmd = "psabpf-ctl table default pipe {} {} id {} ".format(TEST_PIPELINE_ID, table, action)
+        if data:
+            # TODO: add support for counters and meters
+            cmd = cmd + "data "
+            for d in data:
+                cmd = cmd + "{} ".format(d)
+        self.exec_ns_cmd(cmd, "Table set default entry failed")
+
     def meter_update(self, name, index, pir, pbs, cir, cbs):
         cmd = "psabpf-ctl meter update pipe {} {} " \
               "index {} {}:{} {}:{}".format(TEST_PIPELINE_ID, name,

@@ -76,10 +76,10 @@ function install_ptf_ebpf_test_deps() (
   # we test under current kernel, not the newest one
   apt-get install -y --no-install-recommends ${P4C_PTF_PACKAGES}
 
-  git clone --recursive https://github.com/P4-Research/psabpf.git /tmp/psabpf
+  git clone --recursive --branch tatry/table-set-default https://github.com/P4-Research/psabpf.git /tmp/psabpf
   cd /tmp/psabpf
   # psabpf is under heavy development, later use git tags when it will be ready to use
-  git reset --hard 8fc9687
+  git reset --hard 44ec2c8
   ./build_libbpf.sh
   mkdir build
   cd build

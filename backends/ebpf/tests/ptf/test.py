@@ -25,9 +25,10 @@ class SimpleForwardingPSATest(P4EbpfTest):
         # use default action
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet(self, pkt, PORT1)
-
-    def tearDown(self):
-        super(SimpleForwardingPSATest, self).tearDown()
+        # change default action
+        self.table_set_default(table="ingress_tbl_fwd", action=1, data=[6])
+        testutils.send_packet(self, PORT0, pkt)
+        testutils.verify_packet(self, pkt, PORT2)
 
 
 class PSAResubmitTest(P4EbpfTest):
