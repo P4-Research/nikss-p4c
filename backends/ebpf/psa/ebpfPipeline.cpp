@@ -352,9 +352,9 @@ void EBPFEgressPipeline::emit(CodeBuilder *builder) {
     cstring msgStr, varStr;
 
     builder->newline();
-    target->emitCodeSection(builder, sectionName);
+    builder->target->emitCodeSection(builder, sectionName);
     builder->emitIndent();
-    target->emitMain(builder, functionName, model.CPacketName.str());
+    builder->target->emitMain(builder, functionName, model.CPacketName.str());
     builder->spc();
     builder->blockStart();
 

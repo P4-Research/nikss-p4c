@@ -310,7 +310,7 @@ void EBPFDeparser::emitBufferAdjusts(CodeBuilder *builder) const {
     builder->endOfStatement(true);
     builder->emitIndent();
     builder->appendFormat("%s = ", returnCode.c_str());
-    program->target->emitResizeBuffer(builder, program->model.CPacketName.str(),
+    builder->target->emitResizeBuffer(builder, program->model.CPacketName.str(),
                                       outerHdrOffsetVar);
     builder->endOfStatement(true);
 

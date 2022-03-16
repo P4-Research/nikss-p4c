@@ -11,9 +11,6 @@ class EBPFControlPSA;
 class EBPFControlPSA : public EBPFControl {
  public:
     bool timestampIsUsed = false;
-    // FIXME: this should not be part of EBPFControlPSA object.
-    // It should be moved to ConvertToEBPFPsaControl.
-    const IR::P4Control* p4Control;
 
     const IR::Parameter* user_metadata;
     const IR::Parameter* inputStandardMetadata;
@@ -21,7 +18,7 @@ class EBPFControlPSA : public EBPFControl {
 
     EBPFControlPSA(const EBPFProgram* program, const IR::ControlBlock* control,
                    const IR::Parameter* parserHeaders) :
-        EBPFControl(program, control, parserHeaders), p4Control(control->container) {}
+        EBPFControl(program, control, parserHeaders) {}
 };
 
 }  // namespace EBPF

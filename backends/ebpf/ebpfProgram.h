@@ -37,10 +37,6 @@ class EBPFType;
 
 class EBPFProgram : public EBPFObject {
  public:
-    // The builder->target defines either TC or XDP target,
-    // while for PSA-eBPF we may use both of them interchangeably.
-    // This field stores the Target object that is unique per eBPF program (pipeline).
-    const Target* target;
     const EbpfOptions& options;
     const IR::P4Program* program;
     const IR::ToplevelBlock*  toplevel;

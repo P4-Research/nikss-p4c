@@ -30,10 +30,8 @@ BPFOBJ=
 # Get the source name of the object to match targets
 BPFNAME=$(basename $(BPFOBJ))
 
-CFILE=
-
 # Possible values: "-mcpu=generic|probe|v1|v2|v3" or "-mcpu=v1|v2 -mattr=+alu32"
-COMPILERFLAGS="-mcpu=generic"
+LLC_FLAGS="-mcpu=generic"
 
 all: verify_target_bpf $(BPFOBJ)
 
@@ -81,7 +79,7 @@ $(BPFNAME).o: %.o : %.bc
 psa: P4ARGS_TARGET= --arch psa
 psa: $(BPFNAME).c
 	$(CLANG) $(ARGS) $(CFLAGS) $(INCLUDES) -emit-llvm -DBTF -c -o  $(BPFNAME).bc $(BPFNAME).c
-	$(LLC) -march=bpf $(COMPILERFLAGS) -filetype=obj -o $(BPFNAME).o $(BPFNAME).bc
+	$(LLC) -march=bpf $(LLC_FLAGS) -filetype=obj -o $(BPFNAME).o $(BPFNAME).bc
 
 clean:
 	rm -f *.o *.bc $(BPFNAME).c $(BPFNAME).h
