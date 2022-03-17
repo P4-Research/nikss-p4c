@@ -258,7 +258,7 @@ class P4EbpfTest(EbpfTest):
         self.exec_ns_cmd(cmd, "Table delete failed")
 
     def table_set_default(self, table, action=0, data=None):
-        cmd = "psabpf-ctl table default pipe {} {} id {} ".format(TEST_PIPELINE_ID, table, action)
+        cmd = "psabpf-ctl table default set pipe {} {} id {} ".format(TEST_PIPELINE_ID, table, action)
         if data:
             # TODO: add support for counters and meters
             cmd = cmd + "data "
