@@ -31,6 +31,7 @@ class ControlBodyTranslator : public virtual CodeGenInspector {
     std::set<const IR::Parameter*> toDereference;
     std::vector<cstring> saveAction;
     P4::P4CoreLibrary& p4lib;
+
     int commentDescriptionDepth;
 
  public:
