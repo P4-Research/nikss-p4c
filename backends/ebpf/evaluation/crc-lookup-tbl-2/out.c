@@ -160,7 +160,7 @@ void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
     struct lookup_tbl_val* lookup_table;
     u32 index = 0;
     lookup_table = BPF_MAP_LOOKUP_ELEM(crc_lookup_tbl, &index);
-    volatile u32 lookup_key = 0;
+    u32 lookup_key = 0;
     u32 lookup_value =0;
     if (lookup_table != NULL) {
             for (u16 i = 0; i < data_size; i++) {
@@ -168,7 +168,7 @@ void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
                 lookup_key = (u32)(((*reg) & 0xFF) ^ *current--);
 
 
-                        lookup_value = lookup_table->table[lookup_key & 255];
+                        lookup_value = lookup_table->table[(u8)(lookup_key & 255)];
 
                         //bpf_trace_message("CRC32: lookup value: %x\n", lookup_value);
                         // bpf_trace_message("CRC32: current crc value: %x\n", *reg);

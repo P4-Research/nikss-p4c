@@ -9,13 +9,11 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="377f10a9-9f38-49c5-b01d-0746d8fa4c47" name="Default Changelist" comment="Add slicing by 4 tables generation">
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-lookup-tbl-2/out.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-lookup-tbl-2/out.c" afterDir="false" />
+    <list default="true" id="377f10a9-9f38-49c5-b01d-0746d8fa4c47" name="Default Changelist" comment="Add lookup table as a single map value">
+      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-slice-by-4-tc2/out.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-no-opt/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-no-opt/out.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-lookup-tbl-2/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-lookup-tbl-2/out.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-slice-by-4-tc/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-slice-by-4-tc/out.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-test-p4/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-test-p4/out.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/out.o" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/out.o" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/setup_test.sh" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/setup_test.sh" afterDir="false" />
     </list>
@@ -49,13 +47,14 @@
     <property name="cf.first.check.clang-format" value="false" />
     <property name="cidr.known.project.marker" value="true" />
     <property name="cmake.loaded.for.project" value="true" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-lookup-tbl-2" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/backends/ebpf/evaluation" />
     <property name="nodejs_package_manager_path" value="npm" />
+    <property name="settings.editor.selected.configurable" value="CLionExternalConfigurable" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
-      <recent name="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-lookup-tbl-2" />
       <recent name="$PROJECT_DIR$/backends/ebpf/evaluation" />
+      <recent name="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-lookup-tbl-2" />
       <recent name="$PROJECT_DIR$/backends/ebpf/evaluation/crc-lookup-tbl-2" />
       <recent name="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-slice-by-4" />
       <recent name="$PROJECT_DIR$/backends/ebpf/evaluation/crc-slice-by-4-tc" />
@@ -68,6 +67,16 @@
     <configuration default="true" type="GradleAppRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true">
       <method v="2">
         <option name="com.jetbrains.cidr.cpp.gradle.execution.GradleNativeBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="CLionExternalRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true">
+      <method v="2">
+        <option name="CLION.EXTERNAL.BUILD" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Unnamed" type="CMakeRunConfiguration" factoryName="Application" nameIsGenerated="true" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
       </method>
     </configuration>
   </component>
@@ -90,7 +99,7 @@
       <workItem from="1635192874731" duration="4699000" />
       <workItem from="1645440088861" duration="33195000" />
       <workItem from="1646774472676" duration="559000" />
-      <workItem from="1646852127840" duration="26495000" />
+      <workItem from="1646852127840" duration="60997000" />
     </task>
     <task id="LOCAL-00001" summary="Add parser-memcpy xdp file">
       <created>1627145554985</created>
@@ -232,7 +241,14 @@
       <option name="project" value="LOCAL" />
       <updated>1646860746937</updated>
     </task>
-    <option name="localTasksCounter" value="21" />
+    <task id="LOCAL-00021" summary="Add lookup table as a single map value">
+      <created>1647097857631</created>
+      <option name="number" value="00021" />
+      <option name="presentableId" value="LOCAL-00021" />
+      <option name="project" value="LOCAL" />
+      <updated>1647097857631</updated>
+    </task>
+    <option name="localTasksCounter" value="22" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -272,6 +288,7 @@
     <MESSAGE value="Add CRC lookup table opt" />
     <MESSAGE value="Add XDP CRC lookup table opt" />
     <MESSAGE value="Add slicing by 4 tables generation" />
-    <option name="LAST_COMMIT_MESSAGE" value="Add slicing by 4 tables generation" />
+    <MESSAGE value="Add lookup table as a single map value" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add lookup table as a single map value" />
   </component>
 </project>
