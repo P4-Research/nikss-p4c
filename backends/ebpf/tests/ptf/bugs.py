@@ -36,7 +36,7 @@ class Issue127(P4EbpfTest):
         pkt = testutils.simple_ip_packet()
         testutils.send_packet(self, PORT0, pkt)
         testutils.verify_packet_any_port(self, pkt, ALL_PORTS)
-        self.verify_map_entry("ingress_cnt", key="0 0 0 0", expected_value="01 00 00 00")
+        self.counter_verify(name="ingress_cnt", keys=[0], packets=1)
 
 
 class Issue177(P4EbpfTest):
