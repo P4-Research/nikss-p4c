@@ -288,7 +288,7 @@ class P4EbpfTest(EbpfTest):
         if indirect:
             cmd = cmd + "ref "
         cmd = cmd + self._table_create_str_from_key(keys=keys)
-        _, stdout, _ = self.exec_ns_cmd(cmd, "Table set default entry failed")
+        _, stdout, _ = self.exec_ns_cmd(cmd, "Table get entry failed")
         return json.loads(stdout)[table]
 
     def table_verify(self, table, keys, action=0, priority=None, data=None, references=None,
