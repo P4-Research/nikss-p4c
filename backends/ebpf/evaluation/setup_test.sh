@@ -333,7 +333,147 @@ __generate_crc_lookup_table3() {
     echo $TABLE
     bpftool map update name crc_lookup_tbl key hex  00 00 00 00  value  hex $TABLE
 }
-__generate_crc_lookup_table3
+
+
+__generate_crc_lookup_table4() {
+
+  local -i -r LSB_CRC32_POLY=0xEDB88320 # The CRC32 polynomal LSB order
+  local -i index, index2 byte lsb, lkp1a, lkp1b,lkp1c, lkp2a, lkp2b,lkp2c, lkp3a, lkp3b,lkp3c,ins,ins2,ins3
+  TABLE=""
+  TABLE2=""
+  TABLE3=""
+  TABLE4=""
+  TABLE5=""
+  TABLE6=""
+  TABLE7=""
+  TABLE8=""
+  declare -a calc_tbl
+  declare -a calc_tbl2
+  declare -a calc_tbl3
+  declare -a calc_tbl4
+  declare -a calc_tbl5
+  declare -a calc_tbl6
+  declare -a calc_tbl7
+  declare -a calc_tbl8
+    for index in {0..255}; do
+
+      byte=index
+      for _ in {0..7}; do # 8-bit lsb shift
+
+          byte=$(((byte>>1) ^ ((byte & 1)*LSB_CRC32_POLY)))
+
+      done
+      calc_tbl[index]=$byte
+      calc=$(printf "%08x" $byte)
+
+      #printf "%0x" $byte
+      #echo "BE crc $BECALC"
+      #echo "ins=$calc"
+      TABLE+="${calc:6:2} ${calc:4:2} ${calc:2:2} ${calc:0:2} "
+
+    done
+
+    for index2 in {0..255}; do
+
+      lkp1a=$( bpftool map lookup name crc_lookup_tbl1 key hex $(printf "%x" $index2) 00 00 00 | awk 'FNR == 3 {print $2}' )
+      lkp1a=${calc_tbl[$index2]}
+      ((lkp1b=lkp1a & 0xFF))
+      calc=$(printf "%08x" $lkp1b)
+      #BECALC1="${calc:6:2} ${calc:4:2} ${calc:2:2} ${calc:0:2}"
+      #lkp1c=$( bpftool map lookup name crc_lookup_tbl1 key hex $calc 00 00 00 | awk 'FNR == 3 {print $2}' )
+      lkp1c=${calc_tbl[$lkp1b]}
+      ((ins=(lkp1a >> 8) ^ lkp1c))
+      #printf "lkp1b = %0x\n" $lkp1b
+      #echo "index2= $(printf "%x" $index2)"
+      calc_tbl2[index2]=$ins
+      calc2=$(printf "%08x" $ins)
+      TABLE2+="${calc2:6:2} ${calc2:4:2} ${calc2:2:2} ${calc2:0:2} "
+
+      #lkp2a=$( bpftool map lookup name crc_lookup_tbl2 key hex $(printf "%x" $index2) 00 00 00 | awk 'FNR == 3 {print $2}' )
+      lkp2a=${calc_tbl2[$index2]}
+            ((lkp2b=lkp2a & 0xFF))
+            #calc=$(printf "%08x" $lkp2b)
+            #BECALC1="${calc:6:2} ${calc:4:2} ${calc:2:2} ${calc:0:2}"
+            #lkp2c=$( bpftool map lookup name crc_lookup_tbl1 key hex $calc 00 00 00 | awk 'FNR == 3 {print $2}' )
+            lkp2c=${calc_tbl[$lkp2b]}
+            ((ins2=(lkp2a >> 8) ^ lkp2c))
+            #printf "lkp1b = %0x\n" $lkp1b
+            #echo "index2= $(printf "%x" $index2)"
+            calc_tbl3[index2]=$ins2
+            calc3=$(printf "%08x" $ins2)
+            TABLE3+="${calc3:6:2} ${calc3:4:2} ${calc3:2:2} ${calc3:0:2} "
+      #lkp3a=$( bpftool map lookup name crc_lookup_tbl3 key hex $(printf "%x" $index2) 00 00 00 | awk 'FNR == 3 {print $2}' )
+                  lkp3a=${calc_tbl3[$index2]}
+                  ((lkp3b=lkp3a & 0xFF))
+                  #calc=$(printf "%08x" $lkp3b)
+                  #BECALC1="${calc:6:2} ${calc:4:2} ${calc:2:2} ${calc:0:2}"
+                  #lkp3c=$( bpftool map lookup name crc_lookup_tbl1 key hex $calc 00 00 00 | awk 'FNR == 3 {print $2}' )
+                  lkp3c=${calc_tbl[$lkp3b]}
+                  ((ins3=(lkp3a >> 8) ^ lkp3c))
+                  #printf "lkp1b = %0x\n" $lkp1b
+                  #echo "index2= $(printf "%x" $index2)"
+                  calc_tbl4[index2]=$ins3
+                  calc4=$(printf "%08x" $ins3)
+                  TABLE4+="${calc4:6:2} ${calc4:4:2} ${calc4:2:2} ${calc4:0:2} "
+
+                  lkp3a=${calc_tbl4[$index2]}
+                  ((lkp3b=lkp3a & 0xFF))
+
+                   lkp3c=${calc_tbl[$lkp3b]}
+                   ((ins4=(lkp3a >> 8) ^ lkp3c))
+
+                   calc_tbl5[index2]=$ins4
+                   calc4=$(printf "%08x" $ins4)
+                   TABLE5+="${calc4:6:2} ${calc4:4:2} ${calc4:2:2} ${calc4:0:2} "
+
+                  lkp3a=${calc_tbl5[$index2]}
+                  ((lkp3b=lkp3a & 0xFF))
+
+                   lkp3c=${calc_tbl[$lkp3b]}
+                   ((ins5=(lkp3a >> 8) ^ lkp3c))
+
+                   calc_tbl6[index2]=$ins5
+                   calc4=$(printf "%08x" $ins5)
+                   TABLE6+="${calc4:6:2} ${calc4:4:2} ${calc4:2:2} ${calc4:0:2} "
+
+                  lkp3a=${calc_tbl6[$index2]}
+                  ((lkp3b=lkp3a & 0xFF))
+
+                   lkp3c=${calc_tbl[$lkp3b]}
+                   ((ins6=(lkp3a >> 8) ^ lkp3c))
+
+                   calc_tbl7[index2]=$ins6
+                   calc4=$(printf "%08x" $ins6)
+                   TABLE7+="${calc4:6:2} ${calc4:4:2} ${calc4:2:2} ${calc4:0:2} "
+
+                  lkp3a=${calc_tbl7[$index2]}
+                  ((lkp3b=lkp3a & 0xFF))
+
+                   lkp3c=${calc_tbl[$lkp3b]}
+                   ((ins7=(lkp3a >> 8) ^ lkp3c))
+
+                   calc_tbl8[index2]=$ins7
+                   calc4=$(printf "%08x" $ins7)
+                   TABLE8+="${calc4:6:2} ${calc4:4:2} ${calc4:2:2} ${calc4:0:2} "
+
+
+
+
+    done
+    TABLE+=$TABLE2
+    TABLE+=$TABLE3
+    TABLE+=$TABLE4
+    TABLE+=$TABLE5
+    TABLE+=$TABLE6
+    TABLE+=$TABLE7
+    TABLE+=$TABLE8
+    echo $TABLE8
+    bpftool map update name crc_lookup_tbl key hex  00 00 00 00  value  hex $TABLE
+}
+
+
+
+__generate_crc_lookup_table4
 #__generate_crc_lookup_table_standard
 
 echo -e "Dumping BPF setup:"
