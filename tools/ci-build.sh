@@ -79,7 +79,7 @@ function install_ptf_ebpf_test_deps() (
   git clone --recursive --branch tatry/table-get-indirect https://github.com/P4-Research/psabpf.git /tmp/psabpf
   cd /tmp/psabpf
   # psabpf is under heavy development, later use git tags when it will be ready to use
-  git reset --hard 95af1b9
+  git reset --hard 879ca99
   ./build_libbpf.sh
   mkdir build
   cd build
