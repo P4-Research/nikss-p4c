@@ -20,8 +20,23 @@ limitations under the License.
 #include "frontends/p4/methodInstance.h"
 #include "backends/ebpf/ebpfTable.h"
 #include "ebpfPsaControl.h"
+#include "ebpfPipeline.h"
 
 namespace EBPF {
+
+class ActionTranslationVisitorPSA : public ActionTranslationVisitor,
+                                    public ControlBodyTranslatorPSA {
+ public:
+    ActionTranslationVisitorPSA(const EBPFProgram* program, cstring valueName) :
+            CodeGenInspector(program->refMap, program->typeMap),
+            ActionTranslationVisitor(valueName, program),
+            ControlBodyTranslatorPSA(program->to<EBPFPipeline>()->control) {}
+
+    bool preorder(const IR::PathExpression* pe) override;
+    bool isActionParameter(const IR::Expression *expression) const;
+
+    void processMethod(const P4::ExternMethod* method) override;
+};
 
 class EBPFTablePSA : public EBPFTable {
  private:
@@ -33,6 +48,11 @@ class EBPFTablePSA : public EBPFTable {
                        size_t size) const;
 
  protected:
+    ActionTranslationVisitor* createActionTranslationVisitor(
+            cstring valueName, const EBPFProgram* program) const override {
+        return new ActionTranslationVisitorPSA(program->to<EBPFPipeline>(), valueName);
+    }
+
     void emitTableValue(CodeBuilder* builder, const IR::MethodCallExpression* actionMce,
                         cstring valueName);
     void emitDefaultActionInitializer(CodeBuilder *builder);

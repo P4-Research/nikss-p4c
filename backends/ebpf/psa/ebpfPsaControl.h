@@ -24,6 +24,13 @@ namespace EBPF {
 
 class EBPFControlPSA;
 
+class ControlBodyTranslatorPSA : public ControlBodyTranslator {
+ public:
+    explicit ControlBodyTranslatorPSA(const EBPFControlPSA* control);
+
+    void processMethod(const P4::ExternMethod* method) override;
+};
+
 class EBPFControlPSA : public EBPFControl {
  public:
     // Keeps track if ingress_timestamp or egress_timestamp is used within a control block.
