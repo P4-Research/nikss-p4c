@@ -20,6 +20,7 @@ limitations under the License.
 #include "ebpfPsaTable.h"
 #include "ebpfPsaControl.h"
 #include "xdpHelpProgram.h"
+#include "externs/ebpfPsaTableImplementation.h"
 
 namespace EBPF {
 
@@ -520,7 +521,7 @@ bool ConvertToEBPFControlPSA::preorder(const IR::ControlBlock *ctrl) {
     control->inputStandardMetadata = *it; ++it;
     control->outputStandardMetadata = *it;
 
-    auto codegen = new ControlBodyTranslator(control);
+    auto codegen = new ControlBodyTranslatorPSA(control);
     codegen->substitute(control->headers, parserHeaders);
 
     if (type != TC_EGRESS) {
@@ -606,6 +607,23 @@ bool ConvertToEBPFControlPSA::preorder(const IR::Declaration_Variable* decl) {
         }
     }
     return true;
+}
+
+bool ConvertToEBPFControlPSA::preorder(const IR::ExternBlock* instance) {
+    auto di = instance->node->to<IR::Declaration_Instance>();
+    if (di == nullptr)
+        return false;
+    cstring typeName = instance->type->getName().name;
+
+    if (typeName == "ActionProfile") {
+        auto ap = new EBPFActionProfilePSA(program, control->codeGen, di);
+        control->tables.emplace(di->name.name, ap);
+    } else {
+        ::error(ErrorType::ERR_UNEXPECTED, "Unexpected block %s nested within control",
+                instance);
+    }
+
+    return false;
 }
 
 // =====================EBPFDeparser=============================

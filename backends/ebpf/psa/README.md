@@ -143,6 +143,29 @@ a new element to the outer map (indexed by clone session or multicast group iden
 or `multicast_group` in a PSA program) and initialize an inner map. To add a new clone session/multicast group member,
 a control plane must add new element to the inner map.
 
+## PSA externs
+
+### ActionProfile
+
+[ActionProfile](https://p4.org/p4-spec/docs/PSA.html#sec-action-profile) extern is a table implementation that separates
+actions (and its parameters) from P4 table. Extern is implemented as an additional hash map, in which key is member
+reference and value is the same as in a table without implementation (stores action id, action data, etc.). Map for
+table with `ActionProfile` has changed value - instead of action specification it stores member reference, which
+is a key for map implementing `ActionProfile`.
+
+`hit` field returned from `apply()` method on table is set to `true` only when entry is found in both maps, it is when
+member reference is found in a P4 table and that reference points to a valid member (it exists).
+
+Limitations for P4 tables with implementation `ActionProfile`:
+- DirectCounter and DirectMeter externs are not supported.
+- Default action can't be specified other than `NoAction`.
+- (Const) entries can't be specified.
+
+`ActionProfile` instance can be shared between multiple P4 tables, every of them must have exactly the same action list.
+
+**Note:** As of April 2022, support for ActionProfile extern in `psabpf-ctl` CLI/API is not implemented yet. As a workaround
+you can use table CLI/API for this extern.
+
 # Getting started
 
 ## Installation 
