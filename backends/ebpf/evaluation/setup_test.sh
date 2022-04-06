@@ -467,7 +467,7 @@ __generate_crc_lookup_table4() {
     TABLE+=$TABLE6
     TABLE+=$TABLE7
     TABLE+=$TABLE8
-    echo $TABLE8
+
     bpftool map update name crc_lookup_tbl key hex  00 00 00 00  value  hex $TABLE
 }
 
