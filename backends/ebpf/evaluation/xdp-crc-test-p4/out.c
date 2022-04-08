@@ -8,7 +8,11 @@
 #define BYTES(w) ((w) / 8)
 #define write_partial(a, w, s, v) do { *((u8*)a) = ((*((u8*)a)) & ~(EBPF_MASK(u8, w) << s)) | (v << s) ; } while (0)
 #define write_byte(base, offset, v) do { *(u8*)((base) + (offset)) = (v); } while (0)
-#define bpf_trace_message(fmt, ...)
+#define bpf_trace_message(fmt, ...)   /*                           \
+    do {                                                           \
+        char ____fmt[] = fmt;                                      \
+        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
+    } while(0)*/
 
 #define CLONE_MAX_PORTS 64
 #define CLONE_MAX_INSTANCES 1
@@ -44,10 +48,7 @@ struct ethernet_t {
     u8 ebpf_valid;
 };
 struct crc_t {
-    u8 f1; /* bit<4> */
-    u8 f2; /* bit<4> */
-    u32 f3; /* bit<32> */
-    u32 f4; /* bit<32> */
+    char data_bytes[9];
     u32 crc; /* bit<32> */
     u8 ebpf_valid;
 };
@@ -78,6 +79,7 @@ struct xdp2tc_metadata {
 
 
 
+
 struct bpf_map_def SEC("maps") tx_port = {
         .type          = BPF_MAP_TYPE_DEVMAP,
         .key_size      = sizeof(int),
@@ -96,8 +98,7 @@ REGISTER_TABLE_OUTER(multicast_grp_tbl, BPF_MAP_TYPE_ARRAY_OF_MAPS, __u32, __u32
 BPF_ANNOTATE_KV_PAIR(multicast_grp_tbl, __u32, __u32)
 REGISTER_TABLE(xdp2tc_shared_map, BPF_MAP_TYPE_PERCPU_ARRAY, u32, struct xdp2tc_metadata, 1)
 BPF_ANNOTATE_KV_PAIR(xdp2tc_shared_map, u32, struct xdp2tc_metadata)
-REGISTER_TABLE(crc_lookup_tbl, BPF_MAP_TYPE_ARRAY, u32, u32, 256)
-BPF_ANNOTATE_KV_PAIR(crc_lookup_tbl, u32, u32)
+
 REGISTER_END()
 
         static __always_inline
@@ -118,21 +119,18 @@ return reg;
 static __always_inline
 void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
 
-    data += data_size -1;
-    unsigned char* current = (unsigned char*) data;
-    u32* lookup_value = NULL;
-
-    for (u16 i = 0; i < data_size; i++){
-
-        u32 lookup_key = (((*reg) & 0xFF) ^ *current--);
-
-        lookup_value =  BPF_MAP_LOOKUP_ELEM(crc_lookup_tbl, &lookup_key);
-        if (lookup_value != NULL) {
-
-            *reg =   ((*reg) >> 8) ^ *lookup_value;
-            /
-
+    data += data_size - 1;
+#pragma unroll
+    for (u16 i = 0; i < data_size; i++) {
+        bpf_trace_message("CRC32: outer: %x\n", i);
+        *reg ^= *data;
+#pragma unroll
+        for (u8 bit = 0; bit < 8; bit++) {
+            bpf_trace_message("CRC32: inner: %x\n", bit);
+            *reg = (*reg) & 1 ? ((*reg) >> 1) ^ poly : (*reg) >> 1;
         }
+        data--;
+
     }
 }
 static __always_inline u32 crc32_finalize(u32 reg, const u32 poly) {
@@ -257,17 +255,27 @@ int xdp_ingress_func(struct xdp_md *skb) {
         goto reject;
     }
 
-    parsed_hdr.crc.f1 = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) >> 4) & EBPF_MASK(u8, 4));
-    ebpf_packetOffsetInBits += 4;
+    parsed_hdr.crc.data_bytes[0] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
+    ebpf_packetOffsetInBits += 8;
 
-    parsed_hdr.crc.f2 = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))) & EBPF_MASK(u8, 4));
-    ebpf_packetOffsetInBits += 4;
-
-    parsed_hdr.crc.f3 = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
-    ebpf_packetOffsetInBits += 32;
-
-    parsed_hdr.crc.f4 = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
-    ebpf_packetOffsetInBits += 32;
+    //*parsed_hdr->crc.data_bytes[1] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))) & EBPF_MASK(u8, 4));
+    //ebpf_packetOffsetInBits += 4;*//*
+    parsed_hdr.crc.data_bytes[1] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
+    ebpf_packetOffsetInBits += 8;
+    parsed_hdr.crc.data_bytes[2] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
+    ebpf_packetOffsetInBits += 8;
+    parsed_hdr.crc.data_bytes[3] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
+    ebpf_packetOffsetInBits += 8;
+    parsed_hdr.crc.data_bytes[4] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
+    ebpf_packetOffsetInBits += 8;
+    parsed_hdr.crc.data_bytes[5] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
+    ebpf_packetOffsetInBits += 8;
+    parsed_hdr.crc.data_bytes[6] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
+    ebpf_packetOffsetInBits += 8;
+    parsed_hdr.crc.data_bytes[7] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
+    ebpf_packetOffsetInBits += 8;
+    parsed_hdr.crc.data_bytes[8] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
+    ebpf_packetOffsetInBits += 8;
 
     parsed_hdr.crc.crc = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 32;
@@ -299,7 +307,7 @@ int xdp_ingress_func(struct xdp_md *skb) {
     {
         {
             meta_1 = ostd;
-            egress_port_1 = 5;
+            egress_port_1 = 100;
             meta_1.drop = false;
             meta_1.multicast_group = 0;
             meta_1.egress_port = egress_port_1;
@@ -307,11 +315,11 @@ int xdp_ingress_func(struct xdp_md *skb) {
         };
         ingress_h_reg = 0xffffffff;
         {
-            u8 ingress_h_tmp = 0;
+            /*u8 ingress_h_tmp = 0;
             ingress_h_tmp = (parsed_hdr.crc.f1 << 4) | (parsed_hdr.crc.f2 << 0);
             crc32_update(&ingress_h_reg, &ingress_h_tmp, 1, 3988292384);
-            crc32_update(&ingress_h_reg, (u8 *) &(parsed_hdr.crc.f3), 4, 3988292384);
-            crc32_update(&ingress_h_reg, (u8 *) &(parsed_hdr.crc.f4), 4, 3988292384);
+            crc32_update(&ingress_h_reg, (u8 *) &(parsed_hdr.crc.f3), 4, 3988292384);*/
+            crc32_update(&ingress_h_reg, (u8 *) &(parsed_hdr.crc.data_bytes), 9, 3988292384);
         }
         parsed_hdr.crc.crc = crc32_finalize(ingress_h_reg, 3988292384);
     }
@@ -418,35 +426,25 @@ int xdp_ingress_func(struct xdp_md *skb) {
                 return XDP_ABORTED;
             }
 
-            ebpf_byte = ((char*)(&parsed_hdr.crc.f1))[0];
-            write_partial(pkt + BYTES(ebpf_packetOffsetInBits) + 0, 4, 4, (ebpf_byte >> 0));
-            ebpf_packetOffsetInBits += 4;
-
-            ebpf_byte = ((char*)(&parsed_hdr.crc.f2))[0];
-            write_partial(pkt + BYTES(ebpf_packetOffsetInBits) + 0, 4, 0, (ebpf_byte >> 0));
-            ebpf_packetOffsetInBits += 4;
-
-            parsed_hdr.crc.f3 = htonl(parsed_hdr.crc.f3);
-            ebpf_byte = ((char*)(&parsed_hdr.crc.f3))[0];
+            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.crc.f3))[1];
+            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[1];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.crc.f3))[2];
+            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[2];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 2, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.crc.f3))[3];
+            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[3];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 3, (ebpf_byte));
-            ebpf_packetOffsetInBits += 32;
-
-            parsed_hdr.crc.f4 = htonl(parsed_hdr.crc.f4);
-            ebpf_byte = ((char*)(&parsed_hdr.crc.f4))[0];
-            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.crc.f4))[1];
-            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.crc.f4))[2];
-            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 2, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.crc.f4))[3];
-            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 3, (ebpf_byte));
-            ebpf_packetOffsetInBits += 32;
+            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[4];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 4, (ebpf_byte));
+            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[5];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 5, (ebpf_byte));
+            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[6];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 6, (ebpf_byte));
+            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[7];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 7, (ebpf_byte));
+            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[8];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 8, (ebpf_byte));
+            ebpf_packetOffsetInBits += 72;
 
             parsed_hdr.crc.crc = htonl(parsed_hdr.crc.crc);
             ebpf_byte = ((char*)(&parsed_hdr.crc.crc))[0];
@@ -458,6 +456,7 @@ int xdp_ingress_func(struct xdp_md *skb) {
             ebpf_byte = ((char*)(&parsed_hdr.crc.crc))[3];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 3, (ebpf_byte));
             ebpf_packetOffsetInBits += 32;
+            bpf_trace_message("CRC32: emitted CRC: %x\n", parsed_hdr.crc.crc);
 
         }
 
@@ -660,35 +659,25 @@ int tc_ingress_func(SK_BUFF *skb) {
             return XDP_ABORTED;
         }
 
-        ebpf_byte = ((char*)(&parsed_hdr.crc.f1))[0];
-        write_partial(pkt + BYTES(ebpf_packetOffsetInBits) + 0, 4, 4, (ebpf_byte >> 0));
-        ebpf_packetOffsetInBits += 4;
-
-        ebpf_byte = ((char*)(&parsed_hdr.crc.f2))[0];
-        write_partial(pkt + BYTES(ebpf_packetOffsetInBits) + 0, 4, 0, (ebpf_byte >> 0));
-        ebpf_packetOffsetInBits += 4;
-
-        parsed_hdr.crc.f3 = htonl(parsed_hdr.crc.f3);
-        ebpf_byte = ((char*)(&parsed_hdr.crc.f3))[0];
+        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[0];
         write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
-        ebpf_byte = ((char*)(&parsed_hdr.crc.f3))[1];
+        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[1];
         write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
-        ebpf_byte = ((char*)(&parsed_hdr.crc.f3))[2];
+        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[2];
         write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 2, (ebpf_byte));
-        ebpf_byte = ((char*)(&parsed_hdr.crc.f3))[3];
+        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[3];
         write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 3, (ebpf_byte));
-        ebpf_packetOffsetInBits += 32;
-
-        parsed_hdr.crc.f4 = htonl(parsed_hdr.crc.f4);
-        ebpf_byte = ((char*)(&parsed_hdr.crc.f4))[0];
-        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
-        ebpf_byte = ((char*)(&parsed_hdr.crc.f4))[1];
-        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
-        ebpf_byte = ((char*)(&parsed_hdr.crc.f4))[2];
-        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 2, (ebpf_byte));
-        ebpf_byte = ((char*)(&parsed_hdr.crc.f4))[3];
-        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 3, (ebpf_byte));
-        ebpf_packetOffsetInBits += 32;
+        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[4];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 4, (ebpf_byte));
+        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[5];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 5, (ebpf_byte));
+        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[6];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 6, (ebpf_byte));
+        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[7];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 7, (ebpf_byte));
+        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[8];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 8, (ebpf_byte));
+        ebpf_packetOffsetInBits += 72;
 
         parsed_hdr.crc.crc = htonl(parsed_hdr.crc.crc);
         ebpf_byte = ((char*)(&parsed_hdr.crc.crc))[0];

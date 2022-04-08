@@ -9,18 +9,18 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="377f10a9-9f38-49c5-b01d-0746d8fa4c47" name="Default Changelist" comment="Add TC slice-by-8 algo program">
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/ip_hdr_crc-no-opt/out.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/ip_hdr_crc-slice-by-8/out.c" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/ip_hdr_crc-slice_by_4/out.c" afterDir="false" />
+    <list default="true" id="377f10a9-9f38-49c5-b01d-0746d8fa4c47" name="Default Changelist" comment="Add TC ipv4 header processing">
+      <change afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-slice-by-8/out.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-lookup-tbl-2/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-lookup-tbl-2/out.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-no-opt/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-no-opt/out.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-slice-by-4-tc/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/ip_hdr_crc-lkp_tbl/out.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-slice-by-4-tc2/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-slice-by-4-tc2/out.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-slice-by-8-tc2/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/crc-slice-by-8-tc2/out.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/out.o" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/out.o" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/setup_test.sh" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/setup_test.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-lookup-tbl-2/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-lookup-tbl-2/out.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-slice-by-4/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-slice-by-4/out.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-test-p4/out.c" beforeDir="false" afterPath="$PROJECT_DIR$/backends/ebpf/evaluation/xdp-crc-test-p4/out.c" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -105,7 +105,7 @@
       <workItem from="1645440088861" duration="33195000" />
       <workItem from="1646774472676" duration="559000" />
       <workItem from="1646852127840" duration="68433000" />
-      <workItem from="1649186591823" duration="10457000" />
+      <workItem from="1649186591823" duration="34548000" />
     </task>
     <task id="LOCAL-00001" summary="Add parser-memcpy xdp file">
       <created>1627145554985</created>
@@ -282,7 +282,14 @@
       <option name="project" value="LOCAL" />
       <updated>1648194278685</updated>
     </task>
-    <option name="localTasksCounter" value="26" />
+    <task id="LOCAL-00026" summary="Add TC ipv4 header processing">
+      <created>1649278262683</created>
+      <option name="number" value="00026" />
+      <option name="presentableId" value="LOCAL-00026" />
+      <option name="project" value="LOCAL" />
+      <updated>1649278262683</updated>
+    </task>
+    <option name="localTasksCounter" value="27" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -327,6 +334,7 @@
     <MESSAGE value="Modified BPF prog, data as char table" />
     <MESSAGE value="Modified base crc BPF prog, data as char table" />
     <MESSAGE value="Add TC slice-by-8 algo program" />
-    <option name="LAST_COMMIT_MESSAGE" value="Add TC slice-by-8 algo program" />
+    <MESSAGE value="Add TC ipv4 header processing" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add TC ipv4 header processing" />
   </component>
 </project>

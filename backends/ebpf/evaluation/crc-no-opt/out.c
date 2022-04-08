@@ -10,11 +10,11 @@
 #define BYTES(w) ((w) / 8)
 #define write_partial(a, w, s, v) do { *((u8*)a) = ((*((u8*)a)) & ~(EBPF_MASK(u8, w) << s)) | (v << s) ; } while (0)
 #define write_byte(base, offset, v) do { *(u8*)((base) + (offset)) = (v); } while (0)
-#define bpf_trace_message(fmt, ...)     //                           \
-//    do {                                                           \
-//        char ____fmt[] = fmt;                                      \
-//        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
-//    } while(0)
+#define bpf_trace_message(fmt, ...) /*                              \
+    do {                                                           \
+        char ____fmt[] = fmt;                                      \
+        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
+    } while(0)*/
 
 #define CLONE_MAX_PORTS 64
 #define CLONE_MAX_INSTANCES 1
@@ -55,6 +55,20 @@ struct ipv4_t {
     u8 ebpf_valid;
 
 }__attribute__((packed));
+
+struct tmp {
+    u8 ver_ihl; /* bit<8> */
+    u8 diffserv; /* bit<8> */
+    u16 total_len; /* bit<16> */
+    u16 identification; /* bit<16> */
+    u16 flags_offset; /* bit<16> */
+    u8 ttl; /* bit<8> */
+    u8 protocol; /* bit<8> */
+    u32 src_addr; /* bit<32> */
+    u32 dst_addr; /* bit<32> */
+
+}__attribute__((packed));
+
 struct ethernet_t {
     u64 dstAddr; /* EthernetAddress */
     u64 srcAddr; /* EthernetAddress */
@@ -62,7 +76,7 @@ struct ethernet_t {
     u8 ebpf_valid;
 };
 struct crc_t {
-    char data_bytes[9];
+    //char data_bytes[9];
     u32 crc; /* bit<32> */
     u8 ebpf_valid;
 };
@@ -148,14 +162,16 @@ return reg;
 }
 static __always_inline
 void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
-    //data += data_size - 1;
+       data += data_size - 1;
+#pragma unroll
        for (u16 i = 0; i < data_size; i++) {
            bpf_trace_message("CRC32: data byte: %x\n", *data);
            *reg ^= *data;
+#pragma unroll
            for (u8 bit = 0; bit < 8; bit++) {
                *reg = (*reg) & 1 ? ((*reg) >> 1) ^ poly : (*reg) >> 1;
            }
-           data++;
+           data--;
 
        }
 }
@@ -304,16 +320,16 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr, str
 
     parsed_hdr->ipv4.ebpf_valid = 1;
 /* extract(parsed_hdr->crc) */
-    if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 104 + 0)) {
+    if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 32 + 0)) {
         ebpf_errorCode = PacketTooShort;
         goto reject;
     }
 
-    parsed_hdr->crc.data_bytes[0] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
+    /*parsed_hdr->crc.data_bytes[0] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
     ebpf_packetOffsetInBits += 8;
     bpf_trace_message("CRC32: parsed byte1 %x\n",parsed_hdr->crc.data_bytes[0] );
-    /*parsed_hdr->crc.data_bytes[1] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))) & EBPF_MASK(u8, 4));
-    ebpf_packetOffsetInBits += 4;*/
+    *//*parsed_hdr->crc.data_bytes[1] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))) & EBPF_MASK(u8, 4));
+    ebpf_packetOffsetInBits += 4;*//*
     parsed_hdr->crc.data_bytes[1] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
     ebpf_packetOffsetInBits += 8;
     parsed_hdr->crc.data_bytes[2] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
@@ -329,7 +345,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr, str
     parsed_hdr->crc.data_bytes[7] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
     ebpf_packetOffsetInBits += 8;
     parsed_hdr->crc.data_bytes[8] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
-    ebpf_packetOffsetInBits += 8;
+    ebpf_packetOffsetInBits += 8;*/
 
     parsed_hdr->crc.crc = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 32;
@@ -360,7 +376,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr, str
         {
             {
                 meta_1 = ostd;
-                egress_port_1 = 7;
+                egress_port_1 = 6;
                 meta_1->drop = false;
                 meta_1->multicast_group = 0;
                 meta_1->egress_port = egress_port_1;
@@ -374,7 +390,21 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr, str
 
                 crc32_update(&ingress_h_reg, (u8 *) &(parsed_hdr->crc.f3), 4, 3988292384);
                 crc32_update(&ingress_h_reg, (u8 *) &(parsed_hdr->crc.f4), 4, 3988292384);*/
-                crc32_update(&ingress_h_reg, (u8 *) &(parsed_hdr->crc.data_bytes), 9, 3988292384);
+                struct tmp crc_data = {
+                        .ver_ihl = parsed_hdr->ipv4.ver_ihl, /* bit<8> */
+                        .diffserv = parsed_hdr->ipv4.diffserv, /* bit<8> */
+                        .total_len = parsed_hdr->ipv4.total_len, /* bit<16> */
+                        .identification = parsed_hdr->ipv4.identification, /* bit<16> */
+                        .flags_offset = parsed_hdr->ipv4.flags_offset, /* bit<16> */
+                        .ttl = parsed_hdr->ipv4.ttl, /* bit<8> */
+                        .protocol = parsed_hdr->ipv4.protocol, /* bit<8> */
+                        .src_addr = parsed_hdr->ipv4.src_addr, /* bit<32> */
+                        .dst_addr = parsed_hdr->ipv4.dst_addr, /* bit<32> */
+                };
+
+
+
+                crc32_update(&ingress_h_reg, (u8 *) &(crc_data), 18, 3988292384);
                 bpf_trace_message("CRC32: finished crd32_update\n");
             }
             parsed_hdr->crc.crc = crc32_finalize(ingress_h_reg, 3988292384);
@@ -406,7 +436,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr, str
             outHeaderLength += 160;
         }
         if (parsed_hdr->crc.ebpf_valid) {
-            outHeaderLength += 104;
+            outHeaderLength += 32;
         }
 
         int outHeaderOffset = BYTES(outHeaderLength) - BYTES(ebpf_packetOffsetInBits);
@@ -538,11 +568,11 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr, str
         }
 
         if (parsed_hdr->crc.ebpf_valid) {
-            if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 104)) {
+            if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 32)) {
                 return TC_ACT_SHOT;
             }
 
-            ebpf_byte = ((char*)(&parsed_hdr->crc.data_bytes))[0];
+            /*ebpf_byte = ((char*)(&parsed_hdr->crc.data_bytes))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
             ebpf_byte = ((char*)(&parsed_hdr->crc.data_bytes))[1];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
@@ -560,7 +590,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr, str
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 7, (ebpf_byte));
             ebpf_byte = ((char*)(&parsed_hdr->crc.data_bytes))[8];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 8, (ebpf_byte));
-            ebpf_packetOffsetInBits += 72;
+            ebpf_packetOffsetInBits += 72;*/
             parsed_hdr->crc.crc = htonl(parsed_hdr->crc.crc);
             ebpf_byte = ((char*)(&parsed_hdr->crc.crc))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
