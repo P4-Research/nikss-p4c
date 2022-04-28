@@ -336,7 +336,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr, str
         {
             {
                 meta_1 = ostd;
-                egress_port_1 = 6;
+                egress_port_1 = 17;
                 meta_1->drop = false;
                 meta_1->multicast_group = 0;
                 meta_1->egress_port = egress_port_1;

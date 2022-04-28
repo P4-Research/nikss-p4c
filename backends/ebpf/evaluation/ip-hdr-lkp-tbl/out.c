@@ -9,11 +9,11 @@
 #define BYTES(w) ((w) / 8)
 #define write_partial(a, w, s, v) do { *((u8*)a) = ((*((u8*)a)) & ~(EBPF_MASK(u8, w) << s)) | (v << s) ; } while (0)
 #define write_byte(base, offset, v) do { *(u8*)((base) + (offset)) = (v); } while (0)
-#define bpf_trace_message(fmt, ...)                                \
+#define bpf_trace_message(fmt, ...) /*                               \
     do {                                                           \
         char ____fmt[] = fmt;                                      \
         bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
-    } while(0)
+    } while(0)*/
 
 #define CLONE_MAX_PORTS 64
 #define CLONE_MAX_INSTANCES 1
@@ -353,7 +353,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr, str
         {
             {
                 meta_1 = ostd;
-                egress_port_1 = 6;
+                egress_port_1 = 17;
                 meta_1->drop = false;
                 meta_1->multicast_group = 0;
                 meta_1->egress_port = egress_port_1;
