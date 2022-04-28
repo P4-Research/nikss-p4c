@@ -198,8 +198,9 @@ void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
 
             tmp += 4;
         }
-        *current = __builtin_bswap32(*current);
+
         unsigned char *currentChar = (unsigned char *) current;
+        currentChar+= 3;
         for (u16 i = tmp; i < data_size; i++) {
             bpf_trace_message("CRC32: data byte: %x\n", *currentChar);
             lookup_key = (u32)(((*reg) & 0xFF) ^ *currentChar--);
