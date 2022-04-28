@@ -152,8 +152,9 @@ static __always_inline u16 crc16_finalize(u16 reg, const u16 poly) {
 static __always_inline
 void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
 
-
+    data += data_size - 4;
     u32* current = (u32*) data;
+
     //*current = __builtin_bswap32(*current);
     struct lookup_tbl_val* lookup_table;
     u32 index = 0;
@@ -171,9 +172,10 @@ void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
     u16 tmp = 0;
     if (lookup_table != NULL) {
         for (u16 i = data_size; i >= 8; i -= 8) {
-
-            u32 one = *current++ ^ *reg;
-            u32 two = *current++;
+            bpf_trace_message("CRC32: data byte: %x", *current);
+            u32 one =  __builtin_bswap32(*current--) ^ *reg;
+            bpf_trace_message("CRC32: data byte: %x", *current);
+            u32 two = __builtin_bswap32(*current--);
 
             lookup_key = (one & 0x000000FF);
             lookup_value8 = lookup_table->table[(u16)(1792 + (u8)lookup_key)];
@@ -200,10 +202,12 @@ void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
 
             tmp += 8;
         }
+        *current = __builtin_bswap32(*current);
+
         unsigned char *currentChar = (unsigned char *) current;
         for (u16 i = tmp; i < data_size; i++) {
-            //bpf_trace_message("CRC32: data byte: %x\n", *current);
-            lookup_key = (u32)(((*reg) & 0xFF) ^ *currentChar++);
+            bpf_trace_message("CRC32: data byte: %x\n", *current);
+            lookup_key = (u32)(((*reg) & 0xFF) ^ *currentChar--);
 
 
             lookup_value = lookup_table->table[(u8)(lookup_key & 255)];

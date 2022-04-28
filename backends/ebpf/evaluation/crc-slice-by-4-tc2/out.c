@@ -10,7 +10,7 @@
 #define BYTES(w) ((w) / 8)
 #define write_partial(a, w, s, v) do { *((u8*)a) = ((*((u8*)a)) & ~(EBPF_MASK(u8, w) << s)) | (v << s) ; } while (0)
 #define write_byte(base, offset, v) do { *(u8*)((base) + (offset)) = (v); } while (0)
-#define bpf_trace_message(fmt, ...) /*                              \
+#define bpf_trace_message(fmt, ...)/*                               \
     do {                                                          \
        char ____fmt[] = fmt;                                      \
        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
@@ -152,8 +152,9 @@ static __always_inline u16 crc16_finalize(u16 reg, const u16 poly) {
 static __always_inline
 void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
 
-
+    data += data_size - 4;
     u32* current = (u32*) data;
+
     //*current = __builtin_bswap32(*current);
     struct lookup_tbl_val* lookup_table;
     u32 index = 0;
@@ -167,9 +168,9 @@ void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
     u16 tmp = 0;
     if (lookup_table != NULL) {
         for (u16 i = data_size; i >= 4; i -= 4) {
-            //bpf_trace_message("CRC32: current data: %x", *current);
+            bpf_trace_message("CRC32: current data: %x", *current);
             //bpf_trace_message("CRC32: CRC: %x", *reg);
-            *reg ^= *current++;
+            *reg ^= __builtin_bswap32(*current--);
             //bpf_trace_message("CRC32: after XOR with current CRC: %x", *reg);
             lookup_key = (*reg & 0x000000FF);
             //bpf_trace_message("CRC32: lookup key 4: %x", lookup_key);
@@ -193,15 +194,16 @@ void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
             //bpf_trace_message("CRC32: lv3: %x", lookup_value3);
             //bpf_trace_message("CRC32: lv4: %x", lookup_value4);
             *reg = lookup_value4 ^ lookup_value3 ^ lookup_value2 ^ lookup_value1;
-            //bpf_trace_message("CRC32: current CRC: %x", *reg);
+            bpf_trace_message("CRC32: current CRC: %x", *reg);
 
 
             tmp += 4;
         }
+        *current = __builtin_bswap32(*current);
         unsigned char *currentChar = (unsigned char *) current;
         for (u16 i = tmp; i < data_size; i++) {
-            //bpf_trace_message("CRC32: data byte: %x\n", *current);
-            lookup_key = (u32)(((*reg) & 0xFF) ^ *currentChar++);
+            bpf_trace_message("CRC32: data byte: %x\n", *currentChar);
+            lookup_key = (u32)(((*reg) & 0xFF) ^ *currentChar--);
 
 
             lookup_value = lookup_table->table[(u8)(lookup_key & 255)];
@@ -334,7 +336,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr, str
 
     parsed_hdr->crc.data_bytes[0] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
     ebpf_packetOffsetInBits += 8;
-    bpf_trace_message("CRC32: parsed byte1 %x\n",parsed_hdr->crc.data_bytes[0] );
+
     /*parsed_hdr->crc.data_bytes[1] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))) & EBPF_MASK(u8, 4));
     ebpf_packetOffsetInBits += 4;*/
     parsed_hdr->crc.data_bytes[1] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));

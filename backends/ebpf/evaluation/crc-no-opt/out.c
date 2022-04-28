@@ -10,11 +10,11 @@
 #define BYTES(w) ((w) / 8)
 #define write_partial(a, w, s, v) do { *((u8*)a) = ((*((u8*)a)) & ~(EBPF_MASK(u8, w) << s)) | (v << s) ; } while (0)
 #define write_byte(base, offset, v) do { *(u8*)((base) + (offset)) = (v); } while (0)
-#define bpf_trace_message(fmt, ...)     //                           \
-//    do {                                                           \
-//        char ____fmt[] = fmt;                                      \
-//        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
-//    } while(0)
+#define bpf_trace_message(fmt, ...)                                \
+    do {                                                           \
+      char ____fmt[] = fmt;                                      \
+       bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
+   } while(0)
 
 #define CLONE_MAX_PORTS 64
 #define CLONE_MAX_INSTANCES 1
@@ -147,14 +147,14 @@ return reg;
 }
 static __always_inline
 void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
-    //data += data_size - 1;
+       data += data_size - 1;
        for (u16 i = 0; i < data_size; i++) {
            bpf_trace_message("CRC32: data byte: %x\n", *data);
            *reg ^= *data;
            for (u8 bit = 0; bit < 8; bit++) {
                *reg = (*reg) & 1 ? ((*reg) >> 1) ^ poly : (*reg) >> 1;
            }
-           data++;
+           data--;
 
        }
 }

@@ -2,5 +2,8 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/backends/ebpf/runtime/contrib/libbpf" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/control-plane/p4runtime" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/test/frameworks/gtest" vcs="Git" />
   </component>
 </project>

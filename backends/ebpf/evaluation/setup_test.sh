@@ -467,17 +467,18 @@ __generate_crc_lookup_table4() {
     TABLE+=$TABLE6
     TABLE+=$TABLE7
     TABLE+=$TABLE8
-    echo $TABLE8
+
     bpftool map update name crc_lookup_tbl key hex  00 00 00 00  value  hex $TABLE
 }
 
 
 
 __generate_crc_lookup_table4
+
 #__generate_crc_lookup_table_standard
 
 echo -e "Dumping BPF setup:"
-bpftool net show 
+bpftool net show
 
 XDP_PROG_ID="$(bpftool prog show -f | grep xdp_func | awk '{print $1}' | tr -d : | tail -n1)"
 TC_EGRESS_PROG_ID="$(bpftool prog show -f | grep tc_egress_func | awk '{print $1}' | tr -d : | tail -n1)"
