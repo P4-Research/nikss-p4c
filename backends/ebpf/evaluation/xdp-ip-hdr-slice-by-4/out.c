@@ -392,7 +392,7 @@ int xdp_ingress_func(struct xdp_md *skb) {
     {
         {
             meta_1 = ostd;
-            egress_port_1 = 5;
+            egress_port_1 = 17;
             meta_1.drop = false;
             meta_1.multicast_group = 0;
             meta_1.egress_port = egress_port_1;
