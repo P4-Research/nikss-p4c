@@ -10,11 +10,11 @@
 #define BYTES(w) ((w) / 8)
 #define write_partial(a, w, s, v) do { *((u8*)a) = ((*((u8*)a)) & ~(EBPF_MASK(u8, w) << s)) | (v << s) ; } while (0)
 #define write_byte(base, offset, v) do { *(u8*)((base) + (offset)) = (v); } while (0)
-#define bpf_trace_message(fmt, ...)                                \
+#define bpf_trace_message(fmt, ...) /*                               \
     do {                                                           \
       char ____fmt[] = fmt;                                      \
        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
-   } while(0)
+   } while(0)*/
 
 #define CLONE_MAX_PORTS 64
 #define CLONE_MAX_INSTANCES 1
@@ -341,10 +341,7 @@ static __always_inline int process(SK_BUFF *skb, struct headers *parsed_hdr, str
                 crc32_update(&ingress_h_reg, (u8 *) &(parsed_hdr->crc.data_bytes), 9, 3988292384);
                 bpf_trace_message("CRC32: finished crd32_update\n");
             }
-            parsed_hdr->crc.crc = crc32_finalize(ingress_h_reg, 3988292384);
-            u64 tmp = parsed_hdr->ethernet.dstAddr;
-            parsed_hdr->ethernet.dstAddr = parsed_hdr->ethernet.srcAddr;
-            parsed_hdr->ethernet.srcAddr = tmp;
+
         }
     }
     {

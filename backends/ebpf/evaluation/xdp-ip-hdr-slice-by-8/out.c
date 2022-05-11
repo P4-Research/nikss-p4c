@@ -41,14 +41,29 @@ struct element {
 } __attribute__((aligned(4)));
 
 
+struct ipv4_t {
+    u8 ver_ihl; /* bit<8> */
+    u8 diffserv; /* bit<8> */
+    u16 total_len; /* bit<16> */
+    u16 identification; /* bit<16> */
+    u16 flags_offset; /* bit<16> */
+    u8 ttl; /* bit<8> */
+    u8 protocol; /* bit<8> */
+    u16 hdr_checksum; /* bit<16> */
+    u32 src_addr; /* bit<32> */
+    u32 dst_addr; /* bit<32> */
+    u8 ebpf_valid;
+
+
+}__attribute__((packed));
 struct ethernet_t {
     u64 dstAddr; /* EthernetAddress */
     u64 srcAddr; /* EthernetAddress */
     u16 etherType; /* bit<16> */
     u8 ebpf_valid;
-};
+}__attribute__((packed));
 struct crc_t {
-    char data_bytes[9];
+
     u32 crc; /* bit<32> */
     u8 ebpf_valid;
 };
@@ -61,15 +76,11 @@ struct metadata {
 };
 struct headers {
     struct ethernet_t ethernet; /* ethernet_t */
+    struct ipv4_t ipv4;
     struct crc_t crc; /* crc_t */
     __u32 __helper_variable;
 };
-struct tuple_0 {
-    u8 f0; /* bit<4> */
-    u8 f1; /* bit<4> */
-    u32 f2; /* bit<32> */
-    u32 f3; /* bit<32> */
-};
+
 struct xdp2tc_metadata {
     struct headers headers;
     struct psa_ingress_output_metadata_t ostd;
@@ -77,7 +88,9 @@ struct xdp2tc_metadata {
     __u16 pkt_ether_type;
 } __attribute__((aligned(4)));
 
-
+struct lookup_tbl_val {
+    u32 table[2048];
+};
 
 struct bpf_map_def SEC("maps") tx_port = {
         .type          = BPF_MAP_TYPE_DEVMAP,
@@ -97,6 +110,8 @@ REGISTER_TABLE_OUTER(multicast_grp_tbl, BPF_MAP_TYPE_ARRAY_OF_MAPS, __u32, __u32
 BPF_ANNOTATE_KV_PAIR(multicast_grp_tbl, __u32, __u32)
 REGISTER_TABLE(xdp2tc_shared_map, BPF_MAP_TYPE_PERCPU_ARRAY, u32, struct xdp2tc_metadata, 1)
 BPF_ANNOTATE_KV_PAIR(xdp2tc_shared_map, u32, struct xdp2tc_metadata)
+REGISTER_TABLE(crc_lookup_tbl, BPF_MAP_TYPE_ARRAY, u32, struct lookup_tbl_val, 1)
+BPF_ANNOTATE_KV_PAIR(crc_lookup_tbl, u32, struct lookup_tbl_val)
 REGISTER_END()
 
         static __always_inline
@@ -116,15 +131,75 @@ return reg;
 }
 static __always_inline
 void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
-    data += data_size - 1;
-#pragma unroll
-    for (u16 i = 0; i < data_size; i++) {
-        //bpf_trace_message("CRC32: data byte: %x\n", *data);
-        *reg ^= *data;
-        for (u8 bit = 0; bit < 8; bit++) {
-            *reg = (*reg) & 1 ? ((*reg) >> 1) ^ poly : (*reg) >> 1;
+    data += data_size - 4;
+    u32* current = (u32*) data;
+
+    //*current = __builtin_bswap32(*current);
+    struct lookup_tbl_val* lookup_table;
+    u32 index = 0;
+    lookup_table = BPF_MAP_LOOKUP_ELEM(crc_lookup_tbl, &index);
+    u32 lookup_key = 0;
+    u32 lookup_value = 0;
+    u32 lookup_value1 = 0;
+    u32 lookup_value2 = 0;
+    u32 lookup_value3 = 0;
+    u32 lookup_value4 = 0;
+    u32 lookup_value5 = 0;
+    u32 lookup_value6 = 0;
+    u32 lookup_value7 = 0;
+    u32 lookup_value8 = 0;
+    u16 tmp = 0;
+    if (lookup_table != NULL) {
+        for (u16 i = data_size; i >= 8; i -= 8) {
+            bpf_trace_message("CRC32: data byte: %x %d", *current, i);
+            u32 one =  __builtin_bswap32(*current--) ^ *reg;
+            bpf_trace_message("CRC32: data byte: %x %d", *current, i);
+            u32 two = __builtin_bswap32(*current--);
+
+            lookup_key = (one & 0x000000FF);
+            lookup_value8 = lookup_table->table[(u16)(1792 + (u8)lookup_key)];
+            lookup_key = (one >> 8) & 0x000000FF;
+            lookup_value7 = lookup_table->table[(u16)(1536 + (u8)lookup_key)];
+            lookup_key = (one >> 16) & 0x000000FF;
+            lookup_value6 = lookup_table->table[(u16)(1280 + (u8)lookup_key)];
+            lookup_key = one >> 24;
+            lookup_value5 = lookup_table->table[(u16)(1024 + (u8)(lookup_key))];
+
+            lookup_key = (two & 0x000000FF);
+            lookup_value4 = lookup_table->table[(u16)(768 + (u8)lookup_key)];
+            lookup_key = (two >> 8) & 0x000000FF;
+            lookup_value3 = lookup_table->table[(u16)(512 + (u8)lookup_key)];
+            lookup_key = (two >> 16) & 0x000000FF;
+            lookup_value2 = lookup_table->table[(u16)(256 + (u8)lookup_key)];
+            lookup_key = two >> 24;
+            lookup_value1 = lookup_table->table[(u8)(lookup_key)];
+
+            *reg = lookup_value8 ^ lookup_value7 ^ lookup_value6 ^ lookup_value5 ^ lookup_value4 ^
+                   lookup_value3 ^ lookup_value2 ^ lookup_value1;
+
+
+
+            tmp += 8;
         }
-        data--;
+
+
+        unsigned char *currentChar = (unsigned char *) current;
+        currentChar+= 3;
+        for (u16 i = tmp; i < data_size; i++) {
+            bpf_trace_message("CRC32: data byte: %x %d", *currentChar, i);
+            lookup_key = (u32)(((*reg) & 0xFF) ^ *currentChar--);
+
+
+            lookup_value = lookup_table->table[(u8)(lookup_key & 255)];
+
+            //bpf_trace_message("CRC32: lookup value: %x\n", lookup_value);
+            // bpf_trace_message("CRC32: current crc value: %x\n", *reg);
+            *reg = ((*reg) >> 8) ^ lookup_value;
+            //bpf_trace_message("CRC32: next crc value: %x\n", *reg);
+
+        }
+
+
     }
 }
 static __always_inline u32 crc32_finalize(u32 reg, const u32 poly) {
@@ -204,6 +279,9 @@ int xdp_ingress_func(struct xdp_md *skb) {
             .ethernet = {
                     .ebpf_valid = 0
             },
+            .ipv4 = {
+                    .ebpf_valid = 0
+            },
             .crc = {
                     .ebpf_valid = 0
             },
@@ -243,45 +321,61 @@ int xdp_ingress_func(struct xdp_md *skb) {
 
     parsed_hdr.ethernet.ebpf_valid = 1;
 
-/* extract(parsed_hdr.crc) */
-    if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 104 + 0)) {
+    if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
         ebpf_errorCode = PacketTooShort;
         goto reject;
     }
 
-    parsed_hdr.crc.data_bytes[0] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
+    parsed_hdr.ipv4.ver_ihl = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
-    bpf_trace_message("CRC32: parsed byte1 %x\n",parsed_hdr.crc.data_bytes[0] );
-    /*parsed_hdr.crc.data_bytes[1] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))) & EBPF_MASK(u8, 4));
-    ebpf_packetOffsetInBits += 4;*/
-    parsed_hdr.crc.data_bytes[1] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
+
+    parsed_hdr.ipv4.diffserv = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
-    parsed_hdr.crc.data_bytes[2] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
+
+    parsed_hdr.ipv4.total_len = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
+    ebpf_packetOffsetInBits += 16;
+
+    parsed_hdr.ipv4.identification = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
+    ebpf_packetOffsetInBits += 16;
+
+    parsed_hdr.ipv4.flags_offset = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
+    ebpf_packetOffsetInBits += 16;
+
+    parsed_hdr.ipv4.ttl = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
-    parsed_hdr.crc.data_bytes[3] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
+
+    parsed_hdr.ipv4.protocol = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 8;
-    parsed_hdr.crc.data_bytes[4] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
-    ebpf_packetOffsetInBits += 8;
-    parsed_hdr.crc.data_bytes[5] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
-    ebpf_packetOffsetInBits += 8;
-    parsed_hdr.crc.data_bytes[6] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
-    ebpf_packetOffsetInBits += 8;
-    parsed_hdr.crc.data_bytes[7] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
-    ebpf_packetOffsetInBits += 8;
-    parsed_hdr.crc.data_bytes[8] = (u8)((load_byte(pkt, BYTES(ebpf_packetOffsetInBits)) ));
-    ebpf_packetOffsetInBits += 8;
+
+    parsed_hdr.ipv4.hdr_checksum = (u16)((load_half(pkt, BYTES(ebpf_packetOffsetInBits))));
+    ebpf_packetOffsetInBits += 16;
+
+    parsed_hdr.ipv4.src_addr = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
+    ebpf_packetOffsetInBits += 32;
+
+    parsed_hdr.ipv4.dst_addr = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
+    ebpf_packetOffsetInBits += 32;
+
+    parsed_hdr.ipv4.ebpf_valid = 1;
+
+/* extract(parsed_hdr.crc) */
+    if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 32 + 0)) {
+        ebpf_errorCode = PacketTooShort;
+        goto reject;
+    }
+
+
 
     parsed_hdr.crc.crc = (u32)((load_word(pkt, BYTES(ebpf_packetOffsetInBits))));
     ebpf_packetOffsetInBits += 32;
 
     parsed_hdr.crc.ebpf_valid = 1;
-
     goto accept;
 }
 
     reject: {
     if (ebpf_errorCode == 0) {
-        return XDP_ABORTED;
+        return TC_ACT_SHOT;
     }
     goto accept;
 }
@@ -310,9 +404,12 @@ int xdp_ingress_func(struct xdp_md *skb) {
         ingress_h_reg = 0xffffffff;
         {
 
-            crc32_update(&ingress_h_reg, (u8 *) &(parsed_hdr.crc.data_bytes), 9, 3988292384);
+            crc32_update(&ingress_h_reg, (u8 *) &(parsed_hdr.ipv4), 20, 3988292384);
+
+            bpf_trace_message("CRC32: finished crd32_update\n");
         }
         parsed_hdr.crc.crc = crc32_finalize(ingress_h_reg, 3988292384);
+        parsed_hdr.crc.ebpf_valid = 1;
     }
 }
     {
@@ -354,8 +451,11 @@ int xdp_ingress_func(struct xdp_md *skb) {
         if (parsed_hdr.ethernet.ebpf_valid) {
             outHeaderLength += 112;
         }
+        if (parsed_hdr.ipv4.ebpf_valid) {
+            outHeaderLength += 160;
+        }
         if (parsed_hdr.crc.ebpf_valid) {
-            outHeaderLength += 104;
+            outHeaderLength += 32;
         }
 
         int outHeaderOffset = BYTES(outHeaderLength) - BYTES(ebpf_packetOffsetInBits);
@@ -412,30 +512,87 @@ int xdp_ingress_func(struct xdp_md *skb) {
             ebpf_packetOffsetInBits += 16;
 
         }
-        if (parsed_hdr.crc.ebpf_valid) {
-            if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 104)) {
+        if (parsed_hdr.ipv4.ebpf_valid) {
+            if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
                 return TC_ACT_SHOT;
             }
 
-            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[0];
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.ver_ihl))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[1];
+            ebpf_packetOffsetInBits += 8;
+
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.diffserv))[0];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+            ebpf_packetOffsetInBits += 8;
+
+            parsed_hdr.ipv4.total_len = bpf_htons(parsed_hdr.ipv4.total_len);
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.total_len))[0];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.total_len))[1];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[2];
+            ebpf_packetOffsetInBits += 16;
+
+            parsed_hdr.ipv4.identification = bpf_htons(parsed_hdr.ipv4.identification);
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.identification))[0];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.identification))[1];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
+            ebpf_packetOffsetInBits += 16;
+
+            parsed_hdr.ipv4.flags_offset = bpf_htons(parsed_hdr.ipv4.flags_offset);
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.flags_offset))[0];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.flags_offset))[1];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
+            ebpf_packetOffsetInBits += 16;
+
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.ttl))[0];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+            ebpf_packetOffsetInBits += 8;
+
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.protocol))[0];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+            ebpf_packetOffsetInBits += 8;
+
+            parsed_hdr.ipv4.hdr_checksum = bpf_htons(parsed_hdr.ipv4.hdr_checksum);
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.hdr_checksum))[0];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.hdr_checksum))[1];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
+            ebpf_packetOffsetInBits += 16;
+
+            parsed_hdr.ipv4.src_addr = htonl(parsed_hdr.ipv4.src_addr);
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.src_addr))[0];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.src_addr))[1];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.src_addr))[2];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 2, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[3];
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.src_addr))[3];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 3, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[4];
-            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 4, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[5];
-            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 5, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[6];
-            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 6, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[7];
-            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 7, (ebpf_byte));
-            ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[8];
-            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 8, (ebpf_byte));
-            ebpf_packetOffsetInBits += 72;
+            ebpf_packetOffsetInBits += 32;
+
+            parsed_hdr.ipv4.dst_addr = htonl(parsed_hdr.ipv4.dst_addr);
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.dst_addr))[0];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.dst_addr))[1];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.dst_addr))[2];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 2, (ebpf_byte));
+            ebpf_byte = ((char*)(&parsed_hdr.ipv4.dst_addr))[3];
+            write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 3, (ebpf_byte));
+            ebpf_packetOffsetInBits += 32;
+            bpf_trace_message("CRC32: emitted IPv4\n");
+        }
+
+
+
+        if (parsed_hdr.crc.ebpf_valid) {
+            if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 32)) {
+                return TC_ACT_SHOT;
+            }
+
+
             parsed_hdr.crc.crc = htonl(parsed_hdr.crc.crc);
             ebpf_byte = ((char*)(&parsed_hdr.crc.crc))[0];
             write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
@@ -470,6 +627,9 @@ int xdp_egress_func(struct xdp_md *skb) {
 
     volatile struct headers parsed_hdr = {
             .ethernet = {
+                    .ebpf_valid = 0
+            },
+            .ipv4 = {
                     .ebpf_valid = 0
             },
             .crc = {
@@ -585,8 +745,11 @@ int tc_ingress_func(SK_BUFF *skb) {
     if (parsed_hdr.ethernet.ebpf_valid) {
         outHeaderLength += 112;
     }
+    if (parsed_hdr.ipv4.ebpf_valid) {
+        outHeaderLength += 160;
+    }
     if (parsed_hdr.crc.ebpf_valid) {
-        outHeaderLength += 104;
+        outHeaderLength += 32;
     }
 
     int outHeaderOffset = BYTES(outHeaderLength) - BYTES(ebpf_packetOffsetInBits);
@@ -643,30 +806,87 @@ int tc_ingress_func(SK_BUFF *skb) {
         ebpf_packetOffsetInBits += 16;
 
     }
-    if (parsed_hdr.crc.ebpf_valid) {
-        if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 104)) {
+    if (parsed_hdr.ipv4.ebpf_valid) {
+        if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 160)) {
             return TC_ACT_SHOT;
         }
 
-        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[0];
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.ver_ihl))[0];
         write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
-        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[1];
+        ebpf_packetOffsetInBits += 8;
+
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.diffserv))[0];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+        ebpf_packetOffsetInBits += 8;
+
+        parsed_hdr.ipv4.total_len = bpf_htons(parsed_hdr.ipv4.total_len);
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.total_len))[0];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.total_len))[1];
         write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
-        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[2];
+        ebpf_packetOffsetInBits += 16;
+
+        parsed_hdr.ipv4.identification = bpf_htons(parsed_hdr.ipv4.identification);
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.identification))[0];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.identification))[1];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
+        ebpf_packetOffsetInBits += 16;
+
+        parsed_hdr.ipv4.flags_offset = bpf_htons(parsed_hdr.ipv4.flags_offset);
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.flags_offset))[0];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.flags_offset))[1];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
+        ebpf_packetOffsetInBits += 16;
+
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.ttl))[0];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+        ebpf_packetOffsetInBits += 8;
+
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.protocol))[0];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+        ebpf_packetOffsetInBits += 8;
+
+        parsed_hdr.ipv4.hdr_checksum = bpf_htons(parsed_hdr.ipv4.hdr_checksum);
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.hdr_checksum))[0];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.hdr_checksum))[1];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
+        ebpf_packetOffsetInBits += 16;
+
+        parsed_hdr.ipv4.src_addr = htonl(parsed_hdr.ipv4.src_addr);
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.src_addr))[0];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.src_addr))[1];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.src_addr))[2];
         write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 2, (ebpf_byte));
-        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[3];
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.src_addr))[3];
         write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 3, (ebpf_byte));
-        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[4];
-        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 4, (ebpf_byte));
-        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[5];
-        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 5, (ebpf_byte));
-        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[6];
-        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 6, (ebpf_byte));
-        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[7];
-        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 7, (ebpf_byte));
-        ebpf_byte = ((char*)(&parsed_hdr.crc.data_bytes))[8];
-        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 8, (ebpf_byte));
-        ebpf_packetOffsetInBits += 72;
+        ebpf_packetOffsetInBits += 32;
+
+        parsed_hdr.ipv4.dst_addr = htonl(parsed_hdr.ipv4.dst_addr);
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.dst_addr))[0];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.dst_addr))[1];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 1, (ebpf_byte));
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.dst_addr))[2];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 2, (ebpf_byte));
+        ebpf_byte = ((char*)(&parsed_hdr.ipv4.dst_addr))[3];
+        write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 3, (ebpf_byte));
+        ebpf_packetOffsetInBits += 32;
+        bpf_trace_message("CRC32: emitted IPv4\n");
+    }
+
+
+
+    if (parsed_hdr.crc.ebpf_valid) {
+        if (ebpf_packetEnd < pkt + BYTES(ebpf_packetOffsetInBits + 32)) {
+            return TC_ACT_SHOT;
+        }
+
+
         parsed_hdr.crc.crc = htonl(parsed_hdr.crc.crc);
         ebpf_byte = ((char*)(&parsed_hdr.crc.crc))[0];
         write_byte(pkt, BYTES(ebpf_packetOffsetInBits) + 0, (ebpf_byte));
@@ -679,6 +899,8 @@ int tc_ingress_func(SK_BUFF *skb) {
         ebpf_packetOffsetInBits += 32;
         bpf_trace_message("CRC32: emitted CRC: %x\n", parsed_hdr.crc.crc);
     }
+
+
 
 
 
@@ -705,6 +927,9 @@ int tc_egress_func(SK_BUFF *skb) {
     };
     volatile struct headers parsed_hdr = {
             .ethernet = {
+                    .ebpf_valid = 0
+            },
+            .ipv4 = {
                     .ebpf_valid = 0
             },
             .crc = {

@@ -200,6 +200,7 @@ void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
             tmp += 4;
         }
 
+
         unsigned char *currentChar = (unsigned char *) current;
         currentChar+= 3; // jak to zrobić bardziej elegancko
 

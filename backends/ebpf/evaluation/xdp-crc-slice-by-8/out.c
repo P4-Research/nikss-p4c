@@ -8,7 +8,7 @@
 #define BYTES(w) ((w) / 8)
 #define write_partial(a, w, s, v) do { *((u8*)a) = ((*((u8*)a)) & ~(EBPF_MASK(u8, w) << s)) | (v << s) ; } while (0)
 #define write_byte(base, offset, v) do { *(u8*)((base) + (offset)) = (v); } while (0)
-#define bpf_trace_message(fmt, ...)/*                               \
+#define bpf_trace_message(fmt, ...)  /*                             \
     do {                                                           \
       char ____fmt[] = fmt;                                      \
        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__); \
@@ -77,7 +77,9 @@ struct xdp2tc_metadata {
     __u16 pkt_ether_type;
 } __attribute__((aligned(4)));
 
-
+struct lookup_tbl_val {
+    u32 table[2048];
+};
 
 struct bpf_map_def SEC("maps") tx_port = {
         .type          = BPF_MAP_TYPE_DEVMAP,
@@ -97,6 +99,8 @@ REGISTER_TABLE_OUTER(multicast_grp_tbl, BPF_MAP_TYPE_ARRAY_OF_MAPS, __u32, __u32
 BPF_ANNOTATE_KV_PAIR(multicast_grp_tbl, __u32, __u32)
 REGISTER_TABLE(xdp2tc_shared_map, BPF_MAP_TYPE_PERCPU_ARRAY, u32, struct xdp2tc_metadata, 1)
 BPF_ANNOTATE_KV_PAIR(xdp2tc_shared_map, u32, struct xdp2tc_metadata)
+REGISTER_TABLE(crc_lookup_tbl, BPF_MAP_TYPE_ARRAY, u32, struct lookup_tbl_val, 1)
+BPF_ANNOTATE_KV_PAIR(crc_lookup_tbl, u32, struct lookup_tbl_val)
 REGISTER_END()
 
         static __always_inline
@@ -116,15 +120,75 @@ return reg;
 }
 static __always_inline
 void crc32_update(u32 * reg, const u8 * data, u16 data_size, const u32 poly) {
-    data += data_size - 1;
-#pragma unroll
-    for (u16 i = 0; i < data_size; i++) {
-        //bpf_trace_message("CRC32: data byte: %x\n", *data);
-        *reg ^= *data;
-        for (u8 bit = 0; bit < 8; bit++) {
-            *reg = (*reg) & 1 ? ((*reg) >> 1) ^ poly : (*reg) >> 1;
+    data += data_size - 4;
+    u32* current = (u32*) data;
+
+    //*current = __builtin_bswap32(*current);
+    struct lookup_tbl_val* lookup_table;
+    u32 index = 0;
+    lookup_table = BPF_MAP_LOOKUP_ELEM(crc_lookup_tbl, &index);
+    u32 lookup_key = 0;
+    u32 lookup_value = 0;
+    u32 lookup_value1 = 0;
+    u32 lookup_value2 = 0;
+    u32 lookup_value3 = 0;
+    u32 lookup_value4 = 0;
+    u32 lookup_value5 = 0;
+    u32 lookup_value6 = 0;
+    u32 lookup_value7 = 0;
+    u32 lookup_value8 = 0;
+    u16 tmp = 0;
+    if (lookup_table != NULL) {
+        for (u16 i = data_size; i >= 8; i -= 8) {
+            bpf_trace_message("CRC32: data byte: %x", *current);
+            u32 one =  __builtin_bswap32(*current--) ^ *reg;
+            bpf_trace_message("CRC32: data byte: %x", *current);
+            u32 two = __builtin_bswap32(*current--);
+
+            lookup_key = (one & 0x000000FF);
+            lookup_value8 = lookup_table->table[(u16)(1792 + (u8)lookup_key)];
+            lookup_key = (one >> 8) & 0x000000FF;
+            lookup_value7 = lookup_table->table[(u16)(1536 + (u8)lookup_key)];
+            lookup_key = (one >> 16) & 0x000000FF;
+            lookup_value6 = lookup_table->table[(u16)(1280 + (u8)lookup_key)];
+            lookup_key = one >> 24;
+            lookup_value5 = lookup_table->table[(u16)(1024 + (u8)(lookup_key))];
+
+            lookup_key = (two & 0x000000FF);
+            lookup_value4 = lookup_table->table[(u16)(768 + (u8)lookup_key)];
+            lookup_key = (two >> 8) & 0x000000FF;
+            lookup_value3 = lookup_table->table[(u16)(512 + (u8)lookup_key)];
+            lookup_key = (two >> 16) & 0x000000FF;
+            lookup_value2 = lookup_table->table[(u16)(256 + (u8)lookup_key)];
+            lookup_key = two >> 24;
+            lookup_value1 = lookup_table->table[(u8)(lookup_key)];
+
+            *reg = lookup_value8 ^ lookup_value7 ^ lookup_value6 ^ lookup_value5 ^ lookup_value4 ^
+                   lookup_value3 ^ lookup_value2 ^ lookup_value1;
+
+
+
+            tmp += 8;
         }
-        data--;
+
+
+        unsigned char *currentChar = (unsigned char *) current;
+        currentChar+= 3;
+        for (u16 i = tmp; i < data_size; i++) {
+            bpf_trace_message("CRC32: data byte: %x\n", *current);
+            lookup_key = (u32)(((*reg) & 0xFF) ^ *currentChar--);
+
+
+            lookup_value = lookup_table->table[(u8)(lookup_key & 255)];
+
+            //bpf_trace_message("CRC32: lookup value: %x\n", lookup_value);
+            // bpf_trace_message("CRC32: current crc value: %x\n", *reg);
+            *reg = ((*reg) >> 8) ^ lookup_value;
+            //bpf_trace_message("CRC32: next crc value: %x\n", *reg);
+
+        }
+
+
     }
 }
 static __always_inline u32 crc32_finalize(u32 reg, const u32 poly) {

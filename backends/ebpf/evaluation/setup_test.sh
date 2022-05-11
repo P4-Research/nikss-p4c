@@ -473,7 +473,7 @@ __generate_crc_lookup_table4() {
 
 
 
-__generate_crc_lookup_table3
+__generate_crc_lookup_table4
 
 
 #__generate_crc_lookup_table_standard
